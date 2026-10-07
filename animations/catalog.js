@@ -11,8 +11,6 @@ function add(id,title,code,duration,rows,captions,notes,extra={}){
 const count=(events,t)=>events.filter(e=>e.at<=t&&e.kind!=="complete"&&e.kind!=="error").length;
 const cards=(id,title,items,captions,notes,duration=16,extra={})=>add(id,title,"",duration,[],captions,notes,{kind:"cards",items:items.map((label,i)=>({label,at:1+i*2.3,color:["source","op","http","b"][i%4]})),...extra});
 cards("01-tytul","RxJS — operatory, które znasz, ale bałeś się zagadać",["Kiedy?","Ile naraz?","Co pominąć?","Co współdzielić?"],[[0,""],[3,"Znane nazwy. Konkretne decyzje o pracy."],[12,"Jedno zdarzenie może uruchomić znacznie więcej, niż myślisz."]],"Otwarcie. Zapowiedz decyzje o pracy, kolejności i współdzieleniu. Tytuł można pozostawić jako statyczny slajd.",14);
-cards("02-znane-operatory","Jakie znasz operatory RxJS?",["map","tap","filter","switchMap"],[[0,"Daj publiczności chwilę na odpowiedzi."],[11,"A share?"]],"Najpierw pytanie do sali. Nazwy odsłaniają się kolejno jako przykłady. Następny slajd zostawia samo share.",14);
-cards("03-a-share","A share?",["share()","Jeden odbiorca","Drugi odbiorca","Ile pracy?"],[[0,""],[10,"Do odpowiedzi wrócimy po subskrypcjach."]],"Zrób pauzę. Zapytaj, co właściwie jest współdzielone. To zapowiedź późniejszej części.",14);
 add("04-operator","Operator to funkcja","const sub = subject$.pipe(map(x => x * 10)).subscribe(observer)",24,[
  R("Subject",[E(5,"1"),E(9,"2"),E(13,"3"),E(21,"4")]),
  R("map",[E(6.5,"10","op"),E(10.5,"20","op"),E(14.5,"30","op")]),
