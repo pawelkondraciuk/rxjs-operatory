@@ -77,16 +77,16 @@
 .legend-example svg text, .legend-progress svg text { font: bold 34px Arial, sans-serif; text-anchor: middle; dominant-baseline: central; fill: #10242b; }
 .legend-source { fill: #8cd0da; }
 .legend-observer { fill: #b0a0e6; }
-.legend-wire, .legend-terminal-wire { stroke: #111; stroke-width: 6; }
+.legend-wire { stroke: #111; stroke-width: 6; }
 .legend-subscribe .legend-wire, .legend-unsubscribe .legend-wire { stroke-dasharray: 1; }
 .legend-subscribe .legend-wire { stroke-dashoffset: .35; }
 .legend-unsubscribe .legend-wire { stroke-dashoffset: .65; }
-.legend-signal { stroke-width: 6; stroke-dasharray: 1; stroke-dashoffset: 0; }
+.legend-signal { stroke-width: 6; stroke-dasharray: 1; stroke-dashoffset: -.65; }
 .legend-complete { --legend-status: #087438; }
 .legend-error { --legend-status: #b51e2e; }
 .legend-example:is(.legend-complete, .legend-error) .legend-signal { stroke: var(--legend-status); }
-.legend-example:is(.legend-complete, .legend-error) rect { fill: var(--legend-status); }
-.legend-example:is(.legend-complete, .legend-error) svg text { fill: #fff; }
+.legend-example:is(.legend-complete, .legend-error) .legend-observer { fill: var(--legend-status); }
+.legend-example:is(.legend-complete, .legend-error) .legend-observer-label { fill: #fff; }
 .legend-example:is(.legend-complete, .legend-error) .legend-terminal-mark { fill: var(--legend-status); font-size: 40px; }
 .reveal .legend-example:is(.legend-complete, .legend-error) :is(h3, p) { color: var(--legend-status); }
 .reveal .legend-example p { font: 28px/1.3 Arial, sans-serif; margin: 12px 0 0; }
@@ -102,13 +102,13 @@
 .legend-values span { display: inline-grid; place-items: center; flex-shrink: 0; width: 54px; height: 54px; border-radius: 50%; background: #ffc15c; color: #16232b; font-weight: bold; }
 .reveal:not(.overview) .legend-slide.present .legend-subscribe .legend-wire { animation: legend-connect 6s linear infinite; }
 .reveal:not(.overview) .legend-slide.present .legend-unsubscribe .legend-wire { animation: legend-disconnect 6s linear infinite; }
-.reveal:not(.overview) .legend-slide.present .legend-signal { animation: legend-notify 6s linear infinite; }
+.reveal:not(.overview) .legend-slide.present .legend-signal { animation: legend-finish 6s linear infinite; }
 .reveal:not(.overview) .legend-slide.present .legend-terminal-mark { animation: legend-terminal 6s linear infinite; }
 .reveal:not(.overview) .legend-slide.present .legend-progress-fill { animation: legend-progress 6s linear infinite; }
 .reveal.paused .legend-slide.present svg * { animation-play-state: paused; }
 @keyframes legend-connect { 0%, 10% { stroke-dashoffset: 1; } 55%, 99.99% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 1; } }
 @keyframes legend-disconnect { 0%, 10% { stroke-dashoffset: 0; } 55%, 99.99% { stroke-dashoffset: 1; } 100% { stroke-dashoffset: 0; } }
-@keyframes legend-notify { 0%, 10% { stroke-dashoffset: 1; } 55%, 99.99% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 1; } }
+@keyframes legend-finish { 0%, 10% { stroke-dashoffset: 0; } 55%, 99.99% { stroke-dashoffset: -1; } 100% { stroke-dashoffset: 0; } }
 @keyframes legend-terminal { 0%, 54.9% { opacity: 0; } 55%, 99.99% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes legend-progress { 0%, 10% { transform: scaleX(0); } 85%, 99.99% { transform: scaleX(1); } 100% { transform: scaleX(0); } }
 @media (prefers-reduced-motion: reduce) {

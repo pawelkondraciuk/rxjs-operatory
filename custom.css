@@ -138,109 +138,69 @@
 }
 
 /* =========================================
-   Slajd 2: meet.js Białystok (DUŻE ZDJĘCIA)
-/* =========================================
-   Slajd 2: meet.js Białystok + Duży QR kod na Discorda
+   Społeczność: dwa niezależne kody QR
    ========================================= */
-.meetjs-card-hero {
+.reveal .community-slide h2 {
+  font-size: 1.65em;
+  text-transform: none;
+  margin: 0 0 32px;
+}
+
+.community-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 1160px;
+  margin: 0 auto;
+}
+
+.community-channel {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 28px 36px;
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(10px);
-  border-radius: 26px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.06);
-  gap: 24px;
-}
-
-.meetjs-community-content {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
   align-items: center;
-  gap: 32px;
+  padding: 0 36px;
 }
 
-.reveal img.meetjs-community-photo {
+.community-channel + .community-channel {
+  border-left: 2px solid rgba(122, 90, 58, 0.22);
+}
+
+.reveal .community-platform {
+  font-size: 0.6em;
+  font-weight: 700;
+  color: #7a5a3a;
+  margin: 0 0 12px;
+}
+
+.reveal .community-channel h3 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100px;
+  font-size: 0.95em;
+  line-height: 1.2;
+  text-transform: none;
+  margin: 0 0 20px;
+}
+
+.community-qr {
   display: block;
-  width: 100%;
-  height: 360px;
+  line-height: 0;
+}
+
+.reveal .community-qr img {
+  display: block;
+  width: 320px;
+  height: 320px;
   max-width: none;
   max-height: none;
-  object-fit: cover;
-  object-position: center 45%;
   margin: 0;
-  border-radius: 12px;
+  background: #fff;
 }
 
-.meetjs-text {
-  text-align: left;
-  flex: 1;
-}
-
-.meetjs-badge {
-  display: inline-block;
-  font-size: 0.55em;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #7a5a3a;
-  background: rgba(122, 90, 58, 0.12);
-  padding: 5px 14px;
-  border-radius: 20px;
-  margin-bottom: 12px;
-}
-
-.meetjs-text h2 {
-  font-size: 1.65em !important;
-  font-weight: 700 !important;
-  color: #111111 !important;
-  margin: 0 0 8px 0 !important;
-  text-transform: none !important;
-  letter-spacing: -0.015em;
-}
-
-.meetjs-desc {
-  font-size: 0.88em;
-  font-weight: 600;
-  color: #222222;
-  margin: 0 0 10px 0 !important;
-  line-height: 1.35;
-}
-
-.meetjs-subdesc {
-  font-size: 0.68em;
-  color: #555555;
-  margin: 0 !important;
-}
-
-.meetjs-qr-large {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.meetjs-qr-large img {
-  width: 220px;
-  height: 220px;
-  background: #ffffff;
-  padding: 10px;
-  border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  margin: 0 !important;
-}
-
-.meetjs-qr-large .qr-label {
-  font-size: 0.52em;
-  font-weight: 700;
-  color: #222222;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.reveal .community-caption {
+  font-size: 0.6em;
+  color: #555;
+  margin: 16px 0 0;
 }
 
 /* =========================================
@@ -258,6 +218,7 @@
   justify-content: center;
   align-items: center;
   width: 100%;
+  height: 510px;
 }
 
 .photo-box-hero {
@@ -287,34 +248,37 @@
 }
 
 /* Wersja boksu ze zdjęciem na slajdzie z nagłówkiem */
-.photo-box-hero-with-title {
-  width: 980px;
-  height: 510px;
+.photo-box-hero-with-title,
+.trivia-photo-frame,
+.talk-card {
   background: #ffffff;
   border-radius: 20px;
   padding: 12px 12px 16px 12px;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.16);
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+}
+
+.reveal .photo-box-hero-with-title,
+.reveal .trivia-photo-frame {
+  width: max-content;
+  height: auto;
+  display: block;
   margin: auto;
   transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
 }
 
-.photo-box-hero-with-title img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.reveal .photo-box-hero-with-title img,
+.reveal .trivia-photo-frame img {
+  display: block;
+  width: auto;
+  height: auto;
+  object-fit: contain;
   border-radius: 12px;
   margin: 0 !important;
-  max-width: none !important;
-  max-height: none !important;
-}
-
-.photo-box-hero-with-title img.attendee-photo-full {
-  object-fit: contain;
+  /* Limit dotyczy zdjęcia, a ramka obejmuje jego rzeczywiste proporcje. */
+  max-width: 954px !important;
+  max-height: 480px !important;
 }
 
 /* =========================================
@@ -345,11 +309,6 @@
 .talk-card {
   flex: 1 1 0;
   min-width: 0;
-  background: #ffffff;
-  border-radius: 18px;
-  padding: 14px 14px 20px 14px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(0, 0, 0, 0.06);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -364,13 +323,17 @@
 .talk-image-wrapper {
   width: 100%;
   height: 330px;
+  flex-shrink: 0;
   border-radius: 12px;
   overflow: hidden;
 }
 
-.talk-image-wrapper img {
+.reveal .talk-image-wrapper img {
   width: 100%;
   height: 100%;
+  max-width: none;
+  max-height: none;
+  border-radius: inherit;
   object-fit: cover;
   margin: 0 !important;
   display: block;
@@ -616,6 +579,29 @@
 .timeline-dates .tl-num {
   color: inherit;
   font-size: 16px;
+}
+
+.reveal .timeline-dates li:has(> a) {
+  padding: 0;
+}
+
+.reveal .timeline-dates li > a,
+.reveal .timeline-dates li > a:hover,
+.reveal .timeline-dates li > a:visited {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 2px;
+  box-sizing: border-box;
+  border-radius: inherit;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-decoration: none;
+  text-shadow: none;
+  cursor: pointer;
 }
 
 .timeline-dates li.tl-cancelled {
