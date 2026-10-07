@@ -403,14 +403,14 @@
 
 				<section id="02-znane-operatory" class="known-operators-slide">
 					<h2>Jakie znasz<br>operatory RxJS?</h2>
-					<div class="known-operators-list fragment" data-fragment-index="0">
-						<span>map</span>
-						<span>tap</span>
-						<span>filter</span>
-						<span>switchMap</span>
+					<div class="known-operators-list">
+						<span class="fragment" data-fragment-index="0">map</span>
+						<span class="fragment" data-fragment-index="1">tap</span>
+						<span class="fragment" data-fragment-index="2">filter</span>
+						<span class="fragment" data-fragment-index="3">switchMap</span>
 					</div>
 					<aside class="notes">
-						<p>Zapytaj salę: „Jakie znasz operatory RxJS?” i daj chwilę na odpowiedzi. Po jednym kliknięciu odsłoń razem map, tap, filter i switchMap. Następny slajd pyta o share.</p>
+						<p>Zapytaj salę: „Jakie znasz operatory RxJS?” i daj chwilę na odpowiedzi. Kolejnymi naciśnięciami strzałki w prawo odsłaniaj po jednym operatorze: map, tap, filter i switchMap. Następny slajd pyta o share.</p>
 					</aside>
 				</section>
 
@@ -491,7 +491,7 @@
 						<p>Na początku widać trzy niepołączone klocki: Subject, map i odbiorcę. Przy subscribe() prosta czarna kreska wydłuża się od pierwszego klocka do drugiego, a następnie kolejna od drugiego do trzeciego. To kierunek rysowania połączenia, a nie kolejność wewnętrznego wywoływania subskrypcji w RxJS.</p>
 						<p>Subject emituje 1. Wartość najpierw dociera do map, tam zmienia się w 10 i dopiero potem rusza do odbiorcy. To samo dla 2 i 3. Ruch oraz pauza przy map celowo spowalniają ilustrację. W rzeczywistym potoku Subject i map przekazują te wartości synchronicznie, bez takich opóźnień.</p>
 						<p>Przy unsubscribe() kreski skracają się i znikają. Kolejne next(4) nadal jest możliwe na Subject, ale ta subskrypcja już niczego nie przekazuje. Odsubskrybowanie odbiorcy nie oznacza complete Subjecta. map(fn) tworzy operator, a sam callback x =&gt; x * 10 przekształca wartość.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -500,7 +500,7 @@
 					<div class="rx-player" aria-label="Skąd płyną wartości?"></div>
 					<aside class="notes">
 						<p>To zwykły Subject, bez replay. Timer i HTTP są osobnymi przykładami źródeł. Odbiorca Subject subskrybuje dopiero w 8. sekundzie.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -509,7 +509,7 @@
 					<div class="rx-player" aria-label="Co uruchamia pracę?"></div>
 					<aside class="notes">
 						<p>Przykład dotyczy zimnego Observable z Angular HttpClient. Nie generalizuj leniwości na już uruchomiony Promise.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -518,7 +518,7 @@
 					<div class="rx-player" aria-label="Cold vs hot — skąd B zaczyna liczyć?"></div>
 					<aside class="notes">
 						<p>Cold: każdy odbiorca uruchamia własny timer; A subskrybuje w 0 s, B w 6 s, pierwszy tick następuje po 1 s. Hot: jeden timer powstaje niezależnie od odbiorców i nadaje przez zwykły Subject. B subskrybuje w 6 s, więc odbiera 2 w 7 s. Nie odtwarzamy wcześniejszych wartości i nie utożsamiamy hot z replay.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -526,8 +526,8 @@
 					<h2>Dwie subskrypcje — bez share czy z share?</h2>
 					<div class="rx-player" aria-label="Dwie subskrypcje — bez share czy z share?"></div>
 					<aside class="notes">
-						<p>Porównaj ten sam moment przełącznikiem. A subskrybuje w 1 s, B w 3 s. Każdy request trwa 6 s od uruchomienia. Bez share każdy odbiorca uruchamia własne zimne wykonanie. Z share obaj korzystają z tej samej instancji data$ i nakładających się subskrypcji; B dołącza przed odpowiedzią w 7 s. Zwykły share nie przechowuje wyniku dla spóźnionego odbiorcy i domyślnie resetuje po complete.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Porównaj warianty na kolejnych slajdach. A subskrybuje w 1 s, B w 3 s. Każdy request trwa 6 s od uruchomienia. Bez share każdy odbiorca uruchamia własne zimne wykonanie. Z share obaj korzystają z tej samej instancji data$ i nakładających się subskrypcji; B dołącza przed odpowiedzią w 7 s. Zwykły share nie przechowuje wyniku dla spóźnionego odbiorcy i domyślnie resetuje po complete.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -536,7 +536,7 @@
 					<div class="rx-player" aria-label="A jeśli wartością jest Observable?"></div>
 					<aside class="notes">
 						<p>Rozróżnij zwykłe wartości a, b od referencji A$, B$. Zimne źródła wewnętrzne rozpoczynają emisje przy subskrypcji.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -545,7 +545,7 @@
 					<div class="rx-player" aria-label="concatMap — Po kolei"></div>
 					<aside class="notes">
 						<p>Po kolei B i C czekają na zakończenie poprzedniej pracy. Każde wejście zostaje obsłużone, ale kolejka zwiększa opóźnienie. Czas każdego źródła liczymy od jego subskrypcji. Emisje po odsubskrybowaniu nie trafiają do wyniku.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -554,7 +554,7 @@
 					<div class="rx-player" aria-label="mergeMap — Równocześnie"></div>
 					<aside class="notes">
 						<p>Równocześnie B zaczyna bez czekania na A. Wyniki przeplatają się. Domyślnie brak limitu współbieżności. Czas każdego źródła liczymy od jego subskrypcji. Emisje po odsubskrybowaniu nie trafiają do wyniku.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -563,7 +563,7 @@
 					<div class="rx-player" aria-label="switchMap — Najnowsza subskrypcja"></div>
 					<aside class="notes">
 						<p>Projection switchMap jest wywoływana po emisji source$. Każda nowa wartość najpierw odsubskrybowuje poprzedni inner, a potem uruchamia nowy. W naszym źródle teardown zatrzymuje emisje. Unsubscribe HTTP może anulować żądanie po stronie klienta, ale nie cofa wykonanych już zmian na serwerze.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -572,7 +572,7 @@
 					<div class="rx-player" aria-label="exhaustMap — Jestem zajęty"></div>
 					<aside class="notes">
 						<p>Jestem zajęty B przychodzi podczas A i zostaje pominięte. C przychodzi po zakończeniu A, więc może wystartować. Czas każdego źródła liczymy od jego subskrypcji. Emisje po odsubskrybowaniu nie trafiają do wyniku.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -581,7 +581,7 @@
 					<div class="rx-player" aria-label="source$: complete. Czy wynik też kończy? "></div>
 					<aside class="notes">
 						<p>Complete źródła zewnętrznego nie odsubskrybowuje automatycznie aktywnego inner. concatMap obsługuje jeszcze wartości w kolejce i czeka na wszystkie inner; switchMap czeka na aktualny inner. Gdy inner nigdy się nie kończy, wynik może nadal nie emitować complete. Nie należy mylić complete źródła z unsubscribe całego potoku.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -590,7 +590,7 @@
 					<div class="rx-player" aria-label="100 zadań. Ile naraz?"></div>
 					<aside class="notes">
 						<p>Limit ogranicza liczbę aktywnych subskrypcji wewnętrznych. Dalsze wejścia są buforowane, więc limit nie jest pełnym mechanizmem backpressure.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -599,7 +599,7 @@
 					<div class="rx-player" aria-label="Czy ten sam identyfikator wymaga kolejnego HTTP?"></div>
 					<aside class="notes">
 						<p>Porównanie z ostatnią przepuszczoną wartością; domyślnie ===. Identyfikator jest prymitywem. To nie jest globalne usuwanie duplikatów.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -608,7 +608,7 @@
 					<div class="rx-player" aria-label="Czekać na ciszę czy aktualizować w trakcie?"></div>
 					<aside class="notes">
 						<p>Przykład trwającego źródła, bez complete i error podczas pokazu. W aplikacji czasy często będą krótsze. Audit otwiera okno zdarzeniem, a debounce czeka na ciszę.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -617,7 +617,7 @@
 					<div class="rx-player" aria-label="Cztery sposoby ograniczania emisji"></div>
 					<aside class="notes">
 						<p>Wszystkie źródła pozostają aktywne. Sample nie jest replay co takt. Używamy domyślnych opcji throttleTime. Nie porównujemy wartości pojawiających się dokładnie w chwili końca okna.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -626,7 +626,7 @@
 					<div class="rx-player" aria-label="Kto ma prawo uruchomić pracę?"></div>
 					<aside class="notes">
 						<p>Oba warianty potrzebują pierwszych wartości odpowiednich źródeł. withLatestFrom subskrybuje także źródła pomocnicze; nie odkłada ich subskrypcji do kliknięcia.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -635,7 +635,7 @@
 					<div class="rx-player" aria-label="Jeden user$. Dwie instancje async."></div>
 					<aside class="notes">
 						<p>AsyncPipe subskrybuje i sprząta własną subskrypcję; nie dodaje share ani shareReplay. Pokazujemy dwie niezależne instancje pipe, np. (user$ | async)?.name i (user$ | async)?.avatar. Obie subskrybują przed odpowiedzią HTTP. share musi być zastosowany raz do wspólnej instancji user$. Jeden async z aliasem user w szablonie to inny, także przydatny sposób udostępnienia wyniku.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -644,7 +644,7 @@
 					<div class="rx-player" aria-label="share — wspólne wykonanie"></div>
 					<aside class="notes">
 						<p>A i B mają nakładające się subskrypcje. share() nie gwarantuje jednego wykonania na zawsze ani cache dla późniejszych odbiorców.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -653,7 +653,7 @@
 					<div class="rx-player" aria-label="B przychodzi po odpowiedzi. Co dostanie?"></div>
 					<aside class="notes">
 						<p>Źródło HTTP kończy się odpowiedzią w 6 s. Widok A znika w 8 s; B pojawia się w 10 s. Domyślny share resetuje po complete, więc B uruchamia nowy request. shareReplay({bufferSize:1,refCount:true}) zachowuje wynik poprawnie zakończonego źródła i odtwarza go dla B. RefCount true nie usuwa automatycznie tego zakończonego cache. Wersja RxJS 7.8.2.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -662,7 +662,7 @@
 					<div class="rx-player" aria-label="map(expensive) — raz czy dla każdego?"></div>
 					<aside class="notes">
 						<p>Źródłem jest jeden Subject. Dwóch odbiorców subskrybuje przed pierwszą emisją. Bez share mają dwa wykonania map(expensive) na każde next. share umieszczone za map współdzieli także kosztowne obliczenie i przekazuje ten sam wynik obu odbiorcom. Podświetlenie przez 0,9 s symbolizuje koszt, nie opóźnienie map. Callback map pozostaje synchroniczny.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -671,7 +671,7 @@
 					<div class="rx-player" aria-label="Czy expensive jest przed share?"></div>
 					<aside class="notes">
 						<p>Paski czasu przy map są ilustracją kosztu, nie asynchroniczną zmianą semantyki map. Obaj odbiorcy subskrybują przed pierwszą emisją.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -680,7 +680,7 @@
 					<div class="rx-player" aria-label="Widok zniknął. Dlaczego timer nadal działa?"></div>
 					<aside class="notes">
 						<p>Przykład interval, które nie kończy się samo, z poprawnym teardown. A znika w 7 s, B w 10 s; oba async odsubskrybowują. Przy refCount:false shareReplay nadal utrzymuje subskrypcję źródła, więc timer pracuje bez odbiorców. To ryzyko niechcianego zatrzymania zasobów i wycieku, a nie dowód liniowego wzrostu pamięci: bufferSize wynosi 1. Przy true ostatnie unsubscribe rozłącza źródło. Skończone HTTP i jego cache to inna sytuacja.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -689,7 +689,7 @@
 					<div class="rx-player" aria-label="Jeden wynik w kilku miejscach widoku"></div>
 					<aside class="notes">
 						<p>To alternatywa dla wielu async w jednym zakresie szablonu. Dla niezależnych odbiorców nadal może być potrzebne współdzielenie. user jest w przykładzie obiektem.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -698,7 +698,7 @@
 					<div class="rx-player" aria-label="A co z signals?"></div>
 					<aside class="notes">
 						<p>Twórz toSignal raz i używaj wyniku. Przykład bez initialValue, więc przed pierwszą emisją jest undefined. Domyślne sprzątanie subskrypcji wiąże się z kontekstem zniszczenia.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -707,7 +707,7 @@
 					<div class="rx-player" aria-label="Cztery pytania przed kolejnym pipe"></div>
 					<aside class="notes">
 						<p>Zakończ pytaniami, które publiczność może zastosować we własnym kodzie. Przywróć tytułową analogię znajomości operatorów.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -726,7 +726,7 @@
 							<a href="#/b08-merge">merge</a>
 							<a href="#/b09-pairwise">pairwise</a>
 						</nav>
-						<aside class="notes">Koniec głównej prezentacji. Dodatkowe przykłady wybierzesz z listy lub strzałką w dół. Do menu wrócisz linkiem „Dodatkowe przykłady” na każdym z tych slajdów.</aside>
+						<aside class="notes">Koniec głównej prezentacji. Dodatkowe przykłady wybierzesz z listy lub przechodząc dalej strzałką w prawo. Do menu wrócisz linkiem „Dodatkowe przykłady” na każdym z tych slajdów.</aside>
 					</section>
 
 				<section id="b01-defer" class="animation-slide" data-animation="b01-defer">
@@ -735,7 +735,7 @@
 					<div class="rx-player" aria-label="Kiedy odczytujesz wartość?"></div>
 					<aside class="notes">
 						<p>defer jest funkcją tworzącą Observable. Każda subskrypcja wywołuje fabrykę. Przykład izoluje czas odczytu zmiennej, nie czas odpowiedzi HTTP.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -745,7 +745,7 @@
 					<div class="rx-player" aria-label="first() i take(1) — to samo?"></div>
 					<aside class="notes">
 						<p>first bez wartości domyślnej. Gdy źródło milczy i nie kończy się, oba czekają. null jest wartością. Wiersze są niezależnymi przykładami.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -755,7 +755,7 @@
 					<div class="rx-player" aria-label="Potrzebuję wszystkich zdarzeń — w paczkach"></div>
 					<aside class="notes">
 						<p>Zwykłe nienakładające się okna bufferTime. Odfiltruj puste paczki. Potrzebny jest endpoint obsługujący paczki; trzeba osobno zaprojektować błędy i powtórki.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -765,7 +765,7 @@
 					<div class="rx-player" aria-label="Jeden błąd. Czy następny klik zadziała?"></div>
 					<aside class="notes">
 						<p>Oba warianty zwracają of([]), które emituje i kończy się. Catch wewnątrz dotyczy błędu inner Observable. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -775,7 +775,7 @@
 					<div class="rx-player" aria-label="Sprzątanie także po odsubskrybowaniu"></div>
 					<aside class="notes">
 						<p>finalize sprząta dany zakres subskrypcji. Przy wielu równoległych requestach jedna wspólna flaga loading może wymagać licznika.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -785,7 +785,7 @@
 					<div class="rx-player" aria-label="Czekam na komplet zakończonych żądań"></div>
 					<aside class="notes">
 						<p>Każde wejście musi wyemitować co najmniej raz i poprawnie się zakończyć. W RxJS 7.8.2 wejście kończące się bez wartości daje zakończenie bez wyniku. Błąd przerywa całość.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -795,7 +795,7 @@
 					<div class="rx-player" aria-label="Pierwsze z pierwszym. Drugie z drugim."></div>
 					<aside class="notes">
 						<p>Przy nierównym tempie źródeł bufor może rosnąć. Źródła są tu skończonymi przykładami zdarzeń, a ich complete pominięto dla czytelności.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -805,7 +805,7 @@
 					<div class="rx-player" aria-label="Kilka powodów do odświeżenia"></div>
 					<aside class="notes">
 						<p>merge łączy emisje istniejących strumieni. mergeMap dodatkowo mapuje wartości na strumienie wewnętrzne. W przykładzie źródła nie kończą się podczas animacji.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -815,7 +815,7 @@
 					<div class="rx-player" aria-label="Co zmieniło się od poprzedniej wartości?"></div>
 					<aside class="notes">
 						<p>pairwise emituje nakładające się pary kolejnych wartości. Przy obiektach mutowanych w miejscu nadal trzeba uważać na współdzielone referencje.</p>
-						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
 					</aside>
 				</section>
 

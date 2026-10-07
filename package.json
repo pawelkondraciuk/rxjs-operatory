@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "vite",
+    "test": "node --experimental-vm-modules --test tests/animations.test.cjs",
     "build": "vite build",
     "preview": "vite preview"
   },

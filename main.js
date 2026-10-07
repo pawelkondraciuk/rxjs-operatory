@@ -11,6 +11,10 @@ import Notes from 'reveal.js/plugin/notes';
 import { scenes } from './animations/catalog.js';
 import { createPlayer } from './animations/player.js';
 import './animations/reveal.css';
+import { prepareSlides } from './animations/presentation.js';
+
+const sceneById = prepareSlides(scenes);
+const printMode = new URLSearchParams(location.search).has('print-pdf');
 
 const deck = new Reveal({
   plugins: [Markdown, Highlight, Notes],
@@ -23,10 +27,10 @@ const deck = new Reveal({
   minScale: 0.2,
   maxScale: 2.0,
   view: 'slide',
+  navigationMode: 'linear',
 });
 
 const players = new Map();
-const sceneById = new Map(scenes.map(scene => [scene.id, scene]));
 let activePlayer;
 
 function playerFor(slide) {
@@ -41,7 +45,15 @@ function playerFor(slide) {
 
 function activate(slide) {
   activePlayer?.pause();
+  activePlayer?.hideControls();
   activePlayer = playerFor(slide);
+  activePlayer?.hideControls();
+  if (printMode) activePlayer?.finish();
+  else if (!deck.isOverview() && !deck.isPaused() && !document.hidden) activePlayer?.restart();
+}
+
+function resume() {
+  if (!printMode && !deck.isOverview() && !deck.isPaused() && !document.hidden) activePlayer?.play();
 }
 
 deck.on('slidechanged', event => activate(event.currentSlide));
@@ -50,8 +62,11 @@ deck.on('overviewshown', () => {
   document.querySelectorAll('[data-animation]').forEach(playerFor);
 });
 deck.on('paused', () => activePlayer?.pause());
+deck.on('resumed', resume);
+deck.on('overviewhidden', resume);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) activePlayer?.pause();
+  else resume();
 });
 const animationAction = action => () => {
   if (!deck.isOverview() && !deck.isPaused()) action(activePlayer);
@@ -60,11 +75,23 @@ deck.addKeyBinding({ keyCode: 65, key: 'A', description: 'Animacja: odtwórz / p
 deck.addKeyBinding({ keyCode: 219, key: '[', description: 'Animacja: poprzedni krok' }, animationAction(player => player?.step(-1)));
 deck.addKeyBinding({ keyCode: 221, key: ']', description: 'Animacja: następny krok' }, animationAction(player => player?.step(1)));
 deck.addKeyBinding({ keyCode: 82, key: 'R', description: 'Animacja: od początku' }, animationAction(player => player?.reset()));
+deck.addKeyBinding({ keyCode: 85, key: 'U', description: 'Pokaż / ukryj sterowanie animacją' }, animationAction(player => player?.toggleControls()));
+
+// Po użyciu suwaka pilot nadal zmienia slajdy, zamiast przesuwać suwak.
+document.addEventListener('keydown', event => {
+  if (!event.target.closest?.('.rx-toolbar') || !['ArrowLeft','ArrowRight','u','U'].includes(event.key)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  event.target.blur();
+  if (event.key.toLowerCase() === 'u') activePlayer?.toggleControls();
+  else if (event.key === 'ArrowLeft') deck.prev();
+  else deck.next();
+}, true);
 
 // PDF otrzymuje kompletny, nieruchomy kadr każdej animacji.
-if (new URLSearchParams(location.search).has('print-pdf')) {
+if (printMode) {
   document.querySelectorAll('[data-animation]').forEach(slide => {
-    playerFor(slide).seek(sceneById.get(slide.dataset.animation).duration);
+    playerFor(slide).finish();
   });
 }
 deck.initialize().then(() => activate(deck.getCurrentSlide()));

@@ -20,15 +20,17 @@ export function renderOperator(scene, time) {
   const connected = time >= connectedAt && time < unsubscribeAt;
   const transforming = scene.rows[0].events.find(event => time >= event.at + travel && time < event.at + travel + transform && event.at < unsubscribeAt);
   const received = scene.rows[2].events.filter(event => event.at <= time);
-  let svg = `<svg viewBox="0 0 1100 650" role="img" aria-label="Subject, map i odbiorca. ${connected ? 'Aktywna subskrypcja.' : progress > 0 ? 'Zmiana połączenia.' : 'Brak połączenia.'}">`;
+  let svg = `<svg viewBox="0 130 1100 400" role="img" aria-label="Subject, map i odbiorca. ${connected ? 'Aktywna subskrypcja.' : progress > 0 ? 'Zmiana połączenia.' : 'Brak połączenia.'}">`;
 
   // Proste paski wydłużają się kolejno przy subscribe i cofają przy unsubscribe.
   // Animujemy rzeczywiste końce odcinków, bez nieruchomej linii pod spodem.
   let remaining = progress * length;
-  for (const [start, end] of segments) {
+  for (const [start, end] of (time < unsubscribeAt ? [...segments].reverse() : segments)) {
     const visibleLength = Math.max(0, Math.min(end[0] - start[0], remaining));
     if (visibleLength > 0) {
-      svg += `<line data-subscription="true" data-progress="${progress}" x1="${start[0]}" y1="${start[1]}" x2="${start[0] + visibleLength}" y2="${end[1]}" stroke="#111" stroke-width="4"/>`;
+      const x1 = time < unsubscribeAt ? end[0] - visibleLength : start[0];
+      const x2 = time < unsubscribeAt ? end[0] : start[0] + visibleLength;
+      svg += `<line data-subscription="true" data-progress="${progress}" x1="${x1}" y1="${start[1]}" x2="${x2}" y2="${end[1]}" stroke="#111" stroke-width="6"/>`;
     }
     remaining -= end[0] - start[0];
   }
@@ -38,9 +40,9 @@ export function renderOperator(scene, time) {
   else if (time >= disconnectedAt) svg += text(550, 175, 'Subskrypcja zamknięta', 24);
 
   const blocks = [
-    { id: 'subject', x: 160, width: 190, label: 'Subject', fill: '#c5eef1' },
+    { id: 'subject', x: 160, width: 190, label: 'Subject', fill: '#8cd0da' },
     { id: 'map', x: 550, width: 280, label: 'map(x ⇒ x × 10)', fill: '#e7b5f1' },
-    { id: 'observer', x: 940, width: 200, label: 'Odbiorca', fill: '#c9c0ff' },
+    { id: 'observer', x: 940, width: 200, label: 'Odbiorca', fill: '#b0a0e6' },
   ];
   for (const block of blocks) {
     const highlight = block.id === 'map' && transforming;
