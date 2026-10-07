@@ -1,0 +1,828 @@
+﻿<!doctype html>
+<html lang="pl">
+	<head>
+		<meta charset="utf-8">
+		<title>RxJS - operatory, które znasz, ale bałeś się zagadać</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+				
+				<!-- Slajd 1: Tytułowy (duży, kontrastowy pod projektor) -->
+				<section>
+					<h1 class="main-title">
+						RxJS
+						<span class="highlight">Operatory, które znasz, ale bałeś się zagadać</span>
+					</h1>
+
+					<!-- Duża sekcja prelegenta bezpośrednio na tle slajdu -->
+					<div class="speaker-intro-card">
+						<!-- Lewa strona: Awatar + Imię + Sociale (X, GitHub, Discord) -->
+						<div class="speaker-left">
+							<img src="/profile.png" alt="Paweł Kondraciuk" class="speaker-avatar-simple">
+							<div class="speaker-meta-simple">
+								<h4 class="speaker-name-simple">Paweł Kondraciuk</h4>
+								<div class="social-links-simple">
+									<!-- X / Twitter -->
+									<a href="https://x.com/pawelkondraciuk" target="_blank" class="social-link" title="X (Twitter)">
+										<svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+										<span>@pawelkondraciuk</span>
+									</a>
+
+									<!-- GitHub -->
+									<a href="https://github.com/pawelkondraciuk" target="_blank" class="social-link" title="GitHub">
+										<svg viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+										<span>@pawelkondraciuk</span>
+									</a>
+
+									<!-- Discord meet.js Poland -->
+									<a href="https://discord.gg/8r9XKTeNW8" target="_blank" class="social-link" title="Discord meet.js Poland">
+										<svg viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+										<span>meet.js Poland</span>
+									</a>
+								</div>
+							</div>
+						</div>
+
+						<!-- Prawa strona: Senior JavaScript Developer + Logo Tradeweb -->
+						<div class="speaker-right">
+							<div class="speaker-title-job">Senior JavaScript Developer</div>
+							<img src="/tradeweb-logo.svg" alt="Tradeweb" class="company-logo">
+						</div>
+					</div>
+					
+					<aside class="notes">
+						Witajcie! Na dzisiejszej prezentacji odczarujemy trudne operatory z RxJS.
+						Pokażę Wam, że nie taki diabeł straszny. Pamiętajcie o uśmiechu!
+						Otwarcie. Zapowiedz decyzje o pracy, kolejności i współdzieleniu. Tytuł można pozostawić jako statyczny slajd.
+					</aside>
+				</section>
+
+				<!-- Slajd 2: Podchwytliwe pytanie o pierwsze meet.js -->
+				<section id="pierwsze-meetjs-pytanie" class="trivia-slide trivia-question-slide">
+					<h2 class="trivia-question">Kiedy odbyło się<br>pierwsze spotkanie meet.js<br>w Białymstoku?</h2>
+					<aside class="notes">
+						Zadaj pytanie sali i daj chwilę na odpowiedzi. To podchwytliwe pytanie. Odpowiedź pokaż dopiero na następnym slajdzie.
+					</aside>
+				</section>
+
+				<!-- Slajd 3: Pierwsze meet.js to drugie spotkanie JavaScript Białystok -->
+				<section id="pierwsze-meetjs-odpowiedz" class="trivia-slide trivia-answer-slide">
+					<h2 class="trivia-answer-title">meet.js Białystok #2</h2>
+					<p class="trivia-date"><time datetime="2015-02-24">24 lutego 2015</time></p>
+
+					<div class="r-stack trivia-stack-container">
+						<!-- Plakat jest widoczny od razu, zdjęcia zmieniają się po kliknięciu. -->
+						<div class="trivia-media fragment fade-out" data-fragment-index="0">
+							<img src="/meetjs-2-banner.png" alt="Plakat meet.js Białystok #2, 24 lutego, godzina 18:00, Zmiana Klimatu">
+						</div>
+						<div class="trivia-media fragment current-visible" data-fragment-index="0">
+							<img src="/meetjs-2-stage.png" alt="Przygotowania do prelekcji na scenie meet.js Białystok #2">
+						</div>
+						<div class="trivia-media fragment current-visible" data-fragment-index="1">
+							<img src="/meetjs-2-angular.png" alt="Prelekcja o jQuery i Angularze oraz publiczność na meet.js Białystok #2">
+						</div>
+						<div class="trivia-media fragment current-visible" data-fragment-index="2">
+							<img src="/meetjs-2-troll-time.png" alt="Prelekcja Troll Time na meet.js Białystok #2">
+						</div>
+						<div class="trivia-media fragment current-visible" data-fragment-index="3">
+							<img src="/meetjs-2-coffeescript.png" alt="Prelekcja CoffeeScript vs JavaScript na meet.js Białystok #2">
+						</div>
+						<div class="trivia-media fragment current-visible" data-fragment-index="4">
+							<img src="/meetjs-2-handshake.png" alt="Dwóch uczestników podaje sobie ręce na meet.js Białystok #2">
+						</div>
+						<div class="trivia-media fragment" data-fragment-index="5">
+							<img src="/meetjs-2-audience.png" alt="Uczestnicy przy stolikach na meet.js Białystok #2">
+						</div>
+					</div>
+
+					<aside class="notes">
+						<p>Pierwsze spotkanie pod szyldem meet.js odbyło się 24 lutego 2015, ale miało numer #2. Spotkanie #1 odbyło się wcześniej jako JavaScript Białystok. Stąd podchwytliwe pytanie.</p>
+						<p>Wtedy jeszcze nie wiedziałem, kim są ci ludzie, którzy przyszli na spotkanie. Dziś kojarzę większość z nich, może nie wszystkich z imienia :) Trochę jak z operatorami z tytułu tej prezentacji: znasz je z widzenia, ale bałeś się zagadać.</p>
+						<p>Plakat pokazuje datę spotkania. Kolejne kliknięcia pokazują sześć zdjęć z tej edycji.</p>
+					</aside>
+				</section>
+
+				<!-- Slajd 4: meet.js Białystok + Duży QR kod do Discorda -->
+				<section>
+					<div class="meetjs-card-hero">
+						<div class="meetjs-text">
+							<span class="meetjs-badge">Społeczność</span>
+							<h2>meet.js Białystok</h2>
+							<p class="meetjs-desc">Ostatnio współorganizuję lokalne spotkania dla pasjonatów JavaScriptu!</p>
+							<p class="meetjs-subdesc">Zeskanuj kod i dołącz do nas na Discordzie:</p>
+						</div>
+
+						<div class="meetjs-qr-large">
+							<img src="/discord-qr.svg" alt="Discord meet.js QR Code">
+							<span class="qr-label">Discord meet.js Poland</span>
+						</div>
+					</div>
+
+					<aside class="notes">
+						Krótko wspomnij o meet.js Białystok: że ostatnio współorganizujesz te spotkania i reaktywujecie społeczność. Daj ludziom chwilę na wyciągnięcie telefonów i zeskanowanie kodu QR do Discorda!
+					</aside>
+				</section>
+
+				<!-- Slajd 5: Zawsze gdzieś się przewijam na meet.js... (5 ujęć z widowni) -->
+				<section>
+					<div class="talks-header" style="margin-bottom: 16px;">
+						<h2>Zawsze gdzieś się przewijam na meet.js...</h2>
+					</div>
+
+					<div class="r-stack photo-stack-container">
+						<!-- Zdjęcie 1: Widoczne na start -->
+						<div class="photo-box-hero-with-title fragment fade-out" data-fragment-index="0">
+							<img src="/attendee-1.jpg" alt="meet.js Białystok 0x09">
+						</div>
+						<!-- Zdjęcie 2: Krok 1 -->
+						<div class="photo-box-hero-with-title fragment current-visible" data-fragment-index="0">
+							<img src="/attendee-2.jpg" alt="meet.js Białystok #2">
+						</div>
+						<!-- Zdjęcie 3: Krok 2 -->
+						<div class="photo-box-hero-with-title fragment current-visible" data-fragment-index="1">
+							<img src="/attendee-3.jpg" alt="meet.js Białystok #3">
+						</div>
+						<!-- Zdjęcie 4: Krok 3 -->
+						<div class="photo-box-hero-with-title fragment current-visible" data-fragment-index="2">
+							<img src="/attendee-4.jpg" alt="meet.js Białystok #4">
+						</div>
+						<!-- Zdjęcie 5: Krok 4 (zostaje) -->
+						<div class="photo-box-hero-with-title fragment" data-fragment-index="3">
+							<img src="/attendee-5.jpg" alt="meet.js Białystok #5">
+						</div>
+					</div>
+
+					<aside class="notes">
+						Świetny moment na uśmiech z widownią: pokaż, że bez względu na edycję zawsze gdzieś byłeś w kadrze! Klikaj spację, żeby odsłaniać kolejne archiwalne zdjęcia.
+					</aside>
+				</section>
+
+				<!-- Slajd 3: Poprzednie wystąpienia na meet.js (2016 & 2017) -->
+				<section class="talks-slide">
+					<div class="talks-header">
+						<h2>Poprzednie wystąpienia</h2>
+					</div>
+
+					<div class="talks-grid">
+						<!-- Wystąpienie 1: 2016 (zdjęcie codequest) -->
+						<div class="talk-card">
+							<div class="talk-image-wrapper">
+								<img src="/talk-2017.jpg" alt="Jak zostać mobile deweloperem w 1 dzień">
+							</div>
+							<div class="talk-details">
+								<h3 class="talk-title">Jak zostać mobile deweloperem w 1 dzień</h3>
+								<span class="talk-tag">17. lipiec 2016 &bull; meet.js #8</span>
+							</div>
+						</div>
+
+						<!-- Wystąpienie 2: 2017 (zdjęcie Instapage) -->
+						<div class="talk-card">
+							<div class="talk-image-wrapper">
+								<img src="/talk-2016.jpg" alt="Trening na redukcję: jak spalić kilobajty">
+							</div>
+							<div class="talk-details">
+								<h3 class="talk-title">Trening na redukcję: jak spalić kilobajty</h3>
+								<span class="talk-tag">17. maj 2017 &bull; meet.js 15</span>
+							</div>
+						</div>
+					
+						<!-- Wystaˆpienie 3: aktualne -->
+						<div class="talk-card talk-card--current">
+							<div class="talk-image-wrapper talk-image-placeholder">
+								<div class="talk-placeholder-inner">
+									<span class="talk-placeholder-icon">&#9654;</span>
+								</div>
+							</div>
+							<div class="talk-details">
+								<h3 class="talk-title">RxJS: Operatory, kt&oacute;re znasz, ale ba&#322;e&#347; si&#281; zagada&#263;</h3>
+								<span class="talk-tag">22. pa&#378;dziernik 2026 &bull; meet.js #65</span>
+							</div>
+						</div>
+				</div>
+
+					<aside class="notes">
+						Wspomnij o swoich poprzednich prelekcjach: w 2016 roku mówiłeś o mobile developmencie (meet.js #8), a w 2017 roku o redukcji wagi skryptów i spalaniu kilobajtów (meet.js 15).
+					</aside>
+				</section>
+
+				<!-- Slajd Timeline: Wszystkie edycje meet.js Białystok -->
+			<section class="timeline-slide">
+				<div class="timeline-header">
+					<h2>Historia meet.js Białystok</h2>
+					<p class="timeline-subtitle">64 edycje &middot; 2015&#8211;2026</p>
+				</div>
+				<div class="timeline-scroll-wrapper">
+					<div class="timeline-track">
+
+						<!-- 2015 -->
+						<div class="timeline-year-col">
+							<div class="timeline-year-label">2015</div>
+							<div class="timeline-dot-line"><div class="timeline-dot"></div></div>
+							<ul class="timeline-dates">
+								<li><span class="tl-num">#1</span> 20.01</li>
+								<li><span class="tl-num">#2</span> 24.02</li>
+								<li><span class="tl-num">#3</span> 31.03</li>
+								<li><span class="tl-num">#4</span> 28.04</li>
+								<li><span class="tl-num">#5</span> 28.07</li>
+							</ul>
+						</div>
+
+						<!-- 2016 -->
+						<div class="timeline-year-col">
+							<div class="timeline-year-label">2016</div>
+							<div class="timeline-dot-line"><div class="timeline-dot"></div></div>
+							<ul class="timeline-dates">
+								<li><span class="tl-num">#6</span> 24.05</li>
+								<li><span class="tl-num">#7</span> 30.06</li>
+								<li><span class="tl-num">#8</span> 26.07</li>
+								<li><span class="tl-num">#9</span> 06.10</li>
+								<li><span class="tl-num">#10</span> 03.11</li>
+								<li><span class="tl-num">#11</span> 25.11</li>
+							</ul>
+						</div>
+
+						<!-- 2017 -->
+						<div class="timeline-year-col">
+							<div class="timeline-year-label">2017</div>
+							<div class="timeline-dot-line"><div class="timeline-dot"></div></div>
+							<ul class="timeline-dates">
+								<li><span class="tl-num">#12</span> 09.02</li>
+								<li><span class="tl-num">#13</span> 09.03</li>
+								<li><span class="tl-num">#14</span> 13.04</li>
+								<li><span class="tl-num">#15</span> 17.05</li>
+								<li><span class="tl-num">#16</span> 17.10</li>
+								<li><span class="tl-num">#17</span> 19.12</li>
+							</ul>
+						</div>
+
+						<!-- 2018 -->
+						<div class="timeline-year-col">
+							<div class="timeline-year-label">2018</div>
+							<div class="timeline-dot-line"><div class="timeline-dot"></div></div>
+							<ul class="timeline-dates">
+								<li><span class="tl-num">#18</span> 24.01</li>
+								<li><span class="tl-num">#19</span> 21.02</li>
+								<li><span class="tl-num">#20</span> 27.03</li>
+								<li><span class="tl-num">#21</span> 25.04</li>
+								<li><span class="tl-num">#22</span> 30.05</li>
+								<li><span class="tl-num">#23</span> 27.06</li>
+								<li><span class="tl-num">#24</span> 14.11</li>
+								<li><span class="tl-num">#25</span> 19.12</li>
+							</ul>
+						</div>
+
+						<!-- 2019 -->
+						<div class="timeline-year-col">
+							<div class="timeline-year-label">2019</div>
+							<div class="timeline-dot-line"><div class="timeline-dot"></div></div>
+							<ul class="timeline-dates">
+								<li><span class="tl-num">#26</span> 27.02</li>
+								<li><span class="tl-num">#27</span> 24.04</li>
+								<li><span class="tl-num">#28</span> 29.05</li>
+								<li><span class="tl-num">#29</span> 30.10</li>
+								<li><span class="tl-num">#30</span> 27.11</li>
+								<li><span class="tl-num">#31</span> 19.12</li>
+							</ul>
+						</div>
+
+						<!-- 2020 -->
+						<div class="timeline-year-col">
+							<div class="timeline-year-label">2020</div>
+							<div class="timeline-dot-line"><div class="timeline-dot timeline-dot--gap"></div></div>
+							<ul class="timeline-dates">
+								<li><span class="tl-num">#32</span> 29.01</li>
+								<li><span class="tl-num">#33</span> 26.02</li>
+								<li><span class="tl-num">#34</span> 25.03</li>
+							</ul>
+						</div>
+
+						<!-- 2021 -->
+						<div class="timeline-year-col">
+							<div class="timeline-year-label">2021</div>
+							<div class="timeline-dot-line"><div class="timeline-dot"></div></div>
+							<ul class="timeline-dates">
+								<li><span class="tl-num">#35</span> 21.09</li>
+								<li><span class="tl-num">#36</span> 19.10</li>
+								<li><span class="tl-num">#37</span> 23.11</li>
+								<li><span class="tl-num">#38</span> 21.12</li>
+							</ul>
+						</div>
+
+						<!-- 2022 -->
+						<div class="timeline-year-col">
+							<div class="timeline-year-label">2022</div>
+							<div class="timeline-dot-line"><div class="timeline-dot"></div></div>
+							<ul class="timeline-dates">
+								<li><span class="tl-num">#39</span> 24.02</li>
+								<li><span class="tl-num">#40</span> 29.03</li>
+								<li><span class="tl-num">#41</span> 26.04</li>
+								<li><span class="tl-num">#42</span> 24.05</li>
+								<li><span class="tl-num">#43</span> 14.06</li>
+								<li><span class="tl-num">#44</span> 27.09</li>
+								<li><span class="tl-num">#45</span> 27.10</li>
+								<li><span class="tl-num">#46</span> 29.11</li>
+								<li><span class="tl-num">#47</span> 20.12</li>
+							</ul>
+						</div>
+
+						<!-- 2023 -->
+						<div class="timeline-year-col">
+							<div class="timeline-year-label">2023</div>
+							<div class="timeline-dot-line"><div class="timeline-dot"></div></div>
+							<ul class="timeline-dates">
+								<li><span class="tl-num">#48</span> 24.01</li>
+								<li><span class="tl-num">#49</span> 21.02</li>
+								<li><span class="tl-num">#50</span> 28.03</li>
+								<li><span class="tl-num">#51</span> 25.04</li>
+								<li><span class="tl-num">#52</span> 25.05</li>
+								<li><span class="tl-num">#53</span> 29.06</li>
+								<li><span class="tl-num">#54</span> 25.10</li>
+								<li><span class="tl-num">#55</span> 21.11</li>
+							</ul>
+						</div>
+
+						<!-- 2024 -->
+						<div class="timeline-year-col">
+							<div class="timeline-year-label">2024</div>
+							<div class="timeline-dot-line"><div class="timeline-dot"></div></div>
+							<ul class="timeline-dates">
+								<li><span class="tl-num">#56</span> 30.01</li>
+								<li><span class="tl-num">#57</span> 28.05</li>
+								<li><span class="tl-num">#58</span> 25.06</li>
+								<li><span class="tl-num">#59</span> 29.10</li>
+								<li><span class="tl-num">#60</span> 17.12</li>
+							</ul>
+						</div>
+
+						<!-- 2025 -->
+						<div class="timeline-year-col">
+							<div class="timeline-year-label">2025</div>
+							<div class="timeline-dot-line"><div class="timeline-dot"></div></div>
+							<ul class="timeline-dates">
+								<li><span class="tl-num">#61</span> 28.01</li>
+								<li><span class="tl-num">#62</span> 12.05</li>
+							</ul>
+						</div>
+
+						<!-- 2026 -->
+						<div class="timeline-year-col">
+							<div class="timeline-year-label">2026</div>
+							<div class="timeline-dot-line"><div class="timeline-dot timeline-dot--future"></div></div>
+							<ul class="timeline-dates">
+								<li><span class="tl-num">#63</span> 26.03</li>
+								<li><span class="tl-num">#64</span> 28.05</li>
+								<li><span class="tl-num">#65</span> 22.10</li>
+							</ul>
+						</div>
+
+					</div><!-- /.timeline-track -->
+				</div><!-- /.timeline-scroll-wrapper -->
+
+				<aside class="notes">
+					Pokaż wizualnie pełną historię spotkań: od pierwszego w 2015 aż do teraz. Zauważ przerwę w 2020 (pandemia COVID). Łącznie 64 edycje!
+				</aside>
+			</section>
+				<!-- Slajd 7: Agenda / O czym to będzie -->
+				<section>
+					<h2>O czym to będzie?</h2>
+					<br>
+					<ul>
+						<li class="fragment">Reaktywne podejście</li>
+						<li class="fragment">Strumienie danych</li>
+						<li class="fragment">Zrozumienie operatorów</li>
+					</ul>
+				</section>
+
+				<!-- Część merytoryczna. Kolejność, tytuły i notatki edytujemy tutaj. -->
+
+				<section id="02-znane-operatory" class="animation-slide" data-animation="02-znane-operatory">
+					<h2>Jakie znasz operatory RxJS?</h2>
+					<div class="rx-player" aria-label="Jakie znasz operatory RxJS?"></div>
+					<aside class="notes">
+						<p>Najpierw pytanie do sali. Nazwy odsłaniają się kolejno jako przykłady. Następny slajd zostawia samo share.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="03-a-share" class="animation-slide" data-animation="03-a-share">
+					<h2>A share?</h2>
+					<div class="rx-player" aria-label="A share?"></div>
+					<aside class="notes">
+						<p>Zrób pauzę. Zapytaj, co właściwie jest współdzielone. To zapowiedź późniejszej części.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="legenda" class="legend-slide">
+					<h2>Jak czytać animacje?</h2>
+					<p class="legend-intro">A: źródło &nbsp; B: odbiorca</p>
+					<div class="legend-examples">
+						<div class="legend-example legend-subscribe">
+							<h3>subscribe</h3>
+							<svg viewBox="0 0 220 270" role="img" aria-label="Subscribe: prosta linia rośnie od odbiorcy B do źródła A">
+								<line class="legend-wire" x1="110" y1="180" x2="110" y2="90" pathLength="1"/>
+								<rect class="legend-source" x="70" y="10" width="80" height="80"/>
+								<rect class="legend-observer" x="70" y="180" width="80" height="80"/>
+								<text x="110" y="50">A</text><text x="110" y="220">B</text>
+							</svg>
+							<p>Zaczynamy<br>odbierać wartości.</p>
+						</div>
+						<div class="legend-example legend-unsubscribe">
+							<h3>unsubscribe</h3>
+							<svg viewBox="0 0 220 270" role="img" aria-label="Unsubscribe: prosta linia skraca się i odłącza odbiorcę B">
+								<line class="legend-wire" x1="110" y1="90" x2="110" y2="180" pathLength="1"/>
+								<rect class="legend-source" x="70" y="10" width="80" height="80"/>
+								<rect class="legend-observer" x="70" y="180" width="80" height="80"/>
+								<text x="110" y="50">A</text><text x="110" y="220">B</text>
+							</svg>
+							<p>Odbiorca rezygnuje.<br>Połączenie znika.</p>
+						</div>
+						<div class="legend-example legend-complete">
+							<h3>complete</h3>
+							<svg viewBox="0 0 220 270" role="img" aria-label="Complete: pełna czarna linia zmienia kolor na zielony od A do B">
+								<line class="legend-terminal-wire" x1="110" y1="90" x2="110" y2="180"/>
+								<line class="legend-signal" x1="110" y1="90" x2="110" y2="180" pathLength="1"/>
+								<rect class="legend-source" x="70" y="10" width="80" height="80"/>
+								<rect class="legend-observer" x="70" y="180" width="80" height="80"/>
+								<text x="110" y="50">A</text><text x="110" y="220">B</text>
+								<text class="legend-terminal-mark" x="170" y="220">✓</text>
+							</svg>
+							<p>Koniec strumienia.<br>Bez błędu.</p>
+						</div>
+						<div class="legend-example legend-error">
+							<h3>error</h3>
+							<svg viewBox="0 0 220 270" role="img" aria-label="Error: pełna czarna linia zmienia kolor na czerwony od A do B">
+								<line class="legend-terminal-wire" x1="110" y1="90" x2="110" y2="180"/>
+								<line class="legend-signal" x1="110" y1="90" x2="110" y2="180" pathLength="1"/>
+								<rect class="legend-source" x="70" y="10" width="80" height="80"/>
+								<rect class="legend-observer" x="70" y="180" width="80" height="80"/>
+								<text x="110" y="50">A</text><text x="110" y="220">B</text>
+								<text class="legend-terminal-mark" x="170" y="220">×</text>
+							</svg>
+							<p>Koniec strumienia.<br>Z błędem.</p>
+						</div>
+					</div>
+					<div class="legend-bottom">
+                        <div class="legend-progress">
+                            <div><h3>in progress</h3><p>Praca trwa</p></div>
+                            <svg viewBox="0 0 260 110" role="img" aria-label="HTTP w trakcie pracy: pasek postępu rośnie u dołu bloku">
+                                <rect class="legend-work-block" x="10" y="5" width="240" height="100"/>
+                                <text x="130" y="46">HTTP</text>
+                                <rect class="legend-progress-track" x="10" y="85" width="240" height="20"/>
+                                <rect class="legend-progress-fill" x="10" y="85" width="240" height="20"/>
+                            </svg>
+                        </div>
+                        <p class="legend-values"><span aria-hidden="true">1</span> Wartość płynąca<br>do odbiorcy</p>
+                    </div>
+					<aside class="notes">
+						<p>To legenda dla kolejnych diagramów. A oznacza źródło, B odbiorcę. Czarna kreska pokazuje połączenie: przy subscribe wydłuża się od odbiorcy B do źródła A, a przy unsubscribe skraca się i znika. Sama subskrypcja nie musi uruchamiać producenta, na przykład przy już działającym źródle hot.</p>
+						<p>Complete i error zaczynają się od pełnej czarnej linii. Od źródła A do odbiorcy B linia stopniowo zmienia kolor na zielony przy complete lub czerwony przy error. Pełna kolorowa linia pozostaje w ostatniej klatce jako oznaczenie zakończenia. Oba powiadomienia są terminalne: ta subskrypcja nie dostanie już kolejnych wartości. Unsubscribe to rezygnacja odbiorcy i samo nie wywołuje jego callbacku complete. Nie musi również zatrzymać współdzielonego producenta.</p>
+						<p>Blok HTTP z rosnącym paskiem na dole oznacza pracę w toku (in progress). Pasek jest umowną ilustracją czasu pracy, nie pomiarem postępu prawdziwego żądania HTTP. Kółka z liczbami pokazują next, czyli wartości. Animacje legendy powtarzają się co sześć sekund, aby można było spokojnie je omówić. Każda pętla przedstawia nowy przykład, a nie wznowienie zakończonej subskrypcji. Ruch jest ilustracją, nie opóźnieniem RxJS.</p>
+					</aside>
+				</section>
+
+				<section id="04-operator" class="animation-slide" data-animation="04-operator">
+					<h2>Operator to funkcja</h2>
+					<div class="rx-player" aria-label="Operator to funkcja"></div>
+					<aside class="notes">
+						<p>Na początku widać trzy niepołączone klocki: Subject, map i odbiorcę. Przy subscribe() prosta czarna kreska wydłuża się od pierwszego klocka do drugiego, a następnie kolejna od drugiego do trzeciego. To kierunek rysowania połączenia, a nie kolejność wewnętrznego wywoływania subskrypcji w RxJS.</p>
+						<p>Subject emituje 1. Wartość najpierw dociera do map, tam zmienia się w 10 i dopiero potem rusza do odbiorcy. To samo dla 2 i 3. Ruch oraz pauza przy map celowo spowalniają ilustrację. W rzeczywistym potoku Subject i map przekazują te wartości synchronicznie, bez takich opóźnień.</p>
+						<p>Przy unsubscribe() kreski skracają się i znikają. Kolejne next(4) nadal jest możliwe na Subject, ale ta subskrypcja już niczego nie przekazuje. Odsubskrybowanie odbiorcy nie oznacza complete Subjecta. map(fn) tworzy operator, a sam callback x =&gt; x * 10 przekształca wartość.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="05-zrodla" class="animation-slide" data-animation="05-zrodla">
+					<h2>Skąd płyną wartości?</h2>
+					<div class="rx-player" aria-label="Skąd płyną wartości?"></div>
+					<aside class="notes">
+						<p>To zwykły Subject, bez replay. Timer i HTTP są osobnymi przykładami źródeł. Odbiorca Subject subskrybuje dopiero w 8. sekundzie.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="06-subskrypcja" class="animation-slide" data-animation="06-subskrypcja">
+					<h2>Co uruchamia pracę?</h2>
+					<div class="rx-player" aria-label="Co uruchamia pracę?"></div>
+					<aside class="notes">
+						<p>Przykład dotyczy zimnego Observable z Angular HttpClient. Nie generalizuj leniwości na już uruchomiony Promise.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="06a-cold-hot" class="animation-slide" data-animation="06a-cold-hot">
+					<h2>Cold vs hot — skąd B zaczyna liczyć?</h2>
+					<div class="rx-player" aria-label="Cold vs hot — skąd B zaczyna liczyć?"></div>
+					<aside class="notes">
+						<p>Cold: każdy odbiorca uruchamia własny timer; A subskrybuje w 0 s, B w 6 s, pierwszy tick następuje po 1 s. Hot: jeden timer powstaje niezależnie od odbiorców i nadaje przez zwykły Subject. B subskrybuje w 6 s, więc odbiera 2 w 7 s. Nie odtwarzamy wcześniejszych wartości i nie utożsamiamy hot z replay.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="07-hot-cold" class="animation-slide" data-animation="07-hot-cold">
+					<h2>Dwie subskrypcje — bez share czy z share?</h2>
+					<div class="rx-player" aria-label="Dwie subskrypcje — bez share czy z share?"></div>
+					<aside class="notes">
+						<p>Porównaj ten sam moment przełącznikiem. A subskrybuje w 1 s, B w 3 s. Każdy request trwa 6 s od uruchomienia. Bez share każdy odbiorca uruchamia własne zimne wykonanie. Z share obaj korzystają z tej samej instancji data$ i nakładających się subskrypcji; B dołącza przed odpowiedzią w 7 s. Zwykły share nie przechowuje wyniku dla spóźnionego odbiorcy i domyślnie resetuje po complete.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="08-map-strumienie" class="animation-slide" data-animation="08-map-strumienie">
+					<h2>A jeśli wartością jest Observable?</h2>
+					<div class="rx-player" aria-label="A jeśli wartością jest Observable?"></div>
+					<aside class="notes">
+						<p>Rozróżnij zwykłe wartości a, b od referencji A$, B$. Zimne źródła wewnętrzne rozpoczynają emisje przy subskrypcji.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="09-concatmap" class="animation-slide" data-animation="09-concatmap">
+					<h2>concatMap — Po kolei</h2>
+					<div class="rx-player" aria-label="concatMap — Po kolei"></div>
+					<aside class="notes">
+						<p>Po kolei B i C czekają na zakończenie poprzedniej pracy. Każde wejście zostaje obsłużone, ale kolejka zwiększa opóźnienie. Czas każdego źródła liczymy od jego subskrypcji. Emisje po odsubskrybowaniu nie trafiają do wyniku.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="10-mergemap" class="animation-slide" data-animation="10-mergemap">
+					<h2>mergeMap — Równocześnie</h2>
+					<div class="rx-player" aria-label="mergeMap — Równocześnie"></div>
+					<aside class="notes">
+						<p>Równocześnie B zaczyna bez czekania na A. Wyniki przeplatają się. Domyślnie brak limitu współbieżności. Czas każdego źródła liczymy od jego subskrypcji. Emisje po odsubskrybowaniu nie trafiają do wyniku.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="11-switchmap" class="animation-slide" data-animation="11-switchmap">
+					<h2>switchMap — Najnowsza subskrypcja</h2>
+					<div class="rx-player" aria-label="switchMap — Najnowsza subskrypcja"></div>
+					<aside class="notes">
+						<p>Projection switchMap jest wywoływana po emisji source$. Każda nowa wartość najpierw odsubskrybowuje poprzedni inner, a potem uruchamia nowy. W naszym źródle teardown zatrzymuje emisje. Unsubscribe HTTP może anulować żądanie po stronie klienta, ale nie cofa wykonanych już zmian na serwerze.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="12-exhaustmap" class="animation-slide" data-animation="12-exhaustmap">
+					<h2>exhaustMap — Jestem zajęty</h2>
+					<div class="rx-player" aria-label="exhaustMap — Jestem zajęty"></div>
+					<aside class="notes">
+						<p>Jestem zajęty B przychodzi podczas A i zostaje pominięte. C przychodzi po zakończeniu A, więc może wystartować. Czas każdego źródła liczymy od jego subskrypcji. Emisje po odsubskrybowaniu nie trafiają do wyniku.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="12a-complete" class="animation-slide" data-animation="12a-complete">
+					<h2>source$: complete. Czy wynik też kończy? </h2>
+					<div class="rx-player" aria-label="source$: complete. Czy wynik też kończy? "></div>
+					<aside class="notes">
+						<p>Complete źródła zewnętrznego nie odsubskrybowuje automatycznie aktywnego inner. concatMap obsługuje jeszcze wartości w kolejce i czeka na wszystkie inner; switchMap czeka na aktualny inner. Gdy inner nigdy się nie kończy, wynik może nadal nie emitować complete. Nie należy mylić complete źródła z unsubscribe całego potoku.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="13-limit" class="animation-slide" data-animation="13-limit">
+					<h2>100 zadań. Ile naraz?</h2>
+					<div class="rx-player" aria-label="100 zadań. Ile naraz?"></div>
+					<aside class="notes">
+						<p>Limit ogranicza liczbę aktywnych subskrypcji wewnętrznych. Dalsze wejścia są buforowane, więc limit nie jest pełnym mechanizmem backpressure.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="14-distinct" class="animation-slide" data-animation="14-distinct">
+					<h2>Czy ten sam identyfikator wymaga kolejnego HTTP?</h2>
+					<div class="rx-player" aria-label="Czy ten sam identyfikator wymaga kolejnego HTTP?"></div>
+					<aside class="notes">
+						<p>Porównanie z ostatnią przepuszczoną wartością; domyślnie ===. Identyfikator jest prymitywem. To nie jest globalne usuwanie duplikatów.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="15-debounce-audit" class="animation-slide" data-animation="15-debounce-audit">
+					<h2>Czekać na ciszę czy aktualizować w trakcie?</h2>
+					<div class="rx-player" aria-label="Czekać na ciszę czy aktualizować w trakcie?"></div>
+					<aside class="notes">
+						<p>Przykład trwającego źródła, bez complete i error podczas pokazu. W aplikacji czasy często będą krótsze. Audit otwiera okno zdarzeniem, a debounce czeka na ciszę.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="16-czas-cztery" class="animation-slide" data-animation="16-czas-cztery">
+					<h2>Cztery sposoby ograniczania emisji</h2>
+					<div class="rx-player" aria-label="Cztery sposoby ograniczania emisji"></div>
+					<aside class="notes">
+						<p>Wszystkie źródła pozostają aktywne. Sample nie jest replay co takt. Używamy domyślnych opcji throttleTime. Nie porównujemy wartości pojawiających się dokładnie w chwili końca okna.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="17-latest" class="animation-slide" data-animation="17-latest">
+					<h2>Kto ma prawo uruchomić pracę?</h2>
+					<div class="rx-player" aria-label="Kto ma prawo uruchomić pracę?"></div>
+					<aside class="notes">
+						<p>Oba warianty potrzebują pierwszych wartości odpowiednich źródeł. withLatestFrom subskrybuje także źródła pomocnicze; nie odkłada ich subskrypcji do kliknięcia.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="18-async" class="animation-slide" data-animation="18-async">
+					<h2>Jeden user$. Dwie instancje async.</h2>
+					<div class="rx-player" aria-label="Jeden user$. Dwie instancje async."></div>
+					<aside class="notes">
+						<p>AsyncPipe subskrybuje i sprząta własną subskrypcję; nie dodaje share ani shareReplay. Pokazujemy dwie niezależne instancje pipe, np. (user$ | async)?.name i (user$ | async)?.avatar. Obie subskrybują przed odpowiedzią HTTP. share musi być zastosowany raz do wspólnej instancji user$. Jeden async z aliasem user w szablonie to inny, także przydatny sposób udostępnienia wyniku.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="19-share" class="animation-slide" data-animation="19-share">
+					<h2>share — wspólne wykonanie</h2>
+					<div class="rx-player" aria-label="share — wspólne wykonanie"></div>
+					<aside class="notes">
+						<p>A i B mają nakładające się subskrypcje. share() nie gwarantuje jednego wykonania na zawsze ani cache dla późniejszych odbiorców.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="20-sharereplay" class="animation-slide" data-animation="20-sharereplay">
+					<h2>B przychodzi po odpowiedzi. Co dostanie?</h2>
+					<div class="rx-player" aria-label="B przychodzi po odpowiedzi. Co dostanie?"></div>
+					<aside class="notes">
+						<p>Źródło HTTP kończy się odpowiedzią w 6 s. Widok A znika w 8 s; B pojawia się w 10 s. Domyślny share resetuje po complete, więc B uruchamia nowy request. shareReplay({bufferSize:1,refCount:true}) zachowuje wynik poprawnie zakończonego źródła i odtwarza go dla B. RefCount true nie usuwa automatycznie tego zakończonego cache. Wersja RxJS 7.8.2.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="21-share-miejsce" class="animation-slide" data-animation="21-share-miejsce">
+					<h2>map(expensive) — raz czy dla każdego?</h2>
+					<div class="rx-player" aria-label="map(expensive) — raz czy dla każdego?"></div>
+					<aside class="notes">
+						<p>Źródłem jest jeden Subject. Dwóch odbiorców subskrybuje przed pierwszą emisją. Bez share mają dwa wykonania map(expensive) na każde next. share umieszczone za map współdzieli także kosztowne obliczenie i przekazuje ten sam wynik obu odbiorcom. Podświetlenie przez 0,9 s symbolizuje koszt, nie opóźnienie map. Callback map pozostaje synchroniczny.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="21a-share-pozycja" class="animation-slide" data-animation="21a-share-pozycja">
+					<h2>Czy expensive jest przed share?</h2>
+					<div class="rx-player" aria-label="Czy expensive jest przed share?"></div>
+					<aside class="notes">
+						<p>Paski czasu przy map są ilustracją kosztu, nie asynchroniczną zmianą semantyki map. Obaj odbiorcy subskrybują przed pierwszą emisją.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="22-refcount" class="animation-slide" data-animation="22-refcount">
+					<h2>Widok zniknął. Dlaczego timer nadal działa?</h2>
+					<div class="rx-player" aria-label="Widok zniknął. Dlaczego timer nadal działa?"></div>
+					<aside class="notes">
+						<p>Przykład interval, które nie kończy się samo, z poprawnym teardown. A znika w 7 s, B w 10 s; oba async odsubskrybowują. Przy refCount:false shareReplay nadal utrzymuje subskrypcję źródła, więc timer pracuje bez odbiorców. To ryzyko niechcianego zatrzymania zasobów i wycieku, a nie dowód liniowego wzrostu pamięci: bufferSize wynosi 1. Przy true ostatnie unsubscribe rozłącza źródło. Skończone HTTP i jego cache to inna sytuacja.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="23-angular-alias" class="animation-slide" data-animation="23-angular-alias">
+					<h2>Jeden wynik w kilku miejscach widoku</h2>
+					<div class="rx-player" aria-label="Jeden wynik w kilku miejscach widoku"></div>
+					<aside class="notes">
+						<p>To alternatywa dla wielu async w jednym zakresie szablonu. Dla niezależnych odbiorców nadal może być potrzebne współdzielenie. user jest w przykładzie obiektem.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="24-signals" class="animation-slide" data-animation="24-signals">
+					<h2>A co z signals?</h2>
+					<div class="rx-player" aria-label="A co z signals?"></div>
+					<aside class="notes">
+						<p>Twórz toSignal raz i używaj wyniku. Przykład bez initialValue, więc przed pierwszą emisją jest undefined. Domyślne sprzątanie subskrypcji wiąże się z kontekstem zniszczenia.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="25-podsumowanie" class="animation-slide" data-animation="25-podsumowanie">
+					<h2>Cztery pytania przed kolejnym pipe</h2>
+					<div class="rx-player" aria-label="Cztery pytania przed kolejnym pipe"></div>
+					<aside class="notes">
+						<p>Zakończ pytaniami, które publiczność może zastosować we własnym kodzie. Przywróć tytułową analogię znajomości operatorów.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section>
+					<section id="pytania" class="extras-slide">
+						<h2>Pytania?</h2>
+						<p>Dodatkowe przykłady</p>
+						<nav class="extras-links" aria-label="Dodatkowe animacje">
+							<a href="#/b01-defer">of / defer</a>
+							<a href="#/b02-first-take">first / take(1)</a>
+							<a href="#/b03-buffertime">bufferTime</a>
+							<a href="#/b04-catcherror">catchError</a>
+							<a href="#/b05-finalize">finalize</a>
+							<a href="#/b06-forkjoin">forkJoin</a>
+							<a href="#/b07-zip">zip</a>
+							<a href="#/b08-merge">merge</a>
+							<a href="#/b09-pairwise">pairwise</a>
+						</nav>
+						<aside class="notes">Koniec głównej prezentacji. Dodatkowe przykłady wybierzesz z listy lub strzałką w dół. Do menu wrócisz linkiem „Dodatkowe przykłady” na każdym z tych slajdów.</aside>
+					</section>
+
+				<section id="b01-defer" class="animation-slide" data-animation="b01-defer">
+					<h2>Kiedy odczytujesz wartość?</h2>
+					<a class="extras-back" href="#/pytania">Dodatkowe przykłady</a>
+					<div class="rx-player" aria-label="Kiedy odczytujesz wartość?"></div>
+					<aside class="notes">
+						<p>defer jest funkcją tworzącą Observable. Każda subskrypcja wywołuje fabrykę. Przykład izoluje czas odczytu zmiennej, nie czas odpowiedzi HTTP.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="b02-first-take" class="animation-slide" data-animation="b02-first-take">
+					<h2>first() i take(1) — to samo?</h2>
+					<a class="extras-back" href="#/pytania">Dodatkowe przykłady</a>
+					<div class="rx-player" aria-label="first() i take(1) — to samo?"></div>
+					<aside class="notes">
+						<p>first bez wartości domyślnej. Gdy źródło milczy i nie kończy się, oba czekają. null jest wartością. Wiersze są niezależnymi przykładami.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="b03-buffertime" class="animation-slide" data-animation="b03-buffertime">
+					<h2>Potrzebuję wszystkich zdarzeń — w paczkach</h2>
+					<a class="extras-back" href="#/pytania">Dodatkowe przykłady</a>
+					<div class="rx-player" aria-label="Potrzebuję wszystkich zdarzeń — w paczkach"></div>
+					<aside class="notes">
+						<p>Zwykłe nienakładające się okna bufferTime. Odfiltruj puste paczki. Potrzebny jest endpoint obsługujący paczki; trzeba osobno zaprojektować błędy i powtórki.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="b04-catcherror" class="animation-slide" data-animation="b04-catcherror">
+					<h2>Jeden błąd. Czy następny klik zadziała?</h2>
+					<a class="extras-back" href="#/pytania">Dodatkowe przykłady</a>
+					<div class="rx-player" aria-label="Jeden błąd. Czy następny klik zadziała?"></div>
+					<aside class="notes">
+						<p>Oba warianty zwracają of([]), które emituje i kończy się. Catch wewnątrz dotyczy błędu inner Observable. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="b05-finalize" class="animation-slide" data-animation="b05-finalize">
+					<h2>Sprzątanie także po odsubskrybowaniu</h2>
+					<a class="extras-back" href="#/pytania">Dodatkowe przykłady</a>
+					<div class="rx-player" aria-label="Sprzątanie także po odsubskrybowaniu"></div>
+					<aside class="notes">
+						<p>finalize sprząta dany zakres subskrypcji. Przy wielu równoległych requestach jedna wspólna flaga loading może wymagać licznika.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="b06-forkjoin" class="animation-slide" data-animation="b06-forkjoin">
+					<h2>Czekam na komplet zakończonych żądań</h2>
+					<a class="extras-back" href="#/pytania">Dodatkowe przykłady</a>
+					<div class="rx-player" aria-label="Czekam na komplet zakończonych żądań"></div>
+					<aside class="notes">
+						<p>Każde wejście musi wyemitować co najmniej raz i poprawnie się zakończyć. W RxJS 7.8.2 wejście kończące się bez wartości daje zakończenie bez wyniku. Błąd przerywa całość.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="b07-zip" class="animation-slide" data-animation="b07-zip">
+					<h2>Pierwsze z pierwszym. Drugie z drugim.</h2>
+					<a class="extras-back" href="#/pytania">Dodatkowe przykłady</a>
+					<div class="rx-player" aria-label="Pierwsze z pierwszym. Drugie z drugim."></div>
+					<aside class="notes">
+						<p>Przy nierównym tempie źródeł bufor może rosnąć. Źródła są tu skończonymi przykładami zdarzeń, a ich complete pominięto dla czytelności.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="b08-merge" class="animation-slide" data-animation="b08-merge">
+					<h2>Kilka powodów do odświeżenia</h2>
+					<a class="extras-back" href="#/pytania">Dodatkowe przykłady</a>
+					<div class="rx-player" aria-label="Kilka powodów do odświeżenia"></div>
+					<aside class="notes">
+						<p>merge łączy emisje istniejących strumieni. mergeMap dodatkowo mapuje wartości na strumienie wewnętrzne. W przykładzie źródła nie kończą się podczas animacji.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				<section id="b09-pairwise" class="animation-slide" data-animation="b09-pairwise">
+					<h2>Co zmieniło się od poprzedniej wartości?</h2>
+					<a class="extras-back" href="#/pytania">Dodatkowe przykłady</a>
+					<div class="rx-player" aria-label="Co zmieniło się od poprzedniej wartości?"></div>
+					<aside class="notes">
+						<p>pairwise emituje nakładające się pary kolejnych wartości. Przy obiektach mutowanych w miejscu nadal trzeba uważać na współdzielone referencje.</p>
+						<p>Sterowanie: A — odtwórz/pauza, [ / ] — poprzedni/następny krok, R — od początku. Strzałki i spacja zmieniają slajdy. Animacja startuje w pauzie.</p>
+					</aside>
+				</section>
+
+				</section>
+
+			</div>
+		</div>
+
+		<script type="module" src="/main.js"></script>
+	</body>
+</html>

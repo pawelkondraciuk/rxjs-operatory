@@ -1,0 +1,619 @@
+﻿:root {
+  /* Czcionka Palatino - elegancka, książkowa i wyrazista */
+  --r-main-font: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  --r-heading-font: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+
+  /* Mocny kontrast - idealny na jasne sale i projektory */
+  --r-heading-color: #0f0f14;
+  --r-main-color: #222222;
+}
+
+/* Ciepły, kremowy gradient pod całą prezentacją */
+.reveal-viewport {
+  background: linear-gradient(135deg, #fdfbf7 0%, #f3ebd8 100%) !important;
+}
+
+/* Przezroczyste tło slajdów */
+.reveal .slide-background {
+  background: transparent !important;
+}
+
+/* =========================================
+   Slajd 1: Tytułowy (duży i czytelny z rzutnika)
+   ========================================= */
+.main-title {
+  font-size: 2.35em !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  margin-top: 10px !important;
+  margin-bottom: 40px !important;
+  color: #0f0f14 !important;
+  text-transform: none !important;
+  letter-spacing: -0.015em;
+}
+
+.main-title span.highlight {
+  display: block;
+  font-size: 0.72em;
+  font-weight: 400;
+  color: #3f3f44;
+  margin-top: 16px;
+}
+
+/* Dolna sekcja prelegenta bezpośrednio na tle slajdu (bez białego boksu) */
+.speaker-intro-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 50px;
+  padding: 10px 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.speaker-left {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  text-align: left;
+}
+
+.speaker-avatar-simple {
+  width: 95px;
+  height: 95px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+  border: 3px solid #ffffff;
+  flex-shrink: 0;
+}
+
+.speaker-meta-simple {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.speaker-name-simple {
+  font-size: 1.35em !important;
+  font-weight: 700 !important;
+  margin: 0 !important;
+  color: #111111 !important;
+  text-transform: none !important;
+}
+
+.social-links-simple {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 0.62em;
+  font-weight: 600;
+}
+
+.social-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #2b2b2b !important;
+  text-decoration: none !important;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.social-link:hover {
+  opacity: 0.75;
+  transform: translateY(-1px);
+}
+
+.social-link svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+/* Prawa strona: Tytuł zawodowy i Logo Tradeweb */
+.speaker-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  text-align: right;
+}
+
+.speaker-title-job {
+  font-size: 0.78em;
+  font-weight: 700;
+  color: #222222;
+  margin: 0 !important;
+  letter-spacing: -0.01em;
+}
+
+.company-logo {
+  height: 42px;
+  width: auto;
+  max-width: 220px;
+  display: block;
+}
+
+/* =========================================
+   Slajd 2: meet.js Białystok (DUŻE ZDJĘCIA)
+/* =========================================
+   Slajd 2: meet.js Białystok + Duży QR kod na Discorda
+   ========================================= */
+.meetjs-card-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1040px;
+  margin: 40px auto 0 auto;
+  padding: 40px 52px;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(10px);
+  border-radius: 26px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.06);
+  gap: 40px;
+}
+
+.meetjs-text {
+  text-align: left;
+  flex: 1;
+}
+
+.meetjs-badge {
+  display: inline-block;
+  font-size: 0.55em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7a5a3a;
+  background: rgba(122, 90, 58, 0.12);
+  padding: 5px 14px;
+  border-radius: 20px;
+  margin-bottom: 12px;
+}
+
+.meetjs-text h2 {
+  font-size: 2.1em !important;
+  font-weight: 700 !important;
+  color: #111111 !important;
+  margin: 0 0 16px 0 !important;
+  text-transform: none !important;
+  letter-spacing: -0.015em;
+}
+
+.meetjs-desc {
+  font-size: 0.88em;
+  font-weight: 600;
+  color: #222222;
+  margin: 0 0 10px 0 !important;
+  line-height: 1.35;
+}
+
+.meetjs-subdesc {
+  font-size: 0.68em;
+  color: #555555;
+  margin: 0 !important;
+}
+
+.meetjs-qr-large {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.meetjs-qr-large img {
+  width: 185px;
+  height: 185px;
+  background: #ffffff;
+  padding: 10px;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  margin: 0 !important;
+}
+
+.meetjs-qr-large .qr-label {
+  font-size: 0.52em;
+  font-weight: 700;
+  color: #222222;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* =========================================
+   Slajd ze zdjęciami (Pojedynczy, duży boks z płynnym przejściem zdjęć)
+   ========================================= */
+.photo-slide-fullscreen {
+  height: 100%;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.photo-stack-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.photo-box-hero {
+  width: 980px;
+  height: 560px;
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 14px 14px 18px 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.16);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: auto;
+  transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+}
+
+.photo-box-hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+  margin: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+
+/* Wersja boksu ze zdjęciem na slajdzie z nagłówkiem */
+.photo-box-hero-with-title {
+  width: 980px;
+  height: 510px;
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 12px 12px 16px 12px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.16);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: auto;
+  transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+}
+
+.photo-box-hero-with-title img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+  margin: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+
+/* =========================================
+   Slajd: Poprzednie wystąpienia
+   ========================================= */
+.talks-slide {
+  text-align: center;
+}
+
+.talks-header h2 {
+  font-size: 1.85em !important;
+  font-weight: 700 !important;
+  color: #111111 !important;
+  margin: 0 0 28px 0 !important;
+  text-transform: none !important;
+  letter-spacing: -0.015em;
+}
+
+.talks-grid {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  gap: 36px;
+  max-width: 1140px;
+  margin: 0 auto;
+}
+
+.talk-card {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 14px 14px 20px 14px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.talk-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.14);
+}
+
+.talk-image-wrapper {
+  width: 100%;
+  height: 330px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.talk-image-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  margin: 0 !important;
+  display: block;
+}
+
+.talk-details {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
+}
+
+.talk-title {
+  font-size: 0.52em;
+  font-weight: 700;
+  color: #111111;
+  margin: 0 !important;
+  line-height: 1.25;
+}
+
+.talk-tag {
+  font-size: 0.52em;
+  font-weight: 600;
+  color: #555555;
+  letter-spacing: 0.03em;
+}
+
+/* =========================================
+   Slajdy: Pytanie i odpowiedź o pierwsze meet.js
+   ========================================= */
+.trivia-slide {
+  text-align: center;
+}
+
+.trivia-question {
+  font-size: 2.1em !important;
+  font-weight: 700 !important;
+  color: #111111 !important;
+  line-height: 1.2 !important;
+  margin: 0 !important;
+  text-transform: none !important;
+  letter-spacing: -0.015em;
+}
+
+.trivia-answer-title {
+  font-size: 1.6em !important;
+  font-weight: 700 !important;
+  margin: 0 0 6px !important;
+  text-transform: none !important;
+}
+
+.trivia-date {
+  font-size: 0.8em !important;
+  color: #7a5a3a;
+  margin: 0 0 18px !important;
+}
+
+.trivia-stack-container {
+  width: 1120px;
+  height: 540px;
+  margin: 0 auto;
+}
+
+.trivia-media {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.trivia-media img {
+  width: 100%;
+  height: 100%;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain;
+  display: block;
+  margin: 0 !important;
+}
+
+/* =========================================
+   Slajd Timeline: Wszystkie edycje meet.js
+   ========================================= */
+.timeline-slide {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.timeline-header {
+  text-align: center;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.timeline-header h2 {
+  font-size: 1.6em !important;
+  font-weight: 700 !important;
+  color: #111111 !important;
+  margin: 0 0 4px 0 !important;
+  text-transform: none !important;
+  letter-spacing: -0.015em;
+}
+
+.timeline-subtitle {
+  font-size: 0.5em !important;
+  font-weight: 600;
+  color: #666666;
+  margin: 0 !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Wrapper — pełna szerokość, bez scrollbara na prezentacji */
+.timeline-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+}
+
+/* Track poziomy: 12 kolumn (jednen na rok) */
+.timeline-track {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  min-width: 100%;
+  padding: 0 10px 4px 10px;
+  box-sizing: border-box;
+  position: relative;
+}
+
+/* Pozioma linia łącząca wszystkie lata */
+.timeline-track::before {
+  content: '';
+  position: absolute;
+  top: 36px; /* wyśrodkowana z dotami */
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #c8a96a 0%, #a07840 100%);
+  z-index: 0;
+}
+
+/* Jedna kolumna = jeden rok */
+.timeline-year-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+/* Etykieta roku */
+.timeline-year-label {
+  font-size: 0.62em;
+  font-weight: 700;
+  color: #5a3e20;
+  background: #f8edd8;
+  border: 2px solid #c8a96a;
+  border-radius: 8px;
+  padding: 2px 8px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+/* Kontener z dottą */
+.timeline-dot-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 18px;
+  margin-bottom: 6px;
+}
+
+/* Zwykła kropka */
+.timeline-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #c8a96a;
+  border: 2px solid #8a6030;
+  flex-shrink: 0;
+}
+
+/* Kropka przerwy (2020 — COVID) */
+.timeline-dot--gap {
+  background: #e07070;
+  border-color: #a03030;
+}
+
+/* Kropka przyszłości (2026) */
+.timeline-dot--future {
+  background: #7ab8f5;
+  border-color: #2870c0;
+}
+
+/* Lista dat */
+.timeline-dates {
+  list-style: none;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100%;
+  text-align: center;
+}
+
+.timeline-dates li {
+  font-size: 0.36em;
+  line-height: 1.5;
+  color: #333333;
+  white-space: nowrap;
+  font-weight: 600;
+  padding: 0;
+  margin: 0 !important;
+}
+
+/* Anulowane edycje — szary, przekreślony */
+.timeline-dates li.tl-cancelled {
+  color: #aaaaaa;
+  text-decoration: line-through;
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* Numer edycji (#1, #2 …) — brązowy akcent */
+.tl-num {
+  color: #8a6030;
+  font-weight: 700;
+  font-size: 0.9em;
+}
+
+
+
+/* =========================================
+   3. karta wystapieniowa: aktualna prezka (placeholder)
+   ========================================= */
+.talk-card--current {
+  border: 2px solid #c8a96a;
+  box-shadow: 0 16px 40px rgba(200, 169, 106, 0.25);
+}
+
+.talk-image-placeholder {
+  background: linear-gradient(135deg, #f8edd8 0%, #eddcb8 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.talk-placeholder-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.talk-placeholder-icon {
+  font-size: 4em;
+  color: #c8a96a;
+  opacity: 0.6;
+}
