@@ -24,6 +24,14 @@
 .rx-player .rx-clock { font-size:18px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .rx-player input { width:100%; margin:0; min-height:30px; accent-color:#6d4ab5; cursor:pointer; }
 .reveal.overview .rx-toolbar { display:none; }
+.rx-fragment-steps { position:absolute; width:0; height:0; overflow:hidden; pointer-events:none; }
+.reveal .rx-step-mode { position:absolute; top:20px; right:0; z-index:6; padding:8px 14px; border:1px solid #958875; border-radius:4px; background:#f5f0e7; color:#43525b; font:18px Arial,sans-serif; cursor:pointer; }
+.reveal .rx-step-mode:focus-visible { outline:3px solid #6d4ab5; outline-offset:3px; }
+.reveal .rx-stepped h2 { padding-right:230px; }
+.rx-stepped .rx-scrub, .rx-stepped .rx-play { display:none; }
+.rx-stepped .rx-hide { margin-left:auto; }
+.reveal.overview .rx-step-mode { display:none; }
+@media print { .rx-step-mode, .rx-fragment-steps { display:none !important; } }
 .reveal .extras-links { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 32px; text-align: left; }
 .reveal .extras-links a { font-family: Consolas, monospace; font-size: 23px; line-height: 1.4; color: #483566; overflow-wrap: anywhere; }
 .reveal .extras-back { position: absolute; right: 0; top: 4px; font: 16px Arial, sans-serif; color: #53616b; }

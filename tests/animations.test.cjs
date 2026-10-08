@@ -29,13 +29,13 @@ async function harness() {
   const modules=await Promise.all(['catalog','presentation','player','lifecycle','flow'].map(name=>load(`animations/${name}.js`)));
   for(const m of modules)await m.evaluate();
   const scenes=modules[1].namespace.prepareSlides(modules[0].namespace.scenes);
-  function player(id) {
+  function player(id,controls) {
     const elements=new Map();
     const root={isConnected:true,contains:()=>false,addEventListener(){},querySelector(selector){
       if(!elements.has(selector))elements.set(selector,{hidden:selector==='.rx-toolbar',textContent:'',innerHTML:'',setAttribute(){},addEventListener(){}});
       return elements.get(selector);
     }};
-    return {api:modules[2].namespace.createPlayer(root,scenes.get(id)),elements};
+    return {api:modules[2].namespace.createPlayer(root,scenes.get(id),controls),elements};
   }
   return {scenes,player,lifecycle:modules[3].namespace,flow:modules[4].namespace,callbacks};
 }
@@ -101,6 +101,83 @@ test('playback loops, pause cancels frames, restart resets, controls can be hidd
   assert.equal(elements.get('.rx-play').textContent,'Pauza');
   api.pause();assert.equal(callbacks.size,0);
   api.restart();assert.equal(elements.get('input').value,'0');
+});
+
+test('operator fragments animate to stable subscription, map and delivery frames',async()=>{
+  const {scenes,player,callbacks}=await harness();
+  const {api,elements}=player('04-operator');
+  let now=0;
+  const advance=seconds=>{
+    const end=now+seconds*1000;
+    for(;now<=end;now+=50){const pending=[...callbacks.values()];callbacks.clear();pending.forEach(fn=>fn(now));}
+  };
+  const svg=()=>elements.get('.rx-stage').innerHTML;
+  assert.match(svg(),/>Źródło<\/text>/);
+  assert.doesNotMatch(svg(),/Subject|data-subscription|data-token="received"/);
+  for(const [index,target] of scenes.get('04-operator').fragmentSteps.slice(1).entries()){
+    api.playTo(target);
+    advance(6);
+    assert.equal(callbacks.size,0,`fragment ${index} stops without a queued frame`);
+    assert.equal(Number(elements.get('input').value),target);
+    const received=(svg().match(/data-token="received"/g)||[]).length;
+    assert.equal(received,Math.min(3,Math.floor(index/2)));
+    if([1,3,5].includes(index))assert.match(svg(),/data-transformation="true"/);
+    if(index===0)assert.match(svg(),/data-subscription="true" data-progress="1"/);
+    if(index>=7)assert.doesNotMatch(svg(),/data-subscription/);
+    const stable=svg();advance(2);assert.equal(svg(),stable);
+  }
+  api.seek(6.25);
+  assert.doesNotMatch(svg(),/data-token="received"/);
+  api.playTo(7.5);advance(.5);api.pause();
+  assert.equal(callbacks.size,0);
+  api.playTo(7.5);advance(3);
+  assert.equal((svg().match(/data-token="received"/g)||[]).length,1);
+  api.seek(0);assert.doesNotMatch(svg(),/data-subscription|data-token="received"/);
+});
+
+test('operator highlights only the block handling the current value',async()=>{
+  const {player}=await harness();
+  const {api,elements}=player('04-operator');
+  const check=(time,active,phase)=>{
+    api.seek(time);
+    const svg=elements.get('.rx-stage').innerHTML;
+    const highlighted=[...svg.matchAll(/data-node="([^"]+)" data-active="true"/g)].map(match=>match[1]);
+    assert.deepEqual(highlighted,active? [active] : [],`active block at ${time}`);
+    if(phase)assert.match(svg,new RegExp(`data-token="${phase}"`));
+    if(active)assert.match(svg,new RegExp(`data-node="${active}" data-active="true"><rect[^>]*stroke="#805095"`));
+  };
+  for(const start of [5,9,13]){
+    check(start+.1,'source','emitting');
+    check(start+.6,null,'to-map');
+    check(start+1.25,'map');
+    check(start+1.75,null,'to-observer');
+    check(start+2.5,'observer','received');
+    check(start+3.1,null,'received');
+  }
+  check(21.1,'source','unobserved');
+  check(21.6,null,'unobserved');
+  api.seek(6.25);check(7.5,'observer','received');
+  api.seek(6.25);check(6.25,'map');
+});
+
+test('automatic playback releases a manual stop and loops after the first full walkthrough',async()=>{
+  const {player,callbacks}=await harness();
+  const stops=[];
+  const {api}=player('04-operator',{onStop:time=>{stops.push(time);if(time===22)api.playContinuously();}});
+  let now=0;
+  const advance=seconds=>{
+    const end=now+seconds*1000;
+    for(;now<=end;now+=50){const pending=[...callbacks.values()];callbacks.clear();pending.forEach(fn=>fn(now));}
+  };
+  api.playTo(4);advance(1);api.playContinuously();advance(5);
+  assert.ok(api.time>4);
+  assert.equal(stops.length,0);
+  api.seek(20);api.playTo(22);advance(3);
+  assert.deepEqual(stops,[22]);
+  assert.ok(callbacks.size>0);
+  advance(5);
+  assert.ok(api.time<5,'automatic repeat starts from the beginning');
+  api.pause();assert.equal(callbacks.size,0);
 });
 
 test('subscription travels receiver → share → source; values travel source → share → receivers',async()=>{

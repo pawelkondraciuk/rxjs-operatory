@@ -2,12 +2,13 @@
 import { renderOperator } from './operator.js';
 import { palette, terminal, connectionState, transitionDuration, layoutDiagram } from './lifecycle.js';
 import { fadeDuration, planFlow } from './flow.js';
-export function createPlayer(root, scene) {
+export function createPlayer(root, scene, controls = {}) {
 const colors={a:"#ffc15c",b:"#72d8a2",c:"#83cafa",source:palette.source,op:"#e7b5f1",http:palette.observer,muted:"#e7ecef",error:"#f3a3a3"};
 const ink="#16232b";
 const esc=value=>String(value).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 let time=0, running=false, previous=null, lastPaint=-Infinity, animationFrame=null;
+let stopAt=null;
 let flowPlan, playbackDuration=scene.duration, modelTime=0;
 root.innerHTML=`<div class="rx-code"></div><div class="rx-stage"></div>
 <div class="rx-summary"><div class="rx-caption"></div><div class="rx-metrics"></div></div>
@@ -502,7 +503,13 @@ function pause(){
  if(animationFrame!==null)cancelAnimationFrame(animationFrame);
  animationFrame=null;paint();
 }
-function seek(target){pause();time=clamp(target,0,playbackDuration);paint();}
+function seek(target){pause();stopAt=null;time=clamp(target,0,playbackDuration);paint();}
+// Reveal wybiera fragment; odtwarzacz jedynie animuje dojście do jego kadru.
+function playTo(target){
+ pause();stopAt=clamp(target,0,playbackDuration);
+ if(time>=stopAt){seek(stopAt);return;}
+ play();
+}
 function step(direction){
 const shown=scene;
  const logicalPoints=[...new Set([0,scene.duration,...scene.checkpoints,
@@ -525,7 +532,8 @@ function play(){
  running=true;previous=null;paint();animationFrame=requestAnimationFrame(frame);
 }
 function toggle(){if(running)pause();else play();}
-function restart(){pause();time=0;play();}
+function playContinuously(){stopAt=null;play();}
+function restart(){pause();stopAt=null;time=0;play();}
 function hideControls(){el.toolbar.hidden=true;if(root.contains(document.activeElement))document.activeElement.blur();}
 function toggleControls(){if(el.toolbar.hidden)el.toolbar.hidden=false;else hideControls();}
 function frame(now){
@@ -533,20 +541,21 @@ function frame(now){
  if(!running||!root.isConnected)return;
  if(previous!==null)time+=Math.min((now-previous)/1000,.25);
  previous=now;
+ if(stopAt!==null&&time>=stopAt){time=stopAt;stopAt=null;pause();controls.onStop?.(time);return;}
  if(time>=playbackDuration+2){time=0;}
  if(now-lastPaint>=33){paint();lastPaint=now;}
  animationFrame=requestAnimationFrame(frame);
 }
 q('.rx-hide').addEventListener('click',hideControls);
-el.back.addEventListener('click',()=>step(-1));
-el.next.addEventListener('click',()=>step(1));
+el.back.addEventListener('click',()=>controls.step?controls.step(-1):step(-1));
+el.next.addEventListener('click',()=>controls.step?controls.step(1):step(1));
 el.slider.addEventListener('input',()=>seek(Number(el.slider.value)));
-el.play.addEventListener('click',toggle);
-q('.rx-reset').addEventListener('click',restart);
+el.play.addEventListener('click',()=>controls.toggle?controls.toggle():toggle());
+q('.rx-reset').addEventListener('click',()=>controls.reset?controls.reset():restart());
 // Pozwól przyciskom i suwakowi obsługiwać własne klawisze.
 root.addEventListener('keydown',event=>{
  if(event.target.matches('input')||(['Enter',' '].includes(event.key)&&event.target.matches('button')))event.stopPropagation();
 });
 paint();
-return {pause,play,toggle,step,reset:restart,restart,seek,finish:()=>seek(playbackDuration),get duration(){return playbackDuration;},hideControls,toggleControls};
+return {pause,play,playTo,playContinuously,toggle,step,reset:restart,restart,seek,finish:()=>seek(playbackDuration),get isPlaying(){return running;},get time(){return Math.min(time,playbackDuration);},get duration(){return playbackDuration;},hideControls,toggleControls};
 }

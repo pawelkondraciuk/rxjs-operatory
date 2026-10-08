@@ -488,10 +488,10 @@
 					<h2>Operator to funkcja</h2>
 					<div class="rx-player" aria-label="Operator to funkcja"></div>
 					<aside class="notes">
-						<p>Na początku widać trzy niepołączone klocki: Subject, map i odbiorcę. Przy subscribe() prosta czarna kreska wydłuża się od pierwszego klocka do drugiego, a następnie kolejna od drugiego do trzeciego. To kierunek rysowania połączenia, a nie kolejność wewnętrznego wywoływania subskrypcji w RxJS.</p>
-						<p>Subject emituje 1. Wartość najpierw dociera do map, tam zmienia się w 10 i dopiero potem rusza do odbiorcy. To samo dla 2 i 3. Ruch oraz pauza przy map celowo spowalniają ilustrację. W rzeczywistym potoku Subject i map przekazują te wartości synchronicznie, bez takich opóźnień.</p>
-						<p>Przy unsubscribe() kreski skracają się i znikają. Kolejne next(4) nadal jest możliwe na Subject, ale ta subskrypcja już niczego nie przekazuje. Odsubskrybowanie odbiorcy nie oznacza complete Subjecta. map(fn) tworzy operator, a sam callback x =&gt; x * 10 przekształca wartość.</p>
-						<p>Animacja startuje automatycznie i powtarza przykład po krótkiej pauzie. Lewo / prawo: poprzedni / następny slajd. U: pokaż lub ukryj dolne sterowanie tylko na tym slajdzie. A: pauza, [ / ]: krok, R: od początku.</p>
+						<p>Na początku widać trzy niepołączone klocki: Źródło, map i odbiorcę. Przy subscribe() prosta czarna kreska wydłuża się od odbiorcy do map, a następnie od map do źródła. To kierunek rysowania połączenia, a nie kolejność wewnętrznego wywoływania subskrypcji w RxJS.</p>
+						<p>Źródło emituje 1. Wartość najpierw dociera do map, tam zmienia się w 10 i dopiero potem rusza do odbiorcy. To samo dla 2 i 3. Ruch oraz pauza przy map celowo spowalniają ilustrację. W rzeczywistym potoku źródło i map przekazują te wartości synchronicznie, bez takich opóźnień.</p>
+						<p>Przy unsubscribe() kreski skracają się i znikają. Kolejne next(4) nadal jest możliwe w źródle, ale ta subskrypcja już niczego nie przekazuje. Odsubskrybowanie odbiorcy nie oznacza complete źródła. map(fn) tworzy operator, a sam callback x =&gt; x * 10 przekształca wartość.</p>
+						<p>Domyślnie tryb ręczny. Prawo / Page Down: kolejny fragment Reveal.js — subskrypcja, wartość i wynik w map, dostarczenie wyniku do odbiorcy. Lewo cofa krok. Po pierwszym pełnym przebiegu włącza się automatyczne powtarzanie. W automacie lewo / prawo przechodzi między slajdami. M lub przycisk u góry: tryb ręczny / automatyczny. Powrót do trybu ręcznego zatrzymuje animację na ostatnim osiągniętym etapie. U: dolne sterowanie, R: od początku. Odebrane wartości pozostają wewnątrz bloczka odbiorcy.</p>
 					</aside>
 				</section>
 
