@@ -12,9 +12,17 @@ import { scenes } from './animations/catalog.js';
 import { createPlayer } from './animations/player.js';
 import './animations/reveal.css';
 import { prepareSlides } from './animations/presentation.js';
+import { compileScene } from './animations/engine.js';
 
+const params = new URLSearchParams(location.search);
+const printMode = params.has('print-pdf');
+// Menu i istniejące bezpośrednie linki otwierają dodatki świadomie.
+// Zwykła nawigacja głównej ścieżki kończy się na pytaniach.
+const requestedId = location.hash.slice(2).split('/')[0];
+const extras = [...document.querySelectorAll('[data-extras]')];
+const extraLink = extras.some(slide => requestedId === slide.id || requestedId.startsWith(slide.id + '-'));
+if (!params.has('extras') && !printMode && !extraLink) extras.forEach(slide => slide.remove());
 const sceneById = prepareSlides(scenes);
-const printMode = new URLSearchParams(location.search).has('print-pdf');
 
 const deck = new Reveal({
   plugins: [Markdown, Highlight, Notes],
@@ -37,22 +45,26 @@ let restoringSlide = false;
 const slideStates = new Map();
 function stateFor(slide = deck.getCurrentSlide()) {
   if (!slideStates.has(slide)) slideStates.set(slide, {
-    mode: sceneById.get(slide?.dataset.animation)?.fragmentSteps ? 'manual' : 'auto',
+    mode: sceneById.get(slide?.dataset.animation)?.playback?.entry || 'auto',
     visited: false, fragmentIndex: -1, wasPlaying: true,
   });
   return slideStates.get(slide);
 }
 
 // Etapy są fragmentami Reveal, tak samo jak zdjęcia na wcześniejszych slajdach.
-// Nowe slajdy można dołączać, określając ich fragmentSteps w katalogu.
-const steppedSlides = printMode ? [] : [...document.querySelectorAll('[data-animation]')].filter(slide => sceneById.get(slide.dataset.animation)?.fragmentSteps);
+// Każda scena deklaruje semantyczne postoje; ostatni fragment uruchamia AUTO.
+const stopsBySlide = new Map();
+const steppedSlides = printMode ? [] : [...document.querySelectorAll('[data-animation]')].filter(slide => sceneById.get(slide.dataset.animation)?.playback?.stops?.length);
 for (const slide of steppedSlides) {
-  const points = sceneById.get(slide.dataset.animation).fragmentSteps;
+  const scene = sceneById.get(slide.dataset.animation);
+  const stops = compileScene(scene).stops;
+  stopsBySlide.set(slide, stops);
   slide.classList.add('rx-stepped');
   const markers = document.createElement('div');
   markers.className = 'rx-fragment-steps';
   markers.setAttribute('aria-hidden', 'true');
-  markers.innerHTML = points.slice(1).map((time, index) => `<span class="rx-step fragment" data-fragment-index="${index}" data-time="${time}"></span>`).join('');
+  markers.innerHTML = stops.map((stop, index) => `<span class="rx-step fragment" data-fragment-index="${index}" data-time="${stop.time}" data-stop="${stop.id}"></span>`).join('');
+  if (scene.playback.afterLastManualStop === 'start-auto') markers.innerHTML += `<span class="rx-step fragment" data-fragment-index="${stops.length}" data-time="${stops.at(-1).time}" data-handoff="true"></span>`;
   slide.append(markers);
   const button = document.createElement('button');
   button.className = 'rx-step-mode';
@@ -84,7 +96,7 @@ function setMode(mode) {
   if (!isStepped()) return;
   if (mode === 'auto') activePlayer?.playContinuously();
   else {
-    const points = sceneById.get(deck.getCurrentSlide().dataset.animation).fragmentSteps;
+    const points = [0, ...stopsBySlide.get(slide).map(stop => stop.time)];
     const index = points.findLastIndex(point => point <= time);
     deck.navigateFragment(index - 1);
     activePlayer?.seek(points[Math.max(0, index)]);
@@ -99,7 +111,7 @@ function stepAnimation(direction) {
   if (isStepped()) { if (direction > 0) deck.next(); else deck.prev(); }
   else activePlayer?.step(direction);
 }
-function toggleAnimation() { if (isStepped()) toggleMode(); else activePlayer?.toggle(); }
+function toggleAnimation() { if (isStepped() && stateFor().mode === 'manual') setMode('auto'); else activePlayer?.toggle(); }
 steppedSlides.forEach(updateMode);
 
 function playerFor(slide) {
@@ -109,15 +121,13 @@ function playerFor(slide) {
     if (!scene) throw new Error(`Nieznana animacja: ${slide.dataset.animation}`);
     players.set(slide, createPlayer(slide.querySelector('.rx-player'), scene, isStepped(slide) ? {
       step: stepAnimation, reset: resetAnimation, toggle: toggleAnimation,
-      onStop: time => {
-        if (slide === deck.getCurrentSlide() && stateFor(slide).mode === 'manual' && time === scene.fragmentSteps.at(-1)) setMode('auto');
-      },
     } : {}));
   }
   return players.get(slide);
 }
 
 function activate(slide) {
+  suspendedPlaying = false;
   if (activeSlide && activePlayer) stateFor(activeSlide).wasPlaying = activePlayer.isPlaying;
   activePlayer?.pause();
   activePlayer?.hideControls();
@@ -133,22 +143,28 @@ function activate(slide) {
       restoringSlide = false;
     } else state.fragmentIndex = slide.querySelectorAll('.rx-step.visible').length - 1;
     activePlayer?.seek(fragmentTime(slide));
-  } else if (!deck.isOverview() && !deck.isPaused() && !document.hidden && state.wasPlaying) {
+  } else if (state.mode !== 'static' && !deck.isOverview() && !deck.isPaused() && !document.hidden && state.wasPlaying) {
     activePlayer?.play();
   }
   state.visited = true;
 }
 
+let suspendedPlaying = false;
+function suspend() { suspendedPlaying ||= Boolean(activePlayer?.isPlaying); activePlayer?.pause(); }
 function resume() {
   if (!printMode && !deck.isOverview() && !deck.isPaused() && !document.hidden) {
-    if (isStepped() && stateFor().mode === 'manual') activePlayer?.playTo(fragmentTime());
-    else activePlayer?.play();
+    if (suspendedPlaying) {
+      if (isStepped() && stateFor().mode === 'manual') activePlayer?.playTo(fragmentTime());
+      else if (activePlayer?.state !== 'finished') activePlayer?.play();
+    }
+    suspendedPlaying = false;
   }
 }
 
 deck.on('fragmentshown', event => {
   if (printMode || restoringSlide || stateFor().mode !== 'manual' || !event.fragment.closest('.rx-fragment-steps') || event.fragment.closest('section') !== activeSlide) return;
   stateFor().fragmentIndex = activeSlide.querySelectorAll('.rx-step.visible').length - 1;
+  if (event.fragment.dataset.handoff === 'true') { setMode('auto'); return; }
   playerFor(deck.getCurrentSlide())?.playTo(fragmentTime());
 });
 deck.on('fragmenthidden', event => {
@@ -159,14 +175,14 @@ deck.on('fragmenthidden', event => {
 
 deck.on('slidechanged', event => activate(event.currentSlide));
 deck.on('overviewshown', () => {
-  activePlayer?.pause();
+  suspend();
   document.querySelectorAll('[data-animation]').forEach(playerFor);
 });
-deck.on('paused', () => activePlayer?.pause());
+deck.on('paused', suspend);
 deck.on('resumed', resume);
 deck.on('overviewhidden', resume);
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) activePlayer?.pause();
+  if (document.hidden) suspend();
   else resume();
 });
 const animationAction = action => () => {

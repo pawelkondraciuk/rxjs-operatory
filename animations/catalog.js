@@ -1,6 +1,8 @@
 // Modele symulacji z dostarczonej paczki rxjs-animacje (RxJS 7.8.2).
 
 "use strict";
+import { configureReferences } from './reference-scenes.js';
+import { resolverScenes } from './resolver-scenes.js';
 const D=[];
 const E=(at,value,color="a",kind="value")=>({at,value,color,kind});
 const B=(start,end,label,color="http",kind="work")=>({start,end,label,color,kind});
@@ -111,11 +113,13 @@ const throttle=[],throttleWindows=[];let until=-Infinity;
 timeInput.forEach(e=>{if(e.at>=until){throttle.push(e);until=e.at+period;throttleWindows.push(B(e.at,until,"blokada","muted","window"));}});
 const sample=[];let lastTick=0;
 for(let tick=period;tick<24;tick+=period){const fresh=timeInput.filter(e=>e.at>lastTick&&e.at<=tick);if(fresh.length)sample.push({...fresh[fresh.length-1],at:tick});lastTick=tick;}
-add("15-debounce-audit","Czekać na ciszę czy aktualizować w trakcie?","debounceTime(3500) vs auditTime(3500)",24,[
+add("15-debounce-audit","Czekać na ciszę czy aktualizować w trakcie?","debounceTime(3500) / auditTime(3500) / throttleTime(3500) / sampleTime(3500)",24,[
  R("wejście",timeInput),
  R("debounceTime",debounce,[],{ticks:timeInput.map(e=>e.at+period),showCount:true}),
- R("auditTime",audit,auditWindows,{showCount:true})
-],[[0,"Okno 3,5 s — celowo spowolnione do prezentacji."],[4,"Zdarzenia wciąż przychodzą. Debounce przesuwa moment emisji."],[4.5,"Audit emituje D po zamknięciu pierwszego okna."],[11.8,"Dopiero po ciszy debounce emituje G."],[21.5,"Wybór zależy od tego, czy potrzebujesz aktualizacji w trakcie zmian."]],"Przykład trwającego źródła, bez complete i error podczas pokazu. W aplikacji czasy często będą krótsze. Audit otwiera okno zdarzeniem, a debounce czeka na ciszę.");
+ R("auditTime",audit,auditWindows,{showCount:true}),
+ R("throttleTime",throttle,throttleWindows,{showCount:true}),
+ R("sampleTime",sample,[],{ticks:[3.5,7,10.5,14,17.5,21],showCount:true})
+],[[0,"Wspólne wejście. Okno 3,5 s dla każdego operatora."],[1,"Throttle przepuszcza A i przez 3,5 s pomija kolejne wartości."],[3.5,"Sample emituje C w stałym rytmie od subskrypcji."],[4,"Zdarzenia wciąż przychodzą. Debounce przesuwa moment emisji."],[4.5,"Audit emituje D po zamknięciu pierwszego okna."],[11.8,"Dopiero po ciszy debounce emituje G."],[17.5,"Sample: brak nowych wartości od poprzedniego taktu, więc brak emisji."],[21.5,"Debounce: cisza. Audit: koniec okna. Throttle: początek. Sample: stały takt."]],"Przykład trwającego źródła, bez complete i error podczas pokazu. W aplikacji czasy często będą krótsze. Audit otwiera okno zdarzeniem, a debounce czeka na ciszę. Throttle przepuszcza pierwszą wartość i pomija kolejne przez 3,5 s (domyślnie leading: true, trailing: false). Sample odlicza takty od subskrypcji i emituje tylko wtedy, gdy od poprzedniego taktu przyszła nowa wartość. Pomijamy zdarzenia dokładnie na granicach okien.");
 add("16-czas-cztery","Cztery sposoby ograniczania emisji","okno 3,5 s · throttle: leading=true, trailing=false",24,[
  R("wejście",timeInput),R("debounceTime",debounce,[],{showCount:true}),R("auditTime",audit,auditWindows,{showCount:true}),R("throttleTime",throttle,throttleWindows,{showCount:true}),R("sampleTime",sample,[],{ticks:[3.5,7,10.5,14,17.5,21],showCount:true})
 ],[[0,"Wspólne wejście. Różne momenty emisji."],[3.5,"Sample działa w stałym rytmie liczonym od subskrypcji."],[4.5,"Audit zamyka okno otwarte pierwszą wartością."],[11.8,"Debounce emituje po przerwie w zdarzeniach."],[17.5,"Sample nie powtarza wartości, gdy od poprzedniego taktu nic nie przyszło."],[22,"Throttle w tej konfiguracji przepuszcza pierwszą wartość okna."]],"Wszystkie źródła pozostają aktywne. Sample nie jest replay co takt. Używamy domyślnych opcji throttleTime. Nie porównujemy wartości pojawiających się dokładnie w chwili końca okna.");
@@ -320,7 +324,10 @@ add("b09-pairwise","Co zmieniło się od poprzedniej wartości?","position$.pipe
  R("pairwise",[E(6,"10→15","op"),E(10,"15→12","op"),E(14,"12→20","op")]),
  R("różnica",[E(6,"+5","b"),E(10,"−3","c"),E(14,"+8","b")])
 ],[[0,"Pierwsza wartość zostaje zapamiętana."],[6,"Pierwsza para powstaje dopiero przy drugiej emisji."],[10,"Z pary można wyliczyć kierunek i wielkość zmiany."],[15,"Bez ręcznego przechowywania previousValue poza potokiem."]],"pairwise emituje nakładające się pary kolejnych wartości. Przy obiektach mutowanych w miejscu nadal trzeba uważać na współdzielone referencje.",bonus);
+configureReferences(D);
+D.push(...resolverScenes());
 D.forEach(scene=>{
+ scene.playback ||= {entry:'auto',finish:'loop'};
  const points=new Set([0,scene.duration]);
  (scene.captions||[]).forEach(c=>points.add(c[0]));
  if(scene.kind==="cards")scene.items.forEach(item=>points.add(Math.min(scene.duration,item.at+.5)));

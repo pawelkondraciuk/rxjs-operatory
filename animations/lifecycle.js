@@ -19,17 +19,17 @@ export function terminal(row) {
   return candidates.sort((a, b) => a.at - b.at || (a.kind === 'unsubscribe' ? 1 : -1))[0] || null;
 }
 
-export function connectionState(time, start, end, events = []) {
+export function connectionState(time, start, end, events = [], connectDuration = transitionDuration) {
   const clamp = n => Math.max(0, Math.min(1, n));
   if (time < start) return { offset: 1, color: palette.wire, phase: 'waiting' };
   const lastValueAt = end ? Math.max(-Infinity,...events.filter(e => e.at <= end.at && e.kind !== 'error').map(e=>e.at)) : -Infinity;
   const finishAt = end ? Math.max(end.at, end.kind === 'unsubscribe' ? end.at : lastValueAt + transitionDuration) : Infinity;
   if (end && time >= finishAt) {
-    const progress = clamp((time - finishAt) / transitionDuration);
+    const progress = clamp((time - finishAt) / (end.duration || transitionDuration));
     return { offset: end.kind === 'unsubscribe' ? progress : -progress,
       color: palette[end.kind] || palette.wire, phase: end.kind, done: progress === 1 };
   }
-  return { offset: -(1 - clamp((time - start) / transitionDuration)), color: palette.wire, phase: 'subscribed' };
+  return { offset: -(1 - clamp((time - start) / connectDuration)), color: palette.wire, phase: 'subscribed' };
 }
 
 // Układ poziomy wykorzystuje szerokość ekranu zamiast pomniejszać pionowy diagram.
@@ -64,7 +64,7 @@ export function layoutDiagram(nodes, edges, trays, width = 1240, height = 460) {
   trays.forEach((q,i) => {
     const n=anchors[i];
     q.anchor=n.id;
-    q.x=n.x;q.y=n.y+n.h/2+77;q.w=Math.min(pitch-40,400);
+    q.x=n.x;q.y=n.y+n.h/2+56;q.w=Math.min(pitch-40,400);
     q.label='';
   });
   return links;

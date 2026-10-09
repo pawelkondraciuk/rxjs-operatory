@@ -1,3 +1,4 @@
+import { configureScene } from './scene-config.js';
 // Każdy wariant jest osobnym slajdem, dostępnym przyciskiem pilota „dalej”.
 export function prepareSlides(scenes) {
   const byId = new Map(scenes.map(scene => [scene.id, scene]));
@@ -69,7 +70,7 @@ export function prepareSlides(scenes) {
     variants.forEach((variant, i) => {
       const target = i ? slide.cloneNode(true) : slide;
       const id = i ? `${original.id}-${i + 1}` : original.id;
-      const scene = { ...variant, id, rendererId: original.id };
+      const scene = configureScene({ ...variant, id, rendererId: original.id });
       byId.set(id, scene);
       target.id = id;
       target.dataset.animation = id;

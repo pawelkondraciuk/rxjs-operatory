@@ -53,15 +53,24 @@ export function planFlow(nodes, links, modelDuration) {
       if(visiting.has(e))throw new Error('Cyclic value flow');
       const next=new Set(visiting).add(e);
       const dependencies=incoming(e.a.id).filter(parent=>values.includes(parent));
-      const ready=Math.max(phase,...dependencies.map(parent=>emit(parent,next)+(dependencies.length?handoffDuration:0)));
+      dependencies.forEach(parent=>emit(parent,next));
       const record=records.get(e.id);
-      const departure=Math.max(ready,record.start+transitionDuration);
-      const arrival=departure+transitionDuration;
-      e.events.filter(v=>v.at===at).forEach(v=>record.events.push({...v,logicalAt:v.at,at:departure,arrival}));
+      let arrival=phase;
+      e.events.filter(v=>v.at===at).forEach((v,i)=>{
+        const upstream=dependencies.flatMap(parent=>records.get(parent.id).events.filter(p=>p.logicalAt===at));
+        const matching=upstream.filter(p=>String(p.value)===String(v.value));
+        const ready=Math.max(phase,...(matching.length?matching:upstream).map(p=>p.arrival+handoffDuration));
+        const departure=Math.max(ready,record.start+transitionDuration,i?arrival+handoffDuration:0);
+        arrival=departure+transitionDuration;
+        record.events.push({...v,logicalAt:v.at,at:departure,arrival});
+      });
       valueEnds.set(e,arrival);
       return arrival;
     }
     phase=Math.max(phase,...values.map(e=>emit(e)));
+    // Czytelny checkpoint: nowa wartość już dotarła, stara praca jeszcze trwa.
+    // To wyłącznie handoff ilustracji, bez przesuwania czasu modelu.
+    if(values.length&&ending.length)phase+=handoffDuration;
     const terminalEnds = new Map();
     function finish(e, visiting=new Set()) {
       if(terminalEnds.has(e))return terminalEnds.get(e);
