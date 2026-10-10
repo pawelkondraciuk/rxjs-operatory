@@ -4,7 +4,9 @@
 
 Polska prezentacja „RxJS — Operatory, które znasz, ale bałeś się zagadać”, oparta na Reveal.js. Najpierw przeczytaj ten dokument i README.md (treści, kolejność, speaker notes). Czytaj kod potrzebny do konkretnej zmiany. Zachowuj język polski, identyfikatory slajdów i semantykę RxJS 7.8.2. Po zmianie treści aktualizuj README; po zmianie animacji, architektury lub sterowania także ten plik.
 
-Całość: 49 bazowych slajdów HTML, 66 po rozwinięciu wariantów, 54 animowane. MAIN: 41 slajdów (29 animowanych). EXTRAS: 25 slajdów z 16 bazowych sekcji. Notatki są wspólne dla wariantów sekcji. Scena katalogowa 01-tytul nie jest podpięta do HTML.
+Całość: 49 bazowych slajdów HTML, 66 po rozwinięciu wariantów, 54 animowane. MAIN: 40 slajdów (28 animowanych). EXTRAS: 26 slajdów z 17 bazowych sekcji. Notatki są wspólne dla wariantów sekcji. Scena katalogowa 01-tytul nie jest podpięta do HTML.
+
+18-async zachowuje historyczne ID, ale pokazuje dwie zwykłe subskrypcje niezależnie od frameworka (diagram: subscriptions). Dopiero końcowy podpis wariantu z share wspomina Angular async pipe i React useEffect ze sprzątaniem. 19-share jest w EXTRAS; MAIN przechodzi od porównania dwóch subskrypcji do share/shareReplay.
 
 ## Stos i uruchomienie
 
@@ -21,6 +23,7 @@ Uruchomienie: npm ci, npm run dev. Weryfikacja: npm test, npm run build. Podglą
 | animations/catalog.js | Wiersze zdarzeń, przedziały, podpisy, warianty i liczniki. |
 | animations/presentation.js | prepareSlides(scenes): klonowanie wariantów, tytuły, ID, końcowe konfiguracje. |
 | animations/reference-scenes.js | Dane map/share oraz wspólny model i graf flatteningu. |
+| animations/catch-scenes.js | Model i graf dwóch zakresów catchError, błąd A, fallback i klik B. |
 | animations/scene-config.js | Playback i checkpointy po wybraniu wariantu. |
 | animations/graph-presets.js | Adapter katalogu do grafu; bez SVG, zegara i DOM. |
 | animations/engine.js | compileScene(scene): graf → plan zdarzeń → deterministyczny snapshot. |
@@ -52,6 +55,7 @@ graph jest obiektem albo czystą funkcją sceny. Ma nodes, edges, trays oraz opc
 - panels i workRow to ogólne prymitywy panelu prac. Flattening pokazuje source → operator → odbiorca u góry, listę prac niżej, bez kresek subskrypcji do wierszy. Wpis kolejki jest szary od pierwszej klatki; żółty oznacza aktywną pracę. Wartość oczekująca w concatMap jest osobnym wierszem kolejki (bez inner i subskrypcji). concatAll pokazuje już utworzone Observable. Complete, praca, kolejka i anulowanie mają tekstowy stan, nie tylko kolor.
 - trays:{anchor,x,y,w} przypina historię. Next zachowuje duplikaty; deduplicate:true jest jawną wizualizacją Set. Historia odbiorcy zmienia się dopiero po dotarciu tokena.
 - timeline dodaje jawne zdarzenia/podpisy. schedule pozwala określić tempo ilustracji map/microtask w formacie rekordów zgodnym z planFlow, bez drugiego zegara.
+- tokens domyślnie używa czasu ilustracji; modelTime:true przelicza at/until przez plan.timeOf. Pozwala pokazać emisję przy źródle już po odłączeniu subskrypcji.
 
 compileScene(scene) zwraca {duration,stops,checkpoints,events,plan,snapshot(time)}. Snapshot jest czysty i deterministyczny; cofanie nie wymaga wcześniejszych klatek. Zawiera geometrię, stany połączeń/pracy, tokeny, historie, kolejkę, podpis i liczniki. renderScene(snapshot) nie zna ID slajdów ani operatorów RxJS.
 
@@ -66,6 +70,8 @@ Map zachowuje wejścia 1/2/3, wyniki 10/20/30 wewnątrz odbiorcy i next(4) po un
 15-debounce-audit porównuje debounceTime, auditTime, throttleTime i sampleTime na wspólnym wejściu i okresie 3,5 s. Adapter grafu dla czterech gałęzi rezerwuje layout: fixed, z historią wewnątrz odbiorców i statusem pod operatorem. Postój w 5 s: throttle A, sample C, audit D, debounce bez emisji. Throttle ma domyślne leading:true/trailing:false; sample pomija takty bez nowych wejść. Osobne warianty 16-czas-cztery pozostają w EXTRAS.
 
 Paleta: źródło #8cd0da, odbiorca #b0a0e6, praca #ffc15c, operator #e7b5f1, complete #087438, error #b51e2e, połączenie #111. Stan jest opisany tekstem. Anulowana praca zachowuje zatrzymany pasek i podpis ABORT (klient); nie otrzymuje complete. Terminalny kolor odbiorcy nie przemalowuje automatycznie producenta; wiersz pracy pokazuje własne zakończenie.
+
+b04-catcherror ma dwa grafy layout:fixed z osobnymi bloczkami switchMap i catchError. Na zewnątrz HTTP A przekazuje error przez switchMap, catchError emituje [] z of([]), a wynik complete i odłączenie klik$ blokują HTTP B. Wewnątrz ramki każda praca ma własny catchError i lokalny wynik; complete inner nie kończy odbiorcy. Powrót wyników inner do switchMap jest internal. Postoje: aktywne A, obsługa błędu, pytanie po []. Renderer oznacza workState:errored czerwonym obramowaniem i tekstem, bez warunków zależnych od operatora.
 
 Slajdy techniczne 1280×720: kod, diagram i istniejąca rx-summary mieszczą się powyżej dolnych 20%. Opcjonalne sterowanie zajmuje dolną strefę. Nie dodawaj drugiego paska podpisów. Linie mają 6 px, tekst jest duży, wartości są kapsułkami; starszą historię skracamy wielokropkiem.
 

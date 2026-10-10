@@ -7,23 +7,23 @@ export function catalogGraph(s) {
  const edge=(a,b,events=[],extra={})=>edges.push({a,b,events,...extra});
  const tray=(ri,x,y,w=400,label="")=>trays.push({ri,x,y,w,label});
  const caseId=s.rendererId||s.id;
- if(s.diagram==="async"||caseId==="07-hot-cold"||s.diagram==="coldhot"){
-  const shared=s.comparisonMode==="shared",coldhot=s.diagram==="coldhot",angular=s.diagram==="async";
-  const source=node("observable",550,70,coldhot?(shared?"jeden producent":"timer$"):(angular?"jeden user$":"jeden data$"),"source",null,{w:300});
+ if(s.diagram==="subscriptions"||caseId==="07-hot-cold"||s.diagram==="coldhot"){
+  const shared=s.comparisonMode==="shared",coldhot=s.diagram==="coldhot",simultaneous=s.diagram==="subscriptions";
+  const source=node("observable",550,70,coldhot?(shared?"jeden producent":"timer$"):(simultaneous?"jeden user$":"jeden data$"),"source",null,{w:300});
   source.label=coldhot?(shared?"jeden producent":"timer$"):source.label;
   const jobs=[];
   [0,1].forEach(j=>{
    if(shared&&j===1)return;
    const x=shared?550:j?825:275,ri=j;
-   const birth=coldhot?(j?6:0):j?(angular?1:3):1;
+   const birth=coldhot?(j?6:0):j?(simultaneous?1:3):1;
    jobs.push(node("work"+j,x,235,coldhot?(shared?"wspólny timer":"timer "+["A","B"][j]):shared?"wspólne HTTP":"HTTP "+["A","B"][j],shared?"http":j?"b":"a",ri,{w:230,work:true,born:birth}));
    edge(source,jobs[j],[],{born:birth});
   });
   const hub=shared?node("hub",550,370,coldhot?"Subject":"share()","op",null,{w:240}):null;
   if(hub&&jobs[0])edge(jobs[0],hub,values(0));
   [2,3].forEach((ri,j)=>{
-   const x=j?825:275,start=coldhot?(j?6:0):j?(angular?1:3):1;
-   const sink=node("receiver"+j,x,510,angular?["imię | async","avatar | async"][j]:"Odbiorca "+["A","B"][j],j?"b":"a",ri,{w:250,born:start});
+   const x=j?825:275,start=coldhot?(j?6:0):j?(simultaneous?1:3):1;
+   const sink=node("receiver"+j,x,510,"Odbiorca "+["A","B"][j],j?"b":"a",ri,{w:250,born:start});
    const target=shared?hub:jobs[j];
    edge(target,sink,values(ri),{born:start});
    const targetX=target.x+(j?target.w/2:-target.w/2);
@@ -164,19 +164,6 @@ export function catalogGraph(s) {
    edge(source,map,values(0));edge(map,hub,values(1));
    [0,1].forEach(j=>{const sink=node('sink'+j,1000,100+j*230,'Odbiorca '+['A','B'][j],'http');edge(hub,sink,values(1));tray(1,1000,210+j*230,260);});
   }
- }else if(caseId==='b04-catcherror'){
-  const source=node('queries',150,230,'klik$','source',0);
-  const op=node('catch',550,230,s.catchInside?'switchMap + catch wewnątrz':'switchMap + catch za nim','op');
-  const ri=s.catchInside?2:1;
-  const sink=node('sink',1000,230,'Odbiorca','http',ri);
-  edge(source,op,values(0).filter(e=>s.catchInside||e.at<5),{until:s.catchInside?undefined:5});
-  edge(op,sink,values(ri));tray(ri,1000,350,420);
-  row(ri).spans.forEach((span,i)=>{
-   const failed=span.kind==='error';
-   const requestRow={events:failed?[{at:span.end,kind:'error',value:'error'}]:[],spans:[span],completeAt:failed?undefined:span.end};
-   const http=node('request'+i,220,80+i*125,span.label,'http',null,{work:true,born:span.start,lifecycleRow:requestRow});
-   edge(http,op,failed?[]:[{at:span.end,value:span.label.replace('HTTP ','')}]);
-  });
  }else if(caseId==="b01-defer"){
   const token=node("token",550,65,"token","source",0,{detail:t=>t<9?"A":"B"});
   [3,4].forEach((ri,j)=>{

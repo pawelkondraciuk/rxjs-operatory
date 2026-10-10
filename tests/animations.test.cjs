@@ -246,6 +246,40 @@ test('every variant has deterministic READY, question, FINISHED and fixed geomet
   }
 });
 
+test('catchError confines the error to its scope and only inner recovery accepts the next click',async()=>{
+  const {scenes,engine:{compileScene}}=await harness();
+  for(const [id,inside] of [['b04-catcherror',false],['b04-catcherror-2',true]]) {
+    const engine=compileScene(scenes.get(id)),initial=engine.snapshot(0);
+    const node=(frame,id)=>frame.nodes.find(n=>n.id===id);
+    const history=frame=>frame.histories.find(h=>h.anchor==='observer').values.map(v=>v.value).join(',');
+    assert.equal(node(initial,'http-a').visible,false);
+    assert.equal(node(initial,'observer').notification,null);
+    const first=engine.snapshot(engine.stops[0].time);
+    assert.equal(node(first,'http-a').workState,'active');
+    const error=engine.snapshot(engine.stops[1].time);
+    assert.equal(node(error,'http-a').workState,'errored');
+    assert.equal(history(error),'');
+    assert.equal(node(error,'observer').notification,null,'error must not reach observer');
+    const recovery=engine.events.find(e=>e.type==='deliver-next'&&e.node==='observer'&&e.value==='[]');
+    assert.ok(recovery);
+    assert.equal(history(engine.snapshot(recovery.at-.01)),'','history waits for token arrival');
+    assert.equal(history(engine.snapshot(recovery.at)),'[]');
+    const question=engine.snapshot(engine.stops[2].time);
+    assert.equal(node(question,'observer').notification,inside?null:'complete');
+    if(inside)assert.equal(node(question,'http-b').visible,false,'B is not created ahead of its click');
+    const finish=engine.snapshot(engine.duration);
+    assert.equal(history(finish),inside?'[],B':'[]');
+    assert.equal(node(finish,'observer').notification,inside?null:'complete');
+    assert.equal(finish.metrics[0].value,inside?2:1);
+    assert.equal(finish.edges.find(e=>e.id==='clicks-switch').visible,inside);
+    assert.equal(engine.events.some(e=>e.type==='inner-create'&&e.node==='http-b'),inside);
+    assert.equal(engine.events.some(e=>e.type==='stream-error'&&e.node==='switch'),!inside);
+    assert.equal(finish.tokens.some(t=>t.phase==='unobserved'&&t.value==='B'),!inside);
+    assert.equal(engine.snapshot(engine.plan.timeOf(8)-.01).tokens.some(t=>t.phase==='unobserved'),false);
+    assert.equal(JSON.stringify(engine.snapshot(engine.stops[2].time)),JSON.stringify(question),'rewind after B');
+  }
+});
+
 test('flatten strategies use identical inputs, queue values before projection and never create ignored inner',async()=>{
   const {scenes,player}=await harness();
   const ids=['09-concatmap','10-mergemap','11-switchmap','12-exhaustmap'];

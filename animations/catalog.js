@@ -176,16 +176,16 @@ const revise=(id,extra)=>Object.assign(D.find(s=>s.id===id),extra);
 const subRows=(shared)=>[
  R(shared?"wspólne HTTP":"HTTP A",[E(7,"user","a")],[B(1,7,"HTTP","http")],{completeAt:7}),
  shared?R("bez drugiego HTTP"):R("HTTP B",[E(7,"user","b")],[B(1,7,"HTTP","http")],{completeAt:7}),
- R("imię | async",[E(7,"user","a")],[B(1,7,"subskrypcja","a","subscription")],{completeAt:7}),
- R("avatar | async",[E(7,"user","b")],[B(1,7,"subskrypcja","b","subscription")],{completeAt:7})
+ R("Odbiorca A",[E(7,"user","a")],[B(1,7,"subskrypcja","a","subscription")],{completeAt:7}),
+ R("Odbiorca B",[E(7,"user","b")],[B(1,7,"subskrypcja","b","subscription")],{completeAt:7})
 ];
 revise("18-async",{
- diagram:"async",title:"Jeden user$. Dwie instancje async.",rows:subRows(false),
- captions:[[0,"Oba miejsca w szablonie korzystają z tego samego user$."],[1,"Każdy async subskrybuje. Bez współdzielenia startują dwa HTTP."],[7,"Oba requesty zwracają dane użytkownika."]],
- notes:"AsyncPipe subskrybuje i sprząta własną subskrypcję; nie dodaje share ani shareReplay. Pokazujemy dwie niezależne instancje pipe, np. (user$ | async)?.name i (user$ | async)?.avatar. Obie subskrybują przed odpowiedzią HTTP. share musi być zastosowany raz do wspólnej instancji user$. Jeden async z aliasem user w szablonie to inny, także przydatny sposób udostępnienia wyniku.",
+ diagram:"subscriptions",title:"Jeden user$. Dwie subskrypcje.",rows:subRows(false),
+ captions:[[0,"A i B korzystają z tego samego user$."],[1,"Każdy odbiorca subskrybuje. Bez współdzielenia startują dwa HTTP."],[7,"Oba requesty zwracają dane użytkownika."]],
+ notes:"Najpierw pokaż dwie zwykłe subskrypcje A i B. http$ oznacza zimne Observable HTTP, np. ajax.getJSON z rxjs/ajax. Obie subskrypcje zaczynają się przed odpowiedzią. share stosujemy raz do wspólnej instancji user$. Dopiero po porównaniu odnieś odbiorców do Angular async pipe albo subscribe w React useEffect ze sprzątaniem przez unsubscribe. W React zachowaj stabilną instancję user$ poza komponentami; nie twórz osobnego share w każdym efekcie. AsyncPipe zarządza własną subskrypcją, ale nie dodaje współdzielenia. share nie jest trwałym cache.",
  variants:{
- without:{rows:subRows(false),code:"user$ = http.get('/api/user')",captions:[[0,"imię | async oraz avatar | async — dwie instancje pipe."],[1,"Dwie strzałki subscribe → dwa wykonania HTTP."],[7,"Ten sam adres API został wywołany dwa razy."]],metrics:[{label:"requesty HTTP",value:t=>t>=1?2:0}]},
- shared:{rows:subRows(true),code:"user$ = http.get('/api/user').pipe(share())",captions:[[0,"Oba async używają tej samej instancji user$ z share()."],[1,"Dwie subskrypcje → jedno wspólne wykonanie HTTP."],[7,"Jedna odpowiedź trafia do obu miejsc w widoku."]],metrics:[{label:"requesty HTTP",value:t=>t>=1?1:0}]}
+ without:{rows:subRows(false),code:"const user$ = http$;\nuser$.subscribe(observerA); user$.subscribe(observerB);",captions:[[0,"http$ to zimne Observable HTTP. A i B subskrybują ten sam user$."],[1,"Dwa subscribe → dwa wykonania HTTP."],[7,"Ten sam adres API został wywołany dwa razy."]],metrics:[{label:"requesty HTTP",value:t=>t>=1?2:0}]},
+ shared:{rows:subRows(true),code:"const user$ = http$.pipe(share());\nuser$.subscribe(observerA); user$.subscribe(observerB);",captions:[[0,"A i B używają tej samej instancji user$ z share()."],[1,"Dwie subskrypcje → jedno wspólne wykonanie HTTP."],[7,"Jedna odpowiedź trafia do obu odbiorców."],[10,"Angular: async pipe. React: subscribe w useEffect + unsubscribe przy sprzątaniu."]],metrics:[{label:"requesty HTTP",value:t=>t>=1?1:0}]}
  }
 });
 const coldRows=[
@@ -292,11 +292,9 @@ add("b03-buffertime","Potrzebuję wszystkich zdarzeń — w paczkach","bufferTim
  R("bufferTime",[E(6,"ABC"),E(12,"DE","b"),E(18,"F","c")],[B(0,6,"paczka 1","muted","window"),B(6,12,"paczka 2","muted","window"),B(12,18,"paczka 3","muted","window")]),
  R("HTTP · paczki",[E(8.5,"✓","a"),E(14.5,"✓","b"),E(20.5,"✓","c")],[B(6.5,8.5,"ABC"),B(12.5,14.5,"DE"),B(18.5,20.5,"F")])
 ],[[0,"API w tym przykładzie przyjmuje paczki zdarzeń."],[6,"Pierwsze trzy wartości trafiają do jednego requestu."],[12,"Druga paczka zachowuje D i E."],[21,"6 zdarzeń, 3 requesty. Żadne zdarzenie nie zostało pominięte."]],"Zwykłe nienakładające się okna bufferTime. Odfiltruj puste paczki. Potrzebny jest endpoint obsługujący paczki; trzeba osobno zaprojektować błędy i powtórki.",{...bonus,metrics:[{label:"zdarzenia",value:t=>count(batchInput,t)},{label:"requesty zbiorcze",value:t=>[6.5,12.5,18.5].filter(at=>at<=t).length}]});
-add("b04-catcherror","Jeden błąd. Czy następny klik zadziała?","catchError wewnątrz vs za switchMap",22,[
- R("zapytania",[E(2,"A"),E(8,"B","b"),E(14,"C","c")]),
- R("catch na zewnątrz",[E(4.5,"[]","muted")],[B(2,4,"HTTP A","error","error")],{completeAt:5}),
- R("catch wewnątrz",[E(4.5,"[]","muted"),E(10,"B","b"),E(16,"C","c")],[B(2,4,"HTTP A","error","error"),B(8,10,"HTTP B","b"),B(14,16,"HTTP C","c")])
-],[[0,"Obsługa błędu zwraca of([]) w obu wariantach."],[4,"Pierwszy request kończy się błędem."],[5,"Catch za switchMap zastępuje cały potok i kończy go po []."],[8,"Catch wewnątrz pozwala nadal słuchać zapytań."],[16,"B i C działają w wariancie obsługującym błąd pojedynczego requestu."]],"Oba warianty zwracają of([]), które emituje i kończy się. Catch wewnątrz dotyczy błędu inner Observable. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik.",bonus);
+// Model, graf i postoje powstają po wybraniu catchInside w configureCatch.
+add("b04-catcherror","Jeden błąd. Czy następny klik zadziała?","catchError wewnątrz vs za switchMap",12,[],[],
+ "Oba warianty zwracają of([]), które emituje i kończy się. Catch wewnątrz dotyczy błędu inner Observable. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik.");
 add("b05-finalize","Sprzątanie także po odsubskrybowaniu","request$.pipe(finalize(cleanup))",22,[
  R("complete",[E(6,"cleanup","b")],[B(1,6,"request","b")],{completeAt:6}),
  R("error",[E(12,"cleanup","b")],[B(7,12,"request","error","error")]),

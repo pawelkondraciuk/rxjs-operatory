@@ -44,6 +44,8 @@ export function compileScene(scene) {
   }
   edges.forEach(e=>{e.events=e.events.filter(v=>v.at>=e.logicalStart&&(!e.logicalEnd || v.at<=e.logicalEnd.at)&&!(e.logicalEnd?.kind==='unsubscribe'&&v.at>=e.logicalEnd.at));});
   const plan=graph.schedule ? scheduledPlan(graph,edges,scene.duration) : planFlow(nodes,edges,scene.duration);
+  const sourceTokens=(graph.tokens||[]).map(token=>token.modelTime?
+    {...token,at:plan.timeOf(token.at),until:plan.timeOf(token.until)}:token);
   const records=[...plan.records.values()];
   const births=new Map(nodes.map(n=>[n.id,n.ready?0:n.createdBy?
     plan.records.get(n.createdBy.edge)?.events.find(e=>e.value===n.createdBy.value)?.arrival??Infinity:
@@ -111,7 +113,7 @@ export function compileScene(scene) {
       const [x,y]=pointAt(points,(time-e.at)/(e.arrival-e.at));
       tokens.push({x,y,value:e.value,color:e.color||'a',edge:r.id,phase:e.phase||'travel'});
     }
-    for(const e of graph.tokens||[]) if(time>=e.at&&time<e.until)tokens.push({...e});
+    for(const e of sourceTokens) if(time>=e.at&&time<e.until)tokens.push({...e});
     const nodeStates=nodes.map(n=>{
       const r=row(n),outgoing=records.filter(e=>e.a.id===n.id),incoming=records.filter(e=>e.b.id===n.id);
       const emitted=outgoing.flatMap(e=>e.events.filter(v=>v.at<=time).map(v=>v.logicalAt));

@@ -6,7 +6,7 @@ export function prepareSlides(scenes) {
     '06a-cold-hot': ['Cold: własny timer dla każdego', 'Hot: dołączasz do działającego źródła'],
     '07-hot-cold': ['Bez share: dwie subskrypcje, dwa HTTP', 'Z share: dwie subskrypcje, jedno HTTP'],
     '12a-complete': ['concatMap: complete czeka na kolejkę', 'switchMap: complete czeka na ostatni inner'],
-    '18-async': ['Dwa async: dwa wykonania HTTP', 'Dwa async z share: jedno wykonanie HTTP'],
+    '18-async': ['Dwie subskrypcje: dwa wykonania HTTP', 'Dwie subskrypcje z share: jedno HTTP'],
     '20-sharereplay': ['share: późny odbiorca uruchamia HTTP', 'shareReplay: późny odbiorca dostaje wynik'],
     '21-share-miejsce': ['Bez share: obliczenia dla każdego odbiorcy', 'map przed share: jedno wspólne obliczenie'],
     '22-refcount': ['refCount: false — timer działa po odejściu', 'refCount: true — ostatni odbiorca odłącza źródło'],
@@ -34,11 +34,7 @@ export function prepareSlides(scenes) {
         metrics:[original.metrics[after?1:0]],
       }));
     } else if (original.id === 'b04-catcherror') {
-      variants = [false,true].map(inside => ({ ...original, catchInside:inside,
-        title:inside?'catchError wewnątrz: kolejne zapytania działają':'catchError na zewnątrz: potok kończy się po []',
-        code:inside?'switchMap(id => http$(id).pipe(catchError(() => of([]))))':'switchMap(http$), catchError(() => of([]))',
-        captions:[[0,'Kliknięcia uruchamiają żądania HTTP.'],[4,'HTTP A: error. Obsługa błędu zwraca [].'],[5,inside?'Kończy się tylko pojedyncze żądanie. Nadal słuchamy kliknięć.':'Zastąpiony potok emituje [] i complete.'],[8,inside?'Kolejny klik uruchamia HTTP B.':'Kolejny klik nie trafia do zakończonego potoku.']],
-      }));
+      variants = [false,true].map(inside => ({ ...original, catchInside:inside }));
     } else if (original.id === '16-czas-cztery') {
       variants = [1, 2, 3, 4].map(i => ({ ...original, seriesIndices: [i],
         title: ['','debounceTime: czekamy na ciszę','auditTime: ostatnia wartość okna','throttleTime: pierwsza wartość okna','sampleTime: odczyt w stałym rytmie'][i],

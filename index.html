@@ -583,19 +583,10 @@
 
 
 				<section id="18-async" class="animation-slide" data-animation="18-async">
-					<h2>Jeden user$. Dwie instancje async.</h2>
-					<div class="rx-player" aria-label="Jeden user$. Dwie instancje async."></div>
+					<h2>Jeden user$. Dwie subskrypcje.</h2>
+					<div class="rx-player" aria-label="Jeden user$. Dwie subskrypcje."></div>
 					<aside class="notes">
-						<p>AsyncPipe subskrybuje i sprząta własną subskrypcję; nie dodaje share ani shareReplay. Pokazujemy dwie niezależne instancje pipe, np. (user$ | async)?.name i (user$ | async)?.avatar. Obie subskrybują przed odpowiedzią HTTP. share musi być zastosowany raz do wspólnej instancji user$. Jeden async z aliasem user w szablonie to inny, także przydatny sposób udostępnienia wyniku.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-
-				<section id="19-share" class="animation-slide" data-animation="19-share">
-					<h2>share — wspólne wykonanie</h2>
-					<div class="rx-player" aria-label="share — wspólne wykonanie"></div>
-					<aside class="notes">
-						<p>A i B mają nakładające się subskrypcje. share() nie gwarantuje jednego wykonania na zawsze ani cache dla późniejszych odbiorców.</p>
+						<p>Najpierw pokaż dwie zwykłe subskrypcje A i B. http$ oznacza zimne Observable HTTP, np. ajax.getJSON z rxjs/ajax. Obie subskrypcje zaczynają się przed odpowiedzią. share stosujemy raz do wspólnej instancji user$. Dopiero po porównaniu odnieś odbiorców do Angular async pipe albo subscribe w React useEffect ze sprzątaniem przez unsubscribe. W React zachowaj stabilną instancję user$ poza komponentami; nie twórz osobnego share w każdym efekcie. AsyncPipe zarządza własną subskrypcją, ale nie dodaje współdzielenia. share nie jest trwałym cache.</p>
 						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
@@ -617,7 +608,7 @@
 					<h2>Jeden błąd. Czy następny klik zadziała?</h2>
 					<div class="rx-player" aria-label="Jeden błąd. Czy następny klik zadziała?"></div>
 					<aside class="notes">
-						<p>Oba warianty zwracają of([]), które emituje i kończy się. Catch wewnątrz dotyczy błędu inner Observable. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik.</p>
+						<p>Porównaj położenie catchError: osobny operator za switchMap albo operator wewnątrz ramki każdego HTTP. http$ jest zimnym Observable, a każde kliknięcie tworzy jego nową subskrypcję. Ręczne postoje pokazują pracę A, błąd i wynik zastępczy []. W obu wariantach catchError subskrybuje of([]), które emituje i kończy się. Na zewnątrz kończy się cały wynik, a subskrypcja klik$ znika. Klik B nadal może wystąpić w źródle, lecz nie uruchamia HTTP B. Wewnątrz kończy się tylko inner A: kolejne kliknięcie uruchamia HTTP B z własnym catchError i przekazuje wynik B. Przerywana linia wskazuje zakres prac tworzonych przez switchMap; nie jest subskrypcją. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik: tutaj wynika to z wyboru of([]).</p>
 						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
@@ -667,6 +658,7 @@
 <a href="?extras#/13-limit">limit współbieżności</a>
 <a href="?extras#/16-czas-cztery">cztery operatory czasu</a>
 <a href="?extras#/17-latest">withLatestFrom / combineLatest</a>
+<a href="?extras#/19-share">share — wspólne wykonanie</a>
 <a href="?extras#/21-share-miejsce">kosztowny map i share</a>
 <a href="?extras#/21a-share-pozycja">pozycja share</a>
 <a href="?extras#/23-angular-alias">async z aliasem</a>
@@ -682,6 +674,16 @@
 </nav>
 						<aside class="notes">Koniec głównej prezentacji. Pilot zatrzymuje się tutaj. Dodatki otwórz świadomie linkiem w menu; adres zawiera wtedy ?extras. Link „Dodatkowe przykłady” wraca do zakończenia głównej ścieżki.</aside>
 					</section>
+
+				<section id="19-share" class="animation-slide" data-extras data-animation="19-share">
+					<h2>share — wspólne wykonanie</h2>
+					<div class="rx-player" aria-label="share — wspólne wykonanie"></div>
+					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
+					<aside class="notes">
+						<p>A i B mają nakładające się subskrypcje. share() nie gwarantuje jednego wykonania na zawsze ani cache dla późniejszych odbiorców.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+					</aside>
+				</section>
 
 				<section id="12a-complete" class="animation-slide" data-extras data-animation="12a-complete">
 					<h2>source$: complete. Czy wynik też kończy? </h2>

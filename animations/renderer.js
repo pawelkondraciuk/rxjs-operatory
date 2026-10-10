@@ -22,10 +22,10 @@ export function renderScene(frame) {
       svg+=text(n.x-n.w/2+18,n.y,n.label,24,'style="text-anchor:start"')+text(n.x+n.w/2-18,n.y,status,22,`style="text-anchor:end;fill:${finished?'#087438':cancelled?'#9c1727':'#16232b'}"`);
       svg+='</g>';continue;
     }
-    const lines=wrapLabel(n.label,Math.floor(n.w/14));
-    svg+=`<g data-node="${esc(n.id)}" opacity="${n.opacity}" data-active="${n.active}" data-work-state="${n.workState}"><rect x="${n.x-n.w/2}" y="${n.y-n.h/2}" width="${n.w}" height="${n.h}" rx="5" fill="${n.fill}" stroke="${n.active?'#805095':'#26343d'}" stroke-width="${n.active?4:1.5}"/>`;
+    const lines=wrapLabel(n.label,Math.floor(n.w/14)),failed=n.workState==='errored';
+    svg+=`<g data-node="${esc(n.id)}" opacity="${n.opacity}" data-active="${n.active}" data-work-state="${n.workState}"><rect x="${n.x-n.w/2}" y="${n.y-n.h/2}" width="${n.w}" height="${n.h}" rx="5" fill="${n.fill}" stroke="${failed?'#b51e2e':n.active?'#805095':'#26343d'}" stroke-width="${failed||n.active?4:1.5}"/>`;
     lines.forEach((line,i)=>svg+=text(n.x,n.y+(n.labelOffset||0)+(i-(lines.length-1)/2)*28,line,26,n.notification?'style="fill:#fff"':''));
-    if(n.status)svg+=text(n.x,n.y+n.h/2+21,n.status,20);
+    if(n.status)svg+=text(n.x,n.y+n.h/2+21,n.status,20,failed?'style="fill:#b51e2e"':'');
     if(n.showProgress)svg+=`<rect data-work-progress="${n.progress}" x="${n.x-n.w/2}" y="${n.y+n.h/2-9}" width="${n.w*n.progress}" height="9" fill="#132f42"/>`;
     if(n.transform)svg+=text(n.x,n.y+n.h/2+52,n.transform,28,'data-transformation="true"');
     svg+='</g>';

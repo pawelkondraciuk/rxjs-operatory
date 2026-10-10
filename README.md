@@ -1,6 +1,6 @@
 # RxJS — Operatory, które znasz, ale bałeś się zagadać
 
-Polska prezentacja Pawła Kondraciuka o sterowaniu pracą, kolejnością, subskrypcjami i współdzieleniem w RxJS, z przykładami Angulara. Otwarcie przypomina historię meet.js Białystok; część techniczna używa animowanych bloczków i wartości.
+Polska prezentacja Pawła Kondraciuka o sterowaniu pracą, kolejnością, subskrypcjami i współdzieleniem w RxJS. Podstawowy przykład współdzielenia jest niezależny od frameworka; po nim wspominamy zastosowania w Angularze i React. Otwarcie przypomina historię meet.js Białystok; część techniczna używa animowanych bloczków i wartości.
 
 Ten README jest mapą treści: opisuje slajdy, zawartość bloczków i speaker notes. Implementację animacji, mapę plików i używane API znajdziesz w [AGENTS.md](AGENTS.md).
 
@@ -27,7 +27,7 @@ Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorz
 
 ## Ścieżka MAIN i czas
 
-MAIN ma 41 slajdów (29 animowanych) i kończy się na „Pytania?”. EXTRAS zawiera 25 dodatkowych wariantów z 16 bazowych sekcji. Całość to 49 bazowych slajdów HTML, 66 po rozwinięciu, 54 animowane.
+MAIN ma 40 slajdów (28 animowanych) i kończy się na „Pytania?”. EXTRAS zawiera 26 dodatkowych wariantów z 17 bazowych sekcji. Całość to 49 bazowych slajdów HTML, 66 po rozwinięciu, 54 animowane.
 
 Kolejność głównego pokazu:
 
@@ -35,13 +35,13 @@ Kolejność głównego pokazu:
 2. map → źródła (timer/HTTP/Subject) → subskrypcja → cold/hot → porównanie dwóch subskrypcji.
 3. map + concatAll → concatMap → mergeMap → switchMap HTTP → exhaustMap.
 4. distinctUntilChanged → debounceTime/auditTime/throttleTime/sampleTime.
-5. async bez/z share → share → share/shareReplay → catchError na zewnątrz/wewnątrz → refCount false/true.
+5. Dwie subskrypcje bez/z share → wzmianka o Angularze i React → share/shareReplay → catchError na zewnątrz/wewnątrz → refCount false/true.
 6. Resolver: problem → microtask → wspólny bufor HTTP.
 7. Cztery pytania podsumowania → Pytania? → świadomy wybór dodatku.
 
-Proponowany budżet 45 minut: otwarcie i legenda 5 min, źródła i map 7 min, flattening 10 min, ograniczanie emisji 3 min, współdzielenie/catchError/refCount 9 min, resolver 7 min, podsumowanie/pytania 4 min. To plan prelegenta, nie zmierzony czas automatu. W razie opóźnienia skróć omówienie porównań źródeł i async; nie uruchamiaj EXTRAS w głównej ścieżce.
+Proponowany budżet 45 minut: otwarcie i legenda 5 min, źródła i map 7 min, flattening 10 min, ograniczanie emisji 3 min, współdzielenie/catchError/refCount 9 min, resolver 7 min, podsumowanie/pytania 4 min. To plan prelegenta, nie zmierzony czas automatu. W razie opóźnienia skróć omówienie porównań źródeł i dwóch subskrypcji; nie uruchamiaj EXTRAS w głównej ścieżce.
 
-EXTRAS: complete outer, limit współbieżności, cztery operatory czasu, withLatestFrom/combineLatest, koszt i pozycja share, alias async, signals, defer, first/take, bufferTime, finalize, forkJoin, zip, merge, pairwise. Menu otwiera ?extras#/id; stare bezpośrednie linki do ID dodatków nadal działają. Powrót „Dodatkowe przykłady” prowadzi do menu MAIN.
+EXTRAS: share — wspólne wykonanie, complete outer, limit współbieżności, cztery operatory czasu, withLatestFrom/combineLatest, koszt i pozycja share, alias async, signals, defer, first/take, bufferTime, finalize, forkJoin, zip, merge, pairwise. Menu otwiera ?extras#/id; stare bezpośrednie linki do ID dodatków nadal działają. Powrót „Dodatkowe przykłady” prowadzi do menu MAIN.
 
 ## Legenda bloczków
 
@@ -440,27 +440,31 @@ Brak notatek w HTML.
 
 > Oba warianty potrzebują pierwszych wartości odpowiednich źródeł. withLatestFrom subskrybuje także źródła pomocnicze; nie odkłada ich subskrypcji do kliknięcia.
 
-## Współdzielenie i Angular
+## Współdzielenie i zastosowania w UI
 
-### Dwie instancje async — `18-async`
+### Dwie subskrypcje — `18-async`
 
-**Temat:** Angular AsyncPipe nie współdzieli automatycznie wykonania HTTP.
+**Temat:** dwie subskrypcje tego samego zimnego Observable HTTP, bez współdzielenia i z share. Historyczne ID pozostają bez zmian.
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
-| 18-async | Dwa async: dwa wykonania HTTP | `user$ = http.get('/api/user')` |
-| 18-async-2 | Dwa async z share: jedno wykonanie HTTP | `user$ = http.get('/api/user').pipe(share())` |
+| 18-async | Dwie subskrypcje: dwa wykonania HTTP | `const user$ = http$; user$.subscribe(observerA); user$.subscribe(observerB);` |
+| 18-async-2 | Dwie subskrypcje z share: jedno HTTP | `const user$ = http$.pipe(share()); user$.subscribe(observerA); user$.subscribe(observerB);` |
 
 **Na bloczkach i w animacji:**
 
-- Bez share: „HTTP A”, „HTTP B”, „imię | async”, „avatar | async”. Dwa wykonania user$, dwie odpowiedzi i licznik 2 requestów.
-- Z share: „wspólne HTTP” → „share()” → „imię | async” i „avatar | async”. Jedna odpowiedź „user” trafia do obu odbiorców; licznik 1 requestu.
+- Bez share: „HTTP A”, „HTTP B”, „Odbiorca A”, „Odbiorca B”. Dwa wykonania user$, dwie odpowiedzi i licznik 2 requestów.
+- Z share: „wspólne HTTP” → „share()” → „Odbiorca A” i „Odbiorca B”. Jedna odpowiedź „user” trafia do obu odbiorców; licznik 1 requestu. Po odpowiedzi końcowy podpis wspomina Angular async pipe oraz subscribe w React useEffect z unsubscribe przy sprzątaniu.
 
 **Speaker notes:**
 
-> AsyncPipe subskrybuje i sprząta własną subskrypcję; nie dodaje share ani shareReplay. Pokazujemy dwie niezależne instancje pipe, np. (user$ | async)?.name i (user$ | async)?.avatar. Obie subskrybują przed odpowiedzią HTTP. share musi być zastosowany raz do wspólnej instancji user$. Jeden async z aliasem user w szablonie to inny, także przydatny sposób udostępnienia wyniku.
+> Najpierw pokaż dwie zwykłe subskrypcje A i B. http$ oznacza zimne Observable HTTP, np. ajax.getJSON z rxjs/ajax. Obie subskrypcje zaczynają się przed odpowiedzią. share stosujemy raz do wspólnej instancji user$. Dopiero po porównaniu odnieś odbiorców do Angular async pipe albo subscribe w React useEffect ze sprzątaniem przez unsubscribe. W React zachowaj stabilną instancję user$ poza komponentami; nie twórz osobnego share w każdym efekcie. AsyncPipe zarządza własną subskrypcją, ale nie dodaje współdzielenia. share nie jest trwałym cache.
+
+Podstawa wzmianki o cyklu życia: [Angular AsyncPipe](https://angular.dev/api/common/AsyncPipe), [React — synchronizacja i sprzątanie efektów](https://react.dev/learn/synchronizing-with-effects).
 
 ### share — `19-share`
+
+**EXTRAS — poza główną ścieżką.** Osobny pokaz zachowany jako dodatek; MAIN przechodzi z dwóch subskrypcji bezpośrednio do późnego odbiorcy.
 
 **Temat:** jedno wykonanie podczas nakładających się subskrypcji.
 
@@ -624,7 +628,7 @@ Modele są symulacją dydaktyczną, nie usługą produkcyjną. Testy sprawdzają
 
 **Temat:** zakończenie głównej części i wybór dodatków.
 
-**Na ekranie:** koniec MAIN i menu 16 rodzin EXTRAS. Pilot nie przechodzi automatycznie do dodatków. Kliknięcie wybranego tematu otwiera jego slajd; każdy ma link powrotny „Dodatkowe przykłady”.
+**Na ekranie:** koniec MAIN i menu 17 rodzin EXTRAS. Pilot nie przechodzi automatycznie do dodatków. Kliknięcie wybranego tematu otwiera jego slajd; każdy ma link powrotny „Dodatkowe przykłady”.
 
 **Speaker notes:** Zakończ główny pokaz. Dodatki otwieraj wyłącznie w odpowiedzi na pytania lub przy zapasie czasu.
 
@@ -686,17 +690,20 @@ Modele są symulacją dydaktyczną, nie usługą produkcyjną. Testy sprawdzają
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
-| b04-catcherror | catchError na zewnątrz: potok kończy się po [] | `switchMap(http$), catchError(() => of([]))` |
-| b04-catcherror-2 | catchError wewnątrz: kolejne zapytania działają | `switchMap(id => http$(id).pipe(catchError(() => of([]))))` |
+| b04-catcherror | catchError na zewnątrz | `klik$.pipe(switchMap(() => http$), catchError(() => of([])))` |
+| b04-catcherror-2 | catchError wewnątrz | `klik$.pipe(switchMap(() => http$.pipe(catchError(() => of([])))))` |
 
 **Na bloczkach i w animacji:**
 
-- Na zewnątrz: „klik$”, „HTTP A”, „switchMap + catch za nim”, „Odbiorca”. Error A zastępowany przez []; wynik complete, kolejne kliki nie są obsługiwane.
-- Wewnątrz: „klik$”, „HTTP A/B/C”, „switchMap + catch wewnątrz”, „Odbiorca”. Error A zastępowany przez [] w inner; kolejne B i C nadal dają wyniki.
+- Na zewnątrz: górny potok „klik$” → „switchMap” → „catchError” → „Odbiorca”. W ramce poniżej HTTP A; błąd dociera przez switchMap do zewnętrznego catchError. Odbiorca otrzymuje [] i complete. Klik B pozostaje przy odłączonym źródle, bez utworzenia HTTP B.
+- Wewnątrz: górny potok „klik$” → „switchMap” → „Odbiorca”. Ramka prac pokazuje osobno HTTP A → catchError → [] i późniejsze HTTP B → catchError → B. Complete dotyczy tylko inner; po wynikach [] i B odbiorca nadal subskrybuje kliknięcia.
+- Error jest oznaczony podpisem i czerwonym obramowaniem pracy. Ręczne postoje: HTTP A pracuje → błąd → [] i pytanie o klik B. Kolejny krok uruchamia AUTO do wyniku. Historia odbiorcy zmienia się po dotarciu wartości. Licznik pokazuje 1 lub 2 requesty.
 
 **Speaker notes:**
 
-> Oba warianty zwracają of([]), które emituje i kończy się. Catch wewnątrz dotyczy błędu inner Observable. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik.
+> Porównaj położenie catchError: osobny operator za switchMap albo operator wewnątrz ramki każdego HTTP. http$ jest zimnym Observable, a każde kliknięcie tworzy jego nową subskrypcję. Ręczne postoje pokazują pracę A, błąd i wynik zastępczy []. W obu wariantach catchError subskrybuje of([]), które emituje i kończy się. Na zewnątrz kończy się cały wynik, a subskrypcja klik$ znika. Klik B nadal może wystąpić w źródle, lecz nie uruchamia HTTP B. Wewnątrz kończy się tylko inner A: kolejne kliknięcie uruchamia HTTP B z własnym catchError i przekazuje wynik B. Przerywana linia wskazuje zakres prac tworzonych przez switchMap; nie jest subskrypcją. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik: tutaj wynika to z wyboru of([]).
+
+Semantyka zastępowania błędu: [implementacja catchError w RxJS 7.8.2](https://github.com/ReactiveX/rxjs/blob/7.8.2/src/internal/operators/catchError.ts).
 
 ### finalize — `b05-finalize`
 
@@ -784,7 +791,7 @@ Modele są symulacją dydaktyczną, nie usługą produkcyjną. Testy sprawdzają
 
 - `index.html`: statyczne slajdy, kolejność i speaker notes (`<aside class="notes">`).
 - `animations/catalog.js`: wartości, czasy, podpisy pod diagramem, liczniki i dane scen.
-- `animations/reference-scenes.js`, `scene-config.js`, `resolver-scenes.js`: konfiguracje rodzin, postoje i finał resolvera.
+- `animations/reference-scenes.js`, `catch-scenes.js`, `scene-config.js`, `resolver-scenes.js`: konfiguracje rodzin, zakresy catchError, postoje i finał resolvera.
 - `animations/presentation.js`: końcowe tytuły i warianty tworzonych slajdów.
 - `public/`: fotografie, plakaty, logo i QR.
 
