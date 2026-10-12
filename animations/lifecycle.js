@@ -5,6 +5,15 @@ export const palette = {
 
 // A i B są rolami na danym połączeniu. Czas ruchu służy wyłącznie ilustracji.
 export const transitionDuration = 0.8;
+export const defaultTiming = Object.freeze({subscribe:.7,travel:.4,transform:.3,terminal:.35,gap:.5,http:1.5});
+export function resolveTiming(overrides) {
+  if (overrides === undefined || overrides === null) return null;
+  const timing={...defaultTiming,...overrides};
+  for (const [key,value] of Object.entries(timing)) {
+    if (!Number.isFinite(value) || value<=0) throw new Error(`Nieprawidłowy czas ilustracji: ${key}`);
+  }
+  return timing;
+}
 export function terminal(row) {
   if (!row) return null;
   const candidates = [
@@ -22,8 +31,8 @@ export function terminal(row) {
 export function connectionState(time, start, end, events = [], connectDuration = transitionDuration) {
   const clamp = n => Math.max(0, Math.min(1, n));
   if (time < start) return { offset: 1, color: palette.wire, phase: 'waiting' };
-  const lastValueAt = end ? Math.max(-Infinity,...events.filter(e => e.at <= end.at && e.kind !== 'error').map(e=>e.at)) : -Infinity;
-  const finishAt = end ? Math.max(end.at, end.kind === 'unsubscribe' ? end.at : lastValueAt + transitionDuration) : Infinity;
+  const lastValueAt = end ? Math.max(-Infinity,...events.filter(e => e.at <= end.at && e.kind !== 'error').map(e=>e.arrival??e.at+transitionDuration)) : -Infinity;
+  const finishAt = end ? Math.max(end.at, end.kind === 'unsubscribe' ? end.at : lastValueAt) : Infinity;
   if (end && time >= finishAt) {
     const progress = clamp((time - finishAt) / (end.duration || transitionDuration));
     return { offset: end.kind === 'unsubscribe' ? progress : -progress,

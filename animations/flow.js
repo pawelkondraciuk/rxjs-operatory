@@ -1,11 +1,16 @@
-import { transitionDuration } from './lifecycle.js';
+import { transitionDuration, resolveTiming } from './lifecycle.js';
 
 export const fadeDuration = 0.3;
 export const handoffDuration = 0.15;
 
 // Zatrzymujemy czas modelu na czas ilustracji przepływu. Dzięki temu opóźnienia
 // rysowania nie zmieniają kolejności zdarzeń RxJS ani czasu pracy producenta.
-export function planFlow(nodes, links, modelDuration) {
+export function planFlow(nodes, links, modelDuration, timingOverrides) {
+  const timing=resolveTiming(timingOverrides);
+  const travel=timing?.travel??transitionDuration;
+  const terminalTravel=timing?.terminal??transitionDuration;
+  const handoff=timing?0:handoffDuration;
+  const gap=timing?.gap??handoffDuration;
   const records = new Map(links.map(e => [e.id, { ...e, events: [], start: Infinity, end: null }]));
   const births = new Map();
   const batches = [];
@@ -18,7 +23,7 @@ export function planFlow(nodes, links, modelDuration) {
   function reveal(id, at) {
     if (births.has(id)) return 0;
     births.set(id, at);
-    return fadeDuration;
+    return timing&&nodes.find(n=>n.id===id)?.ready?0:fadeDuration;
   }
   for (const at of times) {
     const start = clock + at - model;
@@ -29,6 +34,12 @@ export function planFlow(nodes, links, modelDuration) {
     function subscribe(edges) {
       const pending = new Set(edges);
       const finished = new Map();
+      const depth=(e,seen=new Set())=>{
+        if(seen.has(e))throw new Error('Cyclic subscription flow');
+        const next=new Set(seen).add(e);
+        return 1+Math.max(0,...edges.filter(child=>child.a.id===e.b.id).map(child=>depth(child,next)));
+      };
+      const connectDuration=timing?timing.subscribe/Math.max(1,...edges.map(e=>depth(e))):transitionDuration;
       function connect(e) {
         if (finished.has(e)) return finished.get(e);
         pending.delete(e);
@@ -37,7 +48,8 @@ export function planFlow(nodes, links, modelDuration) {
         const fade = Math.max(reveal(e.b.id,ready),reveal(e.a.id,ready));
         const record=records.get(e.id);
         record.start=ready+fade;
-        const done=record.start+transitionDuration;
+        record.connectDuration=connectDuration;
+        const done=record.start+connectDuration;
         finished.set(e,done);
         return done;
       }
@@ -59,9 +71,10 @@ export function planFlow(nodes, links, modelDuration) {
       e.events.filter(v=>v.at===at).forEach((v,i)=>{
         const upstream=dependencies.flatMap(parent=>records.get(parent.id).events.filter(p=>p.logicalAt===at));
         const matching=upstream.filter(p=>String(p.value)===String(v.value));
-        const ready=Math.max(phase,...(matching.length?matching:upstream).map(p=>p.arrival+handoffDuration));
-        const departure=Math.max(ready,record.start+transitionDuration,i?arrival+handoffDuration:0);
-        arrival=departure+transitionDuration;
+        const ready=Math.max(phase,...(matching.length?matching:upstream).map(p=>p.arrival+(timing&&String(p.value)!==String(v.value)?timing.transform:handoff)));
+        const departure=Math.max(ready,record.start+record.connectDuration,i?arrival+gap:0);
+        // Krawędź może mieć własny czas przelotu, np. krótki powrót wyniku inner do operatora.
+        arrival=departure+(e.travel??travel);
         record.events.push({...v,logicalAt:v.at,at:departure,arrival});
       });
       valueEnds.set(e,arrival);
@@ -80,8 +93,8 @@ export function planFlow(nodes, links, modelDuration) {
       const dependencies=(cancelling?outgoing(e.b.id):incoming(e.a.id))
         .filter(parent=>ending.includes(parent)&&parent.logicalEnd.kind===e.logicalEnd.kind);
       const departure=Math.max(phase,...dependencies.map(parent=>finish(parent,next)));
-      records.get(e.id).end={...e.logicalEnd,at:departure,logicalAt:e.logicalEnd.at};
-      const arrival=departure+transitionDuration;
+      records.get(e.id).end={...e.logicalEnd,at:departure,logicalAt:e.logicalEnd.at,duration:terminalTravel};
+      const arrival=departure+terminalTravel;
       terminalEnds.set(e,arrival);
       return arrival;
     }

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototypy frameworku RxJS — QA</title>
+<style>
+body{margin:0;background:#faf7ed;color:#16232b;font-family:Arial,Helvetica,sans-serif}
+header{padding:12px 24px;border-bottom:1px solid #cabfaa;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+button,select{font:17px Arial;padding:7px 10px;background:#eee6d9;border:1px solid #958875;border-radius:4px;color:#16232b}
+button:focus-visible,select:focus-visible{outline:3px solid #6d4ab5;outline-offset:2px}
+#viewport{width:100%;height:min(65vw,800px);overflow:hidden;position:relative}
+#screen{width:1280px;height:720px;padding:24px 32px;box-sizing:border-box;transform-origin:top left;position:absolute}
+h2{font:bold 40px/1.1 Georgia;margin:0;height:76px;display:flex;align-items:center}
+#screen .rx-player{height:500px;grid-template-rows:60px 350px 90px}
+#screen .rx-toolbar{bottom:-94px}
+#screen .rx-code{font-size:24px}
+#diagnostics{padding:12px 24px;font-size:16px;overflow:auto;white-space:pre-wrap}
+#status{font-size:17px;min-width:200px}
+#baseline{margin:8px 24px}#baseline img{width:min(100%,1240px)}#baseline summary{cursor:pointer;font-size:18px}
+#variants{display:none}
+</style></head><body>
+<header>
+<label>Scena <select id="scene"></select></label>
+<label>Checkpoint <select id="checkpoint"></select></label>
+<button id="previous">← Cofnij</button><button id="next">Dalej →</button>
+<button id="toggle">Odtwórz / pauza</button><button id="mode">MANUAL · M</button>
+<button id="reset">READY · R</button><button id="finish">Pokaż wynik · F</button>
+<button id="controls">Sterowanie · U</button><button id="audit">Audyt prototypów</button>
+<output id="status" aria-live="polite"></output>
+</header>
+<div id="variants"></div><div id="viewport"><main id="screen"><h2></h2><div class="rx-player"></div></main></div>
+<details id="baseline"><summary>Obecny concatMap — kadry odniesienia</summary>
+<label>Kadr <select id="baseline-frame"><option value="ready">READY</option><option value="question" selected>Pytanie przy B</option><option value="finished">FINISHED</option></select></label>
+<img src="./baseline/concatmap-question.svg" alt="Obecny concatMap: A pracuje, B czeka jako wartość"></details>
+<details><summary>Notatki i stan diagnostyczny</summary><pre id="diagnostics"></pre></details>
+<script type="module">
+import { prototypeScenes } from '../animations/prototype-scenes.js';
+import { scenes } from '../animations/catalog.js';
+import { prepareSlides } from '../animations/presentation.js';
+import { createPlayer } from '../animations/player.js';
+import { compileScene } from '../animations/engine.js';
+import '../animations/reveal.css';
+
+const select=document.querySelector('#scene'),checkpoints=document.querySelector('#checkpoint');
+let root=document.querySelector('#screen .rx-player');
+const heading=document.querySelector('h2'),status=document.querySelector('#status');
+const variants=document.querySelector('#variants');
+variants.innerHTML='<section data-animation="09-concatmap"><h2></h2><div class="rx-player"></div></section>';
+const legacy=prepareSlides(scenes).get('09-concatmap');
+const all=[...prototypeScenes,{...legacy,id:'qa-current-concatmap',title:'Obecny concatMap — porównanie'}];
+const byId=new Map(all.map(s=>[s.id,s]));
+select.innerHTML=all.map(s=>'<option value="'+s.id+'">'+s.title+'</option>').join('');
+let player,unsubscribe;
+function state(){
+ const c=player.controller,s=player.snapshot;
+ document.querySelector('#mode').textContent=(c?.mode==='auto'?'AUTO':'MANUAL')+' · M';
+ const message=player.state.toUpperCase()+' · '+(c?.mode||'auto').toUpperCase();
+ if(status.textContent!==message)status.textContent=message;
+ document.querySelector('#diagnostics').textContent=byId.get(select.value).notes+'\n'+JSON.stringify({
+  time:s.time,logicalTime:s.logicalTime,executions:s.executions,counts:s.executionCounts,
+  history:s.histories.map(h=>h.values.map(v=>v.value)),focused:s.focusedExecutionId,
+ },null,2);
+}
+function choose(){
+ unsubscribe?.();player?.pause();
+ const replacement=document.createElement('div');replacement.className='rx-player';root.replaceWith(replacement);root=replacement;
+ const scene=byId.get(select.value);heading.textContent=scene.title;
+ player=createPlayer(root,scene);
+ checkpoints.innerHTML='<option value="0">READY</option>'+player.stops.map(s=>'<option value="'+s.time+'">'+s.id+'</option>').join('')+
+  '<option value="'+player.duration+'">FINISHED</option>';
+ unsubscribe=player.subscribe(state);state();
+}
+const c=()=>player.controller;
+document.querySelector('#previous').onclick=()=>{c()?c().previous():player.step(-1);state()};
+document.querySelector('#next').onclick=()=>{c()?c().next():player.step(1);state()};
+document.querySelector('#toggle').onclick=()=>{c()?c().toggle():player.toggle();state()};
+document.querySelector('#mode').onclick=()=>{if(c())c().setMode(c().mode==='manual'?'auto':'manual');state()};
+document.querySelector('#reset').onclick=()=>{c()?c().reset():player.seek(0);state()};
+document.querySelector('#finish').onclick=()=>{c()?c().finish():player.finish();state()};
+document.querySelector('#controls').onclick=()=>player.toggleControls();
+select.onchange=choose;
+checkpoints.onchange=()=>{c()?c().seek(Number(checkpoints.value)):player.seek(Number(checkpoints.value));state()};
+document.querySelector('#baseline-frame').onchange=e=>{
+ document.querySelector('#baseline img').src='./baseline/concatmap-'+e.target.value+'.svg';
+};
+const navigation={ArrowRight:'next',PageDown:'next',']':'next',ArrowLeft:'previous',PageUp:'previous','[':'previous'};
+ document.addEventListener('keydown',event=>{const id=navigation[event.key];if(!id||!event.target.closest('button,select,input'))return;event.preventDefault();event.stopPropagation();event.target.blur();document.querySelector('#'+id).click();},true);
+ document.addEventListener('keydown',event=>{
+ if(event.target.matches('input,select,button'))return;
+ if(event.key==='a'||event.key==='A'){event.preventDefault();if(c()){if(c().mode==='manual')c().setMode('auto');else c().toggle()}else player.toggle();state();return;}
+ const actions={ArrowRight:'next',PageDown:'next',']':'next',ArrowLeft:'previous',PageUp:'previous','[':'previous',
+  ' ':'toggle',r:'reset',R:'reset',f:'finish',F:'finish',m:'mode',M:'mode',u:'controls',U:'controls'};
+ const id=actions[event.key];if(id){event.preventDefault();document.querySelector('#'+id).click()}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)c()?c().suspend():player.pause();else c()?.resume()});
+document.querySelector('#audit').onclick=()=>{
+ const previous=select.value,issues=[];let frames=0;
+ for(const scene of prototypeScenes){
+  select.value=scene.id;choose();
+  const compiled=compileScene(scene);
+  const times=[0,player.duration,...player.stops.map(s=>s.time),...compiled.events.flatMap(e=>[e.at,e.at+.01])];
+  for(const time of times){
+   player.seek(time);frames++;
+   const svg=root.querySelector('svg'),box=svg.viewBox.baseVal;
+   for(const text of svg.querySelectorAll('text')){
+    if(Number(text.closest('g')?.getAttribute('opacity')??1)<.8)continue;
+    const b=text.getBBox();
+    if(b.x<-.5||b.y<-.5||b.x+b.width>box.width+.5||b.y+b.height>box.height+.5)
+     issues.push(scene.id+' @ '+time.toFixed(2)+': '+text.textContent);
+   }
+  }
+ }
+ select.value=previous;choose();
+ status.textContent=frames+' kadrów; poza SVG: '+issues.length;
+ document.querySelector('#diagnostics').textContent=issues.join('\n')||'Brak tekstów poza diagramem.';
+};
+function fit(){const width=document.querySelector('#viewport').clientWidth,scale=Math.min(width/1280,1.5);document.querySelector('#screen').style.transform='scale('+scale+')';document.querySelector('#viewport').style.height=720*scale+'px'}
+window.addEventListener('resize',fit);
+choose();fit();
+window.rxPrototypeQA={get player(){return player},byId,choose};
+</script></body></html>

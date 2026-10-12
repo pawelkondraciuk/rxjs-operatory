@@ -1,4 +1,5 @@
 import { catalogGraph } from './graph-presets.js';
+import { prepareExecutions, executionSnapshot } from './execution-state.js';
 import { layoutDiagram, terminal, connectionState, palette, transitionDuration } from './lifecycle.js';
 import { planFlow, fadeDuration } from './flow.js';
 import { clamp, colors, geometry, pointAt } from './primitives.js';
@@ -18,7 +19,7 @@ export function compileScene(scene) {
   const trays=(graph.trays||[]).map(q=>({...q}));
   const row=n=>n.lifecycleRow || (n.ri!==null?scene.rows[n.ri]:null) || empty;
   const width=graph.width||1240, height=graph.height||340;
-  let edges=graph.edges.map(e=>({...e,a:nodeById.get(e.from||e.a.id),b:nodeById.get(e.to||e.b.id)}));
+  let edges=graph.edges.map(e=>({...e,events:(e.events||[]).map(v=>({...v})),a:nodeById.get(e.from||e.a.id),b:nodeById.get(e.to||e.b.id)}));
   if(graph.layout!=='fixed') edges=layoutDiagram(nodes,edges,trays,width,height);
   for(const edge of edges) {
     if(!edge.a || !edge.b) throw new Error(`${scene.id}: nieznany węzeł krawędzi`);
@@ -42,11 +43,17 @@ export function compileScene(scene) {
     const downstream=edges.filter(next=>next.a===edge.b&&!next.gateWork);
     if(downstream.length&&!edge.fixedStart)edge.logicalStart=Math.max(edge.logicalStart,Math.min(...downstream.map(e=>e.logicalStart)));
   }
+  const executionDefinitions=prepareExecutions(graph.executions,edges);
   edges.forEach(e=>{e.events=e.events.filter(v=>v.at>=e.logicalStart&&(!e.logicalEnd || v.at<=e.logicalEnd.at)&&!(e.logicalEnd?.kind==='unsubscribe'&&v.at>=e.logicalEnd.at));});
-  const plan=graph.schedule ? scheduledPlan(graph,edges,scene.duration) : planFlow(nodes,edges,scene.duration);
-  const sourceTokens=(graph.tokens||[]).map(token=>token.modelTime?
-    {...token,at:plan.timeOf(token.at),until:plan.timeOf(token.until)}:token);
+  const plan=graph.schedule ? scheduledPlan(graph,edges,scene.duration,executionDefinitions) : planFlow(nodes,edges,scene.duration,scene.timing);
+  const sourceTokens=(graph.tokens||[]).map(token=>{
+    const value=token.modelTime?{...token,at:plan.timeOf(token.at),until:plan.timeOf(token.until)}:{...token};
+    const execution=executionDefinitions.find(e=>e.id===token.execution);
+    const end=plan.records.get(execution?.edge)?.end;
+    return end?.kind==='unsubscribe'?{...value,until:Math.min(value.until,end.at)}:value;
+  }).filter(token=>token.until>token.at);
   const records=[...plan.records.values()];
+  records.forEach(r=>{r.connectDuration??=transitionDuration;});
   const births=new Map(nodes.map(n=>[n.id,n.ready?0:n.createdBy?
     plan.records.get(n.createdBy.edge)?.events.find(e=>e.value===n.createdBy.value)?.arrival??Infinity:
     n.createdAt!==undefined?plan.timeOf(n.createdAt):plan.births.get(n.id)??plan.timeOf(n.born||0)]));
@@ -54,15 +61,16 @@ export function compileScene(scene) {
   const add=(type,at,data={})=>events.push({id:`${type}:${data.edge||data.node||'scene'}:${events.length}`,type,at,...data});
   nodes.forEach(n=>add(n.inner?'inner-create':'node-create',births.get(n.id),{node:n.id}));
   for(const r of records) {
-    add('subscribe',r.start,{edge:r.id,node:r.b.id,logicalAt:r.logicalStart});
-    add(r.gateWork?'inner-subscribe':'connected',r.start+(r.connectDuration||transitionDuration),{edge:r.id,node:r.a.id,logicalAt:r.logicalStart});
+    const execution=executionDefinitions.find(e=>e.edge===r.id)?.id;
+    add('subscribe',r.start,{edge:r.id,node:r.b.id,logicalAt:r.logicalStart,...(execution?{execution}:{})});
+    add(r.gateWork?'inner-subscribe':'connected',r.start+(r.connectDuration||transitionDuration),{edge:r.id,node:r.a.id,logicalAt:r.logicalStart,...(execution?{execution}:{})});
     for(const v of r.events) {
-      add(r.a.inner?'inner-next':'source-next',v.at,{edge:r.id,node:r.a.id,value:v.value,logicalAt:v.logicalAt});
-      add('value-travel',v.at,{edge:r.id,node:r.a.id,value:v.value,until:v.arrival,logicalAt:v.logicalAt});
-      add('deliver-next',v.arrival,{edge:r.id,node:r.b.id,value:v.value,logicalAt:v.logicalAt});
+      add(r.a.inner?'inner-next':'source-next',v.at,{edge:r.id,node:r.a.id,value:v.value,logicalAt:v.logicalAt,...(v.execution?{execution:v.execution}:{})});
+      add('value-travel',v.at,{edge:r.id,node:r.a.id,value:v.value,until:v.arrival,logicalAt:v.logicalAt,...(v.execution?{execution:v.execution}:{})});
+      add('deliver-next',v.arrival,{edge:r.id,node:r.b.id,value:v.value,logicalAt:v.logicalAt,...(v.execution?{execution:v.execution}:{})});
     }
     if(r.end) {
-      add(r.end.kind==='unsubscribe'?'inner-unsubscribe':r.end.kind==='error'?'stream-error':'stream-complete',r.end.at,{edge:r.id,node:r.a.id,logicalAt:r.end.logicalAt});
+      add(r.end.kind==='unsubscribe'?'inner-unsubscribe':r.end.kind==='error'?'stream-error':'stream-complete',r.end.at,{edge:r.id,node:r.a.id,logicalAt:r.end.logicalAt,...(execution?{execution}:{})});
       add('disconnected',r.end.at+(r.end.duration||transitionDuration),{edge:r.id,node:r.b.id,kind:r.end.kind});
     }
   }
@@ -77,8 +85,16 @@ export function compileScene(scene) {
   }
   for(const transform of graph.transforms||[])add('operator-transform',transform.at,{node:transform.node,value:transform.label,until:transform.until});
   for(const event of graph.timeline||[]) {
-    const {at,...data}=event;
-    add(event.type,graph.schedule?at:plan.timeOf(at),{...data,logicalAt:at});
+    const {at,event:selector,offset=0,last=false,...data}=event;
+    const matches=selector?events.filter(e=>Object.entries(selector).every(([key,value])=>e[key]===value)):[];
+    const selected=last?matches.at(-1):matches[0];
+    const definition=executionDefinitions.find(e=>e.id===event.execution);
+    const record=records.find(r=>r.id===definition?.edge);
+    if(selector&&!selected&&record?.end?.kind==='unsubscribe')continue;
+    const eventTime=(selector?selected?.at:graph.schedule?at:plan.timeOf(at))+offset;
+    if(!Number.isFinite(eventTime))throw new Error(`${scene.id}: nierozwiązane zdarzenie ${event.type}`);
+    if(record?.end?.kind==='unsubscribe'&&eventTime>=record.end.at)continue;
+    add(event.type,eventTime,{...data,logicalAt:at??selected?.logicalAt??plan.logicalTime(eventTime)});
   }
   events.sort((a,b)=>a.at-b.at);
   const stops=(scene.playback?.stops||[]).map(stop=>{
@@ -101,6 +117,7 @@ export function compileScene(scene) {
   function snapshot(time) {
     time=clamp(time,0,plan.duration);
     const logicalTime=plan.logicalTime(time);
+    const executionState=executionSnapshot(executionDefinitions,records,events,time,logicalTime,Boolean(graph.illustratedWork));
     const edgeStates=records.map(r=>{
       const state=connectionState(time,r.start,r.end,r.events,r.connectDuration);
       return {...state,id:r.id,from:r.a.id,to:r.b.id,points:r.points||geometry(r.a,r.b),visible:!r.internal&&time>=r.start&&!state.done,
@@ -127,7 +144,8 @@ export function compileScene(scene) {
       const active=Boolean(span&&started&&!canceled&&t<span.end);
       const queued=r.spans.some(p=>p.kind==='queue'&&p.start<=t&&t<p.end)||
         Boolean(n.createdBy&&n.inner&&time>=births.get(n.id)&&!started&&r.spans.some(p=>p.kind==='queue'));
-      const completed=Boolean(r.completeAt!==undefined&&t>=r.completeAt);
+      // illustratedWork: praca kończy się w chwili ilustracji swojego complete, a nie dopiero po całej partii zdarzeń.
+      const completed=Boolean(r.completeAt!==undefined&&(t>=r.completeAt||graph.illustratedWork&&lifecycle?.kind==='complete'&&time>=lifecycle.at));
       const errored=r.events.some(e=>e.kind==='error'&&e.at<=t)||span?.kind==='error'&&t>=span.end;
       const workState=canceled?'canceled':errored?'errored':completed?'completed':active?'active':queued?'queued':'idle';
       const terminalInput=incoming.filter(e=>e.end&&stateByEdge.get(e.id).done&&['complete','error'].includes(e.end.kind)).at(-1);
@@ -138,12 +156,23 @@ export function compileScene(scene) {
       const detail=evaluate(n.detail,t);
       let status=notification?(notification==='complete'?'✓ complete':'× error'):detail;
       if(status===undefined)status=canceled?(n.cancelLabel||'odsubskrybowano'):errored?'× error':queued?'czeka w kolejce':stateSpan?.label||
-        (active?(n.timer?'okno otwarte':'praca trwa'):completed?'complete':r.spans.some(p=>p.kind==='subscription'&&p.start<=t&&p.end>t)?'subskrybuje':'');
+        (active?(n.timer?'okno otwarte':'praca trwa'):completed?'complete':graph.illustratedWork&&workEdge&&!started||r.spans.some(p=>p.kind==='subscription'&&p.start<=t&&p.end>t)?'subskrybuje':'');
       const lastInput=incoming.flatMap(e=>e.events.filter(v=>v.arrival<=time)).sort((a,b)=>a.arrival-b.arrival).at(-1);
       if(n.showInput&&lastInput&&!status)status='wejście: '+lastInput.value;
       const activity=(graph.activities||[]).some(a=>a.node===n.id&&time>=a.at&&time<a.until);
       const transform=(graph.transforms||[]).find(a=>a.node===n.id&&time>=a.at&&time<a.until);
-      const progress=span?clamp(((canceled?span.end:t)-span.start)/(span.duration||span.end-span.start)):0;
+      // illustratedWork: pasek biegnie w czasie ilustracji, nie staje na przelot wartości i kończy się razem z pracą.
+      let progress=0;
+      if(span&&!graph.illustratedWork)progress=clamp(((canceled?span.end:t)-span.start)/(span.duration||span.end-span.start));
+      else if(span) {
+        // share < 1 zachowuje niedokończony pasek pracy anulowanej przed czasem.
+        const share=(span.end-span.start)/(span.duration||span.end-span.start);
+        const from=Math.max(plan.timeOf(span.start),workEdge?workEdge.start+(workEdge.connectDuration||transitionDuration):-Infinity);
+        const to=lifecycle?lifecycle.at:plan.timeOf(span.end);
+        if(canceled||completed||t>=span.end)progress=clamp(share);
+        else if(to>from)progress=clamp((time-from)/(to-from))*share;
+        else progress=clamp((t-span.start)/(span.end-span.start))*share;
+      }
       const fill=notification?palette[notification]:queued||n.workRow&&!active&&!canceled&&!completed&&!errored?colors.muted:n.work||n.inner?palette.work:receiver?palette.observer:!incoming.length?palette.source:colors[n.color]||colors.op;
       return {...n,label:evaluate(n.label,t),visible:time>=births.get(n.id)&&(n.until===undefined||t<n.until),
         opacity:n.ready||n.instant?1:clamp((time-births.get(n.id))/fadeDuration),fill,status,notification,workState,
@@ -153,7 +182,9 @@ export function compileScene(scene) {
     const histories=trays.map(q=>{
       const values=records.filter(e=>e.b.id===q.anchor).flatMap(e=>e.events.filter(v=>v.arrival<=time));
       // An explicit history at an operator can show its emitted values too.
-      const delivered=values.length?values:records.filter(e=>e.a.id===q.anchor).flatMap(e=>e.events.filter(v=>v.at<=time));
+      const emitted=values.length?[]:records.filter(e=>e.a.id===q.anchor).flatMap(e=>e.events.filter(v=>v.at<=time));
+      // shownAt: chwila pojawienia się w historii (dotarcie albo emisja), dla fade-in w rendererze.
+      const delivered=values.length?values.map(v=>({...v,shownAt:v.arrival})):emitted.map(v=>({...v,shownAt:v.at}));
       // Historia next zachowuje powtórzenia. Deduplikacja jest jawną cechą
       // wizualizacji Set, nigdy domyślną semantyką strumienia.
       const valuesToShow=q.deduplicate?[...new Map(delivered.map(v=>[v.value,v])).values()]:delivered;
@@ -161,7 +192,8 @@ export function compileScene(scene) {
     });
     return {id:scene.id,title:scene.title,width,height,time,logicalTime,nodes:nodeStates,edges:edgeStates,tokens,histories,
       panels:graph.panels||[],cards:scene.kind==='cards'?scene.items:[],caption:captionAt(captions,time),
-      metrics:(scene.metrics||[]).map(m=>({label:m.label,value:m.value(logicalTime)})),
+      ...executionState,
+      metrics:(scene.metrics||[]).map(m=>({label:m.label,value:m.count?executionState.executionCounts[m.count]:m.value(logicalTime)})),
       queue:graph.queue?evaluate(graph.queue,logicalTime):null};
   }
   return {duration:plan.duration,stops,checkpoints,events,plan,snapshot};
@@ -169,7 +201,15 @@ export function compileScene(scene) {
 
 // Jawne tempo ilustracji jest danymi, przydatnymi np. w synchronicznej transformacji.
 // Format wyniku jest identyczny jak planFlow; nie ma drugiego renderera ani zegara.
-function scheduledPlan(graph,edges,duration) {
-  const records=new Map(edges.map(e=>[e.id,{...e,...graph.schedule[e.id],events:(graph.schedule[e.id]?.events||[]).map(v=>({...v,logicalAt:v.logicalAt??v.at}))}]));
+function scheduledPlan(graph,edges,duration,executions) {
+  const records=new Map(edges.map(e=>{
+    const execution=executions.find(x=>x.edge===e.id);
+    const events=(graph.schedule[e.id]?.events||[]).map(v=>({...v,logicalAt:v.logicalAt??v.at,
+      ...(v.execution||execution?{execution:v.execution||execution.id}:{})})).filter(v=>{
+      const owner=executions.find(x=>x.id===v.execution);
+      return !owner||owner.modelEnd?.kind!=='unsubscribe'||v.logicalAt<owner.modelEnd.at;
+    });
+    return [e.id,{...e,...graph.schedule[e.id],events}];
+  }));
   return {records,births:new Map(),batches:[],duration,logicalTime:t=>t,timeOf:t=>t};
 }

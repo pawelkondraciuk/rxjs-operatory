@@ -1,0 +1,1469 @@
+{
+  "scene": "09-concatmap",
+  "duration": 35.60000000000001,
+  "frames": {
+    "ready": {
+      "id": "09-concatmap",
+      "title": "concatMap — Po kolei",
+      "width": 1240,
+      "height": 380,
+      "time": 0,
+      "logicalTime": 0,
+      "nodes": [
+        {
+          "w": 190,
+          "h": 64,
+          "ri": 0,
+          "id": "source",
+          "x": 125,
+          "y": 50,
+          "label": "source$",
+          "color": "source",
+          "ready": true,
+          "visible": true,
+          "opacity": 1,
+          "fill": "#8cd0da",
+          "status": "",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 220,
+          "h": 64,
+          "ri": null,
+          "id": "op",
+          "x": 720,
+          "y": 50,
+          "label": "concatMap",
+          "color": "op",
+          "ready": true,
+          "visible": true,
+          "opacity": 1,
+          "fill": "#e7b5f1",
+          "status": "",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 240,
+          "h": 64,
+          "ri": 5,
+          "id": "observer",
+          "x": 1100,
+          "y": 50,
+          "label": "Odbiorca",
+          "ready": true,
+          "visible": true,
+          "opacity": 1,
+          "fill": "#b0a0e6",
+          "status": "",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": 1,
+          "x": 595,
+          "y": 166,
+          "workRow": true,
+          "id": "inner0",
+          "label": "A$",
+          "inner": true,
+          "born": 1,
+          "ready": false,
+          "cancelLabel": "anulowana · ABORT (klient)",
+          "visible": false,
+          "opacity": 0,
+          "fill": "#e7ecef",
+          "status": "",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": null,
+          "x": 595,
+          "y": 214,
+          "workRow": true,
+          "id": "queued1",
+          "label": "B (wartość)",
+          "color": "muted",
+          "detail": "w kolejce",
+          "instant": true,
+          "createdBy": {
+            "edge": "source-op",
+            "value": "B"
+          },
+          "until": 2.2,
+          "visible": false,
+          "opacity": 1,
+          "fill": "#e7ecef",
+          "status": "w kolejce",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": 2,
+          "x": 595,
+          "y": 214,
+          "workRow": true,
+          "id": "inner1",
+          "label": "B$",
+          "inner": true,
+          "born": 2.2,
+          "ready": false,
+          "cancelLabel": "anulowana · ABORT (klient)",
+          "visible": false,
+          "opacity": 0,
+          "fill": "#e7ecef",
+          "status": "",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": null,
+          "x": 595,
+          "y": 262,
+          "workRow": true,
+          "id": "queued2",
+          "label": "C (wartość)",
+          "color": "muted",
+          "detail": "w kolejce",
+          "instant": true,
+          "createdBy": {
+            "edge": "source-op",
+            "value": "C"
+          },
+          "until": 3.4000000000000004,
+          "visible": false,
+          "opacity": 1,
+          "fill": "#e7ecef",
+          "status": "w kolejce",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": 3,
+          "x": 595,
+          "y": 262,
+          "workRow": true,
+          "id": "inner2",
+          "label": "C$",
+          "inner": true,
+          "born": 3.4000000000000004,
+          "ready": false,
+          "cancelLabel": "anulowana · ABORT (klient)",
+          "visible": false,
+          "opacity": 0,
+          "fill": "#e7ecef",
+          "status": "",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": null,
+          "x": 595,
+          "y": 310,
+          "workRow": true,
+          "id": "queued3",
+          "label": "D (wartość)",
+          "color": "muted",
+          "detail": "w kolejce",
+          "instant": true,
+          "createdBy": {
+            "edge": "source-op",
+            "value": "D"
+          },
+          "until": 4.6000000000000005,
+          "visible": false,
+          "opacity": 1,
+          "fill": "#e7ecef",
+          "status": "w kolejce",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": 4,
+          "x": 595,
+          "y": 310,
+          "workRow": true,
+          "id": "inner3",
+          "label": "D$",
+          "inner": true,
+          "born": 4.6000000000000005,
+          "ready": false,
+          "cancelLabel": "anulowana · ABORT (klient)",
+          "visible": false,
+          "opacity": 0,
+          "fill": "#e7ecef",
+          "status": "",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        }
+      ],
+      "edges": [
+        {
+          "offset": 1,
+          "color": "#111",
+          "phase": "waiting",
+          "id": "source-op",
+          "from": "source",
+          "to": "op",
+          "points": [
+            [
+              220,
+              50
+            ],
+            [
+              415,
+              50
+            ],
+            [
+              415,
+              50
+            ],
+            [
+              610,
+              50
+            ]
+          ],
+          "visible": false,
+          "progress": 0
+        },
+        {
+          "offset": 1,
+          "color": "#111",
+          "phase": "waiting",
+          "id": "inner0-op",
+          "from": "inner0",
+          "to": "op",
+          "points": [
+            [
+              315,
+              166
+            ],
+            [
+              275,
+              166
+            ],
+            [
+              275,
+              100
+            ],
+            [
+              720,
+              100
+            ],
+            [
+              720,
+              82
+            ]
+          ],
+          "visible": false,
+          "progress": 0
+        },
+        {
+          "offset": 1,
+          "color": "#111",
+          "phase": "waiting",
+          "id": "inner1-op",
+          "from": "inner1",
+          "to": "op",
+          "points": [
+            [
+              315,
+              214
+            ],
+            [
+              261,
+              214
+            ],
+            [
+              261,
+              100
+            ],
+            [
+              720,
+              100
+            ],
+            [
+              720,
+              82
+            ]
+          ],
+          "visible": false,
+          "progress": 0
+        },
+        {
+          "offset": 1,
+          "color": "#111",
+          "phase": "waiting",
+          "id": "inner2-op",
+          "from": "inner2",
+          "to": "op",
+          "points": [
+            [
+              315,
+              262
+            ],
+            [
+              247,
+              262
+            ],
+            [
+              247,
+              100
+            ],
+            [
+              720,
+              100
+            ],
+            [
+              720,
+              82
+            ]
+          ],
+          "visible": false,
+          "progress": 0
+        },
+        {
+          "offset": 1,
+          "color": "#111",
+          "phase": "waiting",
+          "id": "inner3-op",
+          "from": "inner3",
+          "to": "op",
+          "points": [
+            [
+              315,
+              310
+            ],
+            [
+              233,
+              310
+            ],
+            [
+              233,
+              100
+            ],
+            [
+              720,
+              100
+            ],
+            [
+              720,
+              82
+            ]
+          ],
+          "visible": false,
+          "progress": 0
+        },
+        {
+          "offset": 1,
+          "color": "#111",
+          "phase": "waiting",
+          "id": "op-observer",
+          "from": "op",
+          "to": "observer",
+          "points": [
+            [
+              830,
+              50
+            ],
+            [
+              905,
+              50
+            ],
+            [
+              905,
+              50
+            ],
+            [
+              980,
+              50
+            ]
+          ],
+          "visible": false,
+          "progress": 0
+        }
+      ],
+      "tokens": [],
+      "histories": [
+        {
+          "anchor": "observer",
+          "x": 1100,
+          "y": 145,
+          "w": 242,
+          "values": []
+        }
+      ],
+      "panels": [
+        {
+          "x": 300,
+          "y": 110,
+          "w": 590,
+          "h": 229,
+          "label": "PRACE WEWNĘTRZNE",
+          "from": {
+            "x": 720,
+            "y": 82
+          }
+        }
+      ],
+      "cards": [],
+      "caption": "Te same A, B, C, D i czas pracy: 1,2 s od subskrypcji.",
+      "metrics": [
+        {
+          "label": "uruchomione",
+          "value": 0
+        },
+        {
+          "label": "aktywne",
+          "value": 0
+        }
+      ],
+      "queue": "Kolejka wartości: []"
+    },
+    "question": {
+      "id": "09-concatmap",
+      "title": "concatMap — Po kolei",
+      "width": 1240,
+      "height": 380,
+      "time": 6.35,
+      "logicalTime": 1.4500000000000002,
+      "nodes": [
+        {
+          "w": 190,
+          "h": 64,
+          "ri": 0,
+          "id": "source",
+          "x": 125,
+          "y": 50,
+          "label": "source$",
+          "color": "source",
+          "ready": true,
+          "visible": true,
+          "opacity": 1,
+          "fill": "#8cd0da",
+          "status": "",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 220,
+          "h": 64,
+          "ri": null,
+          "id": "op",
+          "x": 720,
+          "y": 50,
+          "label": "concatMap",
+          "color": "op",
+          "ready": true,
+          "visible": true,
+          "opacity": 1,
+          "fill": "#e7b5f1",
+          "status": "",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 240,
+          "h": 64,
+          "ri": 5,
+          "id": "observer",
+          "x": 1100,
+          "y": 50,
+          "label": "Odbiorca",
+          "ready": true,
+          "visible": true,
+          "opacity": 1,
+          "fill": "#b0a0e6",
+          "status": "",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": 1,
+          "x": 595,
+          "y": 166,
+          "workRow": true,
+          "id": "inner0",
+          "label": "A$",
+          "inner": true,
+          "born": 1,
+          "ready": false,
+          "cancelLabel": "anulowana · ABORT (klient)",
+          "visible": true,
+          "opacity": 1,
+          "fill": "#ffc15c",
+          "status": "praca trwa",
+          "notification": null,
+          "workState": "active",
+          "active": false,
+          "progress": 0.37500000000000017,
+          "showProgress": true
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": null,
+          "x": 595,
+          "y": 214,
+          "workRow": true,
+          "id": "queued1",
+          "label": "B (wartość)",
+          "color": "muted",
+          "detail": "w kolejce",
+          "instant": true,
+          "createdBy": {
+            "edge": "source-op",
+            "value": "B"
+          },
+          "until": 2.2,
+          "visible": true,
+          "opacity": 1,
+          "fill": "#e7ecef",
+          "status": "w kolejce",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": 2,
+          "x": 595,
+          "y": 214,
+          "workRow": true,
+          "id": "inner1",
+          "label": "B$",
+          "inner": true,
+          "born": 2.2,
+          "ready": false,
+          "cancelLabel": "anulowana · ABORT (klient)",
+          "visible": false,
+          "opacity": 0,
+          "fill": "#e7ecef",
+          "status": "czeka w kolejce",
+          "notification": null,
+          "workState": "queued",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": null,
+          "x": 595,
+          "y": 262,
+          "workRow": true,
+          "id": "queued2",
+          "label": "C (wartość)",
+          "color": "muted",
+          "detail": "w kolejce",
+          "instant": true,
+          "createdBy": {
+            "edge": "source-op",
+            "value": "C"
+          },
+          "until": 3.4000000000000004,
+          "visible": false,
+          "opacity": 1,
+          "fill": "#e7ecef",
+          "status": "w kolejce",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": 3,
+          "x": 595,
+          "y": 262,
+          "workRow": true,
+          "id": "inner2",
+          "label": "C$",
+          "inner": true,
+          "born": 3.4000000000000004,
+          "ready": false,
+          "cancelLabel": "anulowana · ABORT (klient)",
+          "visible": false,
+          "opacity": 0,
+          "fill": "#e7ecef",
+          "status": "",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": null,
+          "x": 595,
+          "y": 310,
+          "workRow": true,
+          "id": "queued3",
+          "label": "D (wartość)",
+          "color": "muted",
+          "detail": "w kolejce",
+          "instant": true,
+          "createdBy": {
+            "edge": "source-op",
+            "value": "D"
+          },
+          "until": 4.6000000000000005,
+          "visible": false,
+          "opacity": 1,
+          "fill": "#e7ecef",
+          "status": "w kolejce",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": 4,
+          "x": 595,
+          "y": 310,
+          "workRow": true,
+          "id": "inner3",
+          "label": "D$",
+          "inner": true,
+          "born": 4.6000000000000005,
+          "ready": false,
+          "cancelLabel": "anulowana · ABORT (klient)",
+          "visible": false,
+          "opacity": 0,
+          "fill": "#e7ecef",
+          "status": "",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        }
+      ],
+      "edges": [
+        {
+          "offset": 0,
+          "color": "#111",
+          "phase": "subscribed",
+          "id": "source-op",
+          "from": "source",
+          "to": "op",
+          "points": [
+            [
+              220,
+              50
+            ],
+            [
+              415,
+              50
+            ],
+            [
+              415,
+              50
+            ],
+            [
+              610,
+              50
+            ]
+          ],
+          "visible": true,
+          "progress": 1
+        },
+        {
+          "offset": 0,
+          "color": "#111",
+          "phase": "subscribed",
+          "id": "inner0-op",
+          "from": "inner0",
+          "to": "op",
+          "points": [
+            [
+              315,
+              166
+            ],
+            [
+              275,
+              166
+            ],
+            [
+              275,
+              100
+            ],
+            [
+              720,
+              100
+            ],
+            [
+              720,
+              82
+            ]
+          ],
+          "visible": false,
+          "progress": 1
+        },
+        {
+          "offset": 1,
+          "color": "#111",
+          "phase": "waiting",
+          "id": "inner1-op",
+          "from": "inner1",
+          "to": "op",
+          "points": [
+            [
+              315,
+              214
+            ],
+            [
+              261,
+              214
+            ],
+            [
+              261,
+              100
+            ],
+            [
+              720,
+              100
+            ],
+            [
+              720,
+              82
+            ]
+          ],
+          "visible": false,
+          "progress": 0
+        },
+        {
+          "offset": 1,
+          "color": "#111",
+          "phase": "waiting",
+          "id": "inner2-op",
+          "from": "inner2",
+          "to": "op",
+          "points": [
+            [
+              315,
+              262
+            ],
+            [
+              247,
+              262
+            ],
+            [
+              247,
+              100
+            ],
+            [
+              720,
+              100
+            ],
+            [
+              720,
+              82
+            ]
+          ],
+          "visible": false,
+          "progress": 0
+        },
+        {
+          "offset": 1,
+          "color": "#111",
+          "phase": "waiting",
+          "id": "inner3-op",
+          "from": "inner3",
+          "to": "op",
+          "points": [
+            [
+              315,
+              310
+            ],
+            [
+              233,
+              310
+            ],
+            [
+              233,
+              100
+            ],
+            [
+              720,
+              100
+            ],
+            [
+              720,
+              82
+            ]
+          ],
+          "visible": false,
+          "progress": 0
+        },
+        {
+          "offset": 0,
+          "color": "#111",
+          "phase": "subscribed",
+          "id": "op-observer",
+          "from": "op",
+          "to": "observer",
+          "points": [
+            [
+              830,
+              50
+            ],
+            [
+              905,
+              50
+            ],
+            [
+              905,
+              50
+            ],
+            [
+              980,
+              50
+            ]
+          ],
+          "visible": true,
+          "progress": 1
+        }
+      ],
+      "tokens": [],
+      "histories": [
+        {
+          "anchor": "observer",
+          "x": 1100,
+          "y": 145,
+          "w": 242,
+          "values": []
+        }
+      ],
+      "panels": [
+        {
+          "x": 300,
+          "y": 110,
+          "w": 590,
+          "h": 229,
+          "label": "PRACE WEWNĘTRZNE",
+          "from": {
+            "x": 720,
+            "y": 82
+          }
+        }
+      ],
+      "cards": [],
+      "caption": "B dotarło podczas A$. Czy B czeka jako wartość?",
+      "metrics": [
+        {
+          "label": "uruchomione",
+          "value": 1
+        },
+        {
+          "label": "aktywne",
+          "value": 1
+        }
+      ],
+      "queue": "Kolejka wartości: [B]"
+    },
+    "finished": {
+      "id": "09-concatmap",
+      "title": "concatMap — Po kolei",
+      "width": 1240,
+      "height": 380,
+      "time": 35.60000000000001,
+      "logicalTime": 6.999999999999993,
+      "nodes": [
+        {
+          "w": 190,
+          "h": 64,
+          "ri": 0,
+          "id": "source",
+          "x": 125,
+          "y": 50,
+          "label": "source$",
+          "color": "source",
+          "ready": true,
+          "visible": true,
+          "opacity": 1,
+          "fill": "#8cd0da",
+          "status": "complete",
+          "notification": null,
+          "workState": "completed",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 220,
+          "h": 64,
+          "ri": null,
+          "id": "op",
+          "x": 720,
+          "y": 50,
+          "label": "concatMap",
+          "color": "op",
+          "ready": true,
+          "visible": true,
+          "opacity": 1,
+          "fill": "#e7b5f1",
+          "status": "",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 240,
+          "h": 64,
+          "ri": 5,
+          "id": "observer",
+          "x": 1100,
+          "y": 50,
+          "label": "Odbiorca",
+          "ready": true,
+          "visible": true,
+          "opacity": 1,
+          "fill": "#087438",
+          "status": "✓ complete",
+          "notification": "complete",
+          "workState": "completed",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": 1,
+          "x": 595,
+          "y": 166,
+          "workRow": true,
+          "id": "inner0",
+          "label": "A$",
+          "inner": true,
+          "born": 1,
+          "ready": false,
+          "cancelLabel": "anulowana · ABORT (klient)",
+          "visible": true,
+          "opacity": 1,
+          "fill": "#ffc15c",
+          "status": "complete",
+          "notification": null,
+          "workState": "completed",
+          "active": false,
+          "progress": 1,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": null,
+          "x": 595,
+          "y": 214,
+          "workRow": true,
+          "id": "queued1",
+          "label": "B (wartość)",
+          "color": "muted",
+          "detail": "w kolejce",
+          "instant": true,
+          "createdBy": {
+            "edge": "source-op",
+            "value": "B"
+          },
+          "until": 2.2,
+          "visible": false,
+          "opacity": 1,
+          "fill": "#e7ecef",
+          "status": "w kolejce",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": 2,
+          "x": 595,
+          "y": 214,
+          "workRow": true,
+          "id": "inner1",
+          "label": "B$",
+          "inner": true,
+          "born": 2.2,
+          "ready": false,
+          "cancelLabel": "anulowana · ABORT (klient)",
+          "visible": true,
+          "opacity": 1,
+          "fill": "#ffc15c",
+          "status": "complete",
+          "notification": null,
+          "workState": "completed",
+          "active": false,
+          "progress": 1,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": null,
+          "x": 595,
+          "y": 262,
+          "workRow": true,
+          "id": "queued2",
+          "label": "C (wartość)",
+          "color": "muted",
+          "detail": "w kolejce",
+          "instant": true,
+          "createdBy": {
+            "edge": "source-op",
+            "value": "C"
+          },
+          "until": 3.4000000000000004,
+          "visible": false,
+          "opacity": 1,
+          "fill": "#e7ecef",
+          "status": "w kolejce",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": 3,
+          "x": 595,
+          "y": 262,
+          "workRow": true,
+          "id": "inner2",
+          "label": "C$",
+          "inner": true,
+          "born": 3.4000000000000004,
+          "ready": false,
+          "cancelLabel": "anulowana · ABORT (klient)",
+          "visible": true,
+          "opacity": 1,
+          "fill": "#ffc15c",
+          "status": "complete",
+          "notification": null,
+          "workState": "completed",
+          "active": false,
+          "progress": 1,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": null,
+          "x": 595,
+          "y": 310,
+          "workRow": true,
+          "id": "queued3",
+          "label": "D (wartość)",
+          "color": "muted",
+          "detail": "w kolejce",
+          "instant": true,
+          "createdBy": {
+            "edge": "source-op",
+            "value": "D"
+          },
+          "until": 4.6000000000000005,
+          "visible": false,
+          "opacity": 1,
+          "fill": "#e7ecef",
+          "status": "w kolejce",
+          "notification": null,
+          "workState": "idle",
+          "active": false,
+          "progress": 0,
+          "showProgress": false
+        },
+        {
+          "w": 560,
+          "h": 42,
+          "ri": 4,
+          "x": 595,
+          "y": 310,
+          "workRow": true,
+          "id": "inner3",
+          "label": "D$",
+          "inner": true,
+          "born": 4.6000000000000005,
+          "ready": false,
+          "cancelLabel": "anulowana · ABORT (klient)",
+          "visible": true,
+          "opacity": 1,
+          "fill": "#ffc15c",
+          "status": "complete",
+          "notification": null,
+          "workState": "completed",
+          "active": false,
+          "progress": 1,
+          "showProgress": false
+        }
+      ],
+      "edges": [
+        {
+          "offset": -1,
+          "color": "#087438",
+          "phase": "complete",
+          "done": true,
+          "id": "source-op",
+          "from": "source",
+          "to": "op",
+          "points": [
+            [
+              220,
+              50
+            ],
+            [
+              415,
+              50
+            ],
+            [
+              415,
+              50
+            ],
+            [
+              610,
+              50
+            ]
+          ],
+          "visible": false,
+          "progress": 0
+        },
+        {
+          "offset": -1,
+          "color": "#087438",
+          "phase": "complete",
+          "done": true,
+          "id": "inner0-op",
+          "from": "inner0",
+          "to": "op",
+          "points": [
+            [
+              315,
+              166
+            ],
+            [
+              275,
+              166
+            ],
+            [
+              275,
+              100
+            ],
+            [
+              720,
+              100
+            ],
+            [
+              720,
+              82
+            ]
+          ],
+          "visible": false,
+          "progress": 0
+        },
+        {
+          "offset": -1,
+          "color": "#087438",
+          "phase": "complete",
+          "done": true,
+          "id": "inner1-op",
+          "from": "inner1",
+          "to": "op",
+          "points": [
+            [
+              315,
+              214
+            ],
+            [
+              261,
+              214
+            ],
+            [
+              261,
+              100
+            ],
+            [
+              720,
+              100
+            ],
+            [
+              720,
+              82
+            ]
+          ],
+          "visible": false,
+          "progress": 0
+        },
+        {
+          "offset": -1,
+          "color": "#087438",
+          "phase": "complete",
+          "done": true,
+          "id": "inner2-op",
+          "from": "inner2",
+          "to": "op",
+          "points": [
+            [
+              315,
+              262
+            ],
+            [
+              247,
+              262
+            ],
+            [
+              247,
+              100
+            ],
+            [
+              720,
+              100
+            ],
+            [
+              720,
+              82
+            ]
+          ],
+          "visible": false,
+          "progress": 0
+        },
+        {
+          "offset": -1,
+          "color": "#087438",
+          "phase": "complete",
+          "done": true,
+          "id": "inner3-op",
+          "from": "inner3",
+          "to": "op",
+          "points": [
+            [
+              315,
+              310
+            ],
+            [
+              233,
+              310
+            ],
+            [
+              233,
+              100
+            ],
+            [
+              720,
+              100
+            ],
+            [
+              720,
+              82
+            ]
+          ],
+          "visible": false,
+          "progress": 0
+        },
+        {
+          "offset": -1,
+          "color": "#087438",
+          "phase": "complete",
+          "done": true,
+          "id": "op-observer",
+          "from": "op",
+          "to": "observer",
+          "points": [
+            [
+              830,
+              50
+            ],
+            [
+              905,
+              50
+            ],
+            [
+              905,
+              50
+            ],
+            [
+              980,
+              50
+            ]
+          ],
+          "visible": false,
+          "progress": 0
+        }
+      ],
+      "tokens": [],
+      "histories": [
+        {
+          "anchor": "observer",
+          "x": 1100,
+          "y": 145,
+          "w": 242,
+          "values": [
+            {
+              "at": 7.5,
+              "value": "A1",
+              "color": "a",
+              "kind": "value",
+              "logicalAt": 1.65,
+              "arrival": 8.3
+            },
+            {
+              "at": 10.450000000000003,
+              "value": "A2",
+              "color": "a",
+              "kind": "value",
+              "logicalAt": 2.05,
+              "arrival": 11.250000000000004
+            },
+            {
+              "at": 15.700000000000008,
+              "value": "B1",
+              "color": "b",
+              "kind": "value",
+              "logicalAt": 2.85,
+              "arrival": 16.500000000000007
+            },
+            {
+              "at": 18.650000000000006,
+              "value": "B2",
+              "color": "b",
+              "kind": "value",
+              "logicalAt": 3.25,
+              "arrival": 19.450000000000006
+            },
+            {
+              "at": 23.100000000000012,
+              "value": "C1",
+              "color": "c",
+              "kind": "value",
+              "logicalAt": 4.050000000000001,
+              "arrival": 23.900000000000013
+            },
+            {
+              "at": 25.25000000000001,
+              "value": "C2",
+              "color": "c",
+              "kind": "value",
+              "logicalAt": 4.45,
+              "arrival": 26.05000000000001
+            },
+            {
+              "at": 29.700000000000014,
+              "value": "D1",
+              "color": "a",
+              "kind": "value",
+              "logicalAt": 5.250000000000001,
+              "arrival": 30.500000000000014
+            },
+            {
+              "at": 31.850000000000012,
+              "value": "D2",
+              "color": "a",
+              "kind": "value",
+              "logicalAt": 5.65,
+              "arrival": 32.65000000000001
+            }
+          ]
+        }
+      ],
+      "panels": [
+        {
+          "x": 300,
+          "y": 110,
+          "w": 590,
+          "h": 229,
+          "label": "PRACE WEWNĘTRZNE",
+          "from": {
+            "x": 720,
+            "y": 82
+          }
+        }
+      ],
+      "cards": [],
+      "caption": "Outer i wymagane inner zakończyły się. Wynik: complete.",
+      "metrics": [
+        {
+          "label": "uruchomione",
+          "value": 4
+        },
+        {
+          "label": "aktywne",
+          "value": 0
+        }
+      ],
+      "queue": "Kolejka wartości: []"
+    }
+  }
+}

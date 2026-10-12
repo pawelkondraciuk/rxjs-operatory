@@ -12,7 +12,7 @@ Całość: 49 bazowych slajdów HTML, 66 po rozwinięciu wariantów, 54 animowan
 
 JavaScript, HTML i CSS, bez frameworka. Reveal.js ^6.0.2, Vite ^8.3.3, qrcode ^1.5.4. RxJS i Angular są tematami przykładów, nie zależnościami wykonawczymi: nie wykonujemy prawdziwych requestów ani potoków. QR są gotowymi SVG w public/. package.json ma type: commonjs; kod przeglądarki używa ESM przez Vite, konfiguracja .mjs, testy .cjs.
 
-Uruchomienie: npm ci, npm run dev. Weryfikacja: npm test, npm run build. Podgląd buildu: npm run preview. Adres/port odczytaj z komunikatu serwera; base to /rxjs-operatory/. Testy używają node --experimental-vm-modules --test tests/animations.test.cjs.
+Uruchomienie: npm ci, npm run dev. Weryfikacja: npm test, npm run build. Podgląd buildu: npm run preview. Adres/port odczytaj z komunikatu serwera; base to /rxjs-operatory/. Testy używają node --experimental-vm-modules --test tests/*.test.cjs. Prototypy v2: /work/framework-prototypes.html (serwer developerski); żadna scena katalogu nie ma jeszcze playback.controller: 'stages', więc MAIN/EXTRAS działają po staremu.
 
 ## Mapa plików
 
@@ -36,14 +36,19 @@ Uruchomienie: npm ci, npm run dev. Weryfikacja: npm test, npm run build. Podglą
 | animations/resolver-scenes.js | Trzy sceny finału korzystające z tego samego silnika. |
 | animations/reveal.css | Slajdy techniczne, sterowanie, legenda, czytelność, druk. |
 | custom.css, public/ | Ogólna estetyka i zasoby statyczne. |
+| animations/execution-state.js | Stan wykonań inner (running/completed/cancelled/error, HTTP osobno), liczniki z tego samego stanu. |
+| animations/stage-controller.js | Kontroler etapów (playback.controller: 'stages'): →/←, Spacja, M, R, F; wspólny dla QA i Reveal. |
+| animations/reveal-stages.js | Podpięcie kontrolera etapów do klawiatury i fragmentów Reveal. |
+| animations/prototype-scenes.js | Prototypy v2 (concatMap, switchMap, mergeMap, exhaustMap, catchError wewnątrz/na zewnątrz, przypadki kontrolne); tylko podgląd QA. |
 | tests/animations.test.cjs | Semantyka, geometria, klatki, RAF, warianty i resolver. |
+| tests/*-v2.test.cjs | Model, widok, sterowanie i prototypy v2 (wspólny v2-harness.cjs). |
 | work/ | Materiały pomocnicze i podgląd QA, nie źródło treści. |
 
 Audyt/migracja: zachowano Reveal, rows, lifecycle i planowanie dwóch osi czasu. Wydzielono prymitywy, renderer, kompilator i konfiguracje grafów. Usunięto osobny operator.js oraz wybór renderera według ID w playerze. Szczegółowe starsze grafy są adapterami danych. Nie dodawaj rendererów per slajd, osobnych RAF, GSAP, canvas ani Reveal Auto-Animate.
 
 ## Kontrakt sceny
 
-Scena ma id, title, tekst code, duration (czas modelu), rows, captions, metrics oraz opcjonalnie graph i playback. Wiersz: {label, events, spans, completeAt?}. Zdarzenie: {at,value,color,kind}. Przedział: {start,end,label,color,kind,duration?}; rodzaje work, queue, cancel, subscription, state, window, error. Brak completeAt nie oznacza końca przy ostatniej wartości. duration przedziału zachowuje potencjalny czas pracy po anulowaniu, żeby pasek nie dochodził do 100%.
+Scena ma id, title, tekst code, duration (czas modelu), rows, captions, metrics oraz opcjonalnie graph i playback. Wiersz: {label, events, spans, completeAt?}. Zdarzenie: {at,value,color,kind}. Przedział: {start,end,label,color,kind,duration?}; rodzaje work, queue, cancel, subscription, state, window, error. Brak completeAt nie oznacza końca przy ostatniej wartości. duration przedziału zachowuje potencjalny czas pracy po anulowaniu, żeby pasek nie dochodził do 100%. graph.illustratedWork:true (prototypy v2) liczy pasek w czasie ilustracji od subskrypcji do complete/unsubscribe/błędu HTTP, więc nie staje podczas przelotu wartości; wiersz dostaje complete razem z pełnym paskiem. Bez flagi zachowanie jest dotychczasowe.
 
 Katalog ma późniejsze revise(...) i variants nadpisujące wcześniejsze definicje. configureReferences() działa przed checkpointami katalogu. configureScene() działa po wybraniu wariantu w prepareSlides(): tam ustawiaj konfigurację zależną od wariantu.
 
@@ -52,7 +57,7 @@ graph jest obiektem albo czystą funkcją sceny. Ma nodes, edges, trays oraz opc
 - Węzły: stabilne id, label, ri (wiersz), work/inner/timer, ready, born lub createdBy:{edge,value}. Cały graf rezerwuje układ przed odtwarzaniem. ready:true pokazuje niepołączonych uczestników, createdBy ujawnia inner dopiero po dotarciu wejścia do projekcji.
 - Krawędzie: from, to, events, opcjonalnie logicalStart, logicalEnd:{at,kind}, gateWork, internal, points. internal zachowuje semantykę subskrypcji w planie, ale nie rysuje kabla ani tokenów wewnętrznej krawędzi. Subscribe idzie od odbiorcy ku źródłu; next/complete/error ku odbiorcy. Unsubscribe usuwa połączenia od odbiorcy ku źródłu. gateWork zaczyna inner po dotarciu wejścia i zakończeniu starej subskrypcji.
 - layoutDiagram układa poziome kolumny pipeline/fan-out/fan-in. layout: fixed rezerwuje współrzędne. Niezależne przykłady nie dostają sztucznych zależności. W obu układach działa jeden renderer.
-- panels i workRow to ogólne prymitywy panelu prac. Flattening pokazuje source → operator → odbiorca u góry, listę prac niżej, bez kresek subskrypcji do wierszy. Wpis kolejki jest szary od pierwszej klatki; żółty oznacza aktywną pracę. Wartość oczekująca w concatMap jest osobnym wierszem kolejki (bez inner i subskrypcji). concatAll pokazuje już utworzone Observable. Complete, praca, kolejka i anulowanie mają tekstowy stan, nie tylko kolor.
+- panels i workRow to ogólne prymitywy panelu prac. Flattening pokazuje source → operator → odbiorca u góry, listę prac niżej, bez kresek subskrypcji do wierszy. Wpis kolejki jest szary od pierwszej klatki; żółty oznacza aktywną pracę. Wartość oczekująca w concatMap jest osobnym wierszem kolejki (bez inner i subskrypcji). Prototypy v2 (nie obecne slajdy) mają panel ze slotami (panel.slots/rowsTop/rowStep): każda wartość ma stałe miejsce, „B (wartość)” wchodzi fade-in przy dotarciu i przechodzi w B$; trzy kolumny bez napisów w panelach (o HTTP mówi podpis na dole): emisje pod źródłem, prace wewnętrzne pod wyśrodkowanym operatorem, odbiór pod odbiorcą (statusInside; historia po kolei w siatce tray.columns/lines/lineStep: emisje w 1 kolumnie, odbiór w 2 kolumnach w kolejności dotarcia, szeroka kapsułka zajmuje całą linię; kapsułki wchodzą fade-in 0,3 s od shownAt (emisja albo dotarcie); wiersze prac w stałej siatce 4 slotów od góry; mergeMap ma przeplot C/D: A1 A2 B1 B2 C1 D1 D2 C2); wynik inner wraca do operatora krótko i niewidocznie (edge.travel), więc kulka wychodzi z operatora. concatAll pokazuje już utworzone Observable. Complete, praca, kolejka i anulowanie mają tekstowy stan, nie tylko kolor.
 - trays:{anchor,x,y,w} przypina historię. Next zachowuje duplikaty; deduplicate:true jest jawną wizualizacją Set. Historia odbiorcy zmienia się dopiero po dotarciu tokena.
 - timeline dodaje jawne zdarzenia/podpisy. schedule pozwala określić tempo ilustracji map/microtask w formacie rekordów zgodnym z planFlow, bez drugiego zegara.
 - tokens domyślnie używa czasu ilustracji; modelTime:true przelicza at/until przez plan.timeOf. Pozwala pokazać emisję przy źródle już po odłączeniu subskrypcji.

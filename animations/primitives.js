@@ -30,7 +30,13 @@ export function pointAt(points, progress) {
   }
   return points.at(-1);
 }
-export function token(x,y,value,color='a',attrs='',maxWidth=150) {
+export function fitLabel(value,max=19) {
+  const chars=Array.from(String(value));
+  return chars.length<=max?String(value):chars.slice(0,Math.max(0,max-1)).join('')+'…';
+}
+export function token(x,y,value,color='a',attrs='',maxWidth=150,truncate=false) {
   const width=Math.min(maxWidth,Math.max(46,String(value).length*13+20));
-  return `<g ${attrs}><rect x="${x-width/2}" y="${y-23}" width="${width}" height="46" rx="23" fill="${colors[color]||color}" stroke="#fff" stroke-width="3"/>${text(x,y+1,value,23)}</g>`;
+  const label=truncate?fitLabel(value,Math.max(1,Math.floor((width-20)/13))):String(value);
+  const title=label===String(value)?'':`<title>${esc(value)}</title>`;
+  return `<g ${attrs}>${title}<rect x="${x-width/2}" y="${y-23}" width="${width}" height="46" rx="23" fill="${colors[color]||color}" stroke="#fff" stroke-width="3"/>${text(x,y+1,label,23)}</g>`;
 }
