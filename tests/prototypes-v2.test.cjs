@@ -175,7 +175,7 @@ test('work rows stack from the top of the panel in a fixed four-slot grid',async
  for(const scene of scenes){
   const panel=compile(scene).snapshot(0).panels.find(p=>p.id==='jobs');
   assert.equal(panel.rowsTop,panel.y+16);
-  assert.ok(Math.abs(panel.rowStep-(panel.rowHeight+16))<1e-9,scene.id);
+  assert.ok(Math.abs(panel.rowStep-(panel.rowHeight+20))<1e-9,scene.id);
   assert.ok(Math.abs(panel.rowsTop+3*panel.rowStep+panel.rowHeight-(panel.y+panel.h-16))<1e-9,scene.id);
  }
 });

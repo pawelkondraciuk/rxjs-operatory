@@ -1,4 +1,4 @@
-import { configureFlatten, configureConcurrency, flattenGraph } from './reference-scenes.js';
+import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback } from './reference-scenes.js';
 import { configureCatch } from './catch-scenes.js';
 
 export const extraIds = new Set(['b01-defer','b02-first-take','b03-buffertime','b05-finalize','b06-forkjoin','b07-zip','b08-merge','b09-pairwise',
@@ -9,11 +9,15 @@ export function configureScene(scene) {
   const id=scene.rendererId||scene.id;
   if(['09-concatmap','10-mergemap','12-exhaustmap'].includes(id))configureFlatten(scene,{
     '09-concatmap':'concatMap','10-mergemap':'mergeMap','12-exhaustmap':'exhaustMap'}[id]);
-  if(id==='12a-complete')scene.graph=flattenGraph;
+  if(id==='12a-complete'){
+    scene.jobs=scene.jobs.map(job=>({...job,dur:6}));
+    scene.rows=scene.rows.map(row=>({...row,spans:row.spans.map(span=>['work','cancel'].includes(span.kind)?{...span,duration:6}:span)}));
+    scene.graph=flattenGraph;configureFlattenPlayback(scene);
+  }
   if(id==='13-limit')configureConcurrency(scene);
   if(id==='b04-catcherror')configureCatch(scene);
   scene.group=extraIds.has(id)?'bonus':'main';
-  if(scene.playback?.stops)return scene;
+  if(scene.flattenLayout||scene.playback?.stops)return scene;
   const question={
     '05-zrodla':scene.sourceExample===2?12:scene.sourceExample===1?1:2,
     '06-subskrypcja':6,'06a-cold-hot':6,'07-hot-cold':3,'18-async':1,

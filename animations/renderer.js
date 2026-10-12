@@ -61,10 +61,10 @@ function slotPanel(frame,panel) {
   const nodes=frame.nodes||[],slotOf=id=>nodes.find(n=>n.id===id)?.slot;
   const started=new Set(executions.map(e=>e.id)),busy=new Set(executions.map(e=>e.node));
   const waiting=nodes.filter(n=>n.visible&&n.workRow&&n.panel===panel.id&&!busy.has(n.id)&&!(n.execution&&started.has(n.execution))).map(n=>({
-    ...n,type:n.inner?'subscribing':n.dropped&&n.status!=='w kolejce'?'dropped':n.status==='pominięte'?'ignored':'queued'}));
+    ...n,type:n.inner&&n.workState!=='queued'?'subscribing':n.dropped&&n.status!=='w kolejce'?'dropped':n.status==='pominięte'?'ignored':'queued'}));
   // Wiersz kolejki znika, gdy subskrybowany B$ w tym samym slocie skończy fade-in.
-  const covered=new Set(waiting.filter(r=>r.type==='subscribing'&&(r.opacity??1)>=1).map(r=>r.execution));
-  const rows=[...waiting.filter(r=>r.type==='subscribing'||!covered.has(r.execution)),...executions.map(e=>({...e,type:'execution',slot:slotOf(e.node),opacity:1,focused:e.id===frame.focusedExecutionId}))];
+  const covered=new Set(waiting.filter(r=>r.inner&&(r.opacity??1)>=1).map(r=>r.execution));
+  const rows=[...waiting.filter(r=>r.inner||!covered.has(r.execution)),...executions.map(e=>({...e,type:'execution',slot:slotOf(e.node),opacity:1,focused:e.id===frame.focusedExecutionId}))];
   const rowWidth=panel.w-32,x=panel.x+16,h=panel.rowHeight;
   let svg='';
   if(panel.recipe&&executions.length)

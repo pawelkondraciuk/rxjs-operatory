@@ -25,7 +25,7 @@ export function mapGraph(scene) {
   };
 }
 
-export function flattenGraph(scene) {
+function buildFlattenGraph(scene) {
   const all=scene.operatorName==='concatAll',sourceY=50,operatorX=all?780:720;
   const nodes=[
     {id:'source',x:125,y:sourceY,w:190,h:64,label:scene.http?'id$':'source$',ri:0,color:'source',ready:true},
@@ -62,6 +62,105 @@ export function flattenGraph(scene) {
   };
 }
 
+// Wspólny układ rodziny flatteningu: trzy kolumny. Pod źródłem EMISJE, pod wyśrodkowanym operatorem PRACE WEWNĘTRZNE,
+// pod odbiorcą ODBIÓR. Panele mają odstęp od kafelków i od dołu; wiersze zajmują stałe sloty na całej wysokości.
+const frame = {height:460,tileY:50,tileH:76,panelY:148,panelBottom:440,panelW:520,sideW:220,sourceX:140,opX:620,observerX:1100,catchX:860};
+
+export function flattenGraph(scene) {
+  const graph = buildFlattenGraph(scene);
+  const outerCatch = scene.catchScope === 'outer';
+  const panelX = frame.opX;
+  const paired = scene.operatorName === 'concatAll';
+  const opX = paired ? panelX+(frame.panelW-240)/2 : panelX;
+  // Panele są bez napisów; to, że praca jest HTTP, mówi podpis na dole.
+  const slots = scene.jobs.length + (scene.discardedSlot ? 1 : 0);
+  const rowsTop = frame.panelY + 16, rowsBottom = frame.panelBottom - 16, gap = 20;
+  // Stała siatka czterech slotów od góry: mniej prac układa się jedna pod drugą, bez rozciągania odstępów.
+  const grid = Math.max(4,slots), rowHeight = (rowsBottom-rowsTop-(grid-1)*gap)/grid, rowStep = rowHeight+gap;
+  Object.assign(graph,{height:frame.height,queue:null,illustratedWork:true});
+  const tile = {y:frame.tileY,h:frame.tileH};
+  graph.nodes.forEach(n => {
+    // Etykieta źródła jak w kodzie przykładu (source$ albo id$).
+    if (n.id === 'source') Object.assign(n,tile,{x:frame.sourceX,w:200,label:scene.code.startsWith('id$.')?'id$':'source$',statusInside:true});
+    if (n.id === 'op') Object.assign(n,tile,{x:opX,w:240});
+    if (n.id === 'projection') Object.assign(n,tile,{x:panelX-(frame.panelW-240)/2,w:240,label:'map',statusInside:true});
+    if (n.id === 'observer') Object.assign(n,tile,{x:frame.observerX,w:200,statusInside:true});
+    if (!n.workRow) return;
+    // Każda wartość ma własny slot: „B (wartość)” w kolejce, potem B$ w tym samym miejscu.
+    const [, kind, index] = /^(queued|inner|ignored)(\d+)$/.exec(n.id) || [];
+    if (!kind) return;
+    const job = scene.jobs[Number(index)];
+    Object.assign(n,{x:panelX,y:rowsTop+Number(index)*rowStep+rowHeight/2,w:frame.panelW-32,h:rowHeight});
+    Object.assign(n,{panel:'jobs',slot:Number(index),execution:job.value});
+    if (kind === 'queued' || kind === 'ignored') delete n.instant;
+    if (kind === 'inner') n.label=job.value+'$';
+  });
+  // Emisje źródła po kolei w jednej kolumnie, odbiór po kolei w dwóch kolumnach (kolejność dotarcia).
+  const lines = {y:rowsTop+rowHeight/2,w:frame.sideW-24,lines:grid,lineStep:rowStep};
+  graph.trays = [{anchor:'source',x:frame.sourceX,columns:1,...lines},{anchor:'observer',x:frame.observerX,columns:2,...lines}];
+  const resultRow = scene.rows.at(-1);
+  const source = graph.edges.find(e => e.from === 'source');
+  source.logicalEnd = scene.sourceEnd || {at:scene.rows[0].completeAt,kind:'complete'};
+  const output = graph.edges.find(e => e.from === 'op' && e.to === 'observer');
+  output.logicalEnd = scene.resultEnd || {at:resultRow.completeAt,kind:'complete'};
+  if (outerCatch) {
+    graph.nodes.push({id:'catch',...tile,x:frame.catchX,w:170,label:'catchError',color:'op',ready:true});
+    output.from = 'catch';
+    output.logicalEnd = {at:resultRow.completeAt,kind:'complete'};
+    graph.edges.push({from:'op',to:'catch',events:resultRow.events.filter(e=>e.value!=='fallback'),
+      logicalStart:.3,logicalEnd:scene.innerResultEnd});
+  }
+  // Źródło i operatory pokazują własny terminal, nie zakończenie odbiorcy.
+  for(const node of graph.nodes) {
+    if(['source','projection','op','catch'].includes(node.id)) {
+      const output=graph.edges.find(edge=>edge.from===node.id&&!edge.internal);
+      node.terminalEdge=output.id||output.from+'-'+output.to;
+    }
+  }
+  // Indeks pracy jest indeksem wejścia (jak w flattenGraph), także gdy exhaustMap pominął część wartości.
+  graph.executions = [...scene.jobs.entries()].filter(([,j])=>!j.ignored).map(([i,j])=>({
+    id:j.value,node:'inner'+i,edge:'inner'+i+'-op',panel:'jobs',value:j.value,
+    label:j.value+'$',duration:j.dur??j.end-j.start,handlerLabel:scene.catchScope==='inner'?'catchError':undefined,
+  }));
+  for (const edge of graph.edges) {
+    if (edge.from.startsWith('inner')) {
+      const job = scene.jobs[Number(edge.from.slice(5))];
+      edge.events = edge.events.map(e=>({...e,execution:job.value}));
+      // Wynik inner nie leci widocznie z wiersza: krótki, niewidoczny powrót i emisja z operatora.
+      edge.travel = .15;
+      edge.logicalEnd = {at:job.end,kind:job.cancelled?'unsubscribe':job.errored?'error':'complete'};
+    }
+  }
+  const panelH = frame.panelBottom-frame.panelY, below = x => ({x,y:frame.tileY+frame.tileH/2});
+  const side = x => ({x:x-frame.sideW/2,y:frame.panelY,w:frame.sideW,h:panelH,from:below(x)});
+  graph.panels = [
+    side(frame.sourceX),
+    {id:'jobs',x:panelX-frame.panelW/2,y:frame.panelY,w:frame.panelW,h:panelH,from:below(opX),slots,rowsTop,rowStep,rowHeight},
+    side(frame.observerX),
+  ];
+  graph.timeline = [...(graph.timeline||[]),...(scene.timeline||[])];
+  return graph;
+}
+
+// mergeMap: A i B jak w innych strategiach, ale C pracuje dłużej, a D krócej. Emisje C i D się przeplatają,
+// D kończy przed C, więc odbiór dostaje A1 A2 B1 B2 C1 D1 D2 C2.
+function overlapTail(scene) {
+  const tail = {C:{dur:1.9,offsets:[.65,1.65]},D:{dur:.9,offsets:[.35,.65]}};
+  for (const [i,job] of scene.jobs.entries()) {
+    const plan = tail[job.value];
+    if (!plan) continue;
+    Object.assign(job,{dur:plan.dur,end:job.start+plan.dur});
+    Object.assign(scene.rows[i+1],{
+      events:plan.offsets.map((offset,k)=>E(job.start+offset,job.value+(k+1),job.color)),
+      spans:[B(job.start,job.end,job.value,'work',{duration:plan.dur})],completeAt:job.end});
+  }
+  const end = Math.max(...scene.jobs.map(j=>j.end));
+  Object.assign(scene.rows.at(-1),{events:scene.rows.slice(1,-1).flatMap(r=>r.events).sort((a,b)=>a.at-b.at),completeAt:end});
+  scene.duration = end+1.2;
+  scene.captions.at(-1)[0] = end;
+  scene.timeline=[{type:'reception-order',event:{type:'deliver-next',edge:'op-observer',value:'D1'},caption:'D1 dotarło przed C2: mergeMap nie zachowuje kolejności wejść.'}];
+}
+
 export function configureFlatten(scene,mode) {
   const all=mode==='concatAll';
   // Wspólne wejście i potencjalny czas pracy dla czterech strategii.
@@ -88,7 +187,7 @@ export function configureFlatten(scene,mode) {
   const incoming=all?'projection-op':'source-op';
   Object.assign(scene,{rows,jobs,operatorName:mode,http:mode==='switchMap',graph:flattenGraph,duration:completed+1.2,
     code:all?'source$.pipe(map(id => request$(id)), concatAll())':mode==='switchMap'?'id$.pipe(switchMap(id => http.get(`/api/users/${id}`)))':`source$.pipe(${mode}(makeInner$))`,
-    captions:[[0,all?'map tworzy zimne Observable; concatAll subskrybuje po kolei.':'Te same A, B, C, D i czas pracy: 1,2 s od subskrypcji.'],
+    captions:[[0,all?'map tworzy zimne Observable; concatAll subskrybuje po kolei.':mode==='mergeMap'?'Te same A/B/C/D: C pracuje dłużej, D krócej — kolejność wyników może się zmienić.':mode==='switchMap'?'Każde wejście uruchamia HTTP; nowe ID odłącza poprzednią subskrypcję.':'Te same A, B, C, D i czas pracy: 1,2 s od subskrypcji.'],
       [1,'A uruchamia pierwszą pracę.'],[1.45,question],[1.9,all?'B$ i C$ czekają bez pracy HTTP.':mode==='switchMap'?'Unsubscribe przerywa klienta; dopiero potem rusza nowe HTTP.':mode==='exhaustMap'?'B i C pominięte. Ich inner nie powstają.':'Strategia operatora określa kolejkę lub współbieżność.'],
       [2.7,mode==='exhaustMap'?'A$ skończyło się. D może uruchomić nowy inner.':'Wartości z aktywnych inner trafiają do odbiorcy.'],[completed,'Outer i wymagane inner zakończyły się. Wynik: complete.']],
     playback:manual([
@@ -98,6 +197,21 @@ export function configureFlatten(scene,mode) {
       {id:'question',...(all?{modelTime:1.4}:{event:{type:'deliver-next',edge:incoming,value:'B'}}),caption:question},
     ]),metrics:[{label:'uruchomione',value:t=>jobs.filter(j=>!j.ignored&&j.start<=t).length},{label:'aktywne',value:t=>jobs.filter(j=>!j.ignored&&j.start<=t&&t<j.end).length}],
   });
+  if(mode==='mergeMap')overlapTail(scene);
+  configureFlattenPlayback(scene);
+}
+
+export function configureFlattenPlayback(scene) {
+  const mode=scene.operatorName;
+  scene.flattenLayout=true;
+  scene.playerLayout='expanded';
+  scene.metrics=[{label:'uruchomione',count:'started'},{label:'aktywne',count:'active'}];
+  if(scene.playback?.stops)scene.playback={...scene.playback,finish:'hold',stops:scene.playback.stops.map(stop=>
+    stop.id==='first'||stop.id==='question'&&mode==='concatMap'?{...stop,offset:.35}:stop)};
+  else scene.playback={entry:'auto',finish:'hold'};
+  const final=scene.captions.at(-1);
+  if(final?.[0]===scene.rows.at(-1).completeAt)scene.captions=scene.captions.slice(0,-1);
+  scene.timeline=[...(scene.timeline||[]),{type:'result-summary',event:{type:'stream-complete',edge:'op-observer'},offset:.81,caption:final?.[1]||'Ostatni inner zakończony. Wynik: complete.'}];
 }
 
 export function configureReferences(scenes) {
@@ -121,10 +235,12 @@ export function configureReferences(scenes) {
 export function configureConcurrency(scene) {
   const jobs=scene.rows.map(r=>{
     const work=r.spans.find(p=>p.kind==='work');
-    return {value:r.label,at:Math.min(...r.spans.map(p=>p.start)),start:work.start,end:work.end};
+    return {value:r.label,at:Math.min(...r.spans.map(p=>p.start)),start:work.start,end:work.end,dur:work.end-work.start};
   });
   const end=Math.max(...jobs.map(j=>j.end)),result=scene.rows.flatMap(r=>r.events).sort((a,b)=>a.at-b.at);
   scene.rows=[R('source$',jobs.map(j=>E(j.at,j.value)),[],{completeAt:5}),
     ...scene.rows.map((r,i)=>({...r,completeAt:jobs[i].end})),R('wynik',result,[],{completeAt:end})];
   Object.assign(scene,{jobs,operatorName:'mergeMap · limit 3',outerCompleteAt:5,graph:flattenGraph});
+  configureFlattenPlayback(scene);
+  scene.metrics=[{label:'aktywne / 3',count:'active'},{label:'w kolejce',value:t=>jobs.filter(j=>j.at<=t&&t<j.start).length}];
 }

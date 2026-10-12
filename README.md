@@ -13,7 +13,9 @@ npm run dev
 
 Otwórz adres podany przez serwer ze ścieżką `/rxjs-operatory/`. `npm run build` buduje prezentację, `npm run preview` uruchamia podgląd zbudowanej wersji. `S` otwiera widok prelegenta z notatkami, `Esc` widok wszystkich slajdów. Strzałki i Page Up/Page Down obsługują nawigację Reveal.js; fragmenty odsłaniają zdjęcia i listy.
 
-Sceny MAIN z pytaniami zaczynają od nieruchomego READY. Prawo / Page Down uruchamia kolejny postój; lewo cofa. Dopiero następny klik po ostatnim pytaniu uruchamia AUTO na tym samym slajdzie. Automat zatrzymuje się na wyniku FINISHED. U pokazuje dolne sterowanie, A przechodzi z ręcznego do auto lub pauzuje/wznawia auto, M zmienia tryb, [ i ] zmieniają krok, R zaczyna od początku. W AUTO strzałki zmieniają slajdy. Tryb, postój i pauza są pamiętane przy powrocie. EXTRAS domyślnie powtarzają pokaz, z wyjątkiem rodzin mających własne postoje.
+Sceny MAIN z pytaniami zaczynają od nieruchomego READY. Prawo / Page Down uruchamia kolejny etap do postoju; ponowne naciśnięcie podczas ruchu natychmiast pokazuje koniec tego etapu i zatrzymuje animację. Następny klik uruchamia kolejny etap; lewo cofa. Pomijanie ruchu działa również przyciskiem „dalej” i pilotem. Dopiero następny klik po ostatnim pytaniu uruchamia AUTO na tym samym slajdzie. Automat zatrzymuje się na wyniku FINISHED. U pokazuje dolne sterowanie, A przechodzi z ręcznego do auto lub pauzuje/wznawia auto, M zmienia tryb, [ i ] zmieniają krok, R zaczyna od początku. W AUTO prawo / Page Down najpierw pokazuje nieruchomy wynik całej animacji; dopiero kolejne naciśnięcie zmienia slajd. Dotyczy to również pilota i przycisków „dalej”. Lewo wraca do poprzedniego slajdu. Tryb, postój i pauza są pamiętane przy powrocie. EXTRAS domyślnie powtarzają pokaz, z wyjątkiem rodzin mających własne postoje.
+
+W oknie prelegenta (`S`) podgląd następnego slajdu domyślnie pokazuje dużą nazwę, np. **switchMap**, i krótki podtytuł. Wskazuje kolejny slajd, także podczas ręcznych postojów bieżącej animacji. Przełącznik **Podgląd: Tytuł / Slajd** w prawym dolnym rogu tego pola przywraca standardowy podgląd. Wybór jest zapamiętywany w przeglądarce. Notatki pozostają w standardowym polu Notes. Opcjonalne `data-speaker-title` na sekcji ustawia własny podpis wyłącznie dla prelegenta.
 
 Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek.
 
@@ -291,9 +293,14 @@ Brak notatek w HTML.
 | --- | --- | --- |
 | 08-map-strumienie | A jeśli wartością jest Observable? | `map(id => request$(id)) → concatAll()` |
 
-**Na bloczkach:** source$ → map → concatAll → Odbiorca. Panel PRACE WEWNĘTRZNE pokazuje A$, B$, C$. Utworzone B$ i C$ czekają bez uruchomionego HTTP; A$ ma pasek pracy. Kolejne complete uruchamiają następny inner. Wynik: A1, A2, B1, B2, C1, C2.
+**Na bloczkach:** source$ → map → concatAll → Odbiorca. Środkowy panel bez nagłówka pokazuje A$, B$, C$ w stałych miejscach. Utworzone B$ i C$ czekają bez uruchomionego HTTP; A$ ma pasek pracy. Kolejne complete uruchamiają następny inner. Wynik: A1, A2, B1, B2, C1, C2.
 
-**Speaker notes:** Rozróżnij wartość A od referencji A$. map tworzy zimne Observable przy wejściu; dopiero concatAll subskrybuje je kolejno. Zatrzymaj pokaz, gdy A$ pracuje, a B$/C$ już istnieją.
+**Speaker notes:**
+
+- **Pytanie:** A$ pracuje, B$/C$ czekają — ile HTTP działa? Jeden.
+- **map:** Tworzy zimne Observable; samo utworzenie nie uruchamia HTTP.
+- **concatAll:** Subskrybuje po kolei: A$ → B$ → C$.
+- **Różnica:** concatAll kolejkuje Observable; concatMap wartości przed projekcją.
 
 ### concatMap — `09-concatmap`
 
@@ -305,7 +312,12 @@ Brak notatek w HTML.
 
 **Na bloczkach:** source$ → concatMap → Odbiorca oraz panel prac. Wspólne wejście A, B, C, D; praca trwa 1,2 s od subskrypcji. A$ ma pasek, oczekujące B/C/D pozostają wartościami, nie aktywnymi HTTP. Po complete poprzednika projekcja tworzy następny inner. Wynik A1, A2, B1, B2, C1, C2, D1, D2.
 
-**Speaker notes:** Postój B podczas A służy pytaniu o kolejkę. W odróżnieniu od concatAll kolejkujemy wartości przed projekcją. Każde wejście zostaje obsłużone; kolejka zwiększa opóźnienie.
+**Speaker notes:**
+
+- **Pytanie:** B przychodzi podczas A$ — czy powstało już B$? Nie.
+- **Kolejka:** B/C/D czekają jako wartości; jeszcze bez projekcji i HTTP.
+- **Moment:** Complete A$ → projekcja B → subskrypcja B$.
+- **Wniosek:** Jedna praca naraz; kolejność zachowana, kolejka zwiększa opóźnienie.
 
 ### mergeMap — `10-mergemap`
 
@@ -315,9 +327,14 @@ Brak notatek w HTML.
 | --- | --- | --- |
 | 10-mergemap | mergeMap — Równocześnie | `source$.pipe(mergeMap(makeInner$))` |
 
-**Na bloczkach:** source$ → mergeMap → Odbiorca oraz panel A$/B$/C$/D$. Te same wejścia i czas pracy co w pozostałych strategiach. Paski prac nakładają się, wyniki przeplatają; complete dotyczy każdego inner osobno.
+**Na bloczkach:** source$ → mergeMap → Odbiorca oraz panel A$/B$/C$/D$. Te same wejścia A/B/C/D; A i B emitują po kolei, C pracuje 1,9 s, a D 0,9 s. C i D się nakładają, D kończy przed C. Odbiór pokazuje A1 A2 / B1 B2 / C1 D1 / D2 C2 w kolejności dotarcia; complete dotyczy każdego inner osobno.
 
-**Speaker notes:** B nie czeka na A. Domyślnie brak limitu współbieżności. Zwróć uwagę na liczbę aktywnych prac i kolejność wyników.
+**Speaker notes:**
+
+- **Pytanie:** A$ trwa, przychodzi B — czeka czy startuje? Startuje.
+- **Równolegle:** Każde wejście uruchamia inner; domyślnie bez limitu współbieżności.
+- **Przeplot:** C$ trwa dłużej, D$ kończy wcześniej: C1 → D1 → D2 → C2.
+- **Wniosek:** Odbiór według dotarcia; kolejność wejść nie gwarantuje kolejności wyników.
 
 ### switchMap — `11-switchmap`
 
@@ -327,9 +344,14 @@ Brak notatek w HTML.
 | --- | --- | --- |
 | 11-switchmap | switchMap — Najnowsza subskrypcja | ``id$.pipe(switchMap(id => http.get(`/api/users/${id}`)))`` |
 
-**Na bloczkach:** id$ → switchMap → Odbiorca; panel HTTP A/B/C/D. Postój przy B następuje, gdy HTTP A nadal pracuje. Dalej: unsubscribe A, zatrzymany pasek i „anulowana · ABORT (klient)”, następnie start B. Kolejne wejścia anulują B i C; tylko D dostarcza odpowiedź i complete.
+**Na bloczkach:** id$ → switchMap → Odbiorca; stałe wiersze A$/B$/C$/D$; o HTTP mówi podpis na dole. Postój przy B następuje, gdy HTTP A nadal pracuje. Dalej: unsubscribe A, zatrzymany pasek i „ABORT (klient)”, następnie start B. Kolejne wejścia anulują B i C; tylko D dostarcza odpowiedź i complete.
 
-**Speaker notes:** Nowa wartość usuwa poprzednią subskrypcję przed projekcją nowego inner. Teardown zatrzymuje pracę klienta. Anulowana praca nie staje się complete i nie dostarcza późniejszej odpowiedzi. Nie oznacza to cofnięcia zmian już wykonanych na serwerze.
+**Speaker notes:**
+
+- **Pytanie:** B przychodzi podczas HTTP A — co stanie się z A$?
+- **Moment:** Unsubscribe A$ → dopiero start B$; pasek A zatrzymany.
+- **Wynik:** B/C/D zastępują poprzednika; tylko D dostarcza odpowiedź.
+- **Pułapka:** ABORT klienta ≠ cofnięcie operacji serwera; unsubscribe ≠ complete.
 
 ### exhaustMap — `12-exhaustmap`
 
@@ -341,7 +363,12 @@ Brak notatek w HTML.
 
 **Na bloczkach:** source$ → exhaustMap → Odbiorca; panel A$ i D$. B oraz C są oznaczone jako pominięte wejścia: ich inner nie powstają. D pojawia się już po zakończeniu A. Wynik A1, A2, D1, D2.
 
-**Speaker notes:** Identyczny harmonogram A/B/C/D jak w pozostałych strategiach. Podczas aktywnego A nowe B/C nie są kolejkowane ani projektowane.
+**Speaker notes:**
+
+- **Pytanie:** A$ trwa, przychodzi B — czy powstanie B$? Nie.
+- **Pominięcie:** B i C bez projekcji, inner i kolejki.
+- **Moment:** Po complete A$ dopiero nowe D uruchamia D$.
+- **Wniosek:** Trwająca praca ma pierwszeństwo; wynik A1/A2, D1/D2.
 
 ### source$: complete — `12a-complete`
 
@@ -362,7 +389,10 @@ Brak notatek w HTML.
 
 **Speaker notes:**
 
-> Complete źródła zewnętrznego nie odsubskrybowuje automatycznie aktywnego inner. concatMap obsługuje jeszcze wartości w kolejce i czeka na wszystkie inner; switchMap czeka na aktualny inner. Gdy inner nigdy się nie kończy, wynik może nadal nie emitować complete. Nie należy mylić complete źródła z unsubscribe całego potoku.
+- **Pytanie:** Źródło robi complete — czy wynik też już kończy?
+- **concatMap:** Dokańcza aktywny inner i całą kolejkę.
+- **switchMap:** Czeka na aktualny inner; jego complete kończy wynik.
+- **Pułapka:** Complete źródła ≠ unsubscribe; inner bez końca może blokować complete wyniku.
 
 ### 100 zadań. Ile naraz? — `13-limit`
 
@@ -378,7 +408,10 @@ Brak notatek w HTML.
 
 **Speaker notes:**
 
-> Limit ogranicza liczbę aktywnych subskrypcji wewnętrznych. Dalsze wejścia są buforowane, więc limit nie jest pełnym mechanizmem backpressure.
+- **Pytanie:** Pięć wejść, limit 3 — ile prac działa naraz?
+- **Start:** A/B/C aktywne; D/E czekają jako wartości.
+- **Moment:** Complete jednej pracy zwalnia miejsce następnej.
+- **Wniosek:** Limit współbieżności ≠ limit requestów/s; kolejka nadal może rosnąć.
 
 ## Ograniczanie emisji i wyzwalanie pracy
 
@@ -809,6 +842,20 @@ Scena `01-tytul` istnieje w katalogu, ale nie jest podpięta do slajdów; widocz
 
 ## Weryfikacja i podgląd
 
-Wszystkie animowane warianty korzystają z jednego kompilatora, renderera SVG i odtwarzacza. Panel prac wewnętrznych nie ma kresek subskrypcji do wierszy. Kolejka jest szara od pierwszej klatki. Panel jest wspólnym prymitywem: pasek pracy, complete, kolejka i anulowanie mają również opis tekstowy. Diagram oraz istniejący podpis mieszczą się nad dolnymi 20% slajdu; opcjonalne sterowanie jest niżej.
+Wszystkie animowane warianty korzystają z jednego kompilatora, renderera SVG i odtwarzacza. Panel prac wewnętrznych nie ma kresek subskrypcji do wierszy. Kolejka jest szara od pierwszej klatki. Panel jest wspólnym prymitywem: pasek pracy, complete, kolejka i anulowanie mają również opis tekstowy. Na migrowanych slajdach diagram zajmuje większą część ekranu, a podpis jest w dolnej stopce; w pozostałych scenach zachowano dotychczasowe proporcje.
 
-Podgląd developerski: /rxjs-operatory/work/animation-review.html — wybór sceny, READY, pytanie, FINISHED i audyt granic tekstu. Uruchom npm test oraz npm run build po zmianach animacji. Próba na fizycznym projektorze i pełna próba 45 minut wymagają prelegenta.
+Podgląd developerski: /work/animation-review.html (lokalna konfiguracja Vite ma base `/`; build ma `/rxjs-operatory/`) — wybór sceny, READY, pytanie, FINISHED i audyt granic tekstu. Uruchom npm test oraz npm run build po zmianach animacji. Próba na fizycznym projektorze i pełna próba 45 minut wymagają prelegenta.
+
+## Zaakceptowany układ rodziny *Map
+
+Slajdy 08–12, oba warianty `12a-complete` i `13-limit` korzystają teraz z tego samego grafu `flattenGraph` co prototypy. Źródło i odbiorca stoją na końcach; operator jest wyśrodkowany. Pod nimi są trzy boxy bez nagłówków: emisje w jednej kolumnie, stałe wiersze prac oraz odebrane wartości w dwóch kolumnach, w kolejności dotarcia.
+
+W concatMap „B (wartość)” pojawia się z fade-in po dotarciu B do operatora, a po zwolnieniu miejsca zmienia się w B$. concatAll pokazuje istniejące B$ i C$ czekające bez subskrypcji. Wiersze zakończone pozostają zielone; pominięte wejścia exhaustMap nie tworzą wykonań. Standardowa siatka ma cztery miejsca; przykład limitu używa pięciu. Kapsułki emisji i odbioru wchodzą przez 0,3 s. Pasek pracy rośnie również podczas przelotu wartości; wynik wraca do operatora niewidocznie, a widoczna kulka wychodzi z operatora.
+
+Liczniki uruchomionych i aktywnych inner korzystają ze stanu faktycznych subskrypcji. Sceny z tej rodziny trzymają nieruchomy wynik również w EXTRAS. Nawigacja i postoje Reveal pozostają dotychczasowe; kontroler `stages` nadal jest włączony tylko w podglądzie prototypów. Zachowano identyfikatory, kolejność slajdów i budżet 45 minut.
+
+Na migrowanych slajdach diagram zajmuje 480 px wysokości. Większe kafelki mają 76 px wysokości, a odstęp do paneli 60 px; wiersze prac są rozdzielone o 20 px. Mniejszy podpis i liczniki są w stopce przy dole slajdu. U pokazuje kontrolki w miejscu stopki; ukrycie kontrolek przywraca podpis.
+
+W `map + concatAll` oba kafelki stoją blisko siebie nad panelem prac: map wyrównuje się do jego lewej krawędzi, concatAll do prawej. Oba mają szerokość 240 px, z 40 px przerwy między nimi.
+
+Źródło i operatory w migrowanej rodzinie zmieniają tło na zielone przy własnym complete. Źródło może zakończyć się wcześniej; *Map pozostaje aktywne aż do zakończenia wymaganych inner i kolejki. Nieobsłużony error daje czerwony operator, a odsubskrybowane źródło zachowuje swój kolor.

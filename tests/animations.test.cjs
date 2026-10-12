@@ -187,7 +187,7 @@ test('concatAll queues created Observables, switchMap pauses before cancel then 
   assert.equal(sw.snapshot.nodes.find(n=>n.id==='inner1').visible,false);
   sw.finish();const a=sw.snapshot.nodes.find(n=>n.id==='inner0');
   assert.equal(a.workState,'canceled');assert.ok(a.progress>0&&a.progress<1);assert.equal(a.notification,null);
-  assert.ok(sw.snapshot.histories[0].values.every(v=>v.value!=='A'&&v.value!=='B'));
+  assert.ok(sw.snapshot.histories.find(h=>h.anchor==='observer').values.every(v=>v.value!=='A'&&v.value!=='B'));
 });
 
 test('subscription travels receiver → share → source; values travel source → share → receivers',async()=>{
@@ -289,7 +289,7 @@ test('flatten strategies use identical inputs, queue values before projection an
   assert.equal(concat.snapshot.nodes.find(n=>n.id==='inner1').visible,false);
   const exhaust=player(ids[3]).api;exhaust.finish();
   assert.deepEqual(Array.from(exhaust.snapshot.nodes.filter(n=>n.inner),n=>n.id),['inner0','inner3']);
-  assert.deepEqual(Array.from(exhaust.snapshot.histories[0].values,v=>v.value),['A1','A2','D1','D2']);
+  assert.deepEqual(Array.from(exhaust.snapshot.histories.find(h=>h.anchor==='observer').values,v=>v.value),['A1','A2','D1','D2']);
 });
 
 test('concatAll creates references only after the input arrives at projection',async()=>{
@@ -355,7 +355,7 @@ test('work panel shows queued input immediately and holds an aborted progress ba
   const sw=player('11-switchmap');sw.api.finish();
   const canceled=sw.api.snapshot.nodes.find(n=>n.id==='inner0');
   assert.equal(canceled.workState,'canceled');assert.ok(canceled.progress>0&&canceled.progress<1);
-  assert.match(sw.elements.get('.rx-stage').innerHTML,/HTTP A[^]*?anulowana · ABORT/);
+  assert.match(sw.elements.get('.rx-stage').innerHTML,/data-execution="A"[^]*?ABORT \(klient\)/);
   assert.equal(sw.api.snapshot.nodes.find(n=>n.id==='inner3').workState,'completed');
 });
 

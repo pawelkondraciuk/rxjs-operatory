@@ -14,6 +14,8 @@ import './animations/reveal.css';
 import { prepareSlides } from './animations/presentation.js';
 import { compileScene } from './animations/engine.js';
 import { installRevealStages } from './animations/reveal-stages.js';
+import { installAutoFinishGuard } from './animations/reveal-auto-finish.js';
+import { installSpeakerPreview } from './animations/speaker-preview.js';
 
 const params = new URLSearchParams(location.search);
 const printMode = params.has('print-pdf');
@@ -38,6 +40,8 @@ const deck = new Reveal({
   view: 'slide',
   navigationMode: 'linear',
 });
+
+installSpeakerPreview(deck);
 
 const players = new Map();
 let activePlayer;
@@ -84,7 +88,7 @@ function updateMode(slide) {
   const animationMode = stateFor(slide).mode;
   slide.querySelector('.rx-step-mode').textContent = animationMode === 'auto' ? 'Automatyczny · M' : 'Ręczny · M';
   slide.querySelectorAll('.rx-step').forEach(fragment => {
-    // Bez fragmentów natywna nawigacja Reveal przechodzi między slajdami.
+    // Postoje ręczne ustępują w AUTO fragmentowi końcowego wyniku.
     fragment.classList.toggle('fragment', isStaged(slide) || animationMode === 'manual');
     if (animationMode === 'auto' && !isStaged(slide)) fragment.classList.remove('visible', 'current-fragment');
   });
@@ -96,6 +100,7 @@ function setMode(mode) {
   stateFor(slide).mode = mode;
   updateMode(slide);
   deck.sync();
+  autoFinish.sync(slide);
   if (!isStepped()) return;
   if (mode === 'auto') activePlayer?.playContinuously();
   else {
@@ -113,11 +118,20 @@ function resetAnimation() {
 }
 function stepAnimation(direction) {
   if (activePlayer?.controller) { if (direction > 0) activePlayer.controller.next(); else activePlayer.controller.previous(); return; }
-  if (isStepped()) { if (direction > 0) deck.next(); else deck.prev(); }
+  if (isStepped() || stateFor().mode === 'auto') { if (direction > 0) deck.next(); else deck.prev(); }
   else activePlayer?.step(direction);
 }
 function toggleAnimation() { if (activePlayer?.controller) { if (activePlayer.controller.mode === 'manual') activePlayer.controller.setMode('auto'); else activePlayer.controller.toggle(); return; } if (isStepped() && stateFor().mode === 'manual') setMode('auto'); else activePlayer?.toggle(); }
 steppedSlides.forEach(updateMode);
+const autoFinish = installAutoFinishGuard(deck, {
+  slides: printMode ? [] : [...document.querySelectorAll('[data-animation]')].filter(slide => {
+    const scene = sceneById.get(slide.dataset.animation);
+    return scene && !isStaged(slide) && scene.playback?.entry !== 'static';
+  }),
+  getPlayer: slide => players.get(slide),
+  getMode: slide => stateFor(slide).mode,
+  isEnabled: () => !printMode,
+});
 
 function playerFor(slide) {
   if (!slide?.dataset.animation) return;
@@ -131,7 +145,8 @@ function playerFor(slide) {
       },
     } : isStepped(slide) ? {
       step: stepAnimation, reset: resetAnimation, toggle: toggleAnimation,
-    } : {}));
+    } : { step: stepAnimation }));
+    autoFinish.observe(slide, players.get(slide));
   }
   return players.get(slide);
 }
@@ -165,6 +180,7 @@ function activate(slide) {
     activePlayer?.play();
   }
   state.visited = true;
+  autoFinish.sync(slide);
 }
 
 let suspendedPlaying = false;
@@ -182,6 +198,13 @@ function resume() {
 
 deck.on('fragmentshown', event => {
   if (isStaged() || printMode || restoringSlide || stateFor().mode !== 'manual' || !event.fragment.closest('.rx-fragment-steps') || event.fragment.closest('section') !== activeSlide) return;
+  if (activePlayer?.finishStep()) {
+    // Reveal już odsłoniło kolejny fragment. Zatrzymaj bieżący etap i oddaj mu fragment.
+    restoringSlide = true;
+    try { deck.navigateFragment(stateFor().fragmentIndex); }
+    finally { restoringSlide = false; }
+    return;
+  }
   stateFor().fragmentIndex = activeSlide.querySelectorAll('.rx-step.visible').length - 1;
   if (event.fragment.dataset.handoff === 'true') { setMode('auto'); return; }
   playerFor(deck.getCurrentSlide())?.playTo(fragmentTime());

@@ -6,6 +6,7 @@ import { createStageController } from './stage-controller.js';
 // Jedyny zegar animacji. Semantyka i geometria nie zależą od RAF ani od DOM.
 export function createPlayer(root, scene, controls = {}) {
 const engine=compileScene(scene), playbackDuration=engine.duration;
+root.classList?.toggle('rx-expanded',scene.playerLayout==='expanded');
 const staged=scene.playback?.controller==='stages', listeners=new Set();
 let controller;
 let time=0, running=false, previous=null, lastPaint=-Infinity, animationFrame=null, stopAt=null;
@@ -30,7 +31,7 @@ function paint(){
  el.caption.textContent=snapshot.caption;
  el.metrics.innerHTML=snapshot.metrics.map(m=>'<div class="rx-metric"><span>'+esc(m.label)+'</span><b>'+esc(m.value)+'</b></div>').join('');
  el.play.textContent=staged&&time>=playbackDuration?'Wynik':running?'Pauza':time>=playbackDuration?'Powtórz':time>0?'Kontynuuj':'Odtwórz';
- el.back.disabled=!staged&&time<=0; el.next.disabled=!staged&&time>=playbackDuration;
+ el.back.disabled=!staged&&time<=0; el.next.disabled=!staged&&!controls.step&&time>=playbackDuration;
  el.play.disabled=staged&&time>=playbackDuration;
  el.clock.textContent=Math.min(time,playbackDuration).toFixed(1).replace('.',',')+' / '+playbackDuration.toFixed(1).replace('.',',')+' s';
  el.slider.value=String(Math.min(time,playbackDuration));
@@ -43,6 +44,13 @@ function pause(){
  animationFrame=null;paint();
 }
 function seek(target){pause();stopAt=null;time=clamp(target,0,playbackDuration);paint();}
+// Szybkie „dalej” kończy rozpoczęty etap zamiast wybierać następny.
+function finishStep(){
+ if(stopAt===null)return false;
+ const target=stopAt;
+ seek(target);controls.onStop?.(target);
+ return true;
+}
 // Reveal wybiera fragment; odtwarzacz jedynie animuje dojście do jego kadru.
 function playTo(target){
  pause();stopAt=clamp(target,0,playbackDuration);
@@ -80,7 +88,10 @@ function frame(now){
 q('.rx-hide').addEventListener('click',hideControls);
 el.back.addEventListener('click',()=>controller?controller.previous():controls.step?controls.step(-1):step(-1));
 el.next.addEventListener('click',()=>controller?controller.next():controls.step?controls.step(1):step(1));
-el.slider.addEventListener('input',()=>controller?controller.seek(Number(el.slider.value)):seek(Number(el.slider.value)));
+el.slider.addEventListener('input',()=>{
+ const value=Number(el.slider.value), target=Math.abs(value-playbackDuration)<1e-7?playbackDuration:value;
+ if(controller)controller.seek(target);else seek(target);
+});
 el.play.addEventListener('click',()=>controller?controller.toggle():controls.toggle?controls.toggle():toggle());
 q('.rx-reset').addEventListener('click',()=>controller?controller.reset():controls.reset?controls.reset():restart());
 if(staged)q('.rx-finish').addEventListener('click',()=>controller.finish());
@@ -89,7 +100,7 @@ root.addEventListener('keydown',event=>{
  if(event.target.matches('input')||(['Enter',' '].includes(event.key)&&event.target.matches('button')))event.stopPropagation();
 });
 paint();
-const api={subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener);},pause,play,playTo,playContinuously,toggle,step,reset:restart,restart,seek,finish:()=>seek(playbackDuration),get isPlaying(){return running;},get time(){return Math.min(time,playbackDuration);},get duration(){return playbackDuration;},get snapshot(){return engine.snapshot(time);},get stops(){return engine.stops;},get state(){return running?'playing':time>=playbackDuration?'finished':time===0?'ready':'paused';},hideControls,toggleControls};
+const api={subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener);},pause,play,playTo,playContinuously,toggle,step,finishStep,reset:restart,restart,seek,finish:()=>seek(playbackDuration),get isPlaying(){return running;},get time(){return Math.min(time,playbackDuration);},get duration(){return playbackDuration;},get snapshot(){return engine.snapshot(time);},get stops(){return engine.stops;},get state(){return running?'playing':time>=playbackDuration?'finished':time===0?'ready':'paused';},hideControls,toggleControls};
 if(staged){controller=createStageController(api,{mode:scene.playback.entry,...controls.stageOptions});api.controller=controller;}
 return api;
 }

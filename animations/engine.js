@@ -151,7 +151,10 @@ export function compileScene(scene) {
       const terminalInput=incoming.filter(e=>e.end&&stateByEdge.get(e.id).done&&['complete','error'].includes(e.end.kind)).at(-1);
       const receiver=incoming.length>0&&!outgoing.length;
       const ownEnd=terminal(r);
-      const notification=terminalInput&&(receiver||ownEnd&&terminalInput.end.logicalAt===ownEnd.at)?terminalInput.end.kind:null;
+      // Jawne powiązanie kafelka z własnym terminalem wyjścia, niezależne od operatora.
+      const declaredEnd=records.find(edge=>edge.id===n.terminalEdge)?.end;
+      const ownNotification=declaredEnd&&time>=declaredEnd.at&&['complete','error'].includes(declaredEnd.kind)?declaredEnd.kind:null;
+      const notification=n.terminalEdge?ownNotification:terminalInput&&(receiver||ownEnd&&terminalInput.end.logicalAt===ownEnd.at)?terminalInput.end.kind:null;
       const stateSpan=r.spans.find(p=>p.kind==='state'&&p.start<=t&&p.end>t);
       const detail=evaluate(n.detail,t);
       let status=notification?(notification==='complete'?'✓ complete':'× error'):detail;

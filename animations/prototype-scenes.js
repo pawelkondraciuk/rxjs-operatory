@@ -10,111 +10,20 @@ const stages = stops => ({controller:'stages',entry:'manual',finish:'hold',after
 const timing = {terminal:.8,http:1.5};
 // Postój po dotarciu wartości czeka, aż jej wiersz w panelu prac skończy fade-in.
 const rowFade = .35;
-// Układ prototypów: trzy kolumny. Pod źródłem EMISJE, pod wyśrodkowanym operatorem PRACE WEWNĘTRZNE,
-// pod odbiorcą ODBIÓR. Panele mają odstęp od kafelków i od dołu; wiersze zajmują stałe sloty na całej wysokości.
-const frame = {height:400,tileY:46,tileH:60,panelY:112,panelBottom:372,panelW:520,sideW:200,sourceX:140,opX:620,observerX:1100,catchX:860};
-
-function prototypeGraph(scene) {
-  const graph = flattenGraph(scene);
-  const outerCatch = scene.catchScope === 'outer';
-  const opX = frame.opX;
-  // Panele są bez napisów; to, że praca jest HTTP, mówi podpis na dole.
-  const slots = scene.jobs.length + (scene.discardedSlot ? 1 : 0);
-  const rowsTop = frame.panelY + 16, rowsBottom = frame.panelBottom - 16, gap = 16;
-  // Stała siatka czterech slotów od góry: mniej prac układa się jedna pod drugą, bez rozciągania odstępów.
-  const grid = Math.max(4,slots), rowHeight = (rowsBottom-rowsTop-(grid-1)*gap)/grid, rowStep = rowHeight+gap;
-  Object.assign(graph,{height:frame.height,queue:null,illustratedWork:true});
-  const tile = {y:frame.tileY,h:frame.tileH};
-  graph.nodes.forEach(n => {
-    // Etykieta źródła jak w kodzie przykładu (source$ albo id$).
-    if (n.id === 'source') Object.assign(n,tile,{x:frame.sourceX,w:180,label:scene.code.split('.')[0],statusInside:true});
-    if (n.id === 'op') Object.assign(n,tile,{x:opX,w:220});
-    if (n.id === 'observer') Object.assign(n,tile,{x:frame.observerX,w:180,statusInside:true});
-    if (!n.workRow) return;
-    // Każda wartość ma własny slot: „B (wartość)” w kolejce, potem B$ w tym samym miejscu.
-    const [, kind, index] = /^(queued|inner|ignored)(\d+)$/.exec(n.id) || [];
-    if (!kind) return;
-    const job = scene.jobs[Number(index)];
-    Object.assign(n,{panel:'jobs',slot:Number(index),execution:job.value});
-    if (kind === 'queued' || kind === 'ignored') delete n.instant;
-  });
-  // Emisje źródła po kolei w jednej kolumnie, odbiór po kolei w dwóch kolumnach (kolejność dotarcia).
-  const lines = {y:rowsTop+rowHeight/2,w:frame.sideW-24,lines:4,lineStep:rowStep};
-  graph.trays = [{anchor:'source',x:frame.sourceX,columns:1,...lines},{anchor:'observer',x:frame.observerX,columns:2,...lines}];
-  const resultRow = scene.rows.at(-1);
-  const source = graph.edges.find(e => e.from === 'source');
-  source.logicalEnd = scene.sourceEnd || {at:scene.rows[0].completeAt,kind:'complete'};
-  const output = graph.edges.find(e => e.from === 'op' && e.to === 'observer');
-  output.logicalEnd = scene.resultEnd || {at:resultRow.completeAt,kind:'complete'};
-  if (outerCatch) {
-    graph.nodes.push({id:'catch',...tile,x:frame.catchX,w:170,label:'catchError',color:'op',ready:true});
-    output.from = 'catch';
-    output.logicalEnd = {at:resultRow.completeAt,kind:'complete'};
-    graph.edges.push({from:'op',to:'catch',events:resultRow.events.filter(e=>e.value!=='fallback'),
-      logicalStart:.3,logicalEnd:scene.innerResultEnd});
-  }
-  // Indeks pracy jest indeksem wejścia (jak w flattenGraph), także gdy exhaustMap pominął część wartości.
-  graph.executions = [...scene.jobs.entries()].filter(([,j])=>!j.ignored).map(([i,j])=>({
-    id:j.value,node:'inner'+i,edge:'inner'+i+'-op',panel:'jobs',value:j.value,
-    label:j.value+'$',duration:j.dur,handlerLabel:scene.catchScope==='inner'?'catchError':undefined,
-  }));
-  for (const edge of graph.edges) {
-    if (edge.from.startsWith('inner')) {
-      const job = scene.jobs[Number(edge.from.slice(5))];
-      edge.events = edge.events.map(e=>({...e,execution:job.value}));
-      // Wynik inner nie leci widocznie z wiersza: krótki, niewidoczny powrót i emisja z operatora.
-      edge.travel = .15;
-      edge.logicalEnd = {at:job.end,kind:job.cancelled?'unsubscribe':job.errored?'error':'complete'};
-    }
-  }
-  const panelH = frame.panelBottom-frame.panelY, below = x => ({x,y:frame.tileY+frame.tileH/2});
-  const side = x => ({x:x-frame.sideW/2,y:frame.panelY,w:frame.sideW,h:panelH,from:below(x)});
-  graph.panels = [
-    side(frame.sourceX),
-    {id:'jobs',x:opX-frame.panelW/2,y:frame.panelY,w:frame.panelW,h:panelH,from:below(opX),slots,rowsTop,rowStep,rowHeight},
-    side(frame.observerX),
-  ];
-  graph.timeline = [...(graph.timeline||[]),...(scene.timeline||[])];
-  return graph;
-}
-
-// mergeMap: A i B jak w innych strategiach, ale C pracuje dłużej, a D krócej. Emisje C i D się przeplatają,
-// D kończy przed C, więc odbiór dostaje A1 A2 B1 B2 C1 D1 D2 C2.
-function overlapTail(scene) {
-  const tail = {C:{dur:1.9,offsets:[.65,1.65]},D:{dur:.9,offsets:[.35,.65]}};
-  for (const [i,job] of scene.jobs.entries()) {
-    const plan = tail[job.value];
-    if (!plan) continue;
-    Object.assign(job,{dur:plan.dur,end:job.start+plan.dur});
-    Object.assign(scene.rows[i+1],{
-      events:plan.offsets.map((offset,k)=>value(job.start+offset,job.value+(k+1),job.color)),
-      spans:[span(job.start,job.end,job.value,'work',plan.dur)],completeAt:job.end});
-  }
-  const end = Math.max(...scene.jobs.map(j=>j.end));
-  Object.assign(scene.rows.at(-1),{events:scene.rows.slice(1,-1).flatMap(r=>r.events).sort((a,b)=>a.at-b.at),completeAt:end});
-  scene.duration = end+1.2;
-  scene.captions.at(-1)[0] = end;
-  scene.captions.splice(-1,0,[3.05,'D1 dotarło przed C2: mergeMap nie zachowuje kolejności wejść.']);
-}
-
 function basic(mode) {
   const scene = {id:'prototype-'+mode,title:mode+' — te same A/B/C/D'};
   configureFlatten(scene,mode);
-  if (mode === 'mergeMap') overlapTail(scene);
   scene.rows.at(-1).events = scene.rows.at(-1).events.map(e=>({...e,execution:e.value[0]}));
   // Postoje po dotarciu wartości czekają na fade-in wiersza kolejki. switchMap pyta, zanim A zostanie anulowane,
   // a exhaustMap, zanim pokaże odpowiedź „pominięte”.
-  const settled=stop=>stop.id==='first'||stop.id==='question'&&mode==='concatMap'?{...stop,offset:rowFade}:stop;
-  Object.assign(scene,{group:'qa',graph:prototypeGraph,metrics:counts,
-    playback:stages(scene.playback.stops.map(settled)),
+  Object.assign(scene,{group:'qa',graph:flattenGraph,metrics:counts,
+    playback:stages(scene.playback.stops),
     notes:{
       concatMap:'B/C/D czekają jako wartości. Projekcja tworzy inner dopiero po complete poprzednika.',
       switchMap:'Nowe wejście odsubskrybowuje poprzedni inner przed uruchomieniem następnego. ABORT dotyczy klienta.',
       mergeMap:'Każda wartość od razu uruchamia własny inner. Prace trwają równolegle, wyniki mogą się przeplatać.',
       exhaustMap:'Gdy A$ trwa, B i C są pominięte i nie tworzą inner. D przychodzi po complete A$ i uruchamia D$.',
     }[mode]});
-  const resultCaption=scene.captions.pop()[1];
-  scene.timeline=[{type:'result-summary',event:{type:'stream-complete',edge:'op-observer'},offset:timing.terminal+.01,caption:resultCaption}];
   return scene;
 }
 
@@ -172,9 +81,9 @@ function httpExample(id, mode, catchScope, {cancelBeforeError=false,empty=false}
   const scene = {
     id,title:cancelBeforeError?'switchMap — anulowanie B przed błędem':mode+' + '+(catchScope==='inner'?(empty?'catchError → EMPTY':'catchError wewnątrz'):
       catchScope==='outer'?'catchError na zewnątrz':'bez catchError'),
-    group:'qa',operatorName:mode,http:true,catchScope,jobs:activeJobs,discardedSlot:discarded,rows,
+    group:'qa',playerLayout:'expanded',operatorName:mode,http:true,catchScope,jobs:activeJobs,discardedSlot:discarded,rows,
     duration:Math.max(completeAt||b.end,...input.map(v=>v.at),b.errorAt+.7)+1,
-    graph:prototypeGraph,metrics:counts,timeline,resultEnd,
+    graph:flattenGraph,metrics:counts,timeline,resultEnd,
     sourceEnd:b.errored?{at:b.end,kind:'unsubscribe'}:{at:rows[0].completeAt,kind:'complete'},
     innerResultEnd:{at:b.end,kind:'error'},
     code:catchScope==='inner'?`source$.pipe(${mode}(id => http$(id).pipe(catchError(() => ${empty?'EMPTY':"of('fallback B')"}))))`:
