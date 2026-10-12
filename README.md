@@ -27,11 +27,11 @@ Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorz
 
 ## Ścieżka MAIN i czas
 
-MAIN ma 40 slajdów (28 animowanych) i kończy się na „Pytania?”. EXTRAS zawiera 26 dodatkowych wariantów z 17 bazowych sekcji. Całość to 49 bazowych slajdów HTML, 66 po rozwinięciu, 54 animowane.
+MAIN ma 41 slajdów (28 animowanych) i kończy się na „Pytania?”. EXTRAS zawiera 26 dodatkowych wariantów z 17 bazowych sekcji. Całość to 50 bazowych slajdów HTML, 67 po rozwinięciu, 54 animowane.
 
 Kolejność głównego pokazu:
 
-1. Społeczność, historia spotkań, autor, tytuł, pytanie o operatory i legenda.
+1. Społeczność, historia spotkań, autor, tytuł, szeroki kontekst ReactiveX, pytanie o operatory i legenda.
 2. map → źródła (timer/HTTP/Subject) → subskrypcja → cold/hot → porównanie dwóch subskrypcji.
 3. map + concatAll → concatMap → mergeMap → switchMap HTTP → exhaustMap.
 4. distinctUntilChanged → debounceTime/auditTime/throttleTime/sampleTime.
@@ -146,6 +146,16 @@ Kolory wartości rozróżniają też gałęzie A/B/C. Unsubscribe nie oznacza co
 > A dziś porozmawiamy o RxJS. Na tej prezentacji odczarujemy trudne operatory z RxJS. Pokażę Wam, że nie taki diabeł straszny. Pamiętajcie o uśmiechu! Przejście od poprzednich wystąpień do dzisiejszego tematu. Zapowiedz decyzje o pracy, kolejności i współdzieleniu. Tytuł można pozostawić jako statyczny slajd.
 
 ## Wprowadzenie do RxJS
+
+### ReactiveX jest wszędzie — `reactivex-jest-wszedzie`
+
+**Temat:** ReactiveX jest koncepcją obecną w wielu językach, nie tylko w JavaScripcie.
+
+**Na ekranie:** siatka nazw 16 języków: C#, Java, JavaScript, Kotlin, Swift, Scala, C++, Python, Go, Ruby, PHP, Dart, Groovy, Clojure, Objective-C i F#. Plansza nie podaje nazw implementacji.
+
+**Speaker notes:**
+
+> Zanim zaczniemy, mała ciekawostka. ReactiveX nie powstał w JavaScripcie, tylko w .NET. Dzisiaj znajdziemy jego implementacje w ponad 20 językach. Nie wszędzie jest tak popularny jak w Angularze, ale sam koncept jest znacznie szerszy.
 
 ### Jakie znasz operatory RxJS? — `02-znane-operatory`
 
