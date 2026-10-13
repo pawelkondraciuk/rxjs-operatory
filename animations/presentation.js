@@ -1,6 +1,7 @@
 import { configureScene } from './scene-config.js';
 // Każdy wariant jest osobnym slajdem, dostępnym przyciskiem pilota „dalej”.
-export function prepareSlides(scenes) {
+// format ('4:3' | '16:9') trafia do sceny, żeby grafy mogły dobrać wysokość ramki.
+export function prepareSlides(scenes, { format = '4:3' } = {}) {
   const byId = new Map(scenes.map(scene => [scene.id, scene]));
   const titles = {
     '06a-cold-hot': ['Cold: własny timer dla każdego', 'Hot: dołączasz do działającego źródła'],
@@ -21,10 +22,11 @@ export function prepareSlides(scenes) {
         comparisonMode: mode, title: titles[original.id][i],
       }));
     } else if (original.id === '05-zrodla') {
+      // Warianty 0 (timer/interval) i 1 (HTTP) ustawiają configureTimers/configureHttp w configureScene.
       variants = [0,1,2].map(i => ({ ...original, sourceExample:i, duration:i===1?11:20,
-        title:['timer: wartości w czasie','HTTP: odpowiedź i complete','Subject: odbierasz od chwili subskrypcji'][i],
-        code:['timer(2000, 4000)','http.get(\'/api/data\')','subject$.subscribe(observer)'][i],
-        captions:[[[0,'Timer emituje kolejne wartości do odbiorcy.'],[14,'Źródło pozostaje aktywne.']],[[0,'Subskrypcja uruchamia HTTP.'],[7,'Odpowiedź, a następnie complete.']],[[0,'Subject nie przechowuje historii.'],[4,'A zostało wyemitowane bez tego odbiorcy.'],[8,'Odbiorca subskrybuje.'],[12,'Dostaje B; wcześniejsze A do niego nie wraca.']]][i],
+        title:['timer i interval: jedna wartość czy strumień?','HTTP: odpowiedź i complete','Subject: odbierasz od chwili subskrypcji'][i],
+        code:['timer(2000) / interval(2000)','http.get(\'/api/data\')','subject$.subscribe(observer)'][i],
+        captions:[[],[],[[0,'Subject może emitować bez odbiorcy.'],[4,'A bez subskrypcji.'],[8,'Odbiorca subskrybuje.'],[12,'Dostaje B.'],[16,'Dostaje C. Trzy emisje, dwa odbiory.']]][i],
       }));
     } else if (original.id === '21a-share-pozycja') {
       variants = [false,true].map(after => ({ ...original, mapAfterShare:after,
@@ -66,7 +68,7 @@ export function prepareSlides(scenes) {
     variants.forEach((variant, i) => {
       const target = i ? slide.cloneNode(true) : slide;
       const id = i ? `${original.id}-${i + 1}` : original.id;
-      const scene = configureScene({ ...variant, id, rendererId: original.id });
+      const scene = configureScene({ ...variant, id, rendererId: original.id, format });
       byId.set(id, scene);
       target.id = id;
       target.dataset.animation = id;

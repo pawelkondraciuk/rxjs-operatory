@@ -1,6 +1,7 @@
 import { catalogGraph } from './graph-presets.js';
 import { prepareExecutions, executionSnapshot } from './execution-state.js';
-import { layoutDiagram, terminal, connectionState, palette, transitionDuration } from './lifecycle.js';
+import { layoutDiagram, stretchGraph, terminal, connectionState, palette, transitionDuration } from './lifecycle.js';
+import { graphHeightFor, textScaleFor, labelScaleFor } from './format.js';
 import { planFlow, fadeDuration } from './flow.js';
 import { clamp, colors, geometry, pointAt } from './primitives.js';
 
@@ -12,13 +13,17 @@ const workSpans=row=>(row.spans||[]).filter(p=>!['queue','state','window','subsc
 // Kompilacja wykonuje się raz. Cały graf (także niewidoczne inner) rezerwuje miejsca.
 // rows i jawny graf kończą w tym samym planie; RAF nie uczestniczy w semantyce.
 export function compileScene(scene) {
-  const graph=scene.graph ? (typeof scene.graph==='function'?scene.graph(scene):scene.graph) :
+  const source=scene.graph ? (typeof scene.graph==='function'?scene.graph(scene):scene.graph) :
     scene.kind==='cards'?{nodes:[],edges:[],trays:[],width:1240,height:340}:catalogGraph(scene);
+  // Format 4:3 daje wyższy diagram. Grafy z własnym profilem (formatAware) już go mają;
+  // stałe układy rosną proporcjonalnie, automatyczne dostają wyższy obszar w layoutDiagram.
+  const target=graphHeightFor(scene),fixed=source.layout==='fixed';
+  const graph=target&&fixed&&!source.formatAware&&(source.height||340)<target?stretchGraph(source,target):source;
   const nodes=graph.nodes.map(n=>({w:230,h:70,ri:null,...n}));
   const nodeById=new Map(nodes.map(n=>[n.id,n]));
   const trays=(graph.trays||[]).map(q=>({...q}));
   const row=n=>n.lifecycleRow || (n.ri!==null?scene.rows[n.ri]:null) || empty;
-  const width=graph.width||1240, height=graph.height||340;
+  const width=graph.width||1240, height=target&&!fixed?target:graph.height||340;
   let edges=graph.edges.map(e=>({...e,events:(e.events||[]).map(v=>({...v})),a:nodeById.get(e.from||e.a.id),b:nodeById.get(e.to||e.b.id)}));
   if(graph.layout!=='fixed') edges=layoutDiagram(nodes,edges,trays,width,height);
   for(const edge of edges) {
@@ -52,6 +57,10 @@ export function compileScene(scene) {
     const end=plan.records.get(execution?.edge)?.end;
     return end?.kind==='unsubscribe'?{...value,until:Math.min(value.until,end.at)}:value;
   }).filter(token=>token.until>token.at);
+  const explicitHistories=new Map(trays.filter(q=>q.events).map(q=>[q,q.events.map(value=>{
+    const at=q.modelTime?(plan.receivedAt?.(q.anchor,value)??plan.timeOf(value.at)):value.at;
+    return {...value,at,arrival:at,shownAt:at};
+  })]));
   const records=[...plan.records.values()];
   records.forEach(r=>{r.connectDuration??=transitionDuration;});
   const births=new Map(nodes.map(n=>[n.id,n.ready?0:n.createdBy?
@@ -83,7 +92,7 @@ export function compileScene(scene) {
       add('work-stop',edge?.end?.at??plan.timeOf(span.end),{node:n.id,logicalAt:span.end,reason:span.kind==='cancel'?'unsubscribe':span.kind==='error'?'error':'complete'});
     }
   }
-  for(const transform of graph.transforms||[])add('operator-transform',transform.at,{node:transform.node,value:transform.label,until:transform.until});
+  for(const transform of graph.transforms||[])add('operator-transform',transform.at,{node:transform.node,value:transform.label,until:transform.until,...(transform.logicalAt===undefined?{}:{logicalAt:transform.logicalAt})});
   for(const event of graph.timeline||[]) {
     const {at,event:selector,offset=0,last=false,...data}=event;
     const matches=selector?events.filter(e=>Object.entries(selector).every(([key,value])=>e[key]===value)):[];
@@ -111,8 +120,17 @@ export function compileScene(scene) {
     return {...stop,time:time+(stop.offset||0)};
   });
   const checkpoints=[...new Set([0,plan.duration,...events.map(e=>e.at),...stops.map(s=>s.time),...(scene.checkpoints||[]).map(plan.timeOf)])].filter(Number.isFinite).sort((a,b)=>a-b);
+  const codeFrames=[...(scene.codeFrames||[])].sort((a,b)=>a.at-b.at);
   const captions=[...(scene.captions||[]).map(([at,caption])=>[plan.timeOf(at),caption]),
     ...events.filter(e=>e.caption).map(e=>[e.at,e.caption]),...stops.filter(s=>s.caption).map(s=>[s.time,s.caption])].sort((a,b)=>a[0]-b[0]);
+
+  // panel.showOn: panel (box) pojawia się przy pierwszym zdarzeniu pasującym do selektora, jak postój.
+  const panelShownAt=(graph.panels||[]).map(panel=>{
+    if(!panel.showOn)return panel.shownAt;
+    const match=events.find(e=>Object.entries(panel.showOn).every(([key,value])=>e[key]===value));
+    if(!match)throw new Error(`${scene.id}: nierozwiązane showOn panelu`);
+    return match.at;
+  });
 
   function snapshot(time) {
     time=clamp(time,0,plan.duration);
@@ -163,7 +181,7 @@ export function compileScene(scene) {
       const lastInput=incoming.flatMap(e=>e.events.filter(v=>v.arrival<=time)).sort((a,b)=>a.arrival-b.arrival).at(-1);
       if(n.showInput&&lastInput&&!status)status='wejście: '+lastInput.value;
       const activity=(graph.activities||[]).some(a=>a.node===n.id&&time>=a.at&&time<a.until);
-      const transform=(graph.transforms||[]).find(a=>a.node===n.id&&time>=a.at&&time<a.until);
+      const transform=(graph.transforms||[]).find(a=>a.node===n.id&&time>=a.at&&time<(a.displayUntil??a.until));
       // illustratedWork: pasek biegnie w czasie ilustracji, nie staje na przelot wartości i kończy się razem z pracą.
       let progress=0;
       if(span&&!graph.illustratedWork)progress=clamp(((canceled?span.end:t)-span.start)/(span.duration||span.end-span.start));
@@ -179,7 +197,7 @@ export function compileScene(scene) {
       const fill=notification?palette[notification]:queued||n.workRow&&!active&&!canceled&&!completed&&!errored?colors.muted:n.work||n.inner?palette.work:receiver?palette.observer:!incoming.length?palette.source:colors[n.color]||colors.op;
       return {...n,label:evaluate(n.label,t),visible:time>=births.get(n.id)&&(n.until===undefined||t<n.until),
         opacity:n.ready||n.instant?1:clamp((time-births.get(n.id))/fadeDuration),fill,status,notification,workState,
-        active:activity||Boolean(transform),progress,showProgress:Boolean(span&&(active||canceled)),transform:transform?.label,
+        active:activity||Boolean(transform&&time<transform.until),progress,showProgress:Boolean(span&&(active||canceled)),transform:transform?.label,
         disabled:evaluate(n.disabled,t)};
     });
     const histories=trays.map(q=>{
@@ -187,14 +205,15 @@ export function compileScene(scene) {
       // An explicit history at an operator can show its emitted values too.
       const emitted=values.length?[]:records.filter(e=>e.a.id===q.anchor).flatMap(e=>e.events.filter(v=>v.at<=time));
       // shownAt: chwila pojawienia się w historii (dotarcie albo emisja), dla fade-in w rendererze.
-      const delivered=values.length?values.map(v=>({...v,shownAt:v.arrival})):emitted.map(v=>({...v,shownAt:v.at}));
+      const delivered=explicitHistories.has(q)?explicitHistories.get(q).filter(v=>v.at<=time):
+        values.length?values.map(v=>({...v,shownAt:v.arrival})):emitted.map(v=>({...v,shownAt:v.at}));
       // Historia next zachowuje powtórzenia. Deduplikacja jest jawną cechą
       // wizualizacji Set, nigdy domyślną semantyką strumienia.
       const valuesToShow=q.deduplicate?[...new Map(delivered.map(v=>[v.value,v])).values()]:delivered;
       return {...q,values:valuesToShow.sort((a,b)=>a.arrival-b.arrival)};
     });
-    return {id:scene.id,title:scene.title,width,height,time,logicalTime,nodes:nodeStates,edges:edgeStates,tokens,histories,
-      panels:graph.panels||[],cards:scene.kind==='cards'?scene.items:[],caption:captionAt(captions,time),
+    return {id:scene.id,title:scene.title,code:codeFrames.filter(frame=>frame.at<=time).at(-1)?.code??scene.code,width,height,textScale:graph.textScale??textScaleFor(scene),labelScale:graph.labelScale??labelScaleFor(scene),time,logicalTime,nodes:nodeStates,edges:edgeStates,tokens,histories,
+      panels:(graph.panels||[]).map((panel,i)=>panelShownAt[i]===undefined?panel:{...panel,shownAt:panelShownAt[i],visible:time>=panelShownAt[i]}),cards:scene.kind==='cards'?scene.items:[],caption:captionAt(captions,time),
       ...executionState,
       metrics:(scene.metrics||[]).map(m=>({label:m.label,value:m.count?executionState.executionCounts[m.count]:m.value(logicalTime)})),
       queue:graph.queue?evaluate(graph.queue,logicalTime):null};

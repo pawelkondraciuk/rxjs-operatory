@@ -7,18 +7,21 @@ header{padding:12px 24px;border-bottom:1px solid #cabfaa;display:flex;flex-wrap:
 button,select{font:17px Arial;padding:7px 10px;background:#eee6d9;border:1px solid #958875;border-radius:4px;color:#16232b}
 button:focus-visible,select:focus-visible{outline:3px solid #6d4ab5;outline-offset:2px}
 #viewport{width:100%;height:min(65vw,800px);overflow:hidden;position:relative}
-#screen{width:1280px;height:720px;padding:16px 32px;box-sizing:border-box;transform-origin:top left;position:absolute}
+#screen{width:1280px;height:960px;padding:16px 32px;box-sizing:border-box;transform-origin:top left;position:absolute}
 h2{font:bold 40px/1.1 Georgia;margin:0;height:60px;display:flex;align-items:center}
-#screen .rx-player{height:612px;grid-template-rows:60px 480px 72px}
+#screen .rx-player{height:856px;grid-template-rows:96px 650px 110px}
+[data-ratio="16-9"] #screen .rx-player{height:612px;grid-template-rows:60px 480px 72px}
 #screen .rx-toolbar{bottom:0}
-#screen .rx-code{font-size:24px}
+[data-ratio="16-9"] #screen .rx-code{font-size:24px}
 #diagnostics{padding:12px 24px;font-size:16px;overflow:auto;white-space:pre-wrap}
 #status{font-size:17px;min-width:200px}
 #baseline{margin:8px 24px}#baseline img{width:min(100%,1240px)}#baseline summary{cursor:pointer;font-size:18px}
 #variants{display:none}
+[data-ratio="16-9"] #screen{height:720px}
 </style></head><body>
 <header>
 <label>Scena <select id="scene"></select></label>
+<label>Format <select id="format"><option value="4:3">4:3</option><option value="16:9">16:9</option></select></label>
 <label>Checkpoint <select id="checkpoint"></select></label>
 <button id="previous">← Cofnij</button><button id="next">Dalej →</button>
 <button id="toggle">Odtwórz / pauza</button><button id="mode">MANUAL · M</button>
@@ -38,14 +41,17 @@ import { prepareSlides } from '../animations/presentation.js';
 import { createPlayer } from '../animations/player.js';
 import { compileScene } from '../animations/engine.js';
 import '../animations/reveal.css';
+import { FORMATS, formatFromSearch, toggledFormatUrl } from '../animations/format.js';
+const format=formatFromSearch(location.search);document.documentElement.dataset.ratio=format.replace(':','-');
+const formatSelect=document.querySelector('#format');formatSelect.value=format;formatSelect.onchange=()=>location.replace(toggledFormatUrl(location.href));
 
 const select=document.querySelector('#scene'),checkpoints=document.querySelector('#checkpoint');
 let root=document.querySelector('#screen .rx-player');
 const heading=document.querySelector('h2'),status=document.querySelector('#status');
 const variants=document.querySelector('#variants');
 variants.innerHTML='<section data-animation="09-concatmap"><h2></h2><div class="rx-player"></div></section>';
-const legacy=prepareSlides(scenes).get('09-concatmap');
-const all=[...prototypeScenes,{...legacy,id:'qa-current-concatmap',title:'Obecny concatMap — porównanie'}];
+const legacy=prepareSlides(scenes,{format}).get('09-concatmap');
+const all=[...prototypeScenes.map(s=>({...s,format})),{...legacy,id:'qa-current-concatmap',title:'Obecny concatMap — porównanie'}];
 const byId=new Map(all.map(s=>[s.id,s]));
 select.innerHTML=all.map(s=>'<option value="'+s.id+'">'+s.title+'</option>').join('');
 let player,unsubscribe;
@@ -93,7 +99,7 @@ const navigation={ArrowRight:'next',PageDown:'next',']':'next',ArrowLeft:'previo
 document.addEventListener('visibilitychange',()=>{if(document.hidden)c()?c().suspend():player.pause();else c()?.resume()});
 document.querySelector('#audit').onclick=()=>{
  const previous=select.value,issues=[];let frames=0;
- for(const scene of prototypeScenes){
+ for(const scene of prototypeScenes.map(s=>byId.get(s.id))){
   select.value=scene.id;choose();
   const compiled=compileScene(scene);
   const times=[0,player.duration,...player.stops.map(s=>s.time),...compiled.events.flatMap(e=>[e.at,e.at+.01])];
@@ -112,7 +118,7 @@ document.querySelector('#audit').onclick=()=>{
  status.textContent=frames+' kadrów; poza SVG: '+issues.length;
  document.querySelector('#diagnostics').textContent=issues.join('\n')||'Brak tekstów poza diagramem.';
 };
-function fit(){const width=document.querySelector('#viewport').clientWidth,scale=Math.min(width/1280,1.5);document.querySelector('#screen').style.transform='scale('+scale+')';document.querySelector('#viewport').style.height=720*scale+'px'}
+function fit(){const width=document.querySelector('#viewport').clientWidth,scale=Math.min(width/1280,1.5);document.querySelector('#screen').style.transform='scale('+scale+')';document.querySelector('#viewport').style.height=FORMATS[format].height*scale+'px'}
 window.addEventListener('resize',fit);
 choose();fit();
 window.rxPrototypeQA={get player(){return player},byId,choose};

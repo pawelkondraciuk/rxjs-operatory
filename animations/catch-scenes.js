@@ -40,8 +40,10 @@ export function configureCatch(scene) {
 
 function catchGraph(scene) {
   const inside=scene.catchInside,top=60,opX=430;
+  // Większy tekst 4:3: podpis pod klik$ nie może wyjść poza lewą krawędź.
+  const clicksX=scene.format==='4:3'?140:115;
   const nodes=[
-    {id:'clicks',x:115,y:top,w:200,h:68,label:'klik$',ri:0,color:'source',ready:true,
+    {id:'clicks',x:clicksX,y:top,w:200,h:68,label:'klik$',ri:0,color:'source',ready:true,
       detail:t=>!inside&&t>=8?'B: brak subskrypcji':'np. przycisk'},
     {id:'switch',x:opX,y:top,w:230,h:68,label:'switchMap',color:'op',ready:true,
       lifecycleRow:inside?undefined:row('switchMap',[{at:4,value:'error',kind:'error'}]),
@@ -79,6 +81,6 @@ function catchGraph(scene) {
   return {layout:'fixed',width:1240,height:400,nodes,edges,trays,panels:[panel],
     timeline:inside?[]:[{at:8,type:'source-next',node:'clicks',value:'B'},
       {at:8,type:'ignore-next',node:'switch',value:'B',reason:'no-subscription'}],
-    tokens:inside?[]:[{at:8,until:13,modelTime:true,value:'B',color:'b',x:115,y:145,phase:'unobserved'}],
+    tokens:inside?[]:[{at:8,until:13,modelTime:true,value:'B',color:'b',x:clicksX,y:145,phase:'unobserved'}],
   };
 }

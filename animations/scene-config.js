@@ -1,4 +1,4 @@
-import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback } from './reference-scenes.js';
+import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback, configureSubject, configureTimers, configureHttp } from './reference-scenes.js';
 import { configureCatch } from './catch-scenes.js';
 
 export const extraIds = new Set(['b01-defer','b02-first-take','b03-buffertime','b05-finalize','b06-forkjoin','b07-zip','b08-merge','b09-pairwise',
@@ -16,15 +16,17 @@ export function configureScene(scene) {
   }
   if(id==='13-limit')configureConcurrency(scene);
   if(id==='b04-catcherror')configureCatch(scene);
+  if(id==='05-zrodla'&&scene.sourceExample===0)configureTimers(scene);
+  if(id==='05-zrodla'&&scene.sourceExample===1)configureHttp(scene);
+  if(id==='05-zrodla'&&scene.sourceExample===2)configureSubject(scene);
   scene.group=extraIds.has(id)?'bonus':'main';
   if(scene.flattenLayout||scene.playback?.stops)return scene;
   const question={
-    '05-zrodla':scene.sourceExample===2?12:scene.sourceExample===1?1:2,
     '06-subskrypcja':6,'06a-cold-hot':6,'07-hot-cold':3,'18-async':1,
     '20-sharereplay':10,'22-refcount':10,
     '14-distinct':5,'15-debounce-audit':5,
   }[id];
-  const first={'05-zrodla':scene.sourceExample===0?{id:'subscribe',event:{type:'connected',edge:'source-sink'},caption:'Subscribe połączyło źródło i odbiorcę. Teraz czekamy na pierwszy next.'}:null,
+  const first={
       '07-hot-cold':{id:'first',modelTime:1,caption:'Pierwszy odbiorca subskrybuje.'},
       '06a-cold-hot':{id:'first',modelTime:0,caption:'A subskrybuje. B jeszcze nie słucha.'},
       '20-sharereplay':{id:'first',modelTime:6,caption:'Pierwsze HTTP wyemitowało odpowiedź i zakończyło się.'},
@@ -33,7 +35,6 @@ export function configureScene(scene) {
   if(question!==undefined)scene.playback={entry:'manual',finish:'hold',afterLastManualStop:'start-auto',stops:[
     ...(first?[first]:[]),
     {id:'question',modelTime:question,caption:{
-      '05-zrodla':scene.sourceExample===2?'B dotarło. Wcześniejsze A nie wraca.':'Pierwszy krok gotowy. Dalej uruchamia resztę pokazu.',
       '06-subskrypcja':'Dopiero subscribe uruchomiło HTTP. Deklaracja nie wykonała requestu.',
       '06a-cold-hot':'B dołączył. Czy dostanie własny timer, czy wspólne kolejne wartości?',
       '07-hot-cold':'Obaj odbiorcy już subskrybują. Ile wykonań HTTP?',

@@ -4,7 +4,7 @@ export const colors = { a:'#ffc15c', b:'#72d8a2', c:'#83cafa', source:palette.so
   op:'#e7b5f1', http:palette.observer, muted:'#e7ecef', error:'#f3a3a3' };
 export const clamp = (n, min=0, max=1) => Math.max(min, Math.min(max, n));
 export const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export const text = (x,y,value,size=24,attrs='') => `<text x="${x}" y="${y}" font-size="${size}" text-anchor="middle" dominant-baseline="middle" ${attrs}>${esc(value)}</text>`;
+export const text = (x,y,value,size=24,attrs='') => `<text x="${x}" y="${y}" font-size="${+size.toFixed(2)}" text-anchor="middle" dominant-baseline="middle" ${attrs}>${esc(value)}</text>`;
 export function wrapLabel(value, max=19) {
   const lines=[]; let current='';
   String(value).split(' ').forEach(word => {
@@ -34,9 +34,11 @@ export function fitLabel(value,max=19) {
   const chars=Array.from(String(value));
   return chars.length<=max?String(value):chars.slice(0,Math.max(0,max-1)).join('')+'…';
 }
-export function token(x,y,value,color='a',attrs='',maxWidth=150,truncate=false) {
-  const width=Math.min(maxWidth,Math.max(46,String(value).length*13+20));
-  const label=truncate?fitLabel(value,Math.max(1,Math.floor((width-20)/13))):String(value);
+// scale powiększa kapsułkę razem z tekstem (diagramy 4:3); 1 daje dotychczasowe wymiary.
+export function token(x,y,value,color='a',attrs='',maxWidth=150,truncate=false,scale=1) {
+  const width=Math.min(maxWidth,Math.max(46*scale,(String(value).length*13+20)*scale));
+  // +1e-9: przy skali ułamkowej (np. 1,8) iloraz 3,9999… nie może obciąć mieszczącej się etykiety.
+  const label=truncate?fitLabel(value,Math.max(1,Math.floor((width-20*scale)/(13*scale)+1e-9))):String(value);
   const title=label===String(value)?'':`<title>${esc(value)}</title>`;
-  return `<g ${attrs}>${title}<rect x="${x-width/2}" y="${y-23}" width="${width}" height="46" rx="23" fill="${colors[color]||color}" stroke="#fff" stroke-width="3"/>${text(x,y+1,label,23)}</g>`;
+  return `<g ${attrs}>${title}<rect x="${x-width/2}" y="${y-23*scale}" width="${width}" height="${46*scale}" rx="${23*scale}" fill="${colors[color]||color}" stroke="#fff" stroke-width="3"/>${text(x,y+1,label,23*scale)}</g>`;
 }

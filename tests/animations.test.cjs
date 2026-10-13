@@ -148,28 +148,25 @@ test('manual stops deliver only after travel; snapshots survive seeking backward
   }
 });
 
-test('map keeps its accepted chronology and highlights the currently handling node',async()=>{
+test('operator function delivers doubled values and complete without work or source history',async()=>{
   const {player}=await harness();const {api}=player('04-operator');
-  for(const start of [5,9,13]) {
-    for(const [offset,node,phase] of [[.1,'source','emitting'],[.6,null,'to-map'],[1.25,'map','in-map'],[1.75,null,'to-observer'],[2.5,'observer',null]]) {
-      api.seek(start+offset);
-      assert.deepEqual(Array.from(api.snapshot.nodes.filter(n=>n.active),n=>n.id),node?[node]:[]);
-      if(phase)assert.ok(api.snapshot.tokens.some(t=>t.phase===phase));
-    }
-  }
-  api.seek(7.49);assert.equal(api.snapshot.histories[0].values.length,0);
-  api.seek(7.5);assert.equal(api.snapshot.histories[0].values[0].value,'10');
-  api.finish();assert.deepEqual(Array.from(api.snapshot.histories[0].values,v=>v.value),['10','20','30']);
+  api.seek(api.stops.at(-1).time);
+  assert.deepEqual(Array.from(api.snapshot.histories[0].values,v=>v.value),['2']);
+  api.finish();assert.deepEqual(Array.from(api.snapshot.histories[0].values,v=>v.value),['2','4','6']);
   assert.ok(api.snapshot.edges.every(e=>!e.visible));
-  assert.equal(api.snapshot.nodes.find(n=>n.id==='source').notification,null);
+  assert.ok(api.snapshot.nodes.every(n=>!n.showProgress));
+  assert.equal(api.snapshot.nodes.find(n=>n.id==='observer').notification,'complete');
+  assert.equal(api.snapshot.nodes.find(n=>n.id==='source').notification,'complete');
+  assert.equal(api.snapshot.histories.length,1);
 });
 
-test('manual to auto continues from the stop and holds FINISHED without orphan RAF',async()=>{
+test('manual to auto continues from the first result and holds FINISHED without orphan RAF',async()=>{
   const {player,callbacks}=await harness();const {api}=player('04-operator');
-  api.seek(7.5);api.playContinuously();
+  api.controller.seek(api.stops.at(-1).time);api.controller.next();
+  assert.equal(api.controller.mode,'auto');
   for(let now=0;now<30000;now+=50){const pending=[...callbacks.values()];callbacks.clear();pending.forEach(fn=>fn(now));}
   assert.equal(api.time,api.duration);assert.equal(api.state,'finished');assert.equal(callbacks.size,0);
-  api.reset();assert.equal(api.time,0);assert.equal(api.state,'playing');api.pause();
+  api.controller.reset();assert.equal(api.time,0);assert.equal(api.state,'ready');assert.equal(callbacks.size,0);
 });
 
 test('concatAll queues created Observables, switchMap pauses before cancel then aborts without delivery',async()=>{

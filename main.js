@@ -16,24 +16,30 @@ import { compileScene } from './animations/engine.js';
 import { installRevealStages } from './animations/reveal-stages.js';
 import { installAutoFinishGuard } from './animations/reveal-auto-finish.js';
 import { installSpeakerPreview } from './animations/speaker-preview.js';
+import { FORMATS, formatFromSearch, withFormat, toggledFormatUrl } from './animations/format.js';
 
 const params = new URLSearchParams(location.search);
 const printMode = params.has('print-pdf');
+// Domyślnie projektor 4:3; ?ratio=16:9 (lub klawisz W) przełącza na ekran panoramiczny.
+const format = formatFromSearch(location.search);
+document.documentElement.dataset.ratio = format.replace(':', '-');
+document.querySelectorAll('a[href^="?"], a[href^="./"]').forEach(link => {
+  link.setAttribute('href', withFormat(link.getAttribute('href'), format));
+});
 // Menu i istniejące bezpośrednie linki otwierają dodatki świadomie.
 // Zwykła nawigacja głównej ścieżki kończy się na pytaniach.
 const requestedId = location.hash.slice(2).split('/')[0];
 const extras = [...document.querySelectorAll('[data-extras]')];
 const extraLink = extras.some(slide => requestedId === slide.id || requestedId.startsWith(slide.id + '-'));
 if (!params.has('extras') && !printMode && !extraLink) extras.forEach(slide => slide.remove());
-const sceneById = prepareSlides(scenes);
+const sceneById = prepareSlides(scenes, { format });
 
 const deck = new Reveal({
   plugins: [Markdown, Highlight, Notes],
   hash: true,
   slideNumber: true,
-  // Zoptymalizowane wymiary pod projektory panoramiczne (16:9)
-  width: 1280,
-  height: 720,
+  // Wspólna szerokość 1280; wysokość 960 (4:3) albo 720 (16:9).
+  ...FORMATS[format],
   margin: 0.05,
   minScale: 0.2,
   maxScale: 2.0,
@@ -123,6 +129,19 @@ function stepAnimation(direction) {
 }
 function toggleAnimation() { if (activePlayer?.controller) { if (activePlayer.controller.mode === 'manual') activePlayer.controller.setMode('auto'); else activePlayer.controller.toggle(); return; } if (isStepped() && stateFor().mode === 'manual') setMode('auto'); else activePlayer?.toggle(); }
 steppedSlides.forEach(updateMode);
+// Tytuły animacji są duże (4:3: 64 px), ale długi tytuł zmniejszamy tak, by został w jednej linii obok przycisku trybu.
+function fitTitles() {
+  const context = document.createElement('canvas').getContext('2d');
+  document.querySelectorAll('.animation-slide h2').forEach(title => {
+    title.style.fontSize = '';
+    const style = getComputedStyle(title), size = parseFloat(style.fontSize);
+    const room = FORMATS[format].width - (title.closest('.rx-stepped') ? 230 : 0) - 8;
+    context.font = `${style.fontWeight} ${size}px ${style.fontFamily}`;
+    const width = context.measureText(title.textContent).width;
+    if (width > room) title.style.fontSize = Math.max(44, Math.floor(size * room / width)) + 'px';
+  });
+}
+if (format === '4:3') fitTitles();
 const autoFinish = installAutoFinishGuard(deck, {
   slides: printMode ? [] : [...document.querySelectorAll('[data-animation]')].filter(slide => {
     const scene = sceneById.get(slide.dataset.animation);
@@ -236,6 +255,8 @@ deck.addKeyBinding({ keyCode: 219, key: '[', description: 'Animacja: poprzedni k
 deck.addKeyBinding({ keyCode: 221, key: ']', description: 'Animacja: następny krok' }, animationAction(() => stepAnimation(1)));
 deck.addKeyBinding({ keyCode: 82, key: 'R', description: 'Animacja: od początku' }, animationAction(resetAnimation));
 deck.addKeyBinding({ keyCode: 85, key: 'U', description: 'Pokaż / ukryj sterowanie animacją' }, animationAction(player => player?.toggleControls()));
+// Format zmienia wymiary sceny i grafów, więc wymaga przeładowania; hash zachowuje slajd i fragment.
+if (!printMode) deck.addKeyBinding({ keyCode: 87, key: 'W', description: 'Format 4:3 / 16:9 (przeładowanie)' }, () => location.replace(toggledFormatUrl(location.href)));
 
 const stageReveal = installRevealStages(deck, { getController: slide => players.get(slide)?.controller, isEnabled: () => !printMode });
 

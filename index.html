@@ -513,14 +513,20 @@
 				<section id="04-operator" class="animation-slide" data-animation="04-operator">
 					<h2>Operator to funkcja</h2>
 					<div class="rx-player" aria-label="Operator to funkcja"></div>
-					<aside class="notes"><p>Trzy niepołączone bloczki. Subscribe rysuje połączenia od odbiorcy przez map do źródła. Ręcznie pokaż dotarcie 1, obliczenie 1 × 10 = 10 i dostarczenie 10. Następne kliknięcie uruchamia automat dla 2 → 20, 3 → 30 i unsubscribe. next(4) nie dociera do zamkniętej subskrypcji. Ruch jest ilustracją; callback map jest synchroniczny. Po zakończeniu pozostaje nieruchomy kadr. M wybiera ręczny/auto, A w automacie pauzuje, R powtarza, U odsłania sterowanie.</p></aside>
+					<aside class="notes">
+                        <p>Zanim przejdziemy do operatorów, zobaczmy prosty pipeline. Operator dostaje Observable i zwraca Observable. map(project) tworzy funkcję operatora, którą przekazujemy do pipe; project(value) jest wywoływane później dla emitowanych wartości. Typ OperatorFunction i jego definicja przez UnaryFunction są jedynie zapleczem dla prelegenta, nie treścią ekranu.</p>
+                        <p>Źródło emituje jedynkę. Map zamienia ją na dwójkę, a odbiorca otrzymuje wynik. W rzeczywistym RxJS of(1, 2, 3), projekcja i dostarczenie wartości są synchroniczne; wolne przeloty i pauzy spowalniają wyłącznie ilustrację.</p>
+                        <p>Ręcznie pokazujemy połączenie elementów i pełny przepływ pierwszej wartości. Bieżący wynik jest pod map tylko podczas transformacji; znika, gdy kulka rusza dalej. Box odbioru pojawia się po dotarciu pierwszej wartości. Następne kliknięcie uruchamia automat dla 2 → 4, 3 → 6 oraz complete. Krótszy box odbiorcy zachowuje 2, 4, 6; complete nie jest kolejną wartością. Źródło wysyła complete, map przekazuje je dalej, a odbiorca kończy. Każdy kafelek pokazuje własny moment zakończenia; rozciągnięcie czasowe dotyczy tylko ilustracji. Po zakończeniu pozostaje nieruchomy kadr.</p>
+                        <p>Strzałki przechodzą między checkpointami, Spacja pauzuje lub wznawia, M wybiera ręczny/auto, R przywraca zatrzymany początek w wybranym trybie, U odsłania sterowanie. Ponowne prawo podczas ruchu kończy bieżący etap. Lewo przywraca poprzedni checkpoint także w AUTO.</p>
+                    </aside>
 				</section>
 
 				<section id="05-zrodla" class="animation-slide" data-animation="05-zrodla">
 					<h2>Skąd płyną wartości?</h2>
 					<div class="rx-player" aria-label="Skąd płyną wartości?"></div>
 					<aside class="notes">
-						<p>To zwykły Subject, bez replay. Timer i HTTP są osobnymi przykładami źródeł. Odbiorca Subject subskrybuje dopiero w 8. sekundzie.</p>
+						<p>Timer i interval: dwa źródła jedno pod drugim. Po 2 s oba emitują 0. timer(2000) na tym kończy: jedna wartość i complete. Pytanie na postoju: czy interval też się zakończy? Nie: interval(2000) emituje 0, 1, 2 co 2 s i sam się nie zakończy. Po trzeciej wartości odbiorca ręcznie robi unsubscribe: kabel się odłącza, interval przestaje emitować, ale nie ma complete.</p>
+						<p>To zwykły Subject, bez replay. HTTP jest osobnym przykładem źródła. Odbiorca Subject subskrybuje po emisji A: nie dostaje A, lecz dostaje B i C. Porównaj boxy: trzy emisje, dwa odbiory. Historia emisji należy do diagramu, nie oznacza cache ani możliwości odtworzenia A przez Subject. Postoje: A bez odbiorcy, subskrypcja i odebrane B; dalej AUTO pokazuje C. Subskrypcja pozostaje aktywna.</p>
 						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>

@@ -56,7 +56,7 @@
 .reactivex-language-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px 20px;
+  gap: 22px 20px;
   max-width: 1050px;
   margin: 0 auto;
 }
@@ -64,7 +64,7 @@
 .reactivex-language-grid span {
   display: grid;
   place-items: center;
-  min-height: 66px;
+  min-height: 96px;
   border: 1px solid rgba(78, 87, 97, 0.16);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.62);
@@ -80,7 +80,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 50px;
+  margin-top: 120px;
   padding: 10px 10px;
   width: 100%;
   box-sizing: border-box;
@@ -224,8 +224,8 @@
 
 .reveal .community-qr img {
   display: block;
-  width: 320px;
-  height: 320px;
+  width: 420px;
+  height: 420px;
   max-width: none;
   max-height: none;
   margin: 0;
@@ -253,7 +253,7 @@
   justify-content: center;
   align-items: center;
   width: 100%;
-  height: 510px;
+  height: 790px;
 }
 
 .photo-box-hero {
@@ -312,8 +312,8 @@
   border-radius: 12px;
   margin: 0 !important;
   /* Limit dotyczy zdjęcia, a ramka obejmuje jego rzeczywiste proporcje. */
-  max-width: 954px !important;
-  max-height: 480px !important;
+  max-width: 1200px !important;
+  max-height: 760px !important;
 }
 
 /* =========================================
@@ -357,7 +357,7 @@
 
 .talk-image-wrapper {
   width: 100%;
-  height: 330px;
+  height: 420px;
   flex-shrink: 0;
   border-radius: 12px;
   overflow: hidden;
@@ -410,7 +410,7 @@
   display: flex;
   justify-content: center;
   gap: 64px;
-  margin-top: 48px;
+  margin-top: 96px;
   font: 56px/1.3 Consolas, ui-monospace, monospace;
   color: #7a5a3a;
 }
@@ -453,8 +453,8 @@
 }
 
 .trivia-stack-container {
-  width: 1120px;
-  height: 540px;
+  width: 1240px;
+  height: 780px;
   margin: 0 auto;
 }
 
@@ -605,10 +605,10 @@
   justify-content: center;
   gap: 4px;
   font-size: 18px;
-  line-height: 22px;
+  line-height: 26px;
   font-variant-numeric: tabular-nums;
-  padding: 4px 2px;
-  margin: 0 0 4px !important;
+  padding: 6px 2px;
+  margin: 0 0 6px !important;
 }
 
 .timeline-dates .tl-num {
@@ -628,7 +628,7 @@
   justify-content: center;
   gap: 4px;
   width: 100%;
-  padding: 4px 2px;
+  padding: 6px 2px;
   box-sizing: border-box;
   border-radius: inherit;
   color: inherit;
@@ -675,3 +675,21 @@
   color: #555555;
   margin: 12px 0 0;
 }
+
+/* =========================================
+   Format 16:9 (?ratio=16:9, klawisz W): dotychczasowe rozmiary.
+   Bazowe wartości powyżej wykorzystują wysokość sceny 4:3 (1280×960).
+   ========================================= */
+[data-ratio="16-9"] .reveal .community-qr img { width: 320px; height: 320px; }
+[data-ratio="16-9"] .photo-stack-container { height: 510px; }
+[data-ratio="16-9"] .reveal .photo-box-hero-with-title img,
+[data-ratio="16-9"] .reveal .trivia-photo-frame img { max-width: 954px !important; max-height: 480px !important; }
+[data-ratio="16-9"] .trivia-stack-container { width: 1120px; height: 540px; }
+[data-ratio="16-9"] .talk-image-wrapper { height: 330px; }
+[data-ratio="16-9"] .reactivex-language-grid { gap: 16px 20px; }
+[data-ratio="16-9"] .reactivex-language-grid span { min-height: 66px; }
+[data-ratio="16-9"] .known-operators-list { margin-top: 48px; }
+[data-ratio="16-9"] .speaker-intro-card { margin-top: 50px; }
+[data-ratio="16-9"] .timeline-dates li { line-height: 22px; padding: 4px 2px; margin: 0 0 4px !important; }
+[data-ratio="16-9"] .reveal .timeline-dates li:has(> a) { padding: 0; }
+[data-ratio="16-9"] .reveal .timeline-dates li > a { padding: 4px 2px; }

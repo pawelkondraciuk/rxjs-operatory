@@ -4,24 +4,210 @@ const R=(label,events=[],spans=[],extra={})=>({label,events,spans,...extra});
 const B=(start,end,label,kind='work',extra={})=>({start,end,label,kind,...extra});
 const manual=stops=>({entry:'manual',stops,afterLastManualStop:'start-auto',finish:'hold'});
 
+// Wszystkie next i complete mają logicalAt: 0: of emituje synchronicznie.
+// Poniższe czasy wyłącznie rozciągają ilustrację, bez wykonywania kodu przykładu.
+function mapSequence(scene) {
+  const timing={pipeline:.2,handoff:.05,subscribe:3.2,travel:1.2,transform:1.4,receivedHold:.5,gap:.7,terminal:1.2,...scene.timing};
+  for(const [key,value] of Object.entries(timing)) {
+    if(!Number.isFinite(value)||value<=0)throw new Error(`${scene.id}: nieprawidłowy czas ilustracji ${key}`);
+  }
+  const seconds=value=>Math.round(value*1e9)/1e9;
+  const subscribe=seconds(timing.pipeline+timing.handoff),connected=seconds(subscribe+timing.subscribe);
+  let departure=seconds(connected+timing.handoff);
+  const values=[1,2,3].map(value=>{
+    const arrival=seconds(departure+timing.travel),output=seconds(arrival+timing.transform);
+    const received=seconds(output+timing.travel),held=seconds(received+timing.receivedHold);
+    const item={value:String(value),result:String(value*2),departure,arrival,output,received,held};
+    departure=seconds(held+timing.gap);
+    return item;
+  });
+  const complete=values.at(-1).held,duration=seconds(complete+timing.terminal);
+  return {timing,seconds,pipeline:timing.pipeline,subscribe,connected,values,complete,duration};
+}
+
+export function configureOperator(scene) {
+  const sequence=mapSequence(scene),{timing,pipeline,subscribe,connected,values,duration}=sequence;
+  const example='of(1, 2, 3).pipe(map(x => x * 2))';
+  // Na początku prezentacji nie mówimy o subskrypcji ani o momencie startu pracy.
+  const pipelineCaption='map stoi między źródłem a odbiorcą';
+  const subscribeCaption='Łączymy źródło, map i odbiorcę';
+  const firstCaption='Źródło emituje 1. map przekształca ją w 2, a odbiorca otrzymuje wynik';
+  // Na początku prezentacji nie wprowadzamy subscribe w kodzie; ekran pokazuje tylko pipe z map.
+  Object.assign(scene,{graph:mapGraph,timing,playerLayout:'function',duration,code:example,
+    rows:[R('Źródło',values.map(v=>E(0,v.value)),[],{completeAt:0}),
+      R('map',values.map(v=>E(0,v.result,'op')),[],{completeAt:0}),
+      R('Odbiorca',values.map(v=>E(0,v.result,'op')),[],{completeAt:0})],
+    captions:[[0,'Źródło, operator i odbiorca'],[timing.handoff,pipelineCaption],
+      [subscribe,subscribeCaption],...values.flatMap(v=>[
+        [v.departure,`Źródło emituje ${v.value}. Wartość płynie do map`],
+        [v.arrival,`map przekształca ${v.value} w ${v.result}. Projekcja działa synchronicznie`],
+        [v.received,v.value==='1'?firstCaption:`Odbiorca otrzymuje ${v.result} i zachowuje wcześniejsze wartości`],
+      ]),[sequence.complete,'Źródło wysyła complete. Sygnał przechodzi przez map do odbiorcy'],
+      [duration,'Operator przekształcił trzy wartości. Po complete strumień zakończył pracę']],
+    playback:{...manual([
+      {id:'pipeline',time:pipeline,caption:pipelineCaption},
+      {id:'subscribed',time:connected,caption:subscribeCaption},
+      {id:'first',time:values[0].held,caption:firstCaption},
+    ]),controller:'stages'},metrics:[],
+  });
+}
+
 export function mapGraph(scene) {
-  const input=scene.rows[0].events.filter(e=>e.at<18);
+  const {timing,seconds,subscribe,values,complete,duration}=mapSequence(scene),frame=frameFor(scene),layout=frame.operator;
+  const halfSubscribe=timing.subscribe/2,halfTerminal=timing.terminal/2;
+  const tile={y:layout.tileY,h:layout.tileH};
   const nodes=[
-    {id:'source',x:155,y:150,w:230,h:80,label:'Źródło',ready:true,color:'source'},
-    {id:'map',x:590,y:150,w:300,h:80,label:'map(x ⇒ x × 10)',ready:true,color:'op'},
-    {id:'observer',x:1080,y:184,w:260,h:148,label:'Odbiorca',labelOffset:-34,ready:true,color:'http'},
+    {id:'source',x:layout.sourceX,...tile,w:layout.sideW,label:'Źródło',statusInside:true,terminalEdge:'source-map',ready:true,color:'source'},
+    {id:'map',x:layout.opX,...tile,w:layout.mapW,label:'map(x => x * 2)',statusInside:true,terminalEdge:'map-observer',ready:true,color:'op'},
+    {id:'observer',x:layout.observerX,...tile,w:layout.observerW??layout.sideW,label:'Odbiorca',statusInside:true,ready:true,color:'http'},
   ];
-  return {layout:'fixed',width:1240,height:340,nodes,
-    edges:[{from:'source',to:'map',points:[[270,150],[440,150]]},{from:'map',to:'observer',points:[[740,150],[950,150]]}],
-    trays:[{anchor:'observer',x:1080,y:220,w:240}],
+  // Box i kafelek odbiorcy mają te same wymiary; trzy wartości mieszczą się w jednym rzędzie.
+  const observer=nodes.find(n=>n.id==='observer');
+  const receiverBox={x:observer.x-observer.w/2,y:layout.boxY,w:observer.w,h:layout.boxH??observer.h,shownAt:values[0].received,
+    from:{x:observer.x,y:observer.y+observer.h/2}};
+  return {layout:'fixed',formatAware:true,width:1240,height:frame.height,nodes,
+    ...(layout.textScale?{textScale:layout.textScale,labelScale:layout.labelScale}:{}),
+    edges:[{from:'source',to:'map',logicalStart:0},{from:'map',to:'observer',logicalStart:0}],
+    panels:[receiverBox],
+    trays:[{anchor:'observer',x:observer.x,y:receiverBox.y+receiverBox.h/2,w:receiverBox.w-4,lines:1}],
     schedule:{
-      'source-map':{start:2.5,connectDuration:1.5,end:{at:19,kind:'unsubscribe',duration:1},events:input.map(e=>({...e,logicalAt:e.at,at:e.at+.35,arrival:e.at+1,phase:'to-map'}))},
-      'map-observer':{start:1,connectDuration:1.5,end:{at:18,kind:'unsubscribe',duration:1},events:input.map(e=>({...e,value:String(Number(e.value)*10),at:e.at+1.5,arrival:e.at+2.5,phase:'to-observer',color:'op'}))},
+      'source-map':{start:seconds(subscribe+halfSubscribe),connectDuration:halfSubscribe,
+        end:{at:complete,logicalAt:0,kind:'complete',duration:seconds(complete+halfTerminal)-complete},
+        events:values.map(v=>({...E(v.departure,v.value),logicalAt:0,arrival:v.arrival,phase:'to-map'}))},
+      'map-observer':{start:subscribe,connectDuration:halfSubscribe,
+        end:{at:seconds(complete+halfTerminal),logicalAt:0,kind:'complete',duration:duration-seconds(complete+halfTerminal)},
+        events:values.map(v=>({...E(v.output,v.result,'op'),logicalAt:0,arrival:v.received,phase:'to-observer'}))},
     },
-    activities:[...scene.rows[0].events.map(e=>({node:'source',at:e.at,until:e.at+.35})),...input.map(e=>({node:'observer',at:e.at+2.5,until:e.at+3}))],
-    transforms:input.map(e=>({node:'map',at:e.at+1,until:e.at+1.5,label:`${e.value} × 10 = ${Number(e.value)*10}`})),
-    tokens:[...scene.rows[0].events.map(e=>({...e,until:e.at+(e.at>=18?1.5:.35),x:155,y:80,phase:e.at>=18?'unobserved':'emitting'})),
-      ...input.map(e=>({...e,at:e.at+1,until:e.at+1.5,x:590,y:80,phase:'in-map'}))],
+    activities:[...values.map(v=>({node:'source',at:v.departure,until:v.departure+timing.handoff})),
+      ...values.map(v=>({node:'observer',at:v.received,until:v.held}))],
+    transforms:values.map(v=>({node:'map',at:v.arrival,until:v.output,logicalAt:0,label:`${v.value} → ${v.result}`})),
+  };
+}
+
+// Wariant timer/interval: timer(2000) emituje 0 i kończy się complete. interval(2000) emituje 0, 1, 2 i sam się nie kończy,
+// więc odbiorca ręcznie robi unsubscribe (7 s): kabel się odłącza, bez complete. Trzy wartości mieszczą się w boxie.
+export function configureTimers(scene) {
+  const ticks=[2,4,6].map((at,i)=>E(at,String(i),'source')),stop=7;
+  const once=[E(2,'0','source')];
+  Object.assign(scene,{graph:timersGraph,playerLayout:'function',duration:8,unsubscribeAt:stop,
+    title:'timer i interval: jedna wartość czy strumień?',code:'timer(2000) / interval(2000)',
+    // Odbiorca timera dostaje ✓ complete dopiero po dotarciu sygnału (terminal krawędzi), nie z completeAt wiersza.
+    rows:[R('timer(2000)',once,[],{completeAt:2}),R('Odbiorca timer',once),
+      R('interval(2000)',ticks),R('Odbiorca interval',ticks)],
+    captions:[[0,'Dwa źródła: timer(2000) i interval(2000)'],[2,'Po 2 s oba źródła emitują 0'],
+      [4,'interval emituje kolejną wartość. timer już się zakończył'],
+      [stop,'Odbiorca robi unsubscribe. interval przestaje emitować, bez complete']],
+    metrics:[],
+    playback:manual([
+      {id:'first',event:{type:'deliver-next',edge:'interval-intervalSink',value:'0'},offset:.35,caption:'Po 2 s oba źródła emitują 0'},
+      {id:'question',event:{type:'disconnected',edge:'timer-timerSink'},caption:'timer(2000) zakończył się po jednej wartości. Czy interval też się zakończy?'},
+      {id:'third',event:{type:'deliver-next',edge:'interval-intervalSink',value:'2'},offset:.35,caption:'interval wysłał 0, 1, 2 i działa dalej. Sam się nie zakończy'},
+      {id:'unsubscribed',event:{type:'disconnected',edge:'interval-intervalSink'},caption:'Odbiorca robi unsubscribe. interval przestaje emitować, bez complete'},
+    ]),
+  });
+}
+
+export function timersGraph(scene) {
+  const frame=frameFor(scene),layout=frame.timers,tile={h:layout.tileH,ready:true,statusInside:true};
+  // 4:3 ma własne kolumny i wyższy box; 16:9 zachowuje dotychczasowe położenia.
+  const source=layout.source||{x:190,w:320},sink=layout.sink||{x:640,w:260},box=layout.box||{x:1015,w:370},boxH=layout.boxH||layout.tileH;
+  const nodes=[],panels=[],trays=[];
+  const stopped=t=>t>=scene.unsubscribeAt;
+  [['timer','timerSink','timer(2000)','po 2 s'],['interval','intervalSink','interval(2000)',t=>stopped(t)?'zatrzymany':'co 2 s']].forEach(([id,sinkId,label,detail],i)=>{
+    const y=layout.rows[i];
+    nodes.push({id,...tile,x:source.x,y,w:source.w,label,detail,ri:i*2,color:'source',terminalEdge:id+'-'+sinkId},
+      {id:sinkId,...tile,x:sink.x,y,w:sink.w,label:'Odbiorca',ri:i*2+1,color:'http',...(i?{detail:t=>stopped(t)?'unsubscribe':undefined}:{})});
+    // Box odbiorów na prawo od odbiorcy, w tym samym rzędzie; łącznik jest poziomy.
+    // 4:3: box pojawia się przy pierwszym odbiorze w tym rzędzie.
+    panels.push({x:box.x-box.w/2,y:y-boxH/2,w:box.w,h:boxH,from:{x:sink.x+sink.w/2,y},
+      ...(layout.showOnFirst?{showOn:{type:'deliver-next',edge:id+'-'+sinkId,value:'0'}}:{})});
+    // 4:3: jeden wyśrodkowany rząd (0, 1, 2 mieszczą się bez wielokropka przy skali 1,8).
+    trays.push({anchor:sinkId,x:box.x,y,w:box.w-24,...(layout.showOnFirst?{lines:1}:{})});
+  });
+  return {layout:'fixed',formatAware:true,width:1240,height:frame.height,nodes,panels,trays,
+    ...(layout.textScale?{textScale:layout.textScale,labelScale:layout.labelScale}:{}),
+    edges:[{from:'timer',to:'timerSink',events:scene.rows[0].events,logicalStart:0},
+      {from:'interval',to:'intervalSink',events:scene.rows[2].events,logicalStart:0,logicalEnd:{at:scene.unsubscribeAt,kind:'unsubscribe'}}]};
+}
+
+// Wariant HTTP: subskrypcja uruchamia request (praca tylko w kafelku HTTP), odpowiedź „dane” trafia do boxu pod odbiorcą,
+// potem complete. Odbiorca ma własny wiersz bez pracy, więc nie pokazuje paska ani „praca trwa”.
+export function configureHttp(scene) {
+  const response=[E(7,'dane','http')];
+  Object.assign(scene,{graph:httpGraph,playerLayout:'function',duration:9,
+    title:'HTTP: odpowiedź i complete',code:"http.get('/api/data')",
+    rows:[R('HTTP',response,[B(1,7,'request')],{completeAt:7}),R('Odbiorca',response)],
+    captions:[[0,'HTTP i odbiorca'],[1,'Subskrypcja uruchamia HTTP'],[7,'Odpowiedź, a następnie complete']],
+    metrics:[],
+    playback:manual([{id:'request',modelTime:4,caption:'Request w toku. Odbiorca czeka na odpowiedź'}]),
+  });
+}
+
+export function httpGraph(scene) {
+  const frame=frameFor(scene),layout=frame.http,tile={y:layout.tileY,h:layout.tileH,ready:true,statusInside:true};
+  const nodes=[
+    // Między wysłaniem odpowiedzi a sygnałem complete kafelek nie udaje jeszcze zakończenia.
+    {id:'http',x:layout.httpX??320,...tile,w:layout.httpW??320,label:'HTTP',ri:0,work:true,terminalEdge:'http-observer',detail:t=>t>=7?'odpowiedź wysłana':undefined},
+    {id:'observer',x:layout.observerX??940,...tile,w:layout.observerW??280,label:'Odbiorca',ri:1,color:'http'},
+  ];
+  const observer=nodes[1];
+  // 4:3: box odbioru pojawia się, gdy „dane” dotrą do odbiorcy.
+  const box={x:observer.x-observer.w/2,y:layout.boxY,w:observer.w,h:layout.boxH??layout.tileH,from:{x:observer.x,y:observer.y+observer.h/2},
+    ...(layout.showOnFirst?{showOn:{type:'deliver-next',edge:'http-observer',value:'dane'}}:{})};
+  return {layout:'fixed',formatAware:true,width:1240,height:frame.height,nodes,panels:[box],
+    ...(layout.textScale?{textScale:layout.textScale,labelScale:layout.labelScale}:{}),
+    trays:[{anchor:'observer',x:observer.x,y:box.y+box.h/2,w:box.w-4,lines:1}],
+    edges:[{from:'http',to:'observer',events:scene.rows[0].events}]};
+}
+
+// Wariant Subject: emisja może nastąpić także bez podłączonego odbiorcy.
+export function configureSubject(scene) {
+  // Zwarte tempo: A po 1 s bez odbiorcy, subskrypcja w 2,5 s, B w 4 s, C w 5,5 s.
+  const at={a:1,subscribe:2.5,b:4,c:5.5},received=[E(at.b,'B','b'),E(at.c,'C','c')];
+  const emitted=[E(at.a,'A'),...received];
+  // Subskrypcja w tym przykładzie pozostaje aktywna; nie demonstrujemy unsubscribe.
+  scene.rows=scene.rows.map((row,i)=>i===2?R(row.label,emitted):i===3?R(row.label,received):row);
+  Object.assign(scene,{graph:subjectGraph,playerLayout:'expanded',metrics:[],subscribeAt:at.subscribe,duration:at.c+1,
+    captions:[[0,'Subject może emitować także bez subskrypcji'],
+      [at.a,'Subject emituje A. Nie ma jeszcze odbiorcy'],
+      [at.subscribe,'Odbiorca dołącza do Subject. Wcześniejsze A nie jest odtwarzane'],
+      [at.b,'Subject emituje B do aktywnego odbiorcy'],[at.c,'Subject emituje C do aktywnego odbiorcy']],
+    playback:manual([
+      {id:'unobserved',event:{type:'source-next',node:'source',value:emitted[0].value},offset:.35,
+        caption:'A wyemitowane bez subskrypcji: jedna emisja, zero odebranych wartości'},
+      {id:'subscribed',event:{type:'connected',edge:'source-sink'},
+        caption:'Odbiorca subskrybuje. Wcześniejsze A nie wraca'},
+      {id:'first',event:{type:'deliver-next',edge:'source-sink',value:'B'},offset:.35,
+        caption:'Odbiorca dostał B. Emisje: A, B; odbiór: tylko B'},
+    ]),
+  });
+}
+
+export function subjectGraph(scene) {
+  const emitted=scene.rows[2].events,first=emitted[0],frame=frameFor(scene),big=frame.subject;
+  // 4:3: duże kafelki i boxy, które pojawiają się przy pierwszej emisji / pierwszym odbiorze; A nie leci obok Subject.
+  // 16:9: dotychczasowe kolumny z historią w trzech liniach.
+  const sourceX=big?big.sourceX:frame.sourceX,sinkX=big?big.sinkX:frame.observerX;
+  const tileY=big?big.tileY:frame.tileY,tileH=big?big.tileH:frame.tileH,tileW=big?big.tileW:200;
+  const tile={y:tileY,h:tileH,w:tileW,ready:true,statusInside:true};
+  const subscribeAt=scene.subscribeAt;
+  const box=(x,showOn)=>big?{x:x-tileW/2,y:big.boxY,w:tileW,h:big.boxH,from:{x,y:tileY+tileH/2},showOn}:
+    {x:x-frame.sideW/2,y:frame.panelY,w:frame.sideW,h:frame.columnH,from:{x,y:tileY+tileH/2}};
+  // Box 4:3 ma jeden rząd wartości (trzy kapsułki mieszczą się w 280 px), 16:9 trzy linie w kolumnie.
+  const history=big?{y:big.boxY+big.boxH/2,w:tileW-4,lines:1}:
+    {y:frame.panelY+frame.historyTop,w:frame.sideW-24,columns:1,lines:3,lineStep:frame.historyStep};
+  return {layout:'fixed',formatAware:true,width:1240,height:frame.height,
+    ...(big?{textScale:big.textScale,labelScale:big.labelScale}:{}),
+    nodes:[{id:'source',x:sourceX,...tile,label:'Subject',ri:2,color:'source',detail:t=>t<subscribeAt?'0 odbiorców':'1 odbiorca'},
+      {id:'sink',x:sinkX,...tile,label:'Odbiorca',ri:3,color:'http',detail:t=>t<subscribeAt?'nie subskrybuje':'subskrybuje'}],
+    edges:[{id:'source-sink',from:'source',to:'sink',logicalStart:subscribeAt,events:scene.rows[3].events}],
+    panels:[box(sourceX,{type:'source-next',node:'source',value:first.value}),box(sinkX,{type:'deliver-next',edge:'source-sink',value:'B'})],
+    trays:[{anchor:'source',x:sourceX,...history,events:emitted,modelTime:true},
+      {anchor:'sink',x:sinkX,...history}],
+    tokens:big?[]:[{...first,at:first.at,until:first.at+.6,modelTime:true,x:frame.sourceX+140,y:tileY,phase:'unobserved'}],
+    timeline:[{at:first.at,type:'source-next',node:'source',value:first.value},
+      {type:'subject-summary',event:{type:'deliver-next',edge:'source-sink',value:'C'},offset:.35,
+        caption:'Wyemitowane: 3 (A, B, C). Odebrane: 2 (B, C). Zwykły Subject nie odtwarza A'}],
   };
 }
 
@@ -64,10 +250,20 @@ function buildFlattenGraph(scene) {
 
 // Wspólny układ rodziny flatteningu: trzy kolumny. Pod źródłem EMISJE, pod wyśrodkowanym operatorem PRACE WEWNĘTRZNE,
 // pod odbiorcą ODBIÓR. Panele mają odstęp od kafelków i od dołu; wiersze zajmują stałe sloty na całej wysokości.
-const frame = {height:460,tileY:50,tileH:76,panelY:148,panelBottom:440,panelW:520,sideW:220,sourceX:140,opX:620,observerX:1100,catchX:860};
+// 4:3 ma własny profil: wyższa ramka, kafelki i sloty; poziomy układ (szerokość 1240) jest wspólny.
+// Scena bez formatu (testy, prototypy) zachowuje geometrię 16:9.
+const horizontal = {panelW:520,sideW:220,sourceX:140,opX:620,observerX:1100,catchX:860};
+const frames = {
+  '16:9': {...horizontal,timers:{tileH:86,rows:[130,330]},http:{tileY:170,tileH:86,boxY:250},operator:{tileY:50,tileH:76,sourceX:140,opX:620,observerX:1100,sideW:200,mapW:240,boxY:148},height:460,tileY:50,tileH:76,panelY:148,panelBottom:440,columnH:210,historyTop:41,historyStep:60},
+  // 04 w 4:3: trzy duże kafelki i box odbioru pod odbiorcą; cała grupa (130 + 50 + 130) na środku ramki 612.
+  // 05 (timer/interval) w 4:3: dwa rzędy po 130 px wyśrodkowane w ramce 612, większy tekst jak w 04.
+  // 05-2 (HTTP) w 4:3: kafelki i box pod odbiorcą jak w 04, grupa wyśrodkowana w pionie i poziomie.
+  '4:3': {...horizontal,timers:{tileH:170,rows:[181,431],boxH:150,source:{x:210,w:360},sink:{x:630,w:280},box:{x:1040,w:340},showOnFirst:true,textScale:1.8,labelScale:2.2},http:{tileY:201,tileH:170,boxY:346,boxH:150,httpX:300,httpW:400,observerX:940,observerW:400,showOnFirst:true,textScale:1.8,labelScale:2.2},subject:{sourceX:300,sinkX:940,tileY:201,tileH:170,tileW:400,boxY:346,boxH:150,textScale:1.8,labelScale:2.2},operator:{tileY:201,tileH:170,sourceX:160,opX:590,observerX:1050,sideW:260,observerW:320,mapW:380,boxY:346,boxH:150,textScale:1.8,labelScale:2.2},height:612,tileY:60,tileH:96,panelY:172,panelBottom:592,columnH:300,historyTop:56,historyStep:84},
+};
+const frameFor = scene => frames[scene.format==='4:3'?'4:3':'16:9'];
 
 export function flattenGraph(scene) {
-  const graph = buildFlattenGraph(scene);
+  const graph = buildFlattenGraph(scene), frame = frameFor(scene);
   const outerCatch = scene.catchScope === 'outer';
   const panelX = frame.opX;
   const paired = scene.operatorName === 'concatAll';
@@ -77,7 +273,7 @@ export function flattenGraph(scene) {
   const rowsTop = frame.panelY + 16, rowsBottom = frame.panelBottom - 16, gap = 20;
   // Stała siatka czterech slotów od góry: mniej prac układa się jedna pod drugą, bez rozciągania odstępów.
   const grid = Math.max(4,slots), rowHeight = (rowsBottom-rowsTop-(grid-1)*gap)/grid, rowStep = rowHeight+gap;
-  Object.assign(graph,{height:frame.height,queue:null,illustratedWork:true});
+  Object.assign(graph,{height:frame.height,formatAware:true,queue:null,illustratedWork:true});
   const tile = {y:frame.tileY,h:frame.tileH};
   graph.nodes.forEach(n => {
     // Etykieta źródła jak w kodzie przykładu (source$ albo id$).
@@ -215,11 +411,7 @@ export function configureFlattenPlayback(scene) {
 }
 
 export function configureReferences(scenes) {
-  const map=scenes.find(s=>s.id==='04-operator');
-  map.graph=mapGraph;
-  map.playback=manual([{id:'subscribe',time:4},{id:'input',time:6,caption:'1 dotarło do map.'},
-    {id:'transform',time:6.25,caption:'1 × 10 = 10. Callback map jest synchroniczny.'},{id:'first',time:7.5,caption:'Odbiorca ma 10. Dalej: automatyczny pokaz 2 i 3.'}]);
-  delete map.fragmentSteps;
+  configureOperator(scenes.find(s=>s.id==='04-operator'));
   configureFlatten(scenes.find(s=>s.id==='08-map-strumienie'),'concatAll');
   configureFlatten(scenes.find(s=>s.id==='11-switchmap'),'switchMap');
   const share=scenes.find(s=>s.id==='19-share');

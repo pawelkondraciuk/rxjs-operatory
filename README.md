@@ -19,6 +19,8 @@ W oknie prelegenta (`S`) podgląd następnego slajdu domyślnie pokazuje dużą 
 
 Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek.
 
+Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przywraca ekran panoramiczny 1280×720. `W` przeładowuje stronę w drugim formacie, zostając na tym samym slajdzie i fragmencie; animacja wraca do stanu tego fragmentu. Linki do EXTRAS i powrót do pytań zachowują wybrany format. Druk działa w obu: `?print-pdf` (4:3) lub `?print-pdf&ratio=16:9`. W 4:3 slajdy wykorzystują pełną wysokość: większe zdjęcia i kody QR, wyższe diagramy, większy tekst i kapsułki w animacjach (×1,15), etykiety kafelków do ×1,3 oraz większy tytuł (64 px; za długi zmniejsza się, by został w jednej linii), kod (42 px, długi łańcuch przechodzi do nowej linii przed .pipe/.subscribe) i podpis.
+
 ## Jak czytać spis
 
 Porównania są osobnymi slajdami. Warianty z sufiksami -2/-3/-4 powstają podczas uruchamiania; pierwszy zachowuje ID bazowe. Poniżej podano kolejność MAIN, a dalszy spis opisuje rodziny tematycznie. Pozycje EXTRAS są oznaczone.
@@ -197,43 +199,47 @@ Brak notatek w HTML.
 
 ### Operator to funkcja — `04-operator`
 
-**Temat:** przekształcanie wartości w potoku i tworzenie połączenia przez subskrypcję.
+**Temat:** map przekształca wartości: źródło → map → odbiorca. Na tym etapie nie mówimy o subskrypcji ani o tym, kiedy praca się uruchamia.
 
-| ID slajdu | Tytuł na ekranie | Kod nad diagramem |
-| --- | --- | --- |
-| 04-operator | Operator to funkcja | `const sub = source$.pipe(map(x => x * 10)).subscribe(observer)` |
+**Na ekranie:** tylko prosty pseudokod `of(1, 2, 3).pipe(map(x => x * 2))`, przez cały slajd bez `.subscribe(observer)`: na początku prezentacji nie wprowadzamy w kodzie subskrypcji. Bez sygnatur TypeScript i adnotacji o typach.
 
-**Na bloczkach:** „Źródło” → „map(x ⇒ x × 10)” → „Odbiorca”. Wejście 1, 2, 3; wyniki 10, 20, 30 zostają wewnątrz odbiorcy. Przy transformacji widać równanie, np. `1 × 10 = 10`. Po unsubscribe źródło emituje 4, lecz odbiorca go nie dostaje. Podświetlony jest bloczek aktualnie obsługujący wartość.
+**Na bloczkach:** „Źródło” → „map(x => x * 2)” → „Odbiorca”. Kafelki mają te same rozmiary i pozycje co na switchMap; operator stoi na środku i ma wyśrodkowany tekst. Box historii ma te same wymiary co kafelek odbiorcy (200×76 px); wartości 2, 4, 6 tworzą jeden wyśrodkowany rząd. Wszystkie kafelki pokazują własne complete, a ich nazwy i statusy są wyrównane w pionie. Źródło nie ma panelu emisji ani paska pracy. Bieżący wynik, np. `1 → 2`, pojawia się pod map tylko podczas transformacji i znika, gdy wynikowa kulka rusza do odbiorcy. Box odbioru wraz z łącznikiem pojawia się dopiero po dotarciu pierwszej wartości; cofnięcie przed ten moment ponownie go ukrywa.
+
+**Etapy:** READY z pseudokodem („Źródło, operator i odbiorca”) → „map stoi między źródłem a odbiorcą” → połączenie elementów („Łączymy źródło, map i odbiorcę”) → ręczny przepływ 1 → 2 → AUTO dla 2 → 4, 3 → 6 i complete. Box odbiorcy zachowuje 2, 4, 6. W 4:3 kafelki mają 170 px wysokości, a tekst jest ok. 1,8× większy niż w 16:9. Zielony terminal i ✓ complete odróżniają zakończenie od wartości next. Wynik pozostaje nieruchomy.
 
 **Speaker notes:**
 
-> Na początku widać trzy niepołączone klocki: Źródło, map i odbiorcę. Przy subscribe() prosta czarna kreska wydłuża się od odbiorcy do map, a następnie od map do źródła. To kierunek rysowania połączenia, a nie kolejność wewnętrznego wywoływania subskrypcji w RxJS.
+> Operator dostaje Observable i zwraca Observable. map(project) tworzy funkcję operatora, którą przekazujemy do pipe; project(value) jest wywoływane później dla emitowanych wartości. Typ OperatorFunction i jego definicja przez UnaryFunction są jedynie zapleczem dla prelegenta, nie treścią ekranu.
 
-> Źródło emituje 1. Wartość najpierw dociera do map, tam zmienia się w 10 i dopiero potem rusza do odbiorcy. To samo dla 2 i 3. Ruch oraz pauza przy map celowo spowalniają ilustrację. W rzeczywistym potoku źródło i map przekazują te wartości synchronicznie, bez takich opóźnień.
+> Źródło emituje jedynkę. Map zamienia ją na dwójkę, a odbiorca otrzymuje wynik. W rzeczywistym RxJS of(1, 2, 3), projekcja i dostarczenie wartości są synchroniczne; wolne przeloty i pauzy spowalniają wyłącznie ilustrację.
 
-> Przy unsubscribe() kreski skracają się i znikają. Kolejne next(4) nadal jest możliwe w źródle, ale ta subskrypcja już niczego nie przekazuje. Odsubskrybowanie odbiorcy nie oznacza complete źródła. map(fn) tworzy operator, a sam callback x => x * 10 przekształca wartość.
+> Ręcznie pokazujemy połączenie elementów i pełny przepływ pierwszej wartości. Następne kliknięcie uruchamia automat dla 2 → 4, 3 → 6 oraz complete. Odbiorca zachowuje 2, 4, 6; complete nie jest kolejną wartością. Po zakończeniu pozostaje nieruchomy kadr.
 
-> Ręcznie pokazujemy subscribe, dotarcie 1 do map, transformację i odebranie 10. Następny klik uruchamia automatyczny pokaz 2, 3 oraz unsubscribe. Wynik pozostaje na ekranie, bez automatycznej pętli. M zmienia tryb, U pokazuje sterowanie, R wraca do początku.
+Kontroler `stages`: → rozpoczyna etap, a ponowne → podczas ruchu kończy go i pauzuje; ← cofa checkpoint także w AUTO. Spacja pauzuje/wznawia, M zmienia tryb, R przywraca zatrzymany READY, zachowując tryb. U odsłania kontrolki. Lewo z READY i prawo z FINISHED zmieniają slajd.
+
+Domyślne tempo wprowadzenia: połączenie 3,2 s łącznie, przelot 1,2 s na krawędź, transformacja 1,4 s, zatrzymanie odbioru 0,5 s, dodatkowa przerwa między emisjami 0,7 s, complete 1,2 s łącznie.
 
 ### Skąd płyną wartości? — `05-zrodla`
 
-**Temat:** trzy niezależne przykłady źródeł, każdy na osobnym slajdzie.
+**Temat:** niezależne przykłady źródeł na trzech slajdach; pierwszy porównuje timer i interval.
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
-| 05-zrodla | timer: wartości w czasie | `timer(2000, 4000)` |
+| 05-zrodla | timer i interval: jedna wartość czy strumień? | `timer(2000) / interval(2000)` |
 | 05-zrodla-2 | HTTP: odpowiedź i complete | `http.get('/api/data')` |
 | 05-zrodla-3 | Subject: odbierasz od chwili subskrypcji | `subject$.subscribe(observer)` |
 
 **Na bloczkach i w animacji:**
 
-- Timer: „timer” → „Odbiorca”, kolejne 0, 1, 2, 3; źródło pozostaje aktywne.
-- HTTP: „HTTP” → „Odbiorca”, praca, jedna odpowiedź „dane” i complete.
-- Subject: „Subject” → „Odbiorca”; A w 4 s przed subskrypcją, odbiorca dołącza w 8 s i dostaje B w 12 s. Bez historii A.
+- Timer i interval: dwa rzędy, każdy „źródło” → „Odbiorca” → box odbiorów na prawo. Górny `timer(2000)` („po 2 s”) emituje 0 i kończy się ✓ complete. Dolny `interval(2000)` („co 2 s”) emituje 0, 1, 2 i sam się nie kończy; odbiorca ręcznie robi unsubscribe (kabel się odłącza, „unsubscribe” / „zatrzymany”, bez complete). Box pokazuje dokładnie 0, 1, 2, bez wielokropka. W 4:3 kafelki mają 170 px, a box każdego rzędu pojawia się przy pierwszym odbiorze w tym rzędzie. Postoje: oba odbiorcy mają 0 → timer zakończony, „Czy interval też się zakończy?” → interval ma 0, 1, 2 → unsubscribe; wynik nieruchomy. W 4:3 rzędy są wyśrodkowane, z dużym tekstem jak na 04.
+- HTTP: „HTTP” → „Odbiorca”, pod Odbiorcą box odbioru (jak na 04). Praca (pasek i „praca trwa”) jest tylko w kafelku HTTP; Odbiorca nie pracuje. Postój: „Request w toku. Odbiorca czeka na odpowiedź”; dalej AUTO: „dane” trafia do boxu, HTTP pokazuje „odpowiedź wysłana”, potem complete na HTTP i Odbiorcy. W 4:3 kafelki mają 400×170 px, box pojawia się dopiero, gdy „dane” dotrą do Odbiorcy, a całość tworzy wyśrodkowaną grupę z dużym tekstem.
+- Subject: „Subject” → „Odbiorca”, pod każdym kafelkiem box historii. Źródło emituje A bez subskrypcji, potem B i C. Odbiorca dołącza po A i dostaje tylko B, C. Końcowo emisje zawierają A, B, C, a odbiór B, C: trzy emisje, dwa odbiory. Historie są pomocą wizualną, nie buforem Subject. Tempo jest zwarte: A po 1 s, subskrypcja 2,5 s, B 4 s, C 5,5 s. W 4:3 kafelki są duże (400×170), a pod każdym pojawia się box z jednym rzędem wartości: box emisji przy A, box odbioru przy B; A nie leci obok Subject, tylko pojawia się w boxie. Całość jest wyśrodkowana. Ręczne postoje: A bez odbiorcy → subskrypcja → B odebrane; dalej AUTO pokazuje C i trzyma wynik. Nie pokazujemy complete ani unsubscribe.
 
 **Speaker notes:**
 
-> To zwykły Subject, bez replay. Timer i HTTP są osobnymi przykładami źródeł. Odbiorca Subject subskrybuje dopiero w 8. sekundzie.
+> Timer i interval: dwa źródła jedno pod drugim. Po 2 s oba emitują 0. timer(2000) na tym kończy: jedna wartość i complete. Pytanie na postoju: czy interval też się zakończy? Nie: interval(2000) emituje 0, 1, 2 co 2 s i sam się nie zakończy. Po trzeciej wartości odbiorca ręcznie robi unsubscribe: kabel się odłącza, interval przestaje emitować, ale nie ma complete.
+
+> To zwykły Subject, bez replay. HTTP jest osobnym przykładem źródła. Odbiorca Subject subskrybuje po emisji A: nie dostaje A, lecz dostaje B i C. Porównaj boxy: trzy emisje, dwa odbiory. Historia emisji należy do diagramu, nie oznacza cache ani możliwości odtworzenia A przez Subject.
 
 ### Co uruchamia pracę? — `06-subskrypcja`
 
@@ -844,7 +850,7 @@ Scena `01-tytul` istnieje w katalogu, ale nie jest podpięta do slajdów; widocz
 
 Wszystkie animowane warianty korzystają z jednego kompilatora, renderera SVG i odtwarzacza. Panel prac wewnętrznych nie ma kresek subskrypcji do wierszy. Kolejka jest szara od pierwszej klatki. Panel jest wspólnym prymitywem: pasek pracy, complete, kolejka i anulowanie mają również opis tekstowy. Na migrowanych slajdach diagram zajmuje większą część ekranu, a podpis jest w dolnej stopce; w pozostałych scenach zachowano dotychczasowe proporcje.
 
-Podgląd developerski: /work/animation-review.html (lokalna konfiguracja Vite ma base `/`; build ma `/rxjs-operatory/`) — wybór sceny, READY, pytanie, FINISHED i audyt granic tekstu. Uruchom npm test oraz npm run build po zmianach animacji. Próba na fizycznym projektorze i pełna próba 45 minut wymagają prelegenta.
+Podgląd developerski: /work/animation-review.html (lokalna konfiguracja Vite ma base `/`; build ma `/rxjs-operatory/`) — wybór sceny i formatu (4:3/16:9), READY, pytanie, FINISHED i audyt granic tekstu. Uruchom npm test oraz npm run build po zmianach animacji. Próba na fizycznym projektorze i pełna próba 45 minut wymagają prelegenta.
 
 ## Zaakceptowany układ rodziny *Map
 
@@ -852,7 +858,7 @@ Slajdy 08–12, oba warianty `12a-complete` i `13-limit` korzystają teraz z teg
 
 W concatMap „B (wartość)” pojawia się z fade-in po dotarciu B do operatora, a po zwolnieniu miejsca zmienia się w B$. concatAll pokazuje istniejące B$ i C$ czekające bez subskrypcji. Wiersze zakończone pozostają zielone; pominięte wejścia exhaustMap nie tworzą wykonań. Standardowa siatka ma cztery miejsca; przykład limitu używa pięciu. Kapsułki emisji i odbioru wchodzą przez 0,3 s. Pasek pracy rośnie również podczas przelotu wartości; wynik wraca do operatora niewidocznie, a widoczna kulka wychodzi z operatora.
 
-Liczniki uruchomionych i aktywnych inner korzystają ze stanu faktycznych subskrypcji. Sceny z tej rodziny trzymają nieruchomy wynik również w EXTRAS. Nawigacja i postoje Reveal pozostają dotychczasowe; kontroler `stages` nadal jest włączony tylko w podglądzie prototypów. Zachowano identyfikatory, kolejność slajdów i budżet 45 minut.
+Liczniki uruchomionych i aktywnych inner korzystają ze stanu faktycznych subskrypcji. Sceny z tej rodziny trzymają nieruchomy wynik również w EXTRAS. Nawigacja i postoje Reveal pozostają dotychczasowe; kontroler `stages` działa w podglądzie prototypów oraz na `04-operator`, a rodzina flatteningu zachowuje dotychczasowe fragmenty. Zachowano identyfikatory, kolejność slajdów i budżet 45 minut.
 
 Na migrowanych slajdach diagram zajmuje 480 px wysokości. Większe kafelki mają 76 px wysokości, a odstęp do paneli 60 px; wiersze prac są rozdzielone o 20 px. Mniejszy podpis i liczniki są w stopce przy dole slajdu. U pokazuje kontrolki w miejscu stopki; ukrycie kontrolek przywraca podpis.
 

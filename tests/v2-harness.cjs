@@ -35,13 +35,13 @@ function scenario({cancelB=false,empty=false,noCatch=false,concat=false}={}) {
 }
 async function playbackHarness({reducedMotion=false}={}) {
  const frames=new Map();let sequence=0,now=0;
- const m=await modules(['player','catalog','reveal-stages'],{
+ const m=await modules(['player','reveal-stages'],{
   document:{activeElement:null},matchMedia:()=>({matches:reducedMotion}),
   requestAnimationFrame:fn=>{frames.set(++sequence,fn);return sequence;},cancelAnimationFrame:id=>frames.delete(id),
  });
- const baseline=m.catalog.scenes.find(s=>s.id==='04-operator');
+ const baseline={id:'playback-fixture',title:'Etapy',code:'',duration:6,rows:[],captions:[],graph:{nodes:[],edges:[],trays:[]},playback:{}};
  function create(options={}) {
-  const scene={...baseline,playback:{...baseline.playback,controller:'stages',entry:'manual',finish:'loop',stops:[{id:'one',time:2},{id:'two',time:4}],...options.playback}};
+  const scene=options.scene||{...baseline,playback:{...baseline.playback,controller:'stages',entry:'manual',finish:'loop',stops:[{id:'one',time:2},{id:'two',time:4}],...options.playback}};
   const elements=new Map(),root={isConnected:true,contains:()=>false,addEventListener(){},querySelector(s){
    if(!elements.has(s))elements.set(s,{hidden:true,listeners:{},setAttribute(){},addEventListener(type,fn){this.listeners[type]=fn;}});
    return elements.get(s);

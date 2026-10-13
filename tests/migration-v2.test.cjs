@@ -16,7 +16,7 @@ const history=(f,id)=>Array.from(f.histories.find(h=>h.anchor===id).values,e=>e.
 test('migrated slides share accepted prototype geometry and retain native Reveal playback',async()=>{
  const {scenes,compile,prototypes}=await family();
  for(const [id,mode]of [['09-concatmap','concatMap'],['10-mergemap','mergeMap'],['11-switchmap','switchMap'],['12-exhaustmap','exhaustMap']]){
-  const real=scenes.get(id),prototype=prototypes.find(s=>s.id==='prototype-'+mode),c=compile(real),p=compile(prototype);
+  const real=scenes.get(id),prototype={...prototypes.find(s=>s.id==='prototype-'+mode),format:real.format},c=compile(real),p=compile(prototype);
   const shape=f=>JSON.stringify({nodes:f.nodes.map(n=>[n.id,n.x,n.y,n.w,n.h]),panels:f.panels,histories:f.histories.map(h=>[h.anchor,h.x,h.y,h.w,h.columns,h.lines,h.lineStep])});
   assert.equal(shape(c.snapshot(0)),shape(p.snapshot(0)),id);
   assert.deepEqual(history(c.snapshot(c.duration),'observer'),history(p.snapshot(p.duration),'observer'));

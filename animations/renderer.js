@@ -65,10 +65,10 @@ function slotPanel(frame,panel) {
   // Wiersz kolejki znika, gdy subskrybowany B$ w tym samym slocie skończy fade-in.
   const covered=new Set(waiting.filter(r=>r.inner&&(r.opacity??1)>=1).map(r=>r.execution));
   const rows=[...waiting.filter(r=>r.inner||!covered.has(r.execution)),...executions.map(e=>({...e,type:'execution',slot:slotOf(e.node),opacity:1,focused:e.id===frame.focusedExecutionId}))];
-  const rowWidth=panel.w-32,x=panel.x+16,h=panel.rowHeight;
+  const rowWidth=panel.w-32,x=panel.x+16,h=panel.rowHeight,k=frame.textScale||1;
   let svg='';
   if(panel.recipe&&executions.length)
-    svg+=text(panel.x+18,panel.y+46,fitLabel(panel.recipe,Math.floor((panel.w-36)/12)),24,'class="rx-inner-recipe" data-inner-recipe="true" style="text-anchor:start;fill:#483566"');
+    svg+=text(panel.x+18,panel.y+46,fitLabel(panel.recipe,Math.floor((panel.w-36)/(12*k))),24*k,'class="rx-inner-recipe" data-inner-recipe="true" style="text-anchor:start;fill:#483566"');
   for(const row of rows) {
     if(row.slot===undefined)continue;
     const y=panel.rowsTop+row.slot*panel.rowStep,execution=row.type==='execution';
@@ -80,8 +80,8 @@ function slotPanel(frame,panel) {
     svg+=`<g class="rx-execution-row" data-execution="${esc(row.execution||row.id)}" data-row-type="${row.type}" data-inner-state="${execution?row.state:row.type}" data-http-state="${row.httpState||'idle'}" data-focused="${Boolean(row.focused)}" opacity="${row.opacity??1}">`;
     svg+=`<rect x="${x}" y="${y}" width="${rowWidth}" height="${h}" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="${row.focused?4:2}" ${dashed?'stroke-dasharray="6 4"':''}/>`;
     svg+=`<title>${esc(label+' · '+status)}</title>`;
-    svg+=text(x+18,y+h/2,fitLabel(label,14),28,'style="text-anchor:start"');
-    svg+=text(x+rowWidth-18,y+h/2,fitLabel(status,Math.floor((rowWidth-190)/13)),24,`style="text-anchor:end;fill:${finished?'#087438':failed||cancelled?'#9c1727':'#16232b'}"`);
+    svg+=text(x+18,y+h/2,fitLabel(label,Math.floor(14/k)),28*k,'style="text-anchor:start"');
+    svg+=text(x+rowWidth-18,y+h/2,fitLabel(status,Math.floor((rowWidth-190*k)/(13*k))),24*k,`style="text-anchor:end;fill:${finished?'#087438':failed||cancelled?'#9c1727':'#16232b'}"`);
     if(execution&&(row.state==='running'||cancelled||row.state==='error'||row.httpState==='error'&&!finished)) {
       const progress=clamp(row.progress||0);
       svg+=`<rect data-execution-progress="${progress}" x="${x}" y="${y+h-7}" width="${rowWidth*progress}" height="7" fill="${cancelled||row.state==='error'?'#b51e2e':'#765011'}"/>`;
@@ -94,10 +94,10 @@ function executionPanel(frame,panel) {
   if(panel.slots)return slotPanel(frame,panel);
   const {rows,hidden,focused,executions}=executionPanelRows(frame,panel);
   const header=panel.recipe?66:38,rowHeight=panel.rowHeight||42,gap=4,detailsHeight=panel.detailsHeight||0;
-  const rowWidth=panel.w-32,x=panel.x+16;
+  const rowWidth=panel.w-32,x=panel.x+16,k=frame.textScale||1;
   let svg='';
   if(panel.recipe&&executions.length)
-    svg+=text(panel.x+18,panel.y+46,fitLabel(panel.recipe,Math.floor((panel.w-36)/12)),24,
+    svg+=text(panel.x+18,panel.y+46,fitLabel(panel.recipe,Math.floor((panel.w-36)/(12*k))),24*k,
       'class="rx-inner-recipe" data-inner-recipe="true" style="text-anchor:start;fill:#483566"');
   rows.forEach((row,i)=>{
     const y=panel.y+header+i*(rowHeight+gap),finished=row.state==='completed',cancelled=row.state==='cancelled';
@@ -105,12 +105,12 @@ function executionPanel(frame,panel) {
     const fill=queued?colors.muted:finished?'#d5ebdc':cancelled?'#f0ddd6':failed?'#f5d6d9':colors.a;
     const stroke=row.focused?'#805095':finished?'#087438':cancelled||failed?'#b51e2e':queued?'#61717a':'#9b6b0c';
     const labelWidth=Math.min(220,rowWidth*.3),statusWidth=rowWidth-labelWidth-32;
-    const label=fitLabel(row.label||row.value||row.id,Math.floor(labelWidth/13));
-    const status=fitLabel(executionStatus(row),Math.floor(statusWidth/11));
+    const label=fitLabel(row.label||row.value||row.id,Math.floor(labelWidth/(13*k)));
+    const status=fitLabel(executionStatus(row),Math.floor(statusWidth/(11*k)));
     svg+=`<g class="rx-execution-row" data-execution="${esc(row.id)}" data-inner-state="${row.state}" data-http-state="${row.httpState||'idle'}" data-focused="${Boolean(row.focused)}"><rect x="${x}" y="${y}" width="${rowWidth}" height="${rowHeight}" rx="5" fill="${fill}" stroke="${stroke}" stroke-width="${row.focused?4:2}" ${queued?'stroke-dasharray="6 4"':''}/>`;
     svg+=`<title>${esc((row.label||row.value||row.id)+' · '+executionStatus(row))}</title>`;
-    svg+=text(x+18,y+rowHeight/2,label,24,'style="text-anchor:start"');
-    svg+=text(x+rowWidth-18,y+rowHeight/2,status,22,`style="text-anchor:end;fill:${finished?'#087438':failed||cancelled?'#9c1727':'#16232b'}"`);
+    svg+=text(x+18,y+rowHeight/2,label,24*k,'style="text-anchor:start"');
+    svg+=text(x+rowWidth-18,y+rowHeight/2,status,22*k,`style="text-anchor:end;fill:${finished?'#087438':failed||cancelled?'#9c1727':'#16232b'}"`);
     if(!queued&&!row.members&&(row.state==='running'||cancelled||failed)) {
       const progress=clamp(row.progress||0);
       svg+=`<rect data-execution-progress="${progress}" x="${x}" y="${y+rowHeight-6}" width="${rowWidth*progress}" height="6" fill="${cancelled||failed?'#b51e2e':'#765011'}"/>`;
@@ -122,7 +122,7 @@ function executionPanel(frame,panel) {
     const completed=hidden.filter(e=>e.state==='completed').length,cancelled=hidden.filter(e=>e.state==='cancelled').length;
     const failed=hidden.filter(e=>e.state==='error').length;
     const summary=[completed&&`${completed} ✓ complete`,cancelled&&`${cancelled} × ABORT`,failed&&`${failed} × error`].filter(Boolean).join(' · ');
-    svg+=text(panel.x+18,historyY,'Starsze: '+summary,22,'data-execution-summary="true" style="text-anchor:start;fill:#43525b"');
+    svg+=text(panel.x+18,historyY,'Starsze: '+summary,22*k,'data-execution-summary="true" style="text-anchor:start;fill:#43525b"');
   }
   if(focused&&detailsHeight) {
     const detailY=panel.y+panel.h-detailsHeight;
@@ -133,24 +133,29 @@ function executionPanel(frame,panel) {
     const second=focused.handledError?(values?'fallback: '+values:focused.state==='completed'?'bez wartości':'oczekuje na wynik zastępczy')+
       (focused.state==='completed'?' → ✓ complete inner':focused.state==='cancelled'?' · × ABORT':' · inner trwa'):
       focused.state==='error'?'× error kończy inner':focused.state==='completed'?'✓ complete inner':focused.state==='cancelled'?'× odsubskrybowano inner':'▶ subskrypcja inner trwa';
-    const chars=Math.floor((rowWidth-36)/12);
-    svg+=text(x+18,detailY+16,fitLabel(first,chars),24,'style="text-anchor:start"');
-    svg+=text(x+18,detailY+43,fitLabel(second,chars),24,'style="text-anchor:start"');
+    const chars=Math.floor((rowWidth-36)/(12*k));
+    svg+=text(x+18,detailY+16,fitLabel(first,chars),24*k,'style="text-anchor:start"');
+    svg+=text(x+18,detailY+43,fitLabel(second,chars),24*k,'style="text-anchor:start"');
     svg+='</g>';
   }
   return svg;
 }
 export function renderScene(frame,options={}) {
   const reduced=Boolean(options.reducedMotion||frame.reducedMotion);
-  const panels=(frame.panels||[]).filter(p=>p.id&&Array.isArray(frame.executions));
+  // Skala tekstu i kapsułek (4:3 > 1); geometria węzłów i paneli pochodzi z grafu.
+  const k=frame.textScale||1;
+  const visiblePanels=(frame.panels||[]).filter(p=>p.visible!==false);
+  const panels=visiblePanels.filter(p=>p.id&&Array.isArray(frame.executions));
   const executionNodes=new Set((frame.executions||[]).filter(e=>panels.some(p=>p.id===e.panel)).map(e=>e.node));
   const inExecutionPanel=n=>executionNodes.has(n.id)||panels.some(p=>n.workRow&&(n.panel===p.id||
     !n.panel&&n.x>=p.x&&n.x<=p.x+p.w&&n.y>=p.y&&n.y<=p.y+p.h));
   let svg=`<svg viewBox="0 0 ${frame.width} ${frame.height}" role="img" aria-label="${esc(frame.title+': '+frame.caption)}"${reduced?' data-reduced-motion="true"':''}>`;
-  for(const p of frame.panels||[]) {
-    if(p.from)svg+=`<path d="M${p.from.x} ${p.from.y} V${p.y}" stroke="#805095" stroke-width="3" stroke-dasharray="6 5"/>`;
+  for(const p of visiblePanels) {
+    // Łącznik pionowy do górnej krawędzi panelu albo poziomy, gdy panel stoi obok kafelka.
+    const beside=p.from&&p.from.y>=p.y&&p.from.y<=p.y+p.h;
+    if(p.from)svg+=`<path d="M${p.from.x} ${p.from.y} ${beside?'H'+p.x:'V'+p.y}" stroke="#805095" stroke-width="3" stroke-dasharray="6 5"/>`;
     svg+=`<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="12" fill="#f1eee7" stroke="#958875" stroke-width="2"/>`;
-    if(p.label)svg+=text(p.x+18,p.y+18,p.label,20,'style="text-anchor:start;fill:#43525b"');
+    if(p.label)svg+=text(p.x+18,p.y+18,p.label,20*k,'style="text-anchor:start;fill:#43525b"');
   }
   for(const e of frame.edges) if(e.visible&&!(reduced&&e.phase==='unsubscribe')) {
     const d=e.points.map((p,i)=>(i?'L':'M')+p.join(' ')).join('');
@@ -166,30 +171,33 @@ export function renderScene(frame,options={}) {
       const status=finished?'✓ complete':cancelled?n.status:queued?'w kolejce':n.workState==='active'?'w trakcie':n.status||'gotowe';
       svg+=`<g data-node="${esc(n.id)}" data-work-state="${n.workState}" opacity="${opacity}"><rect x="${n.x-n.w/2}" y="${n.y-n.h/2}" width="${n.w}" height="${n.h}" rx="5" fill="${fill}" stroke="${stroke}" stroke-width="2" ${queued?'stroke-dasharray="6 4"':''}/>`;
       if(n.showProgress)svg+=`<rect data-work-progress="${n.progress}" x="${n.x-n.w/2}" y="${n.y+n.h/2-7}" width="${n.w*n.progress}" height="7" fill="${cancelled?'#b51e2e':'#765011'}"/>`;
-      svg+=text(n.x-n.w/2+18,n.y,n.label,24,'style="text-anchor:start"')+text(n.x+n.w/2-18,n.y,status,22,`style="text-anchor:end;fill:${finished?'#087438':cancelled?'#9c1727':'#16232b'}"`);
+      svg+=text(n.x-n.w/2+18,n.y,n.label,24*k,'style="text-anchor:start"')+text(n.x+n.w/2-18,n.y,status,22*k,`style="text-anchor:end;fill:${finished?'#087438':cancelled?'#9c1727':'#16232b'}"`);
       svg+='</g>';continue;
     }
-    const lines=wrapLabel(n.label,Math.floor(n.w/14)),failed=n.workState==='errored';
+    const lines=wrapLabel(n.label,Math.floor(n.w/(14*k))),failed=n.workState==='errored';
     svg+=`<g data-node="${esc(n.id)}" opacity="${opacity}" data-active="${n.active}" data-work-state="${n.workState}"><rect x="${n.x-n.w/2}" y="${n.y-n.h/2}" width="${n.w}" height="${n.h}" rx="5" fill="${n.fill}" stroke="${failed?'#b51e2e':n.active?'#805095':'#26343d'}" stroke-width="${failed||n.active?4:1.5}"/>`;
     // statusInside trzyma stan w kafelku, gdy pod nim stoi panel (np. EMISJE pod odbiorcą).
-    const inside=n.statusInside&&n.status,labelShift=inside?-12:0;
-    lines.forEach((line,i)=>svg+=text(n.x,n.y+(n.labelOffset||0)+labelShift+(i-(lines.length-1)/2)*28,line,26,n.notification?'style="fill:#fff"':''));
-    if(inside)svg+=text(n.x,n.y+16,n.status,20,n.notification?'style="fill:#fff"':failed?'style="fill:#b51e2e"':'');
-    else if(n.status)svg+=text(n.x,n.y+n.h/2+21,n.status,20,failed?'style="fill:#b51e2e"':'');
+    const inside=n.statusInside&&n.status,labelShift=inside?-12*k:0;
+    // Etykieta kafelka rośnie do labelScale (4:3), o ile najdłuższa linia mieści się w szerokości; inaczej zostaje przy textScale.
+    const longest=Math.max(1,...lines.map(line=>Array.from(line).length));
+    const labelSize=clamp((n.w-24)/(longest*.55),26*k,26*(frame.labelScale||k)),lineStep=28*labelSize/26;
+    lines.forEach((line,i)=>svg+=text(n.x,n.y+(n.labelOffset||0)+labelShift+(i-(lines.length-1)/2)*lineStep,line,labelSize,n.notification?'style="fill:#fff"':''));
+    if(inside)svg+=text(n.x,n.y+16*k,n.status,20*k,n.notification?'style="fill:#fff"':failed?'style="fill:#b51e2e"':'');
+    else if(n.status)svg+=text(n.x,n.y+n.h/2+21*k,n.status,20*k,failed?'style="fill:#b51e2e"':'');
     if(n.showProgress)svg+=`<rect data-work-progress="${n.progress}" x="${n.x-n.w/2}" y="${n.y+n.h/2-9}" width="${n.w*n.progress}" height="9" fill="#132f42"/>`;
-    if(n.transform)svg+=text(n.x,n.y+n.h/2+52,n.transform,28,'data-transformation="true"');
+    if(n.transform)svg+=text(n.x,n.y+(n.transformOffset??n.h/2+52*k),n.transform,28*k,'data-transformation="true"');
     svg+='</g>';
   }
   for(const panel of panels)svg+=executionPanel(frame,panel);
   for(const t of frame.tokens) {
     const edge=reduced&&frame.edges.find(e=>e.id===t.edge),point=edge?.points?.at(-1);
-    svg+=token(point?.[0]??t.x,point?.[1]??t.y,t.value,t.color,`data-value-on="${esc(t.edge||'source')}" data-token="${esc(t.phase)}"`,150,Boolean(panels.length));
+    svg+=token(point?.[0]??t.x,point?.[1]??t.y,t.value,t.color,`data-value-on="${esc(t.edge||'source')}" data-token="${esc(t.phase)}"`,150*k,Boolean(panels.length),k);
   }
   for(const h of frame.histories) {
-    if(h.lines>1) {
-      // Historia w kilku liniach (panele pod kafelkami), po kolei w kolejności dotarcia. columns dzieli linię na kolumny;
+    if(h.lines>=1) {
+      // Historia w zadanej liczbie linii, również jednej, po kolei w kolejności dotarcia. columns dzieli linię na kolumny;
       // kapsułka szersza niż kolumna zajmuje całą linię. Bez columns kapsułki płyną od lewej. Nadmiar pomija najstarsze linie.
-      const gap=10,widthOf=v=>Math.min(h.w,Math.max(54,String(v.value).length*14+24)),lines=[],columns=h.columns||0,cell=columns?h.w/columns:h.w;
+      const gap=10,widthOf=v=>Math.min(h.w,Math.max(54*k,(String(v.value).length*14+24)*k)),lines=[],columns=h.columns||0,cell=columns?h.w/columns:h.w;
       for(const value of h.values) {
         const width=widthOf(value),line=lines.at(-1);
         if(columns) {
@@ -205,36 +213,38 @@ export function renderScene(frame,options={}) {
           const x=columns?(line.full?h.x:h.x+(j-(columns-1)/2)*cell):h.x-line.used/2+line.items.slice(0,j).reduce((sum,other)=>sum+other.width+gap,0)+item.width/2;
           // Nowa kapsułka wchodzi fade-in (0,3 s) od chwili pojawienia się w historii.
           const opacity=reduced||item.value.shownAt===undefined?1:clamp((frame.time-item.value.shownAt)/.3);
-          svg+=token(x,y,item.value.value,item.value.color||'a',`data-token="received" opacity="${opacity}"`,item.width,true);
+          svg+=token(x,y,item.value.value,item.value.color||'a',`data-token="received" opacity="${opacity}"`,item.width,true,k);
         });
       });
     } else if(panels.length) {
-      const shown=[],gap=8,ellipsisWidth=28;
+      const shown=[],gap=8,ellipsisWidth=28*k;
       let used=0;
       for(let i=h.values.length-1;i>=0;i--) {
-        const value=h.values[i],width=Math.min(150,h.w-(i?ellipsisWidth:0),Math.max(46,String(value.value).length*13+20));
+        const value=h.values[i],width=Math.min(150*k,h.w-(i?ellipsisWidth:0),Math.max(46*k,(String(value.value).length*13+20)*k));
         const next=used+width+(shown.length?gap:0)+(i?ellipsisWidth:0);
         if(next>h.w&&shown.length)break;
         shown.unshift({value,width});used+=width+(shown.length>1?gap:0);
       }
       const hidden=shown.length<h.values.length,fullWidth=used+(hidden?ellipsisWidth:0);
       let x=h.x-fullWidth/2;
-      if(hidden){svg+=text(x+10,h.y,'…',24);x+=ellipsisWidth;}
+      if(hidden){svg+=text(x+10*k,h.y,'…',24*k);x+=ellipsisWidth;}
       for(const item of shown) {
-        svg+=token(x+item.width/2,h.y,item.value.value,item.value.color||'a','data-token="received"',item.width,true);
+        svg+=token(x+item.width/2,h.y,item.value.value,item.value.color||'a','data-token="received"',item.width,true,k);
         x+=item.width+gap;
       }
     } else {
-      const slots=Math.max(1,Math.floor(h.w/74)),shown=h.values.slice(-slots),gap=Math.min(92,h.w/Math.max(1,slots));
-      shown.forEach((v,i)=>svg+=token(h.x+(i-(shown.length-1)/2)*gap,h.y,v.value,v.color||'a','data-token="received"',gap-5));
-      if(h.values.length>slots)svg+=text(h.x-h.w/2-8,h.y,'…',24);
+      const slots=Math.max(1,Math.floor(h.w/(74*k))),shown=h.values.slice(-slots),gap=Math.min(92*k,h.w/Math.max(1,slots));
+      shown.forEach((v,i)=>svg+=token(h.x+(i-(shown.length-1)/2)*gap,h.y,v.value,v.color||'a','data-token="received"',gap-5,false,k));
+      if(h.values.length>slots)svg+=text(h.x-h.w/2-8,h.y,'…',24*k);
     }
   }
-  if(frame.queue&&!panels.length)svg+=text(frame.width/2,frame.height-20,frame.queue,22,'data-queue="true"');
+  if(frame.queue&&!panels.length)svg+=text(frame.width/2,frame.height-20,frame.queue,22*k,'data-queue="true"');
+  // Dwa rzędy kart dzielą wysokość diagramu; przy 340 daje to dotychczasowy krok 155 i karty 130.
+  const cardStep=(frame.height-30)/2,cardH=Math.min(cardStep-25,190);
   frame.cards.forEach((item,i)=>{
-    const x=70+(i%2)*570,y=20+Math.floor(i/2)*155,p=reduced?1:clamp((frame.time-item.at)/.6);
-    svg+=`<g opacity="${p}" transform="translate(${x},${y})"><rect width="530" height="130" rx="5" fill="${colors[item.color]}"/>`;
-    wrapLabel(item.label,29).forEach((line,j,lines)=>svg+=text(265,65+(j-(lines.length-1)/2)*34,line,30));
+    const x=70+(i%2)*570,y=20+Math.floor(i/2)*cardStep+(cardStep-25-cardH)/2,p=reduced?1:clamp((frame.time-item.at)/.6);
+    svg+=`<g opacity="${p}" transform="translate(${x},${y})"><rect width="530" height="${cardH}" rx="5" fill="${colors[item.color]}"/>`;
+    wrapLabel(item.label,Math.floor(29/k)).forEach((line,j,lines)=>svg+=text(265,cardH/2+(j-(lines.length-1)/2)*34*k,line,30*k));
     svg+='</g>';
   });
   return svg+'</svg>';

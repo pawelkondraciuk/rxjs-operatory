@@ -7,6 +7,7 @@ import { createStageController } from './stage-controller.js';
 export function createPlayer(root, scene, controls = {}) {
 const engine=compileScene(scene), playbackDuration=engine.duration;
 root.classList?.toggle('rx-expanded',scene.playerLayout==='expanded');
+root.classList?.toggle('rx-function',scene.playerLayout==='function');
 const staged=scene.playback?.controller==='stages', listeners=new Set();
 let controller;
 let time=0, running=false, previous=null, lastPaint=-Infinity, animationFrame=null, stopAt=null;
@@ -26,7 +27,8 @@ const el={code:q('.rx-code'),stage:q('.rx-stage'),metrics:q('.rx-metrics'),capti
 el.slider.max=String(playbackDuration);
 function paint(){
  const snapshot=engine.snapshot(Math.min(time,playbackDuration));
- el.code.textContent=scene.code;
+ // Kod jest tekstem (esc); <wbr> po „).” pozwala przenieść cały .pipe/.subscribe do nowej linii.
+ el.code.innerHTML=esc(snapshot.code).replace(/\)\./g,')<wbr>.');
  el.stage.innerHTML=renderScene(snapshot,{reducedMotion:globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches || false});
  el.caption.textContent=snapshot.caption;
  el.metrics.innerHTML=snapshot.metrics.map(m=>'<div class="rx-metric"><span>'+esc(m.label)+'</span><b>'+esc(m.value)+'</b></div>').join('');
