@@ -148,7 +148,7 @@ test('manual stops deliver only after travel; snapshots survive seeking backward
   }
 });
 
-test('operator function delivers doubled values and complete without work or source history',async()=>{
+test('operator function delivers three doubled values and complete without work or source history',async()=>{
   const {player}=await harness();const {api}=player('04-operator');
   api.seek(api.stops.at(-1).time);
   assert.deepEqual(Array.from(api.snapshot.histories[0].values,v=>v.value),['2']);
@@ -203,13 +203,13 @@ test('subscription travels receiver → share → source; values travel source �
   assert.ok(first.end.at>=upstream.end.at+transitionDuration);
 });
 
-test('READY shows participants and a value never occupies consecutive connections simultaneously',async()=>{
+test('share fades in before subscription and a value never occupies consecutive connections simultaneously',async()=>{
   const {player}=await harness();
   const {api,elements}=player('07-hot-cold-2');
   api.seek(1.15);
   let svg=elements.get('.rx-stage').innerHTML;
   const opacity=Number(svg.match(/data-node="hub" opacity="([^"]+)"/)[1]);
-  assert.equal(opacity,1);
+  assert.ok(Math.abs(opacity-.5)<1e-8);
   assert.doesNotMatch(svg,/data-connection="work0-hub"/);
   let sawInput=false,sawOutput=false;
   for(let t=0;t<api.duration;t+=.1){
@@ -289,13 +289,17 @@ test('flatten strategies use identical inputs, queue values before projection an
   assert.deepEqual(Array.from(exhaust.snapshot.histories.find(h=>h.anchor==='observer').values,v=>v.value),['A1','A2','D1','D2']);
 });
 
-test('concatAll creates references only after the input arrives at projection',async()=>{
+test('concatAll queues a reference only after it leaves map and arrives at concatAll',async()=>{
   const {scenes,engine:{compileScene}}=await harness();
   const model=compileScene(scenes.get('08-map-strumienie'));
-  const creation=model.events.find(e=>e.type==='inner-create'&&e.node==='inner1');
-  const arrival=model.events.find(e=>e.type==='deliver-next'&&e.edge==='source-projection'&&e.value==='B');
-  assert.equal(creation.at,arrival.at);
-  assert.equal(model.snapshot(arrival.at-.01).nodes.find(n=>n.id==='inner1').visible,false);
+  for(const [i,value] of ['A','B','C'].entries()) {
+    const creation=model.events.find(e=>e.type==='inner-create'&&e.node==='inner'+i);
+    const mapped=model.events.find(e=>e.type==='deliver-next'&&e.edge==='source-projection'&&e.value===value);
+    const arrival=model.events.find(e=>e.type==='deliver-next'&&e.edge==='projection-op'&&e.value===value+'$');
+    assert.equal(creation.at,arrival.at,value);
+    assert.ok(mapped.at<arrival.at,value);
+    assert.equal(model.snapshot(arrival.at-.01).nodes.find(n=>n.id==='inner'+i).visible,false,value);
+  }
 });
 
 test('microtask collects synchronous IDs once; buffer windows and in-flight deduplication are independent',async()=>{

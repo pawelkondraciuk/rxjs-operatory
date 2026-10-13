@@ -11,7 +11,7 @@ import Notes from 'reveal.js/plugin/notes';
 import { scenes } from './animations/catalog.js';
 import { createPlayer } from './animations/player.js';
 import './animations/reveal.css';
-import { prepareSlides } from './animations/presentation.js';
+import { prepareSlides, arrangeSlides } from './animations/presentation.js';
 import { compileScene } from './animations/engine.js';
 import { installRevealStages } from './animations/reveal-stages.js';
 import { installAutoFinishGuard } from './animations/reveal-auto-finish.js';
@@ -23,20 +23,28 @@ const printMode = params.has('print-pdf');
 // Domyślnie projektor 4:3; ?ratio=16:9 (lub klawisz W) przełącza na ekran panoramiczny.
 const format = formatFromSearch(location.search);
 document.documentElement.dataset.ratio = format.replace(':', '-');
+// Najpierw warianty otrzymują stabilne ID; dopiero potem wybieramy ścieżkę.
+const requestedParts = location.hash.slice(2).split('/');
+const requestedId = requestedParts[0];
+const requestedFragment = Number(requestedParts[/^\d+$/.test(requestedId) ? 2 : 1]);
+const sceneById = prepareSlides(scenes, { format });
+const route = arrangeSlides(sceneById, { extras: params.has('extras'), printMode, requestedId });
+// Bezpośredni hash dodatku ma taki sam URL ścieżki jak wejście przez menu.
+// Usunięcie query przy powrocie powoduje przeładowanie i przywraca sam MAIN.
+if (route.extras && !params.has('extras') && !printMode) {
+  const url = new URL(location.href);
+  url.searchParams.set('extras', '');
+  history.replaceState(history.state, '', url);
+}
+// Obejmuje również linki powrotne utworzone przy podziale wariantów.
 document.querySelectorAll('a[href^="?"], a[href^="./"]').forEach(link => {
   link.setAttribute('href', withFormat(link.getAttribute('href'), format));
 });
-// Menu i istniejące bezpośrednie linki otwierają dodatki świadomie.
-// Zwykła nawigacja głównej ścieżki kończy się na pytaniach.
-const requestedId = location.hash.slice(2).split('/')[0];
-const extras = [...document.querySelectorAll('[data-extras]')];
-const extraLink = extras.some(slide => requestedId === slide.id || requestedId.startsWith(slide.id + '-'));
-if (!params.has('extras') && !printMode && !extraLink) extras.forEach(slide => slide.remove());
-const sceneById = prepareSlides(scenes, { format });
 
 const deck = new Reveal({
   plugins: [Markdown, Highlight, Notes],
   hash: true,
+  fragmentInURL: true,
   slideNumber: true,
   // Wspólna szerokość 1280; wysokość 960 (4:3) albo 720 (16:9).
   ...FORMATS[format],
@@ -181,11 +189,18 @@ function activate(slide) {
   const state = stateFor(slide);
   if (printMode) activePlayer?.finish();
   else if (activePlayer?.controller) {
+    // Odtwórz stabilny checkpoint z hasha przed synchronizacją fragmentów stages.
+    const requestedSlide = requestedId === slide.id || deck.getSlides()[Number(requestedId)] === slide;
+    if (!state.visited && requestedSlide && Number.isInteger(requestedFragment) && requestedFragment >= 0) {
+      const marker = slide.querySelectorAll('.rx-step')[requestedFragment];
+      if (marker?.dataset.handoff === 'true') activePlayer.controller.finish();
+      else if (marker) activePlayer.controller.seek(Number(marker.dataset.time));
+    }
     const blocked = deck.isOverview() || deck.isPaused() || document.hidden;
     if (blocked) activePlayer.controller.suspend('environment');
     else {
       activePlayer.controller.resume('environment'); activePlayer.controller.resume('slide');
-      if (!state.visited && state.mode === 'auto') activePlayer.controller.next();
+      if (!state.visited && state.mode === 'auto' && activePlayer.state !== 'finished') activePlayer.controller.next();
     }
   }
   else if (isStepped(slide) && state.mode === 'manual') {
@@ -256,9 +271,18 @@ deck.addKeyBinding({ keyCode: 221, key: ']', description: 'Animacja: następny k
 deck.addKeyBinding({ keyCode: 82, key: 'R', description: 'Animacja: od początku' }, animationAction(resetAnimation));
 deck.addKeyBinding({ keyCode: 85, key: 'U', description: 'Pokaż / ukryj sterowanie animacją' }, animationAction(player => player?.toggleControls()));
 // Format zmienia wymiary sceny i grafów, więc wymaga przeładowania; hash zachowuje slajd i fragment.
-if (!printMode) deck.addKeyBinding({ keyCode: 87, key: 'W', description: 'Format 4:3 / 16:9 (przeładowanie)' }, () => location.replace(toggledFormatUrl(location.href)));
+if (!printMode) deck.addKeyBinding({ keyCode: 87, key: 'W', description: 'Format 4:3 / 16:9 (przeładowanie)' }, () => {
+  const url = new URL(location.href);
+  url.hash = deck.getSlidePath(); // Także przed opóźnionym zapisem URL przez Reveal.
+  location.replace(toggledFormatUrl(url.href));
+});
 
-const stageReveal = installRevealStages(deck, { getController: slide => players.get(slide)?.controller, isEnabled: () => !printMode });
+const stageReveal = installRevealStages(deck, {
+  getController: slide => players.get(slide)?.controller,
+  getPlayer: slide => stateFor(slide).mode === 'static' ? null : players.get(slide),
+  getManualTarget: slide => isStepped(slide) && stateFor(slide).mode === 'manual' ? fragmentTime(slide) : null,
+  isEnabled: () => !printMode,
+});
 
 // Po użyciu suwaka pilot nadal zmienia slajdy, zamiast przesuwać suwak.
 document.addEventListener('keydown', event => {

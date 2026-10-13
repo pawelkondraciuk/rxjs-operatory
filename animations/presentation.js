@@ -1,4 +1,4 @@
-import { configureScene } from './scene-config.js';
+import { configureScene, mainOrder, extraOrder, extraIds } from './scene-config.js';
 // Każdy wariant jest osobnym slajdem, dostępnym przyciskiem pilota „dalej”.
 // format ('4:3' | '16:9') trafia do sceny, żeby grafy mogły dobrać wysokość ramki.
 export function prepareSlides(scenes, { format = '4:3' } = {}) {
@@ -25,7 +25,7 @@ export function prepareSlides(scenes, { format = '4:3' } = {}) {
       // Warianty 0 (timer/interval) i 1 (HTTP) ustawiają configureTimers/configureHttp w configureScene.
       variants = [0,1,2].map(i => ({ ...original, sourceExample:i, duration:i===1?11:20,
         title:['timer i interval: jedna wartość czy strumień?','HTTP: odpowiedź i complete','Subject: odbierasz od chwili subskrypcji'][i],
-        code:['timer(2000) / interval(2000)','http.get(\'/api/data\')','subject$.subscribe(observer)'][i],
+        code:['timer(1000) / interval(1000)','http.get(\'/api/data\')','subject$.subscribe(observer)'][i],
         captions:[[],[],[[0,'Subject może emitować bez odbiorcy.'],[4,'A bez subskrypcji.'],[8,'Odbiorca subskrybuje.'],[12,'Dostaje B.'],[16,'Dostaje C. Trzy emisje, dwa odbiory.']]][i],
       }));
     } else if (original.id === '21a-share-pozycja') {
@@ -43,6 +43,13 @@ export function prepareSlides(scenes, { format = '4:3' } = {}) {
         code: `${original.rows[i].label}(3500)`,
         captions: [[0, ['','Każde zdarzenie odlicza 3,5 s od nowa.','Pierwsze zdarzenie otwiera okno 3,5 s.','Pierwsza wartość przechodzi. Następne w oknie pomijamy.','Co 3,5 s pobieramy najnowszą wartość, jeśli pojawiła się nowa.'][i]], [12, ['','Emisja następuje dopiero po 3,5 s ciszy.','Na końcu okna emitujemy ostatnią otrzymaną wartość.','Domyślnie: leading = true, trailing = false.','Brak nowych zdarzeń oznacza brak kolejnej emisji.'][i]]],
       }));
+      Object.assign(variants[0],{seriesIndices:[1,2],title:'debounceTime i auditTime: cisza czy okno?',
+        code:'debounceTime(3500) / auditTime(3500)',
+        captions:[[0,'Jedno wejście, dwa operatory. Porównujemy ten sam okres 3,5 s'],
+          [4.5,'auditTime emituje D na końcu okna. debounceTime nadal czeka na ciszę'],
+          [11.8,'Po 3,5 s ciszy debounceTime emituje G'],
+          [21.5,'debounceTime: po ciszy. auditTime: ostatnia wartość na końcu okna']],
+      });
     } else if (original.id === 'b02-first-take') {
       variants = [[0, 1], [2, 3]].map((indices, i) => ({ ...original, duration:8, rows: indices.map(j => {
         const r=original.rows[j],shift=i?8:0;
@@ -79,4 +86,35 @@ export function prepareSlides(scenes, { format = '4:3' } = {}) {
     });
   }
   return byId;
+}
+
+// Wywołuj po prepareSlides: jedna bazowa sekcja może mieć warianty w obu ścieżkach.
+export function arrangeSlides(sceneById, { extras = false, printMode = false, requestedId = '' } = {}) {
+  const container = document.querySelector('.reveal .slides');
+  const includeExtras = extras || printMode || extraIds.has(requestedId);
+  const slides = new Map([...container.querySelectorAll('section[id]')].map(slide => [slide.id, slide]));
+  for (const id of [...mainOrder, ...extraOrder]) {
+    const slide = slides.get(id);
+    if (!slide) continue;
+    const bonus = extraIds.has(id);
+    const back = slide.querySelector('.extras-back');
+    if (bonus) {
+      slide.setAttribute('data-extras', '');
+      if (!includeExtras) { slide.remove(); continue; }
+      if (!back) {
+        const link = document.createElement('a');
+        link.className = 'extras-back';
+        link.href = './#/pytania';
+        link.textContent = 'Dodatkowe przykłady';
+        slide.append(link);
+      }
+    } else {
+      slide.removeAttribute('data-extras');
+      back?.remove();
+    }
+    container.append(slide);
+    const scene = sceneById.get(id);
+    if (scene) scene.group = bonus ? 'bonus' : 'main';
+  }
+  return { extras: includeExtras };
 }

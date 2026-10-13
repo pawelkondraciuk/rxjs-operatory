@@ -121,6 +121,13 @@ export function compileScene(scene) {
   });
   const checkpoints=[...new Set([0,plan.duration,...events.map(e=>e.at),...stops.map(s=>s.time),...(scene.checkpoints||[]).map(plan.timeOf)])].filter(Number.isFinite).sort((a,b)=>a-b);
   const codeFrames=[...(scene.codeFrames||[])].sort((a,b)=>a.at-b.at);
+  const codeReveals=codeFrames.flatMap((frame,i)=>{
+    if(!frame.fadeIn)return [];
+    const prefix=i?codeFrames[i-1].code:scene.code;
+    if(!frame.code.startsWith(prefix)||!Number.isFinite(frame.fadeIn)||frame.fadeIn<=0)
+      throw new Error(`${scene.id}: fadeIn kodu wymaga dopisania tekstu i dodatniego czasu`);
+    return [{index:i,at:frame.at,duration:frame.fadeIn,prefix,suffix:frame.code.slice(prefix.length)}];
+  });
   const captions=[...(scene.captions||[]).map(([at,caption])=>[plan.timeOf(at),caption]),
     ...events.filter(e=>e.caption).map(e=>[e.at,e.caption]),...stops.filter(s=>s.caption).map(s=>[s.time,s.caption])].sort((a,b)=>a[0]-b[0]);
 
@@ -159,12 +166,20 @@ export function compileScene(scene) {
       const lifecycle=workEdge?.end;
       const canceled=lifecycle?.kind==='unsubscribe'&&time>=lifecycle.at || (!workEdge&&span?.kind==='cancel'&&t>=span.end);
       const started=workEdge?time>=workEdge.start+(workEdge.connectDuration||transitionDuration):span&&t>=span.start;
-      const active=Boolean(span&&started&&!canceled&&t<span.end);
+      // Terminal w czasie ilustracji: nadawca pokazuje complete/error w chwili wysłania, odbiorca po dotarciu.
+      // Czas modelu stoi podczas partii, więc bez tego stan wyprzedzałby ostatnią wartość albo spóźniał się za błędem.
+      const terminalTime=kind=>{
+        const sent=outgoing.filter(e=>e.end?.kind===kind).map(e=>e.end.at);
+        if(sent.length||outgoing.length)return sent.length?Math.min(...sent):undefined;
+        const got=incoming.filter(e=>e.end?.kind===kind).map(e=>e.end.at+(e.end.duration||transitionDuration));
+        return got.length?Math.min(...got):undefined;
+      };
+      const completeTime=terminalTime('complete'),errorTime=terminalTime('error');
+      const completed=Boolean(r.completeAt!==undefined&&(completeTime!==undefined?time>=completeTime:t>=r.completeAt));
+      const errored=errorTime!==undefined?time>=errorTime:r.events.some(e=>e.kind==='error'&&e.at<=t)||span?.kind==='error'&&t>=span.end;
+      const active=Boolean(span&&started&&!canceled&&!completed&&!errored&&t<span.end);
       const queued=r.spans.some(p=>p.kind==='queue'&&p.start<=t&&t<p.end)||
         Boolean(n.createdBy&&n.inner&&time>=births.get(n.id)&&!started&&r.spans.some(p=>p.kind==='queue'));
-      // illustratedWork: praca kończy się w chwili ilustracji swojego complete, a nie dopiero po całej partii zdarzeń.
-      const completed=Boolean(r.completeAt!==undefined&&(t>=r.completeAt||graph.illustratedWork&&lifecycle?.kind==='complete'&&time>=lifecycle.at));
-      const errored=r.events.some(e=>e.kind==='error'&&e.at<=t)||span?.kind==='error'&&t>=span.end;
       const workState=canceled?'canceled':errored?'errored':completed?'completed':active?'active':queued?'queued':'idle';
       const terminalInput=incoming.filter(e=>e.end&&stateByEdge.get(e.id).done&&['complete','error'].includes(e.end.kind)).at(-1);
       const receiver=incoming.length>0&&!outgoing.length;
@@ -175,9 +190,13 @@ export function compileScene(scene) {
       const notification=n.terminalEdge?ownNotification:terminalInput&&(receiver||ownEnd&&terminalInput.end.logicalAt===ownEnd.at)?terminalInput.end.kind:null;
       const stateSpan=r.spans.find(p=>p.kind==='state'&&p.start<=t&&p.end>t);
       const detail=evaluate(n.detail,t);
+      // „subskrybuje” tylko przy narysowanym połączeniu: nie przed jego zestawieniem i nie po rozpoczęciu unsubscribe.
+      const wires=incoming.filter(e=>!e.internal);
+      const wired=!wires.length||wires.some(e=>time>=e.start+(e.connectDuration||transitionDuration)&&!(e.end&&time>=e.end.at));
+      const subscribed=wired&&r.spans.some(p=>p.kind==='subscription'&&p.start<=t&&p.end>t);
       let status=notification?(notification==='complete'?'✓ complete':'× error'):detail;
       if(status===undefined)status=canceled?(n.cancelLabel||'odsubskrybowano'):errored?'× error':queued?'czeka w kolejce':stateSpan?.label||
-        (active?(n.timer?'okno otwarte':'praca trwa'):completed?'complete':graph.illustratedWork&&workEdge&&!started||r.spans.some(p=>p.kind==='subscription'&&p.start<=t&&p.end>t)?'subskrybuje':'');
+        (active?(n.timer?'okno otwarte':'praca trwa'):completed?'complete':graph.illustratedWork&&workEdge&&!started||subscribed?'subskrybuje':'');
       const lastInput=incoming.flatMap(e=>e.events.filter(v=>v.arrival<=time)).sort((a,b)=>a.arrival-b.arrival).at(-1);
       if(n.showInput&&lastInput&&!status)status='wejście: '+lastInput.value;
       const activity=(graph.activities||[]).some(a=>a.node===n.id&&time>=a.at&&time<a.until);
@@ -212,7 +231,11 @@ export function compileScene(scene) {
       const valuesToShow=q.deduplicate?[...new Map(delivered.map(v=>[v.value,v])).values()]:delivered;
       return {...q,values:valuesToShow.sort((a,b)=>a.arrival-b.arrival)};
     });
-    return {id:scene.id,title:scene.title,code:codeFrames.filter(frame=>frame.at<=time).at(-1)?.code??scene.code,width,height,textScale:graph.textScale??textScaleFor(scene),labelScale:graph.labelScale??labelScaleFor(scene),time,logicalTime,nodes:nodeStates,edges:edgeStates,tokens,histories,
+    const codeIndex=codeFrames.findLastIndex(frame=>frame.at<=time);
+    const reveal=codeReveals.find(frame=>frame.index===codeIndex)||codeReveals.find(frame=>frame.index===codeIndex+1);
+    return {id:scene.id,title:scene.title,code:codeFrames.filter(frame=>frame.at<=time).at(-1)?.code??scene.code,
+      ...(reveal?{codeReveal:{prefix:reveal.prefix,suffix:reveal.suffix,opacity:clamp((time-reveal.at)/reveal.duration)}}:{}),
+      width,height,textScale:graph.textScale??textScaleFor(scene),labelScale:graph.labelScale??labelScaleFor(scene),time,logicalTime,nodes:nodeStates,edges:edgeStates,tokens,histories,
       panels:(graph.panels||[]).map((panel,i)=>panelShownAt[i]===undefined?panel:{...panel,shownAt:panelShownAt[i],visible:time>=panelShownAt[i]}),cards:scene.kind==='cards'?scene.items:[],caption:captionAt(captions,time),
       ...executionState,
       metrics:(scene.metrics||[]).map(m=>({label:m.label,value:m.count?executionState.executionCounts[m.count]:m.value(logicalTime)})),

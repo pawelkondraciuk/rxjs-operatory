@@ -1,6 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {modules}=require('./v2-harness.cjs');
-// Wariant 05-zrodla: timer(2000) i interval(2000) jeden pod drugim.
+// Wariant 05-zrodla: timer(1000) i interval(1000) jeden pod drugim.
 async function timers(format){
  const m=await modules(['catalog','scene-config','engine','renderer']);
  const base=m.catalog.scenes.find(s=>s.id==='05-zrodla');
@@ -12,7 +12,7 @@ const node=(frame,id)=>frame.nodes.find(n=>n.id===id);
 
 test('timer emits one value and completes; interval emits 0, 1, 2 until the receiver unsubscribes',async()=>{
  const {scene,c}=await timers();
- assert.equal(scene.code,'timer(2000) / interval(2000)');
+ assert.equal(scene.code,'timer(1000) / interval(1000)');
  assert.doesNotMatch(scene.code,/subscribe/);
  assert.deepEqual(Array.from(c.stops,s=>s.id),['first','question','third','unsubscribed']);
  const end=c.snapshot(c.duration);

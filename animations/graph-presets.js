@@ -7,7 +7,8 @@ export function catalogGraph(s) {
  const edge=(a,b,events=[],extra={})=>edges.push({a,b,events,...extra});
  const tray=(ri,x,y,w=400,label="")=>trays.push({ri,x,y,w,label});
  const caseId=s.rendererId||s.id;
- if(s.diagram==="subscriptions"||caseId==="07-hot-cold"||s.diagram==="coldhot"){
+ if(caseId==="07-hot-cold"||s.diagram==="late"||s.diagram==="coldhot"&&s.comparisonMode!=="shared")return executionComparison(s);
+ if(s.diagram==="subscriptions"||s.diagram==="coldhot"){
   const shared=s.comparisonMode==="shared",coldhot=s.diagram==="coldhot",simultaneous=s.diagram==="subscriptions";
   const source=node("observable",550,70,coldhot?(shared?"jeden producent":"timer$"):(simultaneous?"jeden user$":"jeden data$"),"source",null,{w:300});
   source.label=coldhot?(shared?"jeden producent":"timer$"):source.label;
@@ -30,23 +31,6 @@ export function catalogGraph(s) {
    const side=j?1015:85;
    edge(sink,target,[{at:start,value:"sub",color:j?"b":"a"}],{dashed:true,born:start,label:"subscribe",points:[[x+(j?125:-125),510],[side,510],[side,target.y],[targetX,target.y]]});
    tray(ri,x,615,420,"");
-  });
- }else if(s.diagram==="late"){
-  const replay=s.comparisonMode==="shared";
-  const src=node("observable",550,65,"HTTP Observable","source",null,{w:300});
-  const first=node("http1",300,235,"HTTP #1","http",0,{w:240,work:true,born:1});
-  edge(src,first,[],{born:1});
-  let second=null;
-  if(!replay){second=node("http2",800,235,"HTTP #2","http",1,{w:240,work:true,born:10});edge(src,second,[],{born:10});}
-  const hub=node("hub",550,385,replay?"shareReplay(1)":"share()","op",null,{w:285,detail:t=>replay&&t>=6?"bufor: dane":t>=6&&t<10?"brak bufora":undefined});
-  edge(first,hub,values(0));
-  if(second)edge(second,hub,values(1));
-  [2,3].forEach((ri,j)=>{
-   const start=j?10:1,x=j?850:250;
-   const sink=node("receiver"+j,x,510,"Widok "+["A","B"][j],j?"b":"a",ri,{w:230,born:start,disabled:t=>!j&&t>=8,detail:t=>!j&&t>=8?"widok zniknął":undefined});
-   edge(hub,sink,values(ri),{born:start,disabled:t=>!j&&t>=8});
-   edge(sink,hub,[{at:start,value:"sub",color:j?"b":"a"}],{born:start,dashed:true,until:j?16:8,label:j?"B dołącza":"subscribe",points:[[x+(j?115:-115),510],[j?1040:60,510],[j?1040:60,385],[550+(j?142:-142),385]]});
-   tray(ri,x,615,410,"");
   });
  }else if(s.diagram==="expensive"){
   const shared=s.comparisonMode==="shared";
@@ -81,8 +65,10 @@ export function catalogGraph(s) {
   edge(source,plain,values(0));edge(source,distinct,values(0));
   const a=node("http-a",260,410,"HTTP","http",1,{work:true,w:220});
   const b=node("http-b",835,410,"HTTP","http",3,{work:true,w:220});
-  edge(plain,a,row(1).spans.map(p=>({at:p.start,value:p.label.replace("GET ",""),color:"a"})));
-  edge(distinct,b,row(3).spans.map(p=>({at:p.start,value:p.label.replace("GET ",""),color:"b"})));
+  // Kolor należy do wartości (A, B), nie do gałęzi: to samo A wygląda tak samo w obu potokach.
+  const request=p=>{const value=p.label.replace("GET ","");return {at:p.start,value,color:row(0).events.find(e=>e.value===value)?.color||"a"};};
+  edge(plain,a,row(1).spans.map(request));
+  edge(distinct,b,row(3).spans.map(request));
   tray(1,260,555,450,"Odpowiedzi · bez filtra");tray(3,835,555,450,"Odpowiedzi · z filtrem");
  }else if(caseId==="15-debounce-audit"||caseId==="16-czas-cztery"){
   const source=node("source",550,65,"zdarzenia$","source",0);
@@ -98,7 +84,21 @@ export function catalogGraph(s) {
    const sink=node("sink"+i,x,465,"Odbiorca","http",null,{w:Math.min(190,space-26)});
    edge(op,sink,values(i));tray(i,x,575,space-22,"Wynik");
   }
-  if(indices.length>2){
+  if(indices.length===2){
+   // Dwie gałęzie korzystają z tego samego wejścia i dotychczasowych modeli emisji.
+   const large=s.format==='4:3',ys=large?[110,390]:[80,300],h=large?120:86,panels=[];
+   Object.assign(source,{x:200,y:(ys[0]+ys[1])/2,w:330,h,ready:true});
+   indices.forEach((i,j)=>{
+    const op=nodes.find(n=>n.id==='op'+i),sink=nodes.find(n=>n.id==='sink'+i);
+    Object.assign(op,{x:620,y:ys[j],w:330,h,ready:true});
+    Object.assign(sink,{x:1040,y:ys[j],w:380,h,ready:true});
+    const box={x:sink.x-sink.w/2,y:sink.y+h/2+20,w:sink.w,h:large?110:84,
+     from:{x:sink.x,y:sink.y+h/2},showOn:{type:'deliver-next',edge:op.id+'-'+sink.id,value:values(i)[0].value}};
+    panels.push(box);Object.assign(trays[j],{anchor:sink.id,x:sink.x,y:box.y+box.h/2,w:box.w-16,lines:1,label:''});
+   });
+   return {nodes,edges,trays,panels,width:W,height:large?612:460,layout:'fixed',formatAware:true,
+    ...(large?{textScale:1.5,labelScale:1.75}:{})};
+  }else if(indices.length>2){
    // Cztery porównania: historia mieści się w odbiorcy, status pod operatorem.
    Object.assign(source,{x:150,y:170,w:240,h:70,ready:true});
    indices.forEach((i,j)=>{
@@ -213,4 +213,62 @@ export function catalogGraph(s) {
  nodes.forEach(n=>{if(!n.work&&!n.inner)n.ready=true;});
  return {nodes, edges:edges.filter(e=>e.a!==definition&&e.b!==definition), trays, width:W, height:H};
 
+}
+
+
+// Definicja jest w kodzie; diagram pokazuje wykonania i odbiorców.
+// Używa wspólnego modelu rows, planFlow i licznika faktycznych subskrypcji.
+function executionComparison(scene) {
+ const large=scene.format==='4:3',height=large?612:460;
+ const shared=scene.comparisonMode==='shared',late=scene.diagram==='late',cold=scene.diagram==='coldhot';
+ const independent=cold||!shared&&!late;
+ const rowY=large?[80,390]:[50,280],nodes=[],edges=[],panels=[],trays=[],executions=[];
+ const values=i=>scene.rows[i].events.filter(e=>e.kind==='value');
+ const tile=(id,x,y,w,label,ri,extra={})=>{const n={id,x,y,w,h:large?120:80,label,ri,statusInside:true,...extra};nodes.push(n);return n;};
+ const link=(from,to,events,extra={})=>edges.push({id:from+'-'+to,from,to,events,...extra});
+ const history=(sink,edgeId)=>{
+  const box={x:sink.x-sink.w/2,y:sink.y+sink.h/2+20,w:sink.w,h:large?140:104,
+    from:{x:sink.x,y:sink.y+sink.h/2},showOn:{type:'deliver-next',edge:edgeId,value:scene.rows[sink.ri].events[0].value}};
+  panels.push(box);trays.push({anchor:sink.id,x:sink.x,y:box.y+(cold?(large?35:27):box.h/2),w:sink.w-16,
+   lines:cold?2:1,...(cold?{lineStep:large?70:50}:{})});
+ };
+ const job=(id,x,y,w,ri,start,label,out)=>{
+  const n=tile(id,x,y,w,label,ri,{work:true,born:start,color:'http'});
+  const span=scene.rows[ri].spans.find(p=>p.kind==='work');
+  executions.push({id: 'execution-'+id,node:id,edge:out,duration:span.end-span.start,label});
+  return n;
+ };
+ if(independent){
+  for(const i of [0,1]){
+   const start=cold?(i?6:0):i?3:1;
+   job('work'+i,270,rowY[i],440,i,start,cold?'timer$':'data$','work'+i+'-receiver'+i);
+   const sink=tile('receiver'+i,960,rowY[i],440,cold?'timer$.subscribe()':'data$.subscribe()',i+2,{born:start,color:'http'});
+   link('work'+i,sink.id,values(i+2),{logicalStart:start});history(sink,'work'+i+'-'+sink.id);
+  }
+ } else {
+  const hub=tile('hub',620,(rowY[0]+rowY[1])/2,300,late?(shared?'shareReplay(1)':'share()'):'share()',null,{ready:late,color:'op'});
+  const ids=late?['http1','http2']:['work0'];
+  for(const [i,id] of ids.entries()){
+   if(late&&shared&&i===1)continue;
+   const start=i?10:1;
+   job(id,175,late?rowY[i]:hub.y,330,i,start,late?'HTTP #'+(i+1):'data$',id+'-hub');
+   link(id,hub.id,values(i),{logicalStart:start});
+  }
+  for(const i of [0,1]){
+   const start=late?(i?10:1):(i?3:1);
+   const sink=tile('receiver'+i,1040,rowY[i],360,'Odbiorca '+['A','B'][i],i+2,{born:start,color:'http'});
+   // Późny odbiorca po resecie share subskrybuje nowe wykonanie.
+   link(hub.id,sink.id,values(i+2),{logicalStart:start});history(sink,hub.id+'-'+sink.id);
+  }
+  if(late&&shared){
+   const y=hub.y+hub.h/2+(large?60:25);
+   panels.push({x:hub.x-hub.w/2,y,w:hub.w,h:large?120:90,label:'bufor ReplaySubject',
+    from:{x:hub.x,y:hub.y+hub.h/2},showOn:{type:'deliver-next',edge:'http1-hub',value:'dane'}});
+   trays.push({anchor:hub.id,x:hub.x,y:y+(large?75:62),w:hub.w-24,lines:1});
+  }
+ }
+ return {layout:'fixed',formatAware:true,width:1240,height,nodes,edges,panels,trays,executions,
+  ...(late?{timeline:[{type:'comparison-result',event:{type:'disconnected',edge:'hub-receiver1'},offset:.1,
+   caption:shared?'B dostał zapamiętaną odpowiedź. Nadal jeden request.':'B dostał nową odpowiedź. Dwa requesty.'}]}:{}),
+  ...(large?{textScale:1.5,labelScale:1.75}:{})};
 }

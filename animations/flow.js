@@ -92,6 +92,8 @@ export function planFlow(nodes, links, modelDuration, timingOverrides) {
       const cancelling=e.logicalEnd.kind==='unsubscribe';
       const dependencies=(cancelling?outgoing(e.b.id):incoming(e.a.id))
         .filter(parent=>ending.includes(parent)&&parent.logicalEnd.kind===e.logicalEnd.kind);
+      // Operator odłącza źródło dopiero po otrzymaniu błędu z innego wejścia (np. inner w switchMap).
+      if(cancelling)dependencies.push(...incoming(e.b.id).filter(parent=>parent!==e&&ending.includes(parent)&&parent.logicalEnd.kind==='error'));
       const departure=Math.max(phase,...dependencies.map(parent=>finish(parent,next)));
       records.get(e.id).end={...e.logicalEnd,at:departure,logicalAt:e.logicalEnd.at,duration:terminalTravel};
       const arrival=departure+terminalTravel;

@@ -9,23 +9,30 @@ async function subject() {
   return {scene,compiled:m.engine.compileScene(scene),m};
 }
 
-test('simple pseudocode stays pipe(map) without subscribe, types or premature emissions',async()=>{
+test('pipe and map fade in together before subscribe and three synchronous emissions',async()=>{
   const {scene,compiled:c,m}=await subject();
   assert.deepEqual(Array.from(m.catalog.scenes.filter(s=>s.playback.controller==='stages'),s=>s.id),['04-operator']);
   assert.deepEqual(Array.from(c.stops,s=>s.id),['pipeline','subscribed','first']);
   const ready=c.snapshot(0),pipeline=c.snapshot(c.stops[0].time),subscribed=c.snapshot(c.stops[1].time);
-  assert.equal(ready.code,'of(1, 2, 3).pipe(map(x => x * 2))');
-  assert.equal(pipeline.code,ready.code);
+  assert.equal(ready.code,'of(1, 2, 3)');
+  assert.equal(pipeline.code,ready.code+'\n.pipe(map(x => x * 2))');
   assert.equal(subscribed.code,pipeline.code);
-  assert.equal(c.snapshot(c.duration).code,ready.code);
+  assert.equal(c.snapshot(c.duration).code,pipeline.code);
   assert.doesNotMatch(subscribed.code,/subscribe/);
   assert.doesNotMatch(subscribed.code,/OperatorFunction|Observable|const|number|\/\//);
-  // Na początku prezentacji podpisy nie mówią o subskrypcji.
-  assert.ok(scene.captions.every(([,text])=>!/subskryp/i.test(text)));
-  assert.ok(c.stops.every(stop=>!/subskryp/i.test(stop.caption)));
+  assert.match(c.stops[0].caption,/pipe/);assert.match(c.stops[1].caption,/subscribe/);
+  assert.equal(ready.nodes.find(n=>n.id==='map').visible,false);
+  assert.equal(pipeline.nodes.find(n=>n.id==='map').visible,true);
+  assert.equal(ready.codeReveal.opacity,0);
+  const fading=c.snapshot(scene.timing.handoff+.15),map=fading.nodes.find(n=>n.id==='map');
+  close(fading.codeReveal.opacity,.5);close(map.opacity,.5);
+  assert.equal(pipeline.codeReveal.opacity,1);
+  assert.equal(pipeline.nodes.find(n=>n.id==='map').opacity,1);
+  assert.doesNotMatch(m.renderer.renderScene(subscribed),/Subscriber|wykonanie #1/);
+  assert.equal(subscribed.panels.length,1);
   for(const frame of [ready,pipeline,subscribed]) {
     assert.deepEqual(history(frame),[]);assert.equal(frame.tokens.length,0);
-    assert.ok(frame.nodes.every(n=>n.visible&&!n.active&&!n.showProgress));
+    assert.ok(frame.nodes.every(n=>!n.active&&!n.showProgress));
   }
   assert.ok(ready.edges.every(e=>!e.visible));assert.ok(pipeline.edges.every(e=>!e.visible));
   assert.ok(subscribed.edges.every(e=>e.visible&&e.phase==='subscribed'));
@@ -48,7 +55,8 @@ test('subscribe travels backwards slowly and next waits for both connections',as
 test('one travelling value becomes a short transformation then one result, with synchronous logical time',async()=>{
   const {compiled:c,m,scene}=await subject();
   const inputs=c.plan.records.get('source-map').events,outputs=c.plan.records.get('map-observer').events;
-  for(let i=0;i<3;i++) {
+  assert.equal(inputs.length,3);assert.equal(outputs.length,3);
+  for(let i=0;i<inputs.length;i++) {
     const input=inputs[i],output=outputs[i];
     close(input.arrival-input.at,scene.timing.travel);
     close(output.at-input.arrival,scene.timing.transform);
@@ -104,7 +112,8 @@ test('receiver box and connector appear only on first delivery and disappear aft
   for(const time of [0,c.stops[1].time,first.at,(first.at+first.arrival)/2,first.arrival-1e-6]){
     const frame=c.snapshot(time),svg=m.renderer.renderScene(frame);
     assert.equal(frame.panels[0].visible,false);assert.deepEqual(history(frame),[]);
-    assert.doesNotMatch(svg,/<rect[^>]*rx="12"|stroke-dasharray="6 5"/);
+    assert.doesNotMatch(svg,/stroke-dasharray="6 5"/);
+    if(time===0)assert.doesNotMatch(svg,/<rect[^>]*rx="12"/);
   }
   for(const time of [first.arrival,c.stops[2].time,c.duration]){
     const frame=c.snapshot(time),svg=m.renderer.renderScene(frame);
@@ -115,7 +124,8 @@ test('receiver box and connector appear only on first delivery and disappear aft
   controller.finish();assert.match(elements.get('.rx-stage').innerHTML,/<rect[^>]*rx="12"/);
   controller.previous();assert.deepEqual(history(player.snapshot),['2']);
   controller.previous();assert.deepEqual(history(player.snapshot),[]);
-  assert.doesNotMatch(elements.get('.rx-stage').innerHTML,/<rect[^>]*rx="12"|stroke-dasharray="6 5"/);
+  assert.equal(player.snapshot.panels[0].visible,false);
+  assert.doesNotMatch(elements.get('.rx-stage').innerHTML,/stroke-dasharray="6 5"/);
   controller.reset();assert.equal(player.snapshot.panels[0].visible,false);
   controller.seek(first.arrival);assert.equal(player.snapshot.panels[0].visible,true);
 });
@@ -138,8 +148,9 @@ test('complete follows the last result, has its own style and ends both edges ex
   const final=c.snapshot(c.duration);
   assert.deepEqual(history(final),['2','4','6']);assert.equal(final.tokens.length,0);
   assert.ok(final.edges.every(e=>e.done&&!e.visible));
-  assert.ok(final.nodes.every(n=>n.notification==='complete'));
-  const titles=Array.from(m.renderer.renderScene(final).matchAll(/<g data-node="[^"]+"[^]*?<text x="[^"]+" y="([^"]+)"/g),match=>Number(match[1]));
+  assert.ok(final.nodes.filter(n=>['source','map','observer'].includes(n.id)).every(n=>n.notification==='complete'));
+  assert.ok(final.nodes.filter(n=>n.id.includes('-')).every(n=>n.notification===null));
+  const titles=Array.from(m.renderer.renderScene(final).matchAll(/<g data-node="(?:source|map|observer)"[^]*?<text x="[^"]+" y="([^"]+)"/g),match=>Number(match[1]));
   assert.equal(titles.length,3);assert.equal(new Set(titles).size,1);
   assert.match(m.renderer.renderScene(final),/✓ complete/);
   assert.doesNotMatch(m.renderer.renderScene(final),/data-work-progress|data-transformation/);
@@ -162,7 +173,7 @@ test('custom timing preserves the storyboard and all checkpoint snapshots are de
 });
 
 // Wyświetlany kod: HTML z <wbr> jako punktami łamania, bez zmiany treści.
-const shownCode=element=>element.innerHTML.replace(/<wbr>/g,'').replace(/&gt;/g,'>').replace(/&lt;/g,'<').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&');
+const shownCode=element=>element.innerHTML.replace(/<span[^>]*aria-hidden="true"[^>]*>[^]*?<\/span>/g,'').replace(/<\/?span[^>]*>/g,'').replace(/<wbr>/g,'').replace(/&gt;/g,'>').replace(/&lt;/g,'<').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&');
 test('manual first delivery, pause, AUTO, backwards and reset restore the displayed code and receiver history',async()=>{
   const {scene}=await subject(),h=await playbackHarness(),{player,controller,elements}=h.create({scene});
   const ready=JSON.stringify(player.snapshot);
@@ -186,7 +197,7 @@ test('manual first delivery, pause, AUTO, backwards and reset restore the displa
     assert.equal(JSON.stringify(player.snapshot),ready);assert.equal(controller.mode,'auto');
   }
   controller.setMode('manual');controller.next();h.advance(100);controller.toggle();const time=player.time;
-  controller.toggle();h.advance(500);assert.ok(time<player.stops[0].time);assert.equal(player.time,player.stops[0].time);
+  controller.toggle();h.advance(1000);assert.ok(time<player.stops[0].time);assert.equal(player.time,player.stops[0].time);
 });
 
 test('Reveal keys and native fragments operate the real slide and ordinary slides recover native navigation',async()=>{

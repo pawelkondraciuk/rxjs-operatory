@@ -19,7 +19,7 @@ root.innerHTML=`<div class="rx-code"></div><div class="rx-stage"></div>
 <button class="rx-next" type="button" title="Następny krok (])">Krok →</button>
 ${staged?'<button class="rx-finish" type="button" title="Pokaż wynik (F)">Pokaż wynik</button>':''}
 <button class="rx-reset" type="button" title="Od początku (R)">↺</button>
-<label class="rx-scrub"><span class="rx-clock"></span><input type="range" min="0" max="${scene.duration}" step="0.1" value="0" aria-label="Czas animacji"></label>
+<label class="rx-scrub"><span class="rx-clock"></span><input type="range" min="0" max="${scene.duration}" step="any" value="0" aria-label="Czas animacji"></label>
 <button class="rx-hide" type="button" title="Ukryj sterowanie (U)">Ukryj · U</button></div>`;
 const q=s=>root.querySelector(s);
 const el={code:q('.rx-code'),stage:q('.rx-stage'),metrics:q('.rx-metrics'),caption:q('.rx-caption'),back:q('.rx-back'),play:q('.rx-play'),next:q('.rx-next'),clock:q('.rx-clock'),slider:q('input'),toolbar:q('.rx-toolbar')};
@@ -27,9 +27,12 @@ const el={code:q('.rx-code'),stage:q('.rx-stage'),metrics:q('.rx-metrics'),capti
 el.slider.max=String(playbackDuration);
 function paint(){
  const snapshot=engine.snapshot(Math.min(time,playbackDuration));
+ const reducedMotion=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches || false;
  // Kod jest tekstem (esc); <wbr> po „).” pozwala przenieść cały .pipe/.subscribe do nowej linii.
- el.code.innerHTML=esc(snapshot.code).replace(/\)\./g,')<wbr>.');
- el.stage.innerHTML=renderScene(snapshot,{reducedMotion:globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches || false});
+ const codeHtml=code=>esc(code).replace(/\)\./g,')<wbr>.');
+ const reveal=snapshot.codeReveal;
+ el.code.innerHTML=reveal?codeHtml(reveal.prefix)+`<span data-code-reveal="true" style="opacity:${reducedMotion&&reveal.opacity>0?1:reveal.opacity}" aria-hidden="${reveal.opacity===0}">${codeHtml(reveal.suffix)}</span>`:codeHtml(snapshot.code);
+ el.stage.innerHTML=renderScene(snapshot,{reducedMotion});
  el.caption.textContent=snapshot.caption;
  el.metrics.innerHTML=snapshot.metrics.map(m=>'<div class="rx-metric"><span>'+esc(m.label)+'</span><b>'+esc(m.value)+'</b></div>').join('');
  el.play.textContent=staged&&time>=playbackDuration?'Wynik':running?'Pauza':time>=playbackDuration?'Powtórz':time>0?'Kontynuuj':'Odtwórz';

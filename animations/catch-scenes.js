@@ -56,8 +56,9 @@ function catchGraph(scene) {
   const trays=[{anchor:'observer',x:1110,y:85,w:210}];
   const panel={x:290,y:157,w:680,h:225,label:inside?'PRACE WEWNĘTRZNE · catchError w każdym HTTP':'PRACA WEWNĘTRZNA · błąd wychodzi do switchMap',from:{x:535,y:94}};
   if(!inside) {
+    // complete pokazuje własny terminal wyjścia (terminalEdge), dopiero gdy zostanie wysłany po [].
     nodes.push({id:'catch-outer',x:775,y:top,w:230,h:68,label:'catchError',ri:2,color:'op',ready:true,
-      detail:t=>t>=4.5?'of([]) · complete':'() => of([])'});
+      terminalEdge:'catch-outer-observer',detail:t=>t>=4.5?'of([])':'() => of([])'});
     edges.push({from:'switch',to:'catch-outer',events:[],logicalStart:0,logicalEnd:{at:4,kind:'error'}},
       {from:'catch-outer',to:'observer',events:scene.rows[5].events,logicalStart:0,logicalEnd:{at:5,kind:'complete'}});
   } else edges.push({from:'switch',to:'observer',events:scene.rows[5].events,logicalStart:0,logicalEnd:null});

@@ -12,9 +12,9 @@ const values=frame=>Array.from(frame.histories[0].values,v=>v.value);
 
 test('only the HTTP tile works; the receiver box gets the response, then both complete',async()=>{
  const {scene,c}=await http();
- assert.equal(scene.code,"http.get('/api/data')");
+ assert.equal(scene.code,"const data$ = http.get('/api/data')");
  const work=c.snapshot(c.stops[0].time);
- assert.deepEqual(Array.from(c.stops,s=>s.id),['request']);
+ assert.deepEqual(Array.from(c.stops,s=>s.id),['request','first']);
  assert.equal(node(work,'http').status,'praca trwa');assert.ok(node(work,'http').showProgress);
  assert.ok(!node(work,'observer').showProgress);assert.notEqual(node(work,'observer').status,'praca trwa');
  assert.deepEqual(values(work),[]);
@@ -42,4 +42,18 @@ test('4:3: tiles and the box under the receiver form one centred group with larg
  assert.equal(c.snapshot(arrived.at-.01).panels[0].visible,false);assert.equal(c.snapshot(arrived.at).panels[0].visible,true);
  const wide=(await http('16:9')).c.snapshot(0);
  assert.equal(wide.textScale,1);assert.equal(wide.height,460);
+});
+
+test('definition is idle before subscribe; first next stops before complete; rewind hides subscriber and code',async()=>{
+ const {c}=await http();const ready=c.snapshot(0);
+ assert.equal(node(ready,'http').visible,true);assert.equal(node(ready,'observer').visible,false);
+ assert.equal(node(ready,'http').showProgress,false);assert.ok(ready.edges.every(e=>!e.visible));
+ assert.doesNotMatch(ready.code,/subscribe/);assert.equal(ready.panels[0].visible,false);
+ const subscribe=c.events.find(e=>e.type==='subscribe'),connected=c.events.find(e=>e.type==='connected');
+ assert.equal(node(c.snapshot(subscribe.at),'observer').visible,true);
+ assert.match(c.snapshot(subscribe.at).code,/subscribe\(render\)/);
+ assert.equal(node(c.snapshot((subscribe.at+connected.at)/2),'http').showProgress,false);
+ const first=c.snapshot(c.stops[1].time);assert.deepEqual(values(first),['dane']);
+ assert.equal(node(first,'observer').notification,null);assert.equal(node(first,'http').notification,null);
+ c.snapshot(c.duration);assert.deepEqual(c.snapshot(0),ready);
 });

@@ -31,7 +31,7 @@ export function resolverScenes() {
       timeline:[{type:'microtask-schedule',at:1,node:'microtask',caption:'Pierwszy miss: planujemy microtask. Pętla nadal działa.'},
         {type:'sync-end',at:4,node:'items'},{type:'microtask-flush',at:5,node:'microtask',value:enrichment.ids.join(',')}],
       queue:t=>t<1?'pending: []':t<1.7?'pending: [A]':t<3.1?'pending: [A, B]':t<5?'pending: [A, B, C]':'pending opróżnione → resolveMany([A, B, C])'},
-    manual([{id:'scheduled',time:1.6,caption:'Jeden microtask jest zaplanowany. Pętla nadal dopisuje ID.'},
+    manual([{id:'scheduled',time:1.9,caption:'Jeden microtask jest zaplanowany. Pętla nadal dopisuje ID.'},
       {id:'question',time:4,caption:'Koniec kodu synchronicznego; pending: A, B, C. Kiedy wykona się flush?'}]),8);
   micro.metrics=[{label:'microtaski',value:t=>t>=1?enrichment.microtasks:0}];
 

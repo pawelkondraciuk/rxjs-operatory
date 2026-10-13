@@ -195,7 +195,7 @@ const hotRows=[
 add("06a-cold-hot","Cold vs hot — skąd B zaczyna liczyć?","cold: własny timer przy subscribe",22,coldRows,[[0,"A słucha od początku. B dołączy później."],[6,"B dołącza. Cold: powstaje jego własny timer."],[7,"B zaczyna od 0. Timer A jest już przy 2."],[19,"Cold: każde subscribe tworzy własnego producenta."]],"Cold: każdy odbiorca uruchamia własny timer; A subskrybuje w 0 s, B w 6 s, pierwszy tick następuje po 1 s. Hot: jeden timer powstaje niezależnie od odbiorców i nadaje przez zwykły Subject. B subskrybuje w 6 s, więc odbiera 2 w 7 s. Nie odtwarzamy wcześniejszych wartości i nie utożsamiamy hot z replay.",{
  diagram:"coldhot",compareLabels:["Cold","Hot"],
  variants:{
-  without:{rows:coldRows,code:"cold: timer(1000, 3000) dla każdej subskrypcji",captions:[[0,"A subskrybuje. Jego timer zaczyna liczyć."],[6,"B subskrybuje — powstaje drugi timer."],[7,"A dostaje 2, a B swoje pierwsze 0."],[19,"Każdy odbiorca ma własne wykonanie."]],metrics:[{label:"producenci",value:t=>1+(t>=6?1:0)}]},
+  without:{rows:coldRows,code:"const timer$ = timer(1000, 3000)",captions:[[0,"A subskrybuje. Jego timer zaczyna liczyć."],[6,"B subskrybuje — powstaje drugi timer."],[7,"A dostaje 2, a B swoje pierwsze 0."],[19,"Każdy odbiorca ma własne wykonanie."]],metrics:[{label:"producenci",value:t=>1+(t>=6?1:0)}]},
   shared:{rows:hotRows,code:"hot: jeden timer → Subject → A i B",captions:[[0,"Jeden producent nadaje przez Subject."],[6,"B dołącza do istniejącego strumienia."],[7,"A i B dostają 2. B nie otrzymuje wcześniejszych 0 i 1."],[19,"Wspólny producent. Bez odtwarzania historii."]],metrics:[{label:"producenci",value:t=>1}]}
  }
 });

@@ -514,10 +514,12 @@
 					<h2>Operator to funkcja</h2>
 					<div class="rx-player" aria-label="Operator to funkcja"></div>
 					<aside class="notes">
-                        <p>Zanim przejdziemy do operatorów, zobaczmy prosty pipeline. Operator dostaje Observable i zwraca Observable. map(project) tworzy funkcję operatora, którą przekazujemy do pipe; project(value) jest wywoływane później dla emitowanych wartości. Typ OperatorFunction i jego definicja przez UnaryFunction są jedynie zapleczem dla prelegenta, nie treścią ekranu.</p>
-                        <p>Źródło emituje jedynkę. Map zamienia ją na dwójkę, a odbiorca otrzymuje wynik. W rzeczywistym RxJS of(1, 2, 3), projekcja i dostarczenie wartości są synchroniczne; wolne przeloty i pauzy spowalniają wyłącznie ilustrację.</p>
-                        <p>Ręcznie pokazujemy połączenie elementów i pełny przepływ pierwszej wartości. Bieżący wynik jest pod map tylko podczas transformacji; znika, gdy kulka rusza dalej. Box odbioru pojawia się po dotarciu pierwszej wartości. Następne kliknięcie uruchamia automat dla 2 → 4, 3 → 6 oraz complete. Krótszy box odbiorcy zachowuje 2, 4, 6; complete nie jest kolejną wartością. Źródło wysyła complete, map przekazuje je dalej, a odbiorca kończy. Każdy kafelek pokazuje własny moment zakończenia; rozciągnięcie czasowe dotyczy tylko ilustracji. Po zakończeniu pozostaje nieruchomy kadr.</p>
-                        <p>Strzałki przechodzą między checkpointami, Spacja pauzuje lub wznawia, M wybiera ręczny/auto, R przywraca zatrzymany początek w wybranym trybie, U odsłania sterowanie. Ponowne prawo podczas ruchu kończy bieżący etap. Lewo przywraca poprzedni checkpoint także w AUTO.</p>
+                        <p><strong>Definicja:</strong> Operator dostaje Observable i zwraca Observable. map(project) tworzy funkcję operatora przekazaną do pipe. Pipe wywołuje te funkcje podczas składania definicji; nie jest uczestnikiem późniejszego przepływu wartości.</p>
+                        <p><strong>Początek:</strong> of(1, 2, 3) definiuje trzy osobne emisje liczb: 1, 2, 3. READY pokazuje źródło i odbiorcę. Pierwsze prawo łagodnie odsłania pipe z map w kodzie i bloczek map w diagramie. Samo pipe nie uruchamia źródła.</p>
+                        <p><strong>Wykonanie:</strong> Subscribe łączy odbiorcę ze źródłem i uruchamia wykonanie. Subskrypcja biegnie upstream, wartości i complete downstream. Nie pokazujemy dodatkowych opisów Subscriberów.</p>
+                        <p><strong>Pierwsza wartość:</strong> Źródło emituje 1. map(x =&gt; x * 2) podwaja tę wartość, a odbiorca dostaje 2. Kolejne emisje 2 i 3 dają wyniki 4 i 6. Nie ma zagnieżdżonego map. of, projekcja i dostarczenie są synchroniczne. Przeloty i postoje spowalniają wyłącznie ilustrację. Wynik pod map znika, kiedy rusza kapsułka.</p>
+                        <p><strong>Dalej:</strong> Box odbioru pojawia się przy pierwszej wartości. AUTO pokazuje 2 → 4, 3 → 6 i complete bieżącego wykonania; w boxie zostają trzy wyniki 2/4/6. Definicję Observable można subskrybować ponownie.</p>
+                        <p><strong>Pilot:</strong> Prawo uruchamia etap, ponowne prawo kończy go. Lewo cofa checkpoint także w AUTO; Spacja pauzuje/wznawia, M wybiera tryb, R przywraca zatrzymany początek, U pokazuje sterowanie.</p>
                     </aside>
 				</section>
 
@@ -525,10 +527,11 @@
 					<h2>Skąd płyną wartości?</h2>
 					<div class="rx-player" aria-label="Skąd płyną wartości?"></div>
 					<aside class="notes">
-						<p>Timer i interval: dwa źródła jedno pod drugim. Po 2 s oba emitują 0. timer(2000) na tym kończy: jedna wartość i complete. Pytanie na postoju: czy interval też się zakończy? Nie: interval(2000) emituje 0, 1, 2 co 2 s i sam się nie zakończy. Po trzeciej wartości odbiorca ręcznie robi unsubscribe: kabel się odłącza, interval przestaje emitować, ale nie ma complete.</p>
-						<p>To zwykły Subject, bez replay. HTTP jest osobnym przykładem źródła. Odbiorca Subject subskrybuje po emisji A: nie dostaje A, lecz dostaje B i C. Porównaj boxy: trzy emisje, dwa odbiory. Historia emisji należy do diagramu, nie oznacza cache ani możliwości odtworzenia A przez Subject. Postoje: A bez odbiorcy, subskrypcja i odebrane B; dalej AUTO pokazuje C. Subskrypcja pozostaje aktywna.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
+                        <p><strong>HTTP — pierwszy slajd części właściwej:</strong> Najpierw istnieje tylko definicja http.get('/api/data'). Samo jej utworzenie nie wysyła requestu. Subscribe dodaje odbiorcę; impuls biegnie do HTTP i uruchamia pracę. Zatrzymaj się przy request, potem przy next. Complete jest osobną notyfikacją po odpowiedzi. Przykład dotyczy cold HTTP, nie już uruchomionego Promise.</p>
+                        <p><strong>Timer i interval:</strong> Po 1 s oba emitują 0. timer(1000) kończy przez complete. Czy interval też się zakończy? Nie: interval(1000) emituje 0, 1, 2 co 1 s. Po trzeciej wartości odbiorca robi unsubscribe; interval zostaje zatrzymany bez callbacku complete.</p>
+                        <p><strong>Subject — po przykładzie dwóch HTTP:</strong> A pojawia się bez odbiorców. Odbiorca 1 dołącza i odbiera B. Dopiero potem dołącza odbiorca 2, więc C dostają obaj. Historie odbiorców: B/C oraz C. Log emisji A/B/C należy do diagramu i nie jest buforem Subject. Nie ma odtworzenia A ani B dla późnego odbiorcy, complete ani unsubscribe.</p>
+                        <p><strong>Sterowanie wprowadzeniem:</strong> Prawo uruchamia lub kończy etap, lewo cofa checkpoint także w AUTO. Spacja pauzuje/wznawia, M zmienia tryb, R przywraca zatrzymany początek, U pokazuje sterowanie.</p>
+                    </aside>
 				</section>
 
 				<section id="06-subskrypcja" class="animation-slide" data-animation="06-subskrypcja">
@@ -536,7 +539,7 @@
 					<div class="rx-player" aria-label="Co uruchamia pracę?"></div>
 					<aside class="notes">
 						<p>Przykład dotyczy zimnego Observable z Angular HttpClient. Nie generalizuj leniwości na już uruchomiony Promise.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -544,24 +547,25 @@
 					<h2>Cold vs hot — skąd B zaczyna liczyć?</h2>
 					<div class="rx-player" aria-label="Cold vs hot — skąd B zaczyna liczyć?"></div>
 					<aside class="notes">
-						<p>Cold: każdy odbiorca uruchamia własny timer; A subskrybuje w 0 s, B w 6 s, pierwszy tick następuje po 1 s. Hot: jeden timer powstaje niezależnie od odbiorców i nadaje przez zwykły Subject. B subskrybuje w 6 s, więc odbiera 2 w 7 s. Nie odtwarzamy wcześniejszych wartości i nie utożsamiamy hot z replay.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
+                        <p><strong>Cold — MAIN:</strong> Kod const timer$ = timer(1000, 3000) definiuje jeden Observable, a każda subskrypcja tworzy własne wykonanie timera. Diagram ma dwa tory timer$ → timer$.subscribe(), a boxy pod odbiorcami przechowują ich osobne wyniki. Górny tor to A, dolny to B. A subskrybuje w 0 s, B w 6 s; pierwszy tick następuje po 1 s. Zapytaj: czy B zacznie od bieżącej wartości A? Nie, dostanie własne 0. Dwa wykonania nie wymagają dwóch definicji Observable.</p>
+                        <p><strong>Hot — EXTRAS:</strong> Jeden timer działa niezależnie od odbiorców i nadaje przez zwykły Subject. B dołącza w 6 s i odbiera 2 w 7 s. Nie dostaje wcześniejszych wartości; hot nie oznacza replay.</p>
+                    </aside>
 				</section>
 
 				<section id="07-hot-cold" class="animation-slide" data-animation="07-hot-cold">
 					<h2>Dwie subskrypcje — bez share czy z share?</h2>
 					<div class="rx-player" aria-label="Dwie subskrypcje — bez share czy z share?"></div>
 					<aside class="notes">
-						<p>Porównaj warianty na kolejnych slajdach. A subskrybuje w 1 s, B w 3 s. Każdy request trwa 6 s od uruchomienia. Bez share każdy odbiorca uruchamia własne zimne wykonanie. Z share obaj korzystają z tej samej instancji data$ i nakładających się subskrypcji; B dołącza przed odpowiedzią w 7 s. Zwykły share nie przechowuje wyniku dla spóźnionego odbiorcy i domyślnie resetuje po complete.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
+                        <p><strong>Bez share — przed Subject:</strong> Kod const data$ = http.get('/api/data') zawiera jedną definicję. Tak jak na slajdzie cold, dwa tory data$ → data$.subscribe() pokazują osobne wykonania z boxami odpowiedzi; górny tor to A, dolny to B. A subskrybuje w 1 s, B w 3 s. Na postoju zapytaj salę, ile requestów powstało. Jeden obiekt Observable przechowuje definicję, ale każdy subscribe uruchamia osobne wykonanie HTTP. Każdy request trwa 6 s.</p>
+                        <p><strong>Zaplecze dla prelegenta:</strong> Schematyczny pseudokod: <code>source$.subscribe(mapSubscriber)</code> podłącza upstream; <code>destination.next(project(value))</code> przekazuje wynik downstream. Kolejny Observable zachowuje dostęp do poprzedniego; pipe nie wykonuje HTTP.</p>
+                        <p><strong>Z share — po Subject:</strong> Definicja jest tylko w kodzie. Źródło ma podpis data$, odbiorcy są rozsunięci z osobnymi boxami odpowiedzi, a bloczek share() między nimi pojawia się łagodnym fade-in podczas pierwszego etapu subskrypcji i znów znika po cofnięciu do początku. Share używa wewnętrznego Subject do rozsyłania wyniku aktywnej subskrypcji źródła. Obaj korzystają z tej samej instancji data$ i nakładających się subskrypcji. B dołącza przed odpowiedzią w 7 s, więc jedna praca dostarcza wynik obu. Zwykły share nie zachowuje wyniku dla późnego odbiorcy i domyślnie resetuje po complete. Przejdź do pytania o odbiorcę po odpowiedzi.</p>
+                    </aside>
 				</section>
 
 				<section id="08-map-strumienie" class="animation-slide" data-animation="08-map-strumienie">
 					<h2>A jeśli wartością jest Observable?</h2>
 					<div class="rx-player" aria-label="A jeśli wartością jest Observable?"></div>
-					<aside class="notes"><ul><li><strong>Pytanie:</strong> A$ pracuje, B$/C$ czekają — ile HTTP działa? Jeden.</li><li><strong>map:</strong> Tworzy zimne Observable; samo utworzenie nie uruchamia HTTP.</li><li><strong>concatAll:</strong> Subskrybuje po kolei: A$ → B$ → C$.</li><li><strong>Różnica:</strong> concatAll kolejkuje Observable; concatMap wartości przed projekcją.</li></ul></aside>
+					<aside class="notes"><ul><li><strong>Pytanie:</strong> A$ pracuje, B$/C$ czekają — ile HTTP działa? Jeden.</li><li><strong>map:</strong> Tworzy zimne Observable; samo utworzenie nie uruchamia HTTP.</li><li><strong>concatAll:</strong> Subskrybuje po kolei: A$ → B$ → C$.</li><li><strong>Różnica:</strong> concatAll kolejkuje Observable; concatMap wartości przed projekcją.</li><li><strong>Przejście:</strong> To kluczowy pomost do concatMap na następnym slajdzie. Na oba przykłady przeznacz około 3 minut.</li></ul></aside>
 				</section>
 
 				<section id="09-concatmap" class="animation-slide" data-animation="09-concatmap">
@@ -597,7 +601,7 @@
 					<div class="rx-player" aria-label="Czy ten sam identyfikator wymaga kolejnego HTTP?"></div>
 					<aside class="notes">
 						<p>Porównanie z ostatnią przepuszczoną wartością; domyślnie ===. Identyfikator jest prymitywem. To nie jest globalne usuwanie duplikatów.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -606,7 +610,7 @@
 					<div class="rx-player" aria-label="Czekać na ciszę czy aktualizować w trakcie?"></div>
 					<aside class="notes">
 						<p>Przykład trwającego źródła, bez complete i error podczas pokazu. W aplikacji czasy często będą krótsze. Audit otwiera okno zdarzeniem, a debounce czeka na ciszę. Throttle przepuszcza pierwszą wartość i pomija kolejne przez 3,5 s (domyślnie leading: true, trailing: false). Sample odlicza takty od subskrypcji i emituje tylko wtedy, gdy od poprzedniego taktu przyszła nowa wartość. Pomijamy zdarzenia dokładnie na granicach okien.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -619,7 +623,7 @@
 					<div class="rx-player" aria-label="Jeden user$. Dwie subskrypcje."></div>
 					<aside class="notes">
 						<p>Najpierw pokaż dwie zwykłe subskrypcje A i B. http$ oznacza zimne Observable HTTP, np. ajax.getJSON z rxjs/ajax. Obie subskrypcje zaczynają się przed odpowiedzią. share stosujemy raz do wspólnej instancji user$. Dopiero po porównaniu odnieś odbiorców do Angular async pipe albo subscribe w React useEffect ze sprzątaniem przez unsubscribe. W React zachowaj stabilną instancję user$ poza komponentami; nie twórz osobnego share w każdym efekcie. AsyncPipe zarządza własną subskrypcją, ale nie dodaje współdzielenia. share nie jest trwałym cache.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -627,9 +631,10 @@
 					<h2>B przychodzi po odpowiedzi. Co dostanie?</h2>
 					<div class="rx-player" aria-label="B przychodzi po odpowiedzi. Co dostanie?"></div>
 					<aside class="notes">
-						<p>Źródło HTTP kończy się odpowiedzią w 6 s. Widok A znika w 8 s; B pojawia się w 10 s. Domyślny share resetuje po complete, więc B uruchamia nowy request. shareReplay({bufferSize:1,refCount:true}) zachowuje wynik poprawnie zakończonego źródła i odtwarza go dla B. RefCount true nie usuwa automatycznie tego zakończonego cache. Wersja RxJS 7.8.2.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
+                        <p><strong>share:</strong> HTTP odpowiada i kończy się w 6 s. A znika w 8 s; B dołącza w 10 s. Czy nadal wystarczy jeden request? Domyślny share resetuje po complete, więc B uruchamia nowe HTTP.</p>
+                        <p><strong>shareReplay:</strong> Wewnętrzny ReplaySubject przechowuje ostatnią wartość. shareReplay({bufferSize:1,refCount:true}) zachowuje wynik poprawnie zakończonego źródła i odtwarza go dla B. RefCount true nie usuwa automatycznie zakończonego cache. To semantyka RxJS 7.8.2, nie pełna polityka cache ani TTL.</p>
+                        <p><strong>Przejście:</strong> Wiemy już, kiedy wykonuje się praca i jak ją współdzielić. Teraz map zwróci Observable: kto będzie decydował, kiedy uruchomić jego pracę?</p>
+                    </aside>
 				</section>
 
 
@@ -641,7 +646,7 @@
 					<div class="rx-player" aria-label="Jeden błąd. Czy następny klik zadziała?"></div>
 					<aside class="notes">
 						<p>Porównaj położenie catchError: osobny operator za switchMap albo operator wewnątrz ramki każdego HTTP. http$ jest zimnym Observable, a każde kliknięcie tworzy jego nową subskrypcję. Ręczne postoje pokazują pracę A, błąd i wynik zastępczy []. W obu wariantach catchError subskrybuje of([]), które emituje i kończy się. Na zewnątrz kończy się cały wynik, a subskrypcja klik$ znika. Klik B nadal może wystąpić w źródle, lecz nie uruchamia HTTP B. Wewnątrz kończy się tylko inner A: kolejne kliknięcie uruchamia HTTP B z własnym catchError i przekazuje wynik B. Przerywana linia wskazuje zakres prac tworzonych przez switchMap; nie jest subskrypcją. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik: tutaj wynika to z wyboru of([]).</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 <section id="22-refcount" class="animation-slide" data-animation="22-refcount">
@@ -649,7 +654,7 @@
 					<div class="rx-player" aria-label="Widok zniknął. Dlaczego timer nadal działa?"></div>
 					<aside class="notes">
 						<p>Przykład interval, które nie kończy się samo, z poprawnym teardown. A znika w 7 s, B w 10 s; oba async odsubskrybowują. Przy refCount:false shareReplay nadal utrzymuje subskrypcję źródła, więc timer pracuje bez odbiorców. To ryzyko niechcianego zatrzymania zasobów i wycieku, a nie dowód liniowego wzrostu pamięci: bufferSize wynosi 1. Przy true ostatnie unsubscribe rozłącza źródło. Skończone HTTP i jego cache to inna sytuacja.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -677,34 +682,46 @@
 					<div class="rx-player" aria-label="Cztery pytania przed kolejnym pipe"></div>
 					<aside class="notes">
 						<p>Zakończ pytaniami, które publiczność może zastosować we własnym kodzie. Przywróć tytułową analogię znajomości operatorów.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 
-				<section>
 					<section id="pytania" class="extras-slide">
 						<h2>Pytania?</h2>
-						<p>Dodatkowe przykłady</p>
-						<nav class="extras-links" aria-label="Dodatkowe animacje">
-<a href="?extras#/12a-complete">complete outer</a>
-<a href="?extras#/13-limit">limit współbieżności</a>
-<a href="?extras#/16-czas-cztery">cztery operatory czasu</a>
-<a href="?extras#/17-latest">withLatestFrom / combineLatest</a>
-<a href="?extras#/19-share">share — wspólne wykonanie</a>
-<a href="?extras#/21-share-miejsce">kosztowny map i share</a>
-<a href="?extras#/21a-share-pozycja">pozycja share</a>
-<a href="?extras#/23-angular-alias">async z aliasem</a>
-<a href="?extras#/24-signals">toSignal</a>
-<a href="?extras#/b01-defer">defer</a>
-<a href="?extras#/b02-first-take">first / take</a>
-<a href="?extras#/b03-buffertime">bufferTime</a>
-<a href="?extras#/b05-finalize">finalize</a>
-<a href="?extras#/b06-forkjoin">forkJoin</a>
-<a href="?extras#/b07-zip">zip</a>
-<a href="?extras#/b08-merge">merge</a>
-<a href="?extras#/b09-pairwise">pairwise</a>
-</nav>
-						<aside class="notes">Koniec głównej prezentacji. Pilot zatrzymuje się tutaj. Dodatki otwórz świadomie linkiem w menu; adres zawiera wtedy ?extras. Link „Dodatkowe przykłady” wraca do zakończenia głównej ścieżki.</aside>
+						<p class="extras-start"><a href="?extras#/12a-complete">Dodatkowe przykłady — zacznij tutaj</a></p>
+                        <nav class="extras-links" aria-label="Dodatkowe animacje">
+                          <div class="extras-group"><h3>Praca i zakończenie</h3>
+                            <a href="?extras#/12a-complete">complete outer → limit 3</a>
+                            <a href="?extras#/06-subskrypcja">Co uruchamia HTTP?</a>
+                            <a href="?extras#/b01-defer">defer</a>
+                            <a href="?extras#/b02-first-take">first / take</a>
+                            <a href="?extras#/b05-finalize">finalize</a>
+                          </div>
+                          <div class="extras-group"><h3>Współdzielenie</h3>
+                            <a href="?extras#/06a-cold-hot-2">Hot: późny odbiorca</a>
+                            <a href="?extras#/19-share">share</a>
+                            <a href="?extras#/18-async">Dwie subskrypcje</a>
+                            <a href="?extras#/21-share-miejsce">Kosztowny map</a>
+                            <a href="?extras#/21a-share-pozycja">Pozycja share</a>
+                            <a href="?extras#/22-refcount">refCount</a>
+                          </div>
+                          <div class="extras-group"><h3>Emisje i łączenie</h3>
+                            <a href="?extras#/15-debounce-audit">Cztery operatory czasu</a>
+                            <a href="?extras#/16-czas-cztery-3">throttle / sample</a>
+                            <a href="?extras#/b03-buffertime">bufferTime</a>
+                            <a href="?extras#/17-latest">withLatest / combineLatest</a>
+                            <a href="?extras#/b06-forkjoin">forkJoin</a>
+                            <a href="?extras#/b07-zip">zip</a>
+                            <a href="?extras#/b08-merge">merge</a>
+                            <a href="?extras#/b09-pairwise">pairwise</a>
+                          </div>
+                          <div class="extras-group"><h3>Praktyka</h3>
+                            <a href="?extras#/23-angular-alias">async z aliasem</a>
+                            <a href="?extras#/24-signals">toSignal</a>
+                            <a href="?extras#/26-resolver-problem">Resolver: trzy kroki</a>
+                          </div>
+                        </nav>
+						<aside class="notes">Koniec części właściwej (30–35 minut poza pełnym otwarciem). Jeśli nie ma pytań: „Zobaczmy jeszcze kilka sytuacji”. Wybierz wyróżniony link, potem pilot prowadzi przez complete outer w concatMap, complete outer w switchMap i limit współbieżności. Ta dogrywka zajmuje około 4–6 minut. Po limicie można zakończyć albo wybrać następny temat. Menu pozwala też odpowiedzieć konkretnym przykładem na pytanie z sali; link „Dodatkowe przykłady” wraca tutaj.</aside>
 					</section>
 
 				<section id="19-share" class="animation-slide" data-extras data-animation="19-share">
@@ -713,7 +730,7 @@
 					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
 					<aside class="notes">
 						<p>A i B mają nakładające się subskrypcje. share() nie gwarantuje jednego wykonania na zawsze ani cache dla późniejszych odbiorców.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -727,16 +744,17 @@
 					<h2>100 zadań. Ile naraz?</h2>
 					<div class="rx-player" aria-label="100 zadań. Ile naraz?"></div>
 					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-<aside class="notes"><ul><li><strong>Pytanie:</strong> Pięć wejść, limit 3 — ile prac działa naraz?</li><li><strong>Start:</strong> A/B/C aktywne; D/E czekają jako wartości.</li><li><strong>Moment:</strong> Complete jednej pracy zwalnia miejsce następnej.</li><li><strong>Wniosek:</strong> Limit współbieżności ≠ limit requestów/s; kolejka nadal może rosnąć.</li></ul></aside>
+<aside class="notes"><ul><li><strong>Pytanie:</strong> Pięć wejść, limit 3 — ile prac działa naraz?</li><li><strong>Start:</strong> A/B/C aktywne; D/E czekają jako wartości.</li><li><strong>Moment:</strong> Complete jednej pracy zwalnia miejsce następnej.</li><li><strong>Wniosek:</strong> Limit współbieżności ≠ limit requestów/s; kolejka nadal może rosnąć.</li><li><strong>Koniec dogrywki:</strong> To naturalny punkt zakończenia po trzech dodatkowych slajdach. Link „Dodatkowe przykłady” wraca do pytań; dalsze tematy są opcjonalne.</li></ul></aside>
 				</section>
 <section id="16-czas-cztery" class="animation-slide" data-extras data-animation="16-czas-cztery">
 					<h2>Cztery sposoby ograniczania emisji</h2>
 					<div class="rx-player" aria-label="Cztery sposoby ograniczania emisji"></div>
 					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
 <aside class="notes">
-						<p>Wszystkie źródła pozostają aktywne. Sample nie jest replay co takt. Używamy domyślnych opcji throttleTime. Nie porównujemy wartości pojawiających się dokładnie w chwili końca okna.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
+                        <p><strong>Wspólne porównanie — MAIN:</strong> Jedno źródło zasila dwa operatory i dwóch odbiorców. Najpierw pytanie przed emisjami; potem audit daje D podczas trwania wejścia, a debounce daje G po ciszy. <strong>debounceTime:</strong> Wyszukiwanie po zakończeniu pisania. Każde wejście odlicza 3,5 s od nowa. Na pierwszym postoju debounce jeszcze milczy; pierwszy wynik G pojawia się po ciszy. W aplikacji zwykle użyjemy znacznie krótszego okresu.</p>
+                        <p><strong>auditTime — na wspólnym MAIN i samodzielnie w EXTRAS:</strong> Aktualizacja układu podczas resize. Pierwsze wejście otwiera okno; kolejne aktualizują zapamiętaną wartość, bez przesuwania końca okna. Na pierwszym końcu okna odbiorca dostaje D. Audit pozwala aktualizować w trakcie ciągłego ruchu, debounce czeka na przerwę.</p>
+                        <p><strong>throttleTime i sampleTime — EXTRAS:</strong> Throttle domyślnie przepuszcza pierwszą wartość okna (leading:true, trailing:false). Sample ma stały rytm od subskrypcji i pomija takt bez nowych wejść. Wszystkie źródła pozostają aktywne; nie porównujemy zdarzeń dokładnie na granicy okna.</p>
+                    </aside>
 				</section>
 <section id="17-latest" class="animation-slide" data-extras data-animation="17-latest">
 					<h2>Kto ma prawo uruchomić pracę?</h2>
@@ -744,7 +762,7 @@
 					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
 <aside class="notes">
 						<p>Oba warianty potrzebują pierwszych wartości odpowiednich źródeł. withLatestFrom subskrybuje także źródła pomocnicze; nie odkłada ich subskrypcji do kliknięcia.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 <section id="21-share-miejsce" class="animation-slide" data-extras data-animation="21-share-miejsce">
@@ -753,7 +771,7 @@
 					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
 <aside class="notes">
 						<p>Źródłem jest jeden Subject. Dwóch odbiorców subskrybuje przed pierwszą emisją. Bez share mają dwa wykonania map(expensive) na każde next. share umieszczone za map współdzieli także kosztowne obliczenie i przekazuje ten sam wynik obu odbiorcom. Podświetlenie przez 0,9 s symbolizuje koszt, nie opóźnienie map. Callback map pozostaje synchroniczny.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 <section id="21a-share-pozycja" class="animation-slide" data-extras data-animation="21a-share-pozycja">
@@ -762,7 +780,7 @@
 					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
 <aside class="notes">
 						<p>Paski czasu przy map są ilustracją kosztu, nie asynchroniczną zmianą semantyki map. Obaj odbiorcy subskrybują przed pierwszą emisją.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 <section id="23-angular-alias" class="animation-slide" data-extras data-animation="23-angular-alias">
@@ -771,7 +789,7 @@
 					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
 <aside class="notes">
 						<p>To alternatywa dla wielu async w jednym zakresie szablonu. Dla niezależnych odbiorców nadal może być potrzebne współdzielenie. user jest w przykładzie obiektem.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 <section id="24-signals" class="animation-slide" data-extras data-animation="24-signals">
@@ -780,7 +798,7 @@
 					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
 <aside class="notes">
 						<p>Twórz toSignal raz i używaj wyniku. Przykład bez initialValue, więc przed pierwszą emisją jest undefined. Domyślne sprzątanie subskrypcji wiąże się z kontekstem zniszczenia.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 <section id="b01-defer" class="animation-slide" data-extras data-animation="b01-defer">
@@ -789,7 +807,7 @@
 					<div class="rx-player" aria-label="Kiedy odczytujesz wartość?"></div>
 					<aside class="notes">
 						<p>defer jest funkcją tworzącą Observable. Każda subskrypcja wywołuje fabrykę. Przykład izoluje czas odczytu zmiennej, nie czas odpowiedzi HTTP.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -799,7 +817,7 @@
 					<div class="rx-player" aria-label="first() i take(1) — to samo?"></div>
 					<aside class="notes">
 						<p>first bez wartości domyślnej. Gdy źródło milczy i nie kończy się, oba czekają. null jest wartością. Wiersze są niezależnymi przykładami.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -809,7 +827,7 @@
 					<div class="rx-player" aria-label="Potrzebuję wszystkich zdarzeń — w paczkach"></div>
 					<aside class="notes">
 						<p>Zwykłe nienakładające się okna bufferTime. Odfiltruj puste paczki. Potrzebny jest endpoint obsługujący paczki; trzeba osobno zaprojektować błędy i powtórki.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -821,7 +839,7 @@
 					<div class="rx-player" aria-label="Sprzątanie także po odsubskrybowaniu"></div>
 					<aside class="notes">
 						<p>finalize sprząta dany zakres subskrypcji. Przy wielu równoległych requestach jedna wspólna flaga loading może wymagać licznika.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -831,7 +849,7 @@
 					<div class="rx-player" aria-label="Czekam na komplet zakończonych żądań"></div>
 					<aside class="notes">
 						<p>Każde wejście musi wyemitować co najmniej raz i poprawnie się zakończyć. W RxJS 7.8.2 wejście kończące się bez wartości daje zakończenie bez wyniku. Błąd przerywa całość.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -841,7 +859,7 @@
 					<div class="rx-player" aria-label="Pierwsze z pierwszym. Drugie z drugim."></div>
 					<aside class="notes">
 						<p>Przy nierównym tempie źródeł bufor może rosnąć. Źródła są tu skończonymi przykładami zdarzeń, a ich complete pominięto dla czytelności.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -851,7 +869,7 @@
 					<div class="rx-player" aria-label="Kilka powodów do odświeżenia"></div>
 					<aside class="notes">
 						<p>merge łączy emisje istniejących strumieni. mergeMap dodatkowo mapuje wartości na strumienie wewnętrzne. W przykładzie źródła nie kończą się podczas animacji.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
 				</section>
 
@@ -861,10 +879,8 @@
 					<div class="rx-player" aria-label="Co zmieniło się od poprzedniej wartości?"></div>
 					<aside class="notes">
 						<p>pairwise emituje nakładające się pary kolejnych wartości. Przy obiektach mutowanych w miejscu nadal trzeba uważać na współdzielone referencje.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO lewo / prawo zmienia slajdy. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
+						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
-				</section>
-
 				</section>
 
 			</div>

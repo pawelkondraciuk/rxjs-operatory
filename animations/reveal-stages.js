@@ -1,5 +1,5 @@
 // Adapter do klawiatury i fragmentów Reveal, bez własnego handlera strzałek.
-export function installRevealStages(deck,{getController,isEnabled=()=>true}={}) {
+export function installRevealStages(deck,{getController,getPlayer=()=>null,getManualTarget=()=>null,isEnabled=()=>true}={}) {
   let controller,slide,unsubscribe,syncing=false,lastIndex;
   const bindings=[
     [39,'→','Następny etap / koniec bieżącego',c=>c.next()],
@@ -21,9 +21,19 @@ export function installRevealStages(deck,{getController,isEnabled=()=>true}={}) 
   function refresh(){
     unsubscribe?.();unsubscribe=null;unbind();slide=deck.getCurrentSlide();
     controller=isEnabled()?getController(slide):null;lastIndex=undefined;
-    if(!controller)return;
-    unsubscribe=controller.subscribe(()=>sync());sync(true);
+    if(controller){unsubscribe=controller.subscribe(()=>sync());sync(true);}
     if(deck.isOverview()||deck.isPaused())return;
+    if(!controller){
+      const player=isEnabled()?getPlayer(slide):null;
+      if(player)deck.addKeyBinding({keyCode:32,key:'Spacja',description:'Animacja: pauza / kontynuuj'},()=>{
+        if(!isEnabled()||deck.isOverview()||deck.isPaused()||deck.getCurrentSlide()!==slide||player.state==='finished')return;
+        const target=getManualTarget(slide);
+        if(player.isPlaying)player.pause();
+        else if(target!==null&&player.time>=target)deck.next();
+        else player.play(); // Pauza zachowuje cel playTo rozpoczętego etapu.
+      });
+      return;
+    }
     bindings.forEach(([keyCode,key,description,action])=>deck.addKeyBinding({keyCode,key,description},()=>{
       if(!deck.isOverview()&&!deck.isPaused())action(controller);
     }));
