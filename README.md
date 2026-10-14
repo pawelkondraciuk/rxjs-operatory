@@ -898,3 +898,6 @@ Na migrowanych slajdach diagram zajmuje 480 px wysokości. Większe kafelki maj�
 W `map + concatAll` górny pipeline ma cztery poziome kolumny: source$ → map → concatAll → odbiorca. map ma krótki przystanek kulki A → A$, bez czasowego progressu. Oczekujące wiersze pojawiają się dopiero po dotarciu A$/B$/C$ do concatAll.
 
 W MAIN 08–12 przy complete zielony staje się execution lane, a nagłówek definicji pozostaje pastelowy. Pozostałe migrowane sceny zmieniają tło całego kafelka przy własnym complete. Źródło może zakończyć się wcześniej; *Map pozostaje aktywne aż do zakończenia wymaganych inner i kolejki. Nieobsłużony error daje czerwony operator, a odsubskrybowane źródło zachowuje swój kolor.
+
+
+Płaski styl obejmuje wyłącznie slajdy 08–12 (map + concatAll, concatMap, mergeMap, switchMap i exhaustMap): scene.playerClass `rx-flatten-flat` usuwa obrysy kafelków, identyfikatorów i etapów HTTP oraz zeruje promienie nagłówków. Placeholder kolejki zachowuje przerywany obrys. Geometria, fonty, porty, progress, stany i animacje pozostają bez zmian; pozostałe slajdy nie otrzymują tej klasy.

@@ -137,3 +137,16 @@
 /* Tory wykonania (04a-dwa-tory): liczniki czytelniejsze, ale lżejsze od diagramu. */
 .rx-player.rx-lanes .rx-metric { font-size:24px; }
 .rx-player.rx-lanes .rx-metric b { font-size:40px; }
+
+/* Lokalny styl rodziny flatteningu: wyłącznie powierzchnie kafelków, bez zmiany geometrii i przepływu. */
+.rx-player.rx-flatten-flat [data-node] > rect:first-of-type,
+.rx-player.rx-flatten-flat [data-inner-stage] > rect:first-of-type,
+.rx-player.rx-flatten-flat [data-inner-work] > rect:first-of-type {
+  stroke: none;
+  rx: 0;
+  ry: 0;
+}
+.rx-player.rx-flatten-flat [data-inner-work-panel] > rect {
+  rx: 0;
+  ry: 0;
+}
