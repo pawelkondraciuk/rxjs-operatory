@@ -85,9 +85,11 @@ test('one travelling value becomes a short transformation then one result, with 
   }
 });
 
-test('tiles share switchMap geometry, the receiver box is shorter and the transient result stays underneath',async()=>{
+test('operator tiles retain the legacy reference geometry and transient results stay underneath',async()=>{
   const {compiled:c,m,scene}=await subject();
-  const switchScene=m.catalog.scenes.find(s=>s.id==='11-switchmap'),reference=m.engine.compileScene(switchScene).snapshot(0);
+  const switchScene={id:'legacy-reference-switch'};
+  m['reference-scenes'].configureFlatten(switchScene,'switchMap');
+  const reference=m.engine.compileScene(switchScene).snapshot(0);
   const current=c.snapshot(0),shape=n=>[n.x,n.y,n.w,n.h];
   for(const [id,referenceId] of [['source','source'],['map','op'],['observer','observer']]) {
     assert.deepEqual(shape(current.nodes.find(n=>n.id===id)),shape(reference.nodes.find(n=>n.id===referenceId)));

@@ -433,6 +433,7 @@ function buildFlattenGraph(scene) {
 // 4:3 ma własny profil: wyższa ramka, kafelki i sloty; poziomy układ (szerokość 1240) jest wspólny.
 // Scena bez formatu (testy, prototypy) zachowuje geometrię 16:9.
 const horizontal = {panelW:520,sideW:220,sourceX:140,opX:620,observerX:1100,catchX:860};
+const httpWorkSlides=new Set(['08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap']);
 const frames = {
   '16:9': {...horizontal,timers:{tileH:86,rows:[130,330]},http:{tileY:170,tileH:86,boxY:250},operator:{tileY:50,tileH:76,sourceX:140,opX:620,observerX:1100,sideW:200,mapW:240,boxY:148},height:460,tileY:50,tileH:76,panelY:148,panelBottom:440,columnH:210,historyTop:41,historyStep:60},
   // 04 w 4:3: trzy duże kafelki i box odbioru pod odbiorcą; cała grupa (130 + 50 + 130) na środku ramki 612.
@@ -515,21 +516,25 @@ export function flattenGraph(scene) {
     side(frame.observerX),
   ];
   graph.timeline = [...(graph.timeline||[]),...(scene.timeline||[])];
-  if (scene.id==='09-concatmap') configureConcatWorkPanel(graph,scene,frame);
+  if (httpWorkSlides.has(scene.id)) configureHttpWorkPanel(graph,scene,frame);
   return graph;
 }
 
-// Wyłącznie concatMap: główny tor S1 nad lokalnymi pracami #1–#4.
-function configureConcatWorkPanel(graph,scene,frame) {
+// Główny tor S1 nad lokalnymi requestami. Prototypy i dodatki zachowują swoje modele.
+function configureHttpWorkPanel(graph,scene,frame) {
   const large=scene.format==='4:3',top=large?28:10,defH=large?70:56,rowH=large?74:64;
+  const all=scene.operatorName==='concatAll';
   const laneY=top+defH+rowH/2;
   const main={color:'#7457D9',fill:'#D9CFF5',ink:'#513A9A',label:'S1'};
   Object.assign(graph,{subscribers:{S1:main},laneWire:5,portRadius:11,ball:{r:25,font:29,textFill:'#fff'},
     ...(large?{textScale:1.4,labelScale:1.6}:{})});
-  for(const [id,x,w,headerFill] of [['source',205,310,'#8FC9D4'],['op',600,310,'#D8B3E6']]) {
+  const tiles=all?[['source',145,190,'#8FC9D4'],['projection',400,230,'#D8B3E6'],['op',677.5,235,'#D8B3E6']]:
+    [['source',205,310,'#8FC9D4'],['op',600,310,'#D8B3E6']];
+  for(const [id,x,w,headerFill] of tiles) {
     Object.assign(graph.nodes.find(n=>n.id===id),{x,w,top,defH,rowH,laneSlots:{S1:0},growRows:true,
       y:top+(defH+rowH)/2,h:defH+rowH,headerFill,runtimeFill:'#EDE6F8',terminalBadge:true,detail:'',statusInside:false,rx:7});
   }
+  if(all)graph.nodes.find(n=>n.id==='projection').transformBalls=true;
   const receiver=graph.nodes.find(n=>n.id==='observer');
   Object.assign(receiver,{x:1025,w:370,y:laneY,h:rowH,top:laneY-rowH/2,defH:0,rowH,laneSlots:{S1:0},
     label:'',detail:'',labelOffset:0,ready:false,born:.3,subscriber:'S1',headerFill:'#EAE4F7',runtimeFill:'#EDE6F8',
@@ -538,6 +543,8 @@ function configureConcatWorkPanel(graph,scene,frame) {
   graph.trays=[{anchor:'observer',x:970,y:laneY,w:270,balls:true,max:4,gap:8,ball:{r:29.5,font:34.2,textFill:'#fff'}}];
   const works=scene.jobs.map((job,i)=>({id:'#'+(i+1),slot:i,value:job.value,color:['#6D4CD3','#B85D05','#087FAD','#B73770'][i%4],
     node:'inner'+i,edge:'inner'+i+'-op',queuedNode:graph.nodes.some(n=>n.id==='queued'+i)?'queued'+i:undefined,
+    ...(all?{value:job.value+'$',queueObservable:true,queueLabel:'W KOLEJCE · Observable'}:{}),
+    ...(job.ignored?{ignoredNode:'ignored'+i}:{}),
     duration:job.dur??job.end-job.start,stages:[{column:'source',edge:'inner'+i+'-op',progress:true}]}));
   const panel=createInnerWorkPanel({works,height:frame.height,large,y:large?228:180,
     columns:[{id:'source',label:'HTTP GET',fill:'#8FC9D4',runtime:'#E3F0F3'}]});
@@ -546,7 +553,7 @@ function configureConcatWorkPanel(graph,scene,frame) {
   for(const node of graph.nodes.filter(n=>n.workRow))Object.assign(node,{x:panel.x+panel.w/2,
     y:panel.rowsTop+node.slot*panel.rowHeight+panel.rowHeight/2,w:panel.w-32,h:panel.rowHeight});
   for(const edge of graph.edges.filter(e=>e.from.startsWith('inner')))edge.travel=1;
-  const byValue=new Map(scene.jobs.map((job,i)=>[job.value,works[i].color]));
+  const byValue=new Map(scene.jobs.flatMap((job,i)=>[[job.value,works[i].color],[job.value+'$',works[i].color]]));
   const emitted=new Map(graph.edges.filter(e=>e.from.startsWith('inner')).flatMap(e=>e.events.map(v=>
     [JSON.stringify([v.at,v.value]),byValue.get(v.execution)])));
   for(const edge of graph.edges)edge.events=edge.events.map(e=>({...e,
@@ -562,18 +569,20 @@ function overlapTail(scene) {
     if (!plan) continue;
     Object.assign(job,{dur:plan.dur,end:job.start+plan.dur});
     Object.assign(scene.rows[i+1],{
-      events:plan.offsets.map((offset,k)=>E(job.start+offset,job.value+(k+1),job.color)),
+      events:httpWorkSlides.has(scene.id)?[E(job.end,job.value,job.color)]:plan.offsets.map((offset,k)=>E(job.start+offset,job.value+(k+1),job.color)),
       spans:[B(job.start,job.end,job.value,'work',{duration:plan.dur})],completeAt:job.end});
   }
   const end = Math.max(...scene.jobs.map(j=>j.end));
   Object.assign(scene.rows.at(-1),{events:scene.rows.slice(1,-1).flatMap(r=>r.events).sort((a,b)=>a.at-b.at),completeAt:end});
   scene.duration = end+1.2;
   scene.captions.at(-1)[0] = end;
-  scene.timeline=[{type:'reception-order',event:{type:'deliver-next',edge:'op-observer',value:'D1'},caption:'D1 dotarło przed C2: mergeMap nie zachowuje kolejności wejść.'}];
+  scene.timeline=[httpWorkSlides.has(scene.id)?
+    {type:'reception-order',event:{type:'deliver-next',edge:'op-observer',value:'D'},caption:'D dotarło przed C: mergeMap nie zachowuje kolejności wejść.'}:
+    {type:'reception-order',event:{type:'deliver-next',edge:'op-observer',value:'D1'},caption:'D1 dotarło przed C2: mergeMap nie zachowuje kolejności wejść.'}];
 }
 
 export function configureFlatten(scene,mode) {
-  const all=mode==='concatAll',concatHttp=scene.id==='09-concatmap'&&mode==='concatMap';
+  const all=mode==='concatAll',httpWork=httpWorkSlides.has(scene.id),concatHttp=scene.id==='09-concatmap'&&mode==='concatMap';
   // Wspólne wejście i potencjalny czas pracy dla czterech strategii.
   const input=(all?[1,1.2,1.4]:[1,1.45,1.9,2.7]).map((at,i)=>({at,value:'ABCD'[i],dur:1.2,color:['a','b','c','a'][i]}));
   let end=0;
@@ -586,7 +595,7 @@ export function configureFlatten(scene,mode) {
   const result=[],rows=[R('wejście',input.map(v=>E(v.at,v.value,v.color)),[],{completeAt:3})];
   if(all)rows.push(R('map',input.map(v=>E(v.at,v.value+'$',v.color)),[],{completeAt:3}));
   for(const job of jobs) {
-    const ev=concatHttp?[E(job.end,job.value,job.color)]:job.ignored?[]:(mode==='switchMap'?[1.1]:[.65,1.05]).filter(offset=>job.start+offset<job.end).map((offset,i)=>E(job.start+offset,job.value+(mode==='switchMap'?'':i+1),job.color));
+    const ev=httpWork?(job.ignored||job.cancelled?[]:[E(job.end,job.value,job.color)]):job.ignored?[]:(mode==='switchMap'?[1.1]:[.65,1.05]).filter(offset=>job.start+offset<job.end).map((offset,i)=>E(job.start+offset,job.value+(mode==='switchMap'?'':i+1),job.color));
     result.push(...ev);
     rows.push(R(job.value+'$',ev,job.ignored?[]:[...(job.start>job.at?[B(job.at,job.start,job.value+(all?'$':''),'queue')]:[]),
       B(job.start,job.end,job.value,job.cancelled?'cancel':'work',{duration:job.dur})],{completeAt:job.ignored||job.cancelled?undefined:job.end}));
@@ -596,8 +605,8 @@ export function configureFlatten(scene,mode) {
   rows.push(R('wynik',result,[],{completeAt:completed}));
   const question=all?'A$ pracuje; B$ i C$ już istnieją. Ile requestów uruchomiono?':mode==='switchMap'?'B dotarło podczas HTTP A. Co stanie się z aktywnym requestem?':mode==='concatMap'?'B dotarło podczas A$. Czy B czeka jako wartość?':mode==='mergeMap'?'B dotarło podczas A$. Czy uruchomimy drugą pracę?':'B dotarło podczas A$. Czy powstanie B$?';
   const incoming=all?'projection-op':'source-op';
-  Object.assign(scene,{rows,jobs,operatorName:mode,http:concatHttp||mode==='switchMap',graph:flattenGraph,duration:completed+1.2,
-    code:concatHttp?'source$.pipe(concatMap(id => http.get(url(id))))':all?'source$.pipe(map(id => request$(id)), concatAll())':mode==='switchMap'?'id$.pipe(switchMap(id => http.get(`/api/users/${id}`)))':`source$.pipe(${mode}(makeInner$))`,
+  Object.assign(scene,{rows,jobs,operatorName:mode,http:httpWork||mode==='switchMap',graph:flattenGraph,duration:completed+1.2,
+    code:httpWork?(all?'source$.pipe(map(id => http.get(url(id))), concatAll())':`${mode==='switchMap'?'id$':'source$'}.pipe(${mode}(id => http.get(url(id))))`):all?'source$.pipe(map(id => request$(id)), concatAll())':mode==='switchMap'?'id$.pipe(switchMap(id => http.get(`/api/users/${id}`)))':`source$.pipe(${mode}(makeInner$))`,
     captions:[[0,all?'map tworzy zimne Observable; concatAll subskrybuje po kolei.':mode==='mergeMap'?'Te same A/B/C/D: C pracuje dłużej, D krócej — kolejność wyników może się zmienić.':mode==='switchMap'?'Każde wejście uruchamia HTTP; nowe ID odłącza poprzednią subskrypcję.':'Te same A, B, C, D i czas pracy: 1,2 s od subskrypcji.'],
       [1,'A uruchamia pierwszą pracę.'],[1.45,question],[1.9,all?'B$ i C$ czekają bez pracy HTTP.':mode==='switchMap'?'Unsubscribe przerywa klienta; dopiero potem rusza nowe HTTP.':mode==='exhaustMap'?'B i C pominięte. Ich inner nie powstają.':'Strategia operatora określa kolejkę lub współbieżność.'],
       [2.7,mode==='exhaustMap'?'A$ skończyło się. D może uruchomić nowy inner.':'Wartości z aktywnych inner trafiają do odbiorcy.'],[completed,'Outer i wymagane inner zakończyły się. Wynik: complete.']],
@@ -612,6 +621,8 @@ export function configureFlatten(scene,mode) {
     scene.captions[0][1]='Każde ID uruchamia jeden HTTP: jedna odpowiedź i complete. Kolejka czeka przed projekcją.';
     scene.playback.stops.find(s=>s.id==='active').caption='Pierwszy HTTP jest aktywny; po odpowiedzi zakończy się i zwolni miejsce.';
   }
+  if(httpWork&&all)scene.captions[1][1]='map tworzy A$; samo utworzenie Observable nie uruchamia HTTP.';
+  if(httpWork&&!concatHttp)scene.playback.stops.find(s=>s.id==='active').caption='Pierwszy HTTP jest aktywny; każda odpowiedź oznacza jedną wartość i complete.';
   if(mode==='mergeMap')overlapTail(scene);
   configureFlattenPlayback(scene);
 }

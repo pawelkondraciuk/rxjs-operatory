@@ -22,11 +22,18 @@ export function innerWorkPanelSnapshot(panel, records, births, time) {
   const rows = panel.works.flatMap(work => {
     const output = record(work.edge), born = births.get(work.node) ?? Infinity;
     const queuedAt = work.queuedNode ? births.get(work.queuedNode) : undefined;
+    const ignoredAt=work.ignoredNode?births.get(work.ignoredNode):undefined;
     const y = panel.rowsTop + work.slot * panel.rowHeight;
     const color = work.color || '#7457D9';
     const base = {id:work.id, slot:work.slot, value:work.value, color, y, h:panel.rowHeight};
-    if (time < born) {
-      return queuedAt !== undefined && time >= queuedAt ? [{...base,state:'queued',opacity:clamp((time-queuedAt)/.3)}] : [];
+    if(ignoredAt!==undefined) {
+      const opacity=clamp((time-ignoredAt)/.3);
+      return time>=ignoredAt&&opacity>0?[{...base,state:'ignored',opacity}]:[];
+    }
+    const waitingAt=work.queueObservable?born:queuedAt;
+    if (time < born || work.queueObservable&&time<output.start) {
+      return waitingAt !== undefined && time >= waitingAt ? [{...base,state:'queued',queueLabel:work.queueLabel,
+        existingObservable:Boolean(work.queueObservable),opacity:clamp((time-waitingAt)/.3)}] : [];
     }
     if (!output) return [];
     const stages = work.stages.map((stage, i) => {
@@ -39,7 +46,7 @@ export function innerWorkPanelSnapshot(panel, records, births, time) {
       return {...stage,index:i,state,hasProgress:Boolean(stage.progress),progress};
     });
     const establishing=time<Math.max(connected(output),...work.stages.map(s=>connected(record(s.edge||work.edge))));
-    const state=establishing?'subscribing':stateOf(output), reveal=clamp((time-born)/.3);
+    const state=establishing?'subscribing':stateOf(output), reveal=clamp((time-(work.queueObservable?output.start:born))/.3);
     // Kable i wartości pozostają w poziomym wierszu, aż do prawej granicy panelu.
     const wires = work.stages.map((stage,i) => {
       const r = record(stage.edge || work.edge), terminal = r.end;
@@ -55,7 +62,7 @@ export function innerWorkPanelSnapshot(panel, records, births, time) {
       return r.events.filter(e=>time>=e.at&&time<e.arrival).map(e=>({stage:i,value:e.value,color,
         progress:clamp((time-e.at)/(e.arrival-e.at))}));
     });
-    return [{...base, state, opacity:queuedAt===undefined?reveal:1, reveal:queuedAt===undefined?1:reveal, stages, wires, tokens}];
+    return [{...base,state,queueLabel:work.queueLabel,opacity:waitingAt===undefined?reveal:1,reveal:waitingAt===undefined?1:reveal,stages,wires,tokens}];
   });
   return {...panel, rows};
 }

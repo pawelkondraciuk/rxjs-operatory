@@ -162,14 +162,15 @@ function innerWorkPanel(panel,reduced=false) {
     svg+=`<rect x="${x+16}" y="${row.y}" width="${identifierW-8}" height="${rowHeight}" fill="#FFFBF4" stroke="#D2C9C4" stroke-width="1"/>`;
     svg+=`<rect x="${x+16}" y="${row.y}" width="7" height="${rowHeight}" fill="${identity}"/>`;
     svg+=text(x+32,cy,row.id+' · '+row.value,font,`style="text-anchor:start;fill:${identity};font-weight:600"`);
-    if(row.state==='queued') {
-      svg+=`<rect data-inner-placeholder="${row.state}" x="${left}" y="${row.y}" width="${right-left}" height="${rowHeight}" fill="#EEEBE9" stroke="#BEB4BF" stroke-width="2" stroke-dasharray="8 6"/>`;
-      svg+=text((left+right)/2,cy,'W KOLEJCE',font,'style="fill:#746B76;font-weight:600"');
+    if(row.state==='queued'||row.state==='ignored') {
+      const queued=row.state==='queued';
+      svg+=`<rect data-inner-placeholder="${row.state}" x="${left}" y="${row.y}" width="${right-left}" height="${rowHeight}" fill="${queued?'#EEEBE9':'#F2EDEA'}"${queued?' stroke="#BEB4BF" stroke-width="2" stroke-dasharray="8 6"':''}/>`;
+      svg+=text((left+right)/2,cy,queued?row.queueLabel||'W KOLEJCE':'pominięte',font,'style="fill:#746B76;font-weight:600"');
       svg+='</g>';continue;
     }
     if(row.reveal<1&&!reduced) {
       svg+=`<g opacity="${1-row.reveal}"><rect x="${left}" y="${row.y}" width="${right-left}" height="${rowHeight}" fill="#EEEBE9" stroke="#BEB4BF" stroke-dasharray="8 6"/>`;
-      svg+=text((left+right)/2,cy,'W KOLEJCE',font,'style="fill:#746B76;font-weight:600"')+'</g>';
+      svg+=text((left+right)/2,cy,row.queueLabel||'W KOLEJCE',font,'style="fill:#746B76;font-weight:600"')+'</g>';
     }
     svg+=`<g opacity="${reduced?1:row.reveal}">`;
     row.stages.forEach((stage,i)=>{

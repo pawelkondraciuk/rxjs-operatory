@@ -287,7 +287,7 @@ test('flatten strategies use identical inputs, queue values before projection an
   assert.equal(concat.snapshot.nodes.find(n=>n.id==='inner1').visible,false);
   const exhaust=player(ids[3]).api;exhaust.finish();
   assert.deepEqual(Array.from(exhaust.snapshot.nodes.filter(n=>n.inner),n=>n.id),['inner0','inner3']);
-  assert.deepEqual(Array.from(exhaust.snapshot.histories.find(h=>h.anchor==='observer').values,v=>v.value),['A1','A2','D1','D2']);
+  assert.deepEqual(Array.from(exhaust.snapshot.histories.find(h=>h.anchor==='observer').values,v=>v.value),['A','D']);
 });
 
 test('concatAll queues a reference only after it leaves map and arrives at concatAll',async()=>{
@@ -357,7 +357,7 @@ test('work panel shows queued input immediately and holds an aborted progress ba
   const sw=player('11-switchmap');sw.api.finish();
   const canceled=sw.api.snapshot.nodes.find(n=>n.id==='inner0');
   assert.equal(canceled.workState,'canceled');assert.ok(canceled.progress>0&&canceled.progress<1);
-  assert.match(sw.elements.get('.rx-stage').innerHTML,/data-execution="A"[^]*?ABORT \(klient\)/);
+  assert.match(sw.elements.get('.rx-stage').innerHTML,/data-inner-work="#1"[^]*?anulowane/);
   assert.equal(sw.api.snapshot.nodes.find(n=>n.id==='inner3').workState,'completed');
 });
 

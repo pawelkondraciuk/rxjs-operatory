@@ -577,7 +577,7 @@
 				<section id="08-map-strumienie" class="animation-slide" data-animation="08-map-strumienie">
 					<h2>A jeśli wartością jest Observable?</h2>
 					<div class="rx-player" aria-label="A jeśli wartością jest Observable?"></div>
-					<aside class="notes"><ul><li><strong>Pytanie:</strong> A$ pracuje, B$/C$ czekają — ile HTTP działa? Jeden.</li><li><strong>map:</strong> Tworzy zimne Observable; samo utworzenie nie uruchamia HTTP.</li><li><strong>concatAll:</strong> Subskrybuje po kolei: A$ → B$ → C$.</li><li><strong>Różnica:</strong> concatAll kolejkuje Observable; concatMap wartości przed projekcją.</li><li><strong>Przejście:</strong> To kluczowy pomost do concatMap na następnym slajdzie. Na oba przykłady przeznacz około 3 minut.</li></ul></aside>
+					<aside class="notes"><ul><li><strong>Pytanie:</strong> A$ pracuje, B$/C$ czekają — ile HTTP działa? Jeden.</li><li><strong>map:</strong> Kulka A zmienia się w A$: map tworzy zimne HTTP Observable, bez rozpoczęcia requestu. Wiersze #1 · A$, #2 · B$, #3 · C$ pojawiają się po dotarciu referencji do concatAll. W KOLEJCE · Observable oznacza już utworzony inner, ale bez portów, subskrypcji i progressu.</li><li><strong>concatAll:</strong> Subskrybuje po kolei: A$ → B$ → C$.</li><li><strong>Różnica:</strong> concatAll kolejkuje Observable; concatMap wartości przed projekcją.</li><li><strong>Przejście:</strong> To kluczowy pomost do concatMap na następnym slajdzie. Na oba przykłady przeznacz około 3 minut.</li></ul></aside>
 				</section>
 
 				<section id="09-concatmap" class="animation-slide" data-animation="09-concatmap">
@@ -589,19 +589,19 @@
 				<section id="10-mergemap" class="animation-slide" data-animation="10-mergemap">
 					<h2>mergeMap — Równocześnie</h2>
 					<div class="rx-player" aria-label="mergeMap — Równocześnie"></div>
-					<aside class="notes"><ul><li><strong>Pytanie:</strong> A$ trwa, przychodzi B — czeka czy startuje? Startuje.</li><li><strong>Równolegle:</strong> Każde wejście uruchamia inner; domyślnie bez limitu współbieżności.</li><li><strong>Przeplot:</strong> C$ trwa dłużej, D$ kończy wcześniej: C1 → D1 → D2 → C2.</li><li><strong>Wniosek:</strong> Odbiór według dotarcia; kolejność wejść nie gwarantuje kolejności wyników.</li></ul></aside>
+					<aside class="notes"><ul><li><strong>Pytanie:</strong> A$ trwa, przychodzi B — czeka czy startuje? Startuje.</li><li><strong>Równolegle:</strong> Każde wejście uruchamia własny HTTP i subskrypcję, z niezależnym postępem w tle wiersza. Jeden request daje jedną odpowiedź. Górny S1 jest wspólną subskrypcją wyniku, a #1–#4 to osobne prace wewnętrzne.</li><li><strong>Kolejność:</strong> C$ trwa dłużej, D$ kończy wcześniej: D dociera przed C. Odbiorca mieści A/B/D/C w kolorach prac i ze stałym rozmiarem kulek.</li><li><strong>Wniosek:</strong> Odbiór według dotarcia; kolejność wejść nie gwarantuje kolejności wyników.</li></ul></aside>
 				</section>
 
 				<section id="11-switchmap" class="animation-slide" data-animation="11-switchmap">
 					<h2>switchMap — Najnowsza subskrypcja</h2>
 					<div class="rx-player" aria-label="switchMap — Najnowsza subskrypcja"></div>
-					<aside class="notes"><ul><li><strong>Pytanie:</strong> B przychodzi podczas HTTP A — co stanie się z A$?</li><li><strong>Moment:</strong> Unsubscribe A$ → dopiero start B$; pasek A zatrzymany.</li><li><strong>Wynik:</strong> B/C/D zastępują poprzednika; tylko D dostarcza odpowiedź.</li><li><strong>Pułapka:</strong> ABORT klienta ≠ cofnięcie operacji serwera; unsubscribe ≠ complete.</li></ul></aside>
+					<aside class="notes"><ul><li><strong>Pytanie:</strong> B przychodzi podczas HTTP A — co stanie się z A$?</li><li><strong>Moment:</strong> Unsubscribe A$ → dopiero start B$; postęp A zatrzymany, wiersz szary i opisany jako anulowane. Brak impulsu complete; odsubskrybowany request nie emituje odpowiedzi.</li><li><strong>Wynik:</strong> B/C/D zastępują poprzednika; tylko D dostarcza odpowiedź.</li><li><strong>Pułapka:</strong> ABORT klienta ≠ cofnięcie operacji serwera; unsubscribe ≠ complete.</li></ul></aside>
 				</section>
 
 				<section id="12-exhaustmap" class="animation-slide" data-animation="12-exhaustmap">
 					<h2>exhaustMap — Jestem zajęty</h2>
 					<div class="rx-player" aria-label="exhaustMap — Jestem zajęty"></div>
-					<aside class="notes"><ul><li><strong>Pytanie:</strong> A$ trwa, przychodzi B — czy powstanie B$? Nie.</li><li><strong>Pominięcie:</strong> B i C bez projekcji, inner i kolejki.</li><li><strong>Moment:</strong> Po complete A$ dopiero nowe D uruchamia D$.</li><li><strong>Wniosek:</strong> Trwająca praca ma pierwszeństwo; wynik A1/A2, D1/D2.</li></ul></aside>
+					<aside class="notes"><ul><li><strong>Pytanie:</strong> A$ trwa, przychodzi B — czy powstanie B$? Nie.</li><li><strong>Pominięcie:</strong> B i C zachowują identyfikatory i stały napis „pominięte”, bez projekcji, inner, portów, progressu i kolejki.</li><li><strong>Moment:</strong> Po complete A$ dopiero nowe D uruchamia D$.</li><li><strong>Wniosek:</strong> Trwająca praca ma pierwszeństwo; wynik A, D — po jednej odpowiedzi HTTP.</li></ul></aside>
 				</section>
 
 

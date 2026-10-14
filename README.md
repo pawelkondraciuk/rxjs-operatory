@@ -318,9 +318,9 @@ Subject ma pionowe rozgałęzienie do dwóch odbiorców. Log źródła kończy z
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
-| 08-map-strumienie | A jeśli wartością jest Observable? | `map(id => request$(id)) → concatAll()` |
+| 08-map-strumienie | A jeśli wartością jest Observable? | `source$.pipe(map(id => http.get(url(id))), concatAll())` |
 
-**Na bloczkach:** source$ → map → concatAll → Odbiorca. Środkowy panel bez nagłówka pokazuje A$, B$, C$ w stałych miejscach. Utworzone B$ i C$ czekają bez uruchomionego HTTP; A$ ma pasek pracy. Kolejne complete uruchamiają następny inner. Wynik: A1, A2, B1, B2, C1, C2.
+**Na bloczkach:** source$ → map → concatAll → Odbiorca. Góra ma jeden główny tor S1, pastelowe nagłówki i execution lanes. Kulka A zmienia się w map w A$ — zimne Observable, nie rozpoczęty request. Dolny panel HTTP GET ma stałe wiersze #1 · A$, #2 · B$, #3 · C$. Utworzone B$ i C$ mają W KOLEJCE · Observable, bez portów, subskrypcji i postępu. Kolejne complete zwalniają miejsce na następny HTTP. Jeden request daje jedną odpowiedź; wynik A, B, C trafia do kompaktowego odbiorcy w dużych kolorowych kulkach z białymi literami.
 
 **Speaker notes:**
 
@@ -352,15 +352,15 @@ Subject ma pionowe rozgałęzienie do dwóch odbiorców. Log źródła kończy z
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
-| 10-mergemap | mergeMap — Równocześnie | `source$.pipe(mergeMap(makeInner$))` |
+| 10-mergemap | mergeMap — Równocześnie | `source$.pipe(mergeMap(id => http.get(url(id))))` |
 
-**Na bloczkach:** source$ → mergeMap → Odbiorca oraz panel A$/B$/C$/D$. Te same wejścia A/B/C/D; A i B emitują po kolei, C pracuje 1,9 s, a D 0,9 s. C i D się nakładają, D kończy przed C. Odbiór pokazuje A1 A2 / B1 B2 / C1 D1 / D2 C2 w kolejności dotarcia; complete dotyczy każdego inner osobno.
+**Na bloczkach:** source$ → mergeMap → kompaktowy Odbiorca, jeden główny tor S1. Szeroki panel HTTP GET ma przylegające wiersze #1–#4, osobne porty, kolory i postęp w tle. Każde wejście A/B/C/D natychmiast tworzy i subskrybuje HTTP, bez kolejki. Każdy request emituje jedną odpowiedź i complete. C pracuje 1,9 s, a D 0,9 s: nakładają się, lecz późniejszy D kończy przed C. Odbiorca mieści wszystkie cztery odpowiedzi A, B, D, C w kolejności dotarcia.
 
 **Speaker notes:**
 
 - **Pytanie:** A$ trwa, przychodzi B — czeka czy startuje? Startuje.
 - **Równolegle:** Każde wejście uruchamia inner; domyślnie bez limitu współbieżności.
-- **Przeplot:** C$ trwa dłużej, D$ kończy wcześniej: C1 → D1 → D2 → C2.
+- **Kolejność:** C$ trwa dłużej, D$ kończy wcześniej: odpowiedź D dociera przed C.
 - **Wniosek:** Odbiór według dotarcia; kolejność wejść nie gwarantuje kolejności wyników.
 
 ### switchMap — `11-switchmap`
@@ -369,9 +369,9 @@ Subject ma pionowe rozgałęzienie do dwóch odbiorców. Log źródła kończy z
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
-| 11-switchmap | switchMap — Najnowsza subskrypcja | ``id$.pipe(switchMap(id => http.get(`/api/users/${id}`)))`` |
+| 11-switchmap | switchMap — Najnowsza subskrypcja | `id$.pipe(switchMap(id => http.get(url(id))))` |
 
-**Na bloczkach:** id$ → switchMap → Odbiorca; stałe wiersze A$/B$/C$/D$; o HTTP mówi podpis na dole. Postój przy B następuje, gdy HTTP A nadal pracuje. Dalej: unsubscribe A, zatrzymany pasek i „ABORT (klient)”, następnie start B. Kolejne wejścia anulują B i C; tylko D dostarcza odpowiedź i complete.
+**Na bloczkach:** id$ → switchMap → kompaktowy Odbiorca, jeden tor S1. Panel HTTP GET ma stałe, przylegające wiersze #1–#4. Postój przy B następuje, gdy HTTP A nadal pracuje. Dalej: unsubscribe A, szary wiersz „anulowane”, zatrzymany postęp i przygaszony kabel bez impulsu complete, następnie start B. Kolejne wejścia anulują B i C; tylko D dostarcza jedną odpowiedź i complete. Nagłówki definicji się nie zmieniają.
 
 **Speaker notes:**
 
@@ -386,16 +386,16 @@ Subject ma pionowe rozgałęzienie do dwóch odbiorców. Log źródła kończy z
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
-| 12-exhaustmap | exhaustMap — Jestem zajęty | `source$.pipe(exhaustMap(makeInner$))` |
+| 12-exhaustmap | exhaustMap — Jestem zajęty | `source$.pipe(exhaustMap(id => http.get(url(id))))` |
 
-**Na bloczkach:** source$ → exhaustMap → Odbiorca; panel A$ i D$. B oraz C są oznaczone jako pominięte wejścia: ich inner nie powstają. D pojawia się już po zakończeniu A. Wynik A1, A2, D1, D2.
+**Na bloczkach:** source$ → exhaustMap → kompaktowy Odbiorca, tor S1 oraz panel HTTP GET. B i C podczas A zachowują identyfikatory i stałe oznaczenie „pominięte”, bez utworzonego HTTP, portów, kolejki i subskrypcji. Wiersze mają stałe sloty; D startuje po complete A. Każdy uruchomiony HTTP daje jedną odpowiedź; wynik A, D. Zakończone wiersze są jasnozielone z przygaszonymi połączeniami.
 
 **Speaker notes:**
 
 - **Pytanie:** A$ trwa, przychodzi B — czy powstanie B$? Nie.
 - **Pominięcie:** B i C bez projekcji, inner i kolejki.
 - **Moment:** Po complete A$ dopiero nowe D uruchamia D$.
-- **Wniosek:** Trwająca praca ma pierwszeństwo; wynik A1/A2, D1/D2.
+- **Wniosek:** Trwająca praca ma pierwszeństwo; wynik A, D — po jednej odpowiedzi na request.
 
 ### source$: complete — `12a-complete`
 
@@ -877,22 +877,24 @@ Scena `01-tytul` istnieje w katalogu, ale nie jest podpięta do slajdów; widocz
 
 ## Weryfikacja i podgląd
 
-Wszystkie animowane warianty korzystają z jednego kompilatora, renderera SVG i odtwarzacza. Panel prac wewnętrznych nie ma kresek subskrypcji do wierszy. Kolejka jest szara od pierwszej klatki. Panel jest wspólnym prymitywem: pasek pracy, complete, kolejka i anulowanie mają również opis tekstowy. Na migrowanych slajdach diagram zajmuje większą część ekranu, a podpis jest w dolnej stopce; w pozostałych scenach zachowano dotychczasowe proporcje.
+Wszystkie animowane warianty korzystają z jednego kompilatora, renderera SVG i odtwarzacza. Panel prac wewnętrznych ma lokalne poziome połączenia, bez stałych przewodów między górą a dołem slajdu. Kolejka jest szara od pierwszej klatki. Panel jest wspólnym prymitywem: pasek pracy, complete, kolejka i anulowanie mają również opis tekstowy. Na migrowanych slajdach diagram zajmuje większą część ekranu, a podpis jest w dolnej stopce; w pozostałych scenach zachowano dotychczasowe proporcje.
 
 Podgląd developerski: /work/animation-review.html (lokalna konfiguracja Vite ma base `/`; build ma `/rxjs-operatory/`) — wybór sceny i formatu (4:3/16:9), READY, pytanie, FINISHED i audyt granic tekstu. Uruchom npm test oraz npm run build po zmianach animacji. Próba na fizycznym projektorze i próba 30–35 minut części właściwej wymagają prelegenta; otwarcie i dogrywka są dodatkowo.
 
 ## Zaakceptowany układ rodziny *Map
 
-Slajdy 08–12, oba warianty `12a-complete` i `13-limit` korzystają teraz z tego samego grafu `flattenGraph` co prototypy. Źródło i odbiorca stoją na końcach; operator jest wyśrodkowany. Z wyjątkiem concatMap (opis poniżej), pod nimi są trzy boxy bez nagłówków: emisje w jednej kolumnie, stałe wiersze prac oraz odebrane wartości w dwóch kolumnach, w kolejności dotarcia.
+Slajdy MAIN 08–12 korzystają ze wspólnego adaptera `configureHttpWorkPanel` na bazie `flattenGraph`. Góra pokazuje jeden S1 z execution lanes, pastelowymi nagłówkami i kolorowymi poziomymi połączeniami. Źródło nie trzyma historii emisji; do czterech odpowiedzi HTTP mieści się w kompaktowym odbiorcy. Kulki mają białe litery i pełną paletę A indygo #6D4CD3 / B pomarańcz #B85D05 / C niebieski #087FAD / D malinowy #B73770. Tę samą paletę mają porty, paski i linie prac; progress jest łagodniejszy, complete jasnozielone.
 
-**Wyjątek: concatMap — Po kolei.** Tylko `09-concatmap` ma górny pipeline w stylu Cold/share: jeden S1 z execution lanes, kolorowymi portami i stałymi nagłówkami definicji. Źródło nie trzyma historii emisji; cztery odpowiedzi HTTP są kulkami wewnątrz odbiorcy. Dół zajmuje ponad 90% szerokości diagramu; nagłówek PRACE WEWNĘTRZNE jest oddzielony poziomą linią, bez kontenera i przewodów między poziomami. Wiersze nie mają pionowych odstępów, completed zostaje zielonkawe z przygaszoną linią; kolejka to pełnoszeroki placeholder. Wynik przechodzi do prawej granicy dolnego panelu, a dopiero potem wychodzi z concatMap. Kontrola: #1 aktywny z #2/#3 w kolejce oraz #1 complete, #2 aktywny, #3 nadal czeka. Pozostałe slajdy i prototypy zachowują poprzedni wygląd; catchError jest odłożony.
+Dół zajmuje ponad 90% szerokości diagramu: nagłówek PRACE WEWNĘTRZNE, poziomy separator, wspólny nagłówek HTTP GET i przylegające wiersze prac. Nie ma zaokrąglonego kontenera ani przewodów między poziomami. Wynik wychodzi do prawej granicy panelu, a dopiero potem z górnego operatora do odbiorcy. Każdy zakończony request daje jedną odpowiedź; anulowany nie daje complete. concatAll kolejkuje już utworzone Observable (#2 · B$, W KOLEJCE · Observable); concatMap kolejkuje wartości przed projekcją. mergeMap uruchamia równoległe wiersze i zachowuje odpowiedź D przed C. switchMap szarzy anulowane prace bez terminalnego impulsu. exhaustMap zachowuje wiersze pominiętych wejść z identyfikatorami i napisem „pominięte”, bez inner i kolejki.
 
-W concatMap B pojawia się jako wartość W KOLEJCE; dopiero po complete poprzednika powstaje B$ i jego subskrypcja. concatAll pokazuje istniejące B$ i C$ czekające bez subskrypcji; wpis kolejki wchodzi z fade-in dopiero, gdy Observable utworzone przez map dotrze do concatAll. Wiersze zakończone pozostają zielone; pominięte wejścia exhaustMap nie tworzą wykonań. Standardowa siatka ma cztery miejsca; przykład limitu używa pięciu. Kapsułki emisji i odbioru wchodzą przez 0,3 s. Pasek pracy rośnie również podczas przelotu wartości; wynik wraca do operatora niewidocznie, a widoczna kulka wychodzi z operatora.
+Dodatki 12a/13-limit i prototypy QA zachowują poprzednie modele oraz geometrię. Cold/share i catchError również pozostają bez zmian; dodatkowa obsługa catchError w nowym panelu jest odłożona.
+
+W concatMap B pojawia się jako wartość W KOLEJCE; dopiero po complete poprzednika powstaje B$ i jego subskrypcja. concatAll pokazuje istniejące B$ i C$ czekające bez subskrypcji; wpis kolejki wchodzi z fade-in dopiero, gdy Observable utworzone przez map dotrze do concatAll. Wiersze zakończone pozostają zielone; pominięte wejścia exhaustMap nie tworzą wykonań. Standardowa siatka ma cztery miejsca; przykład limitu używa pięciu. Kapsułki emisji i odbioru wchodzą przez 0,3 s. Postęp jest wyliczany w czasie ilustracji; w MAIN 08–12 kulka najpierw przechodzi po lokalnym wyjściu do prawej granicy panelu, a potem wychodzi z operatora. Dodatki i prototypy zachowują krótki, niewidoczny powrót.
 
 Liczniki uruchomionych i aktywnych inner korzystają ze stanu faktycznych subskrypcji. Sceny z tej rodziny trzymają nieruchomy wynik również w EXTRAS. Nawigacja i postoje Reveal rodziny flatteningu pozostają dotychczasowe. Kontroler `stages` działa w podglądzie prototypów oraz w przebudowanym wprowadzeniu (04, wszystkie 05, cold 06a, oba 07 i oba 20). Spacja pauzuje/wznawia także pozostałe animacje, bez zmiany natywnej obsługi statycznego otwarcia. Zachowano identyfikatory i działające demonstracje; kolejność części właściwej odpowiada opisanej wyżej narracji 30–35 minut.
 
-Na migrowanych slajdach diagram zajmuje 480 px wysokości. Większe kafelki mają 76 px wysokości, a odstęp do paneli 60 px; wiersze prac są rozdzielone o 20 px, z wyjątkiem przylegających wierszy nowego concatMap. Mniejszy podpis i liczniki są w stopce przy dole slajdu. U pokazuje kontrolki w miejscu stopki; ukrycie kontrolek przywraca podpis.
+Na migrowanych slajdach diagram zajmuje 480 px wysokości. Większe kafelki mają 76 px wysokości, a odstęp do paneli 60 px; wiersze prac w dodatkach są rozdzielone o 20 px, a MAIN 08–12 ma przylegające wiersze nowego panelu. Mniejszy podpis i liczniki są w stopce przy dole slajdu. U pokazuje kontrolki w miejscu stopki; ukrycie kontrolek przywraca podpis.
 
-W `map + concatAll` oba kafelki stoją blisko siebie nad panelem prac: map wyrównuje się do jego lewej krawędzi, concatAll do prawej. Oba mają szerokość 240 px, z 40 px przerwy między nimi.
+W `map + concatAll` górny pipeline ma cztery poziome kolumny: source$ → map → concatAll → odbiorca. map ma krótki przystanek kulki A → A$, bez czasowego progressu. Oczekujące wiersze pojawiają się dopiero po dotarciu A$/B$/C$ do concatAll.
 
-Źródło i operatory w migrowanej rodzinie zmieniają tło na zielone przy własnym complete. Źródło może zakończyć się wcześniej; *Map pozostaje aktywne aż do zakończenia wymaganych inner i kolejki. Nieobsłużony error daje czerwony operator, a odsubskrybowane źródło zachowuje swój kolor.
+W MAIN 08–12 przy complete zielony staje się execution lane, a nagłówek definicji pozostaje pastelowy. Pozostałe migrowane sceny zmieniają tło całego kafelka przy własnym complete. Źródło może zakończyć się wcześniej; *Map pozostaje aktywne aż do zakończenia wymaganych inner i kolejki. Nieobsłużony error daje czerwony operator, a odsubskrybowane źródło zachowuje swój kolor.

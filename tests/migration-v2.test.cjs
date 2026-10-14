@@ -13,17 +13,14 @@ async function family(){
 }
 const ids=['08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12a-complete','12a-complete-2','13-limit'];
 const history=(f,id)=>Array.from(f.histories.find(h=>h.anchor===id).values,e=>e.value);
-test('migrated slides share accepted prototype geometry and retain native Reveal playback',async()=>{
+test('HTTP slides share the accepted panel and retain native Reveal playback',async()=>{
  const {scenes,compile,prototypes}=await family();
  for(const [id,mode]of [['09-concatmap','concatMap'],['10-mergemap','mergeMap'],['11-switchmap','switchMap'],['12-exhaustmap','exhaustMap']]){
   const real=scenes.get(id),prototype={...prototypes.find(s=>s.id==='prototype-'+mode),format:real.format},c=compile(real),p=compile(prototype);
-  const shape=f=>JSON.stringify({nodes:f.nodes.map(n=>[n.id,n.x,n.y,n.w,n.h]),panels:f.panels,histories:f.histories.map(h=>[h.anchor,h.x,h.y,h.w,h.columns,h.lines,h.lineStep])});
-  if(id==='09-concatmap'){
-   assert.equal(c.snapshot(0).panels[0].frameless,true);
-   assert.equal(p.snapshot(0).innerWorkPanels,undefined); // Prototypy i inne slajdy pozostają bez zmian.
-  }else assert.equal(shape(c.snapshot(0)),shape(p.snapshot(0)),id);
-  if(id==='09-concatmap')assert.deepEqual(history(c.snapshot(c.duration),'observer'),['A','B','C','D']);
-  else assert.deepEqual(history(c.snapshot(c.duration),'observer'),history(p.snapshot(p.duration),'observer'));
+  assert.equal(c.snapshot(0).panels[0].frameless,true);
+  assert.equal(p.snapshot(0).innerWorkPanels,undefined); // Prototypy pozostają przy poprzednich modelach.
+  const expected={concatMap:['A','B','C','D'],mergeMap:['A','B','D','C'],switchMap:['D'],exhaustMap:['A','D']}[mode];
+  assert.deepEqual(history(c.snapshot(c.duration),'observer'),expected);
   assert.equal(real.playback.controller,undefined);assert.equal(real.playback.entry,'manual');
   assert.deepEqual(Array.from(c.stops,s=>s.id),['subscribe','first','active','question']);
  }
@@ -43,19 +40,20 @@ test('real concatMap queue is visible at the question, while concatAll queues ex
  const done=render(c.snapshot(c.duration));assert.equal((done.match(/data-inner-state="completed"/g)||[]).length,4);
  assert.match(done,/PRACE WEWNĘTRZNE/);assert.doesNotMatch(done,/data-queue=|EMISJE|ODBIÓR/);
  const all=compile(scenes.get('08-map-strumienie')),f=all.snapshot(all.stops.at(-1).time),svg=render(f);
- assert.equal(f.executionCounts.started,1);assert.match(svg,/<title>B\$ · ◷ w kolejce<\/title>/);
- assert.match(svg,/<title>C\$ · ◷ w kolejce<\/title>/);assert.equal(f.executions.some(e=>e.id==='B'),false);
+ assert.equal(f.executionCounts.started,1);assert.match(svg,/W KOLEJCE · Observable/);
+ assert.deepEqual(Array.from(f.innerWorkPanels[0].rows.filter(r=>r.state==='queued'),r=>r.value),['B$','C$']);
+ assert.equal(f.executions.some(e=>e.id==='B'),false);
 });
 test('real mergeMap demonstrates chronological reception and C/D overlap',async()=>{
  const {scenes,compile}=await family(),c=compile(scenes.get('10-mergemap')),f=c.snapshot(c.duration);
- assert.deepEqual(history(f,'observer'),['A1','A2','B1','B2','C1','D1','D2','C2']);
+ assert.deepEqual(history(f,'observer'),['A','B','D','C']);
  const sub=c.events.find(e=>e.type==='inner-subscribe'&&e.execution==='D');
  const overlap=c.snapshot(sub.at+.01).executions;assert.equal(overlap.find(e=>e.id==='C').state,'running');assert.equal(overlap.find(e=>e.id==='D').state,'running');
  const terminal=e=>c.events.find(x=>x.type==='stream-complete'&&x.execution===e).at;
- const delivery=c.events.find(e=>e.type==='deliver-next'&&e.node==='observer'&&e.value==='D1');
+ const delivery=c.events.find(e=>e.type==='deliver-next'&&e.node==='observer'&&e.value==='D');
  assert.equal(c.events.find(e=>e.type==='reception-order').at,delivery.at);
- assert.match(c.snapshot(delivery.at).caption,/D1 dotarło przed C2/);
- assert.ok(terminal('D')<terminal('C'));assert.equal(f.histories.find(h=>h.anchor==='observer').columns,2);
+ assert.match(c.snapshot(delivery.at).caption,/D dotarło przed C/);
+ assert.ok(terminal('D')<terminal('C'));assert.equal(f.histories.find(h=>h.anchor==='observer').max,4);
 });
 test('complete outer waits for remaining work; concurrency limit never exceeds three subscriptions',async()=>{
  const {scenes,compile}=await family();
@@ -95,7 +93,7 @@ test('source and flattening operator turn green at their own complete, not toget
    assert.notEqual(c.snapshot(end.at-.001).nodes.find(n=>n.id===nodeId).fill,'#087438');
    const ended=c.snapshot(end.at).nodes.find(n=>n.id===nodeId);
    assert.equal(ended.notification,'complete');
-   if(id==='09-concatmap'){
+   if(c.snapshot(0).innerWorkPanels){
     assert.equal(ended.fill,n.fill);assert.equal(ended.laneStates[0].state,'completed');
     assert.equal(final.nodes.find(n=>n.id===nodeId).fill,n.fill);
    }else{assert.equal(ended.fill,'#087438');assert.equal(final.nodes.find(n=>n.id===nodeId).fill,'#087438');}
