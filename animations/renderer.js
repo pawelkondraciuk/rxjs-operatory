@@ -167,12 +167,16 @@ export function renderScene(frame,options={}) {
     svg+=`<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="12" fill="#f1eee7" stroke="#958875" stroke-width="2"/>`;
     if(p.label)svg+=text(p.x+18,p.y+18,p.label,20*k,'style="text-anchor:start;fill:#43525b"');
   }
-  for(const t of frame.laneTrails||[])
-    svg+=`<path data-lane-trail="${esc(t.id)}" data-trail-kind="${t.kind}" d="${t.points.map((p,i)=>(i?'L':'M')+p.join(' ')).join('')}" fill="none" stroke="${t.color}" stroke-width="${3*k}" opacity="${t.opacity}"${t.kind==='unsubscribe'?` stroke-dasharray="${8*k} ${6*k}"`:''}/>`;
-  for(const e of frame.edges) if(e.visible&&!(reduced&&e.phase==='unsubscribe')) {
+  for(const e of frame.edges) if(e.visible&&(e.subscriber||!(reduced&&e.phase==='unsubscribe'))) {
     const d=e.points.map((p,i)=>(i?'L':'M')+p.join(' ')).join('');
-    const offset=reduced?(e.phase==='subscribed'?0:-1):e.offset;
-    svg+=`<path data-connection="${esc(e.id)}" data-phase="${e.phase}" d="${d}" fill="none" stroke="${e.color}" stroke-width="6" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${offset}"/>`;
+    // Kabel toru (subscriber) zostaje po zakończeniu jako historia; ruch ograniczony pokazuje go od razu w pełni.
+    const offset=e.subscriber?(reduced?0:e.offset):reduced?(e.phase==='subscribed'?0:-1):e.offset,width=e.width||6;
+    svg+=`<path data-connection="${esc(e.id)}" data-phase="${e.phase}" d="${d}" fill="none" stroke="${e.color}" stroke-width="${width}" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${offset}"${e.opacity!==undefined&&e.opacity<1?` opacity="${+e.opacity.toFixed(3)}"`:''}/>`;
+    // Impuls complete/error: krótki odcinek w kolorze stanu biegnie od nadawcy do odbiorcy.
+    if(e.pulse&&!reduced) {
+      const len=.18,at=e.pulse.at*(1+len)-len;
+      svg+=`<path data-pulse="${esc(e.id)}" d="${d}" fill="none" stroke="${e.pulse.color}" stroke-width="${width*2}" stroke-linecap="round" pathLength="1" stroke-dasharray="${len} 2" stroke-dashoffset="${(-at).toFixed(4)}"/>`;
+    }
   }
   for(const n of frame.nodes) if(n.visible&&!inExecutionPanel(n)) {
     const opacity=reduced?1:n.opacity;
@@ -198,21 +202,22 @@ export function renderScene(frame,options={}) {
     else if(n.status)svg+=text(n.x,n.y+n.h/2+21*k,n.status,20*k,failed?'style="fill:#b51e2e"':'');
     if(n.showProgress)svg+=`<rect data-work-progress="${n.progress}" x="${n.x-n.w/2}" y="${n.y+n.h/2-9}" width="${n.w*n.progress}" height="9" fill="#132f42"/>`;
     if(n.transform)svg+=text(n.x,n.y+(n.transformOffset??n.h/2+52*k),n.transform,28*k,'data-transformation="true"');
-    // Wiersze wykonań pod nagłówkiem definicji (rosnący kafelek albo odbiorca z defH): separator i pasek koloru toru.
-    // Stan wykonania to tło wiersza, bez ikon: trwa — naturalne tło kafelka, complete — subtelna zieleń z krótkim
-    // rozbłyskiem, error — subtelna czerwień, unsubscribe — szary, przygaszony wiersz. Nagłówek definicji się nie zmienia.
+    // Wiersze wykonań pod nagłówkiem definicji (rosnący kafelek albo odbiorca z defH): bazowe tło runtime (jaśniejszy
+    // odcień kafelka), separator 1 px i pasek koloru toru — tożsamość subskrypcji zostaje w każdym stanie.
+    // Stan to tło wiersza, bez ikon: trwa — tło bazowe, complete/error — delikatna zieleń/czerwień z krótkim
+    // rozbłyskiem akcentu, unsubscribe — szary, przygaszony wiersz. Nagłówek definicji się nie zmienia.
     const rows=n.laneRows||(n.defH&&n.subscriber?[{subscriber:n.subscriber,color:n.laneColor,
       top:n.y-n.h/2+n.defH,h:n.h-n.defH,growth:1}]:[]);
     const stateOf=id=>(n.laneStates||[]).find(l=>l.subscriber===id);
+    const rowTint={completed:'#DDF1E1',error:'#F7D9D9',cancelled:'#E7E8E8'},rowAccent={completed:'#26804E',error:'#C54848'};
     for(const row of rows) {
       const left=n.x-n.w/2,h=Math.max(0,row.h*row.growth-1),lane=stateOf(row.subscriber),state=lane?.state||'running';
-      const tint={completed:'#d6eedc',error:'#f6d6da',cancelled:'#dfe3e6'}[state],flash={completed:'#8fd3a3',error:'#ee9aa3'}[state];
-      const glow=flash&&!reduced?.85*(1-clamp((frame.time-lane.since)/.7)):0;
+      const glow=rowAccent[state]&&!reduced?.28*(1-clamp((frame.time-lane.since)/.6)):0;
       svg+=`<g data-lane-row="${esc(row.subscriber)}" data-row-state="${state}" opacity="${row.growth}">`;
-      if(tint)svg+=`<rect x="${left+1}" y="${row.top}" width="${n.w-2}" height="${h}" fill="${tint}"/>`;
-      if(glow>0)svg+=`<rect data-row-flash="${state}" x="${left+1}" y="${row.top}" width="${n.w-2}" height="${h}" fill="${flash}" opacity="${glow.toFixed(3)}"/>`;
-      svg+=`<rect x="${left+1}" y="${row.top}" width="${7*k}" height="${h}" fill="${row.color}"${state==='cancelled'?' opacity=".5"':''}/>`;
-      svg+=`<path d="M${left} ${row.top}H${left+n.w}" stroke="#26343d" stroke-opacity=".45" stroke-width="1.5"/></g>`;
+      svg+=`<rect x="${left+1}" y="${row.top}" width="${n.w-2}" height="${h}" fill="${rowTint[state]||n.runtimeFill||'#fff'}"${rowTint[state]||n.runtimeFill?'':' fill-opacity=".35"'}/>`;
+      if(glow>0)svg+=`<rect data-row-flash="${state}" x="${left+1}" y="${row.top}" width="${n.w-2}" height="${h}" fill="${rowAccent[state]}" opacity="${glow.toFixed(3)}"/>`;
+      svg+=`<rect x="${left+1}" y="${row.top}" width="${6*k}" height="${h}" fill="${row.color}"${state==='cancelled'?' opacity=".45"':''}/>`;
+      svg+=`<path d="M${left} ${row.top}H${left+n.w}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/></g>`;
     }
     // Tory subskrybentów: stan wykonania jako mały element w kafelku definicji, gniazda na krawędziach.
     // Hub (np. share): wspólne wejście bez własnego wiersza rozwidla się do wierszy wyjść, przesuniętych w prawo.
@@ -254,7 +259,7 @@ export function renderScene(frame,options={}) {
       svg+=`<path data-hub-link="${esc(input.subscriber)}-${esc(lane.subscriber)}" d="M${left} ${input.y}C${left+bend} ${input.y} ${chipLeft-bend} ${lane.y} ${chipLeft} ${lane.y}" fill="none" stroke="${input.color}" stroke-width="${3*k}" opacity="${Math.min(input.opacity,lane.opacity)}"/>`;
     }
     for(const dot of n.socketDots||[])
-      svg+=`<circle data-socket="${dot.side}" data-subscriber="${esc(dot.subscriber)}" cx="${dot.side==='out'?n.x+n.w/2:n.x-n.w/2}" cy="${dot.y}" r="${13*k}" fill="${dot.color}" stroke="#fff" stroke-width="3" opacity="${dot.opacity}"/>`;
+      svg+=`<circle data-socket="${dot.side}" data-subscriber="${esc(dot.subscriber)}" cx="${dot.side==='out'?n.x+n.w/2:n.x-n.w/2}" cy="${dot.y}" r="${dot.r??13*k}" fill="${dot.color}" stroke="#fff" stroke-width="3" opacity="${dot.opacity}"/>`;
     svg+='</g>';
   }
   for(const panel of panels)svg+=executionPanel(frame,panel);

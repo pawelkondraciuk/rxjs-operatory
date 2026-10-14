@@ -36,9 +36,10 @@ export function prepareSlides(scenes, { format = '4:3' } = {}) {
         metrics:[original.metrics[after?1:0]],
       }));
     } else if (original.id === '04a-dwa-tory') {
-      // Tory wykonania: cold (dwa tory przez cały pipeline) i share() za map (jeden tor do share, dwa wyjścia).
-      variants = ['cold', 'share'].map(mode => ({ ...original, lanesMode: mode,
-        title: mode === 'share' ? 'share() za map: jedno HTTP, dwa wyjścia' : 'Cold: jedna definicja, dwa wykonania' }));
+      // Tory wykonania: cold (dwa tory przez cały pipeline), share() za map (jeden tor do share, dwa wyjścia) i share z unsubscribe A.
+      variants = ['cold', 'share', 'share-unsub'].map(mode => ({ ...original, lanesMode: mode,
+        title: { cold: 'Cold: jedna definicja, dwa wykonania', share: 'share() za map: jedno HTTP, dwa wyjścia',
+          'share-unsub': 'share(): A rezygnuje, B zostaje' }[mode] }));
     } else if (original.id === 'b04-catcherror') {
       variants = [false,true].map(inside => ({ ...original, catchInside:inside }));
     } else if (original.id === '16-czas-cztery') {

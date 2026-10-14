@@ -8,6 +8,8 @@ export function createPlayer(root, scene, controls = {}) {
 const engine=compileScene(scene), playbackDuration=engine.duration;
 root.classList?.toggle('rx-expanded',scene.playerLayout==='expanded');
 root.classList?.toggle('rx-function',scene.playerLayout==='function');
+// Scena może mieć własny kolor tekstu (np. tory wykonania: #26323B); reszta korzysta z domyślnego --ink.
+if(scene.ink)root.style?.setProperty('--ink',scene.ink);
 const staged=scene.playback?.controller==='stages', listeners=new Set();
 let controller;
 let time=0, running=false, previous=null, lastPaint=-Infinity, animationFrame=null, stopAt=null;

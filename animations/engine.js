@@ -178,23 +178,33 @@ export function compileScene(scene) {
     const finish=Math.max(r.end.at,...r.events.filter(e=>e.at<=r.end.at).map(e=>e.arrival));
     return {out:finish,in:finish+duration};
   };
-  // Zakończony tor zostaje przygaszony (trail): gniazda i cienka linia pokazują historię wykonania obok trwających torów.
-  const trail=.4;
+  // Zakończony tor zostaje jako przygaszona historia: kabel i gniazda w kolorze toru z mniejszym kryciem.
+  const trail=.35,laneAccent={complete:'#26804E',error:'#C54848'},laneIdle='#808890';
   const presence=(time,shown,hidden)=>Math.min(clamp((time-shown)/fadeDuration),1-(1-trail)*clamp((time-hidden)/fadeDuration));
-  function laneTrails(time) {
-    return laneRecords.filter(r=>r.end).flatMap(r=>{
-      const duration=r.end.duration||transitionDuration;
-      const from=r.end.kind==='unsubscribe'?r.end.at:Math.max(r.end.at,...r.events.filter(e=>e.at<=r.end.at).map(e=>e.arrival));
-      const opacity=trail*clamp((time-from)/duration);
-      return opacity>0?[{id:r.id,subscriber:r.subscriber,kind:r.end.kind,points:r.points||geometry(r.a,r.b),color:subscriberColor(r.subscriber),opacity}]:[];
-    });
+  // Kabel toru: subscribe rysuje go od odbiorcy; complete/error przebiega krótkim impulsem w kolorze stanu do odbiorcy,
+  // potem kabel wraca do koloru toru z mniejszym kryciem. Unsubscribe bez impulsu: kabel szarzeje i gaśnie.
+  function laneEdgeState(r,time) {
+    const color=subscriberColor(r.subscriber),width=graph.laneWire,base={id:r.id,from:r.a.id,to:r.b.id,subscriber:r.subscriber,
+      points:r.points||geometry(r.a,r.b),visible:!r.internal&&time>=r.start,width};
+    const subscribing=clamp((time-r.start)/(r.connectDuration||transitionDuration));
+    if(!r.end||time<r.end.at)return {...base,phase:'subscribed',color,offset:-(1-subscribing),progress:subscribing,opacity:1};
+    const duration=r.end.duration||transitionDuration;
+    if(r.end.kind==='unsubscribe') {
+      const p=clamp((time-r.end.at)/duration);
+      return {...base,phase:'unsubscribe',color:p>0?laneIdle:color,offset:0,progress:1,opacity:1-(1-trail)*p,done:p>=1};
+    }
+    const start=Math.max(r.end.at,...r.events.filter(e=>e.at<=r.end.at).map(e=>e.arrival)),p=clamp((time-start)/duration);
+    return {...base,phase:r.end.kind,color,offset:0,progress:1,opacity:1-(1-trail)*clamp((time-start-duration)/fadeDuration),done:p>=1,
+      ...(time>=start&&p<1?{pulse:{at:p,color:laneAccent[r.end.kind]||laneAccent.complete}}:{})};
   }
   function socketsOf(n,time) {
     return laneRecords.flatMap(r=>{
       const hidden=hideAt(r),side=r.a.id===n.id?'out':r.b.id===n.id?'in':null;
       if(!side)return [];
       const opacity=side==='out'?presence(time,connectedAt(r),hidden.out):presence(time,r.start,hidden.in);
-      return opacity>0?[{side,subscriber:r.subscriber,edge:r.id,y:laneY(n,r.subscriber),color:subscriberColor(r.subscriber),opacity}]:[];
+      const idle=r.end?.kind==='unsubscribe'&&time>=(side==='out'?hidden.out:hidden.in);
+      return opacity>0?[{side,subscriber:r.subscriber,edge:r.id,y:laneY(n,r.subscriber),color:idle?laneIdle:subscriberColor(r.subscriber),opacity,
+        ...(graph.portRadius?{r:graph.portRadius}:{})}]:[];
     });
   }
   // Stan wykonania na torze (mały element w kafelku definicji): work — pasek i ikona producenta (np. HTTP),
@@ -215,8 +225,9 @@ export function compileScene(scene) {
       if(role==='receiver') {
         const end=input.end,arrival=end&&(end.kind==='unsubscribe'?end.at:end.at+(end.duration||transitionDuration));
         if(end&&time>=arrival){state=end.kind==='complete'?'completed':end.kind==='error'?'error':'cancelled';since=arrival;}
-      } else if(out.end&&time>=out.end.at) {
-        since=out.end.at;
+      } else if(out.end&&time>=out.end.at+(out.end.kind==='unsubscribe'?out.end.duration||transitionDuration:0)) {
+        // complete/error zmienia stan w chwili wysłania w dół; unsubscribe — po dotarciu od odbiorcy.
+        since=out.end.at+(out.end.kind==='unsubscribe'?out.end.duration||transitionDuration:0);
         state=out.end.kind==='complete'?'completed':out.end.kind==='error'?'error':'cancelled';stoppedAt=out.end.at;
       }
       const lane={role,subscriber,label:graph.subscribers?.[subscriber]?.label??subscriber,y:laneY(n,subscriber),color:subscriberColor(subscriber),fill:graph.subscribers?.[subscriber]?.fill,
@@ -235,7 +246,9 @@ export function compileScene(scene) {
   function laneRowsOf(n,time) {
     const rows=new Map();
     for(const r of laneRecords) if(r.a.id===n.id&&n.laneSlots?.[r.subscriber]!==undefined) {
-      const slot=n.laneSlots[r.subscriber],growth=clamp((time-r.start)/rowGrowth),eased=growth*growth*(3-2*growth);
+      // Wiersz rozszerza kafelek tuż przed dotarciem subscribe i kończy wzrost razem z nim.
+      const grow=Math.max(r.start,connectedAt(r)-rowGrowth);
+      const slot=n.laneSlots[r.subscriber],growth=clamp((time-grow)/rowGrowth),eased=growth*growth*(3-2*growth);
       if(eased>(rows.get(slot)?.growth??0))rows.set(slot,{slot,subscriber:r.subscriber,color:subscriberColor(r.subscriber),growth:eased});
     }
     return [...rows.values()].filter(row=>row.growth>0).sort((a,b)=>a.slot-b.slot)
@@ -253,9 +266,9 @@ export function compileScene(scene) {
     const logicalTime=plan.logicalTime(time);
     const executionState=executionSnapshot(executionDefinitions,records,events,time,logicalTime,Boolean(graph.illustratedWork));
     const edgeStates=records.map(r=>{
+      if(r.subscriber)return laneEdgeState(r,time);
       const state=connectionState(time,r.start,r.end,r.events,r.connectDuration);
-      const color=r.subscriber&&state.phase==='subscribed'?subscriberColor(r.subscriber):state.color;
-      return {...state,color,subscriber:r.subscriber,id:r.id,from:r.a.id,to:r.b.id,points:r.points||geometry(r.a,r.b),visible:!r.internal&&time>=r.start&&!state.done,
+      return {...state,id:r.id,from:r.a.id,to:r.b.id,points:r.points||geometry(r.a,r.b),visible:!r.internal&&time>=r.start&&!state.done,
         progress:1-Math.abs(state.offset)};
     });
     const stateByEdge=new Map(edgeStates.map(e=>[e.id,e]));
@@ -326,7 +339,7 @@ export function compileScene(scene) {
         else if(to>from)progress=clamp((time-from)/(to-from))*share;
         else progress=clamp((t-span.start)/(span.end-span.start))*share;
       }
-      const fill=notification&&!n.terminalBadge?palette[notification]:n.subscriber&&graph.subscribers?.[n.subscriber]?graph.subscribers[n.subscriber].tile||graph.subscribers[n.subscriber].fill||subscriberColor(n.subscriber):queued||n.workRow&&!active&&!canceled&&!completed&&!errored?colors.muted:n.work||n.inner?palette.work:receiver?palette.observer:!incoming.length?palette.source:colors[n.color]||colors.op;
+      const fill=notification&&!n.terminalBadge?palette[notification]:n.headerFill?n.headerFill:n.subscriber&&graph.subscribers?.[n.subscriber]?graph.subscribers[n.subscriber].tile||graph.subscribers[n.subscriber].fill||subscriberColor(n.subscriber):queued||n.workRow&&!active&&!canceled&&!completed&&!errored?colors.muted:n.work||n.inner?palette.work:receiver?palette.observer:!incoming.length?palette.source:colors[n.color]||colors.op;
       return {...n,label:evaluate(n.label,t),visible:time>=births.get(n.id)&&(n.until===undefined||t<n.until),
         opacity:n.ready||n.instant?1:clamp((time-births.get(n.id))/fadeDuration),fill,status,notification,workState,
         active:activity||Boolean(transform&&time<transform.until),progress,showProgress:Boolean(span&&(active||canceled)),transform:transform?.label,
@@ -351,7 +364,6 @@ export function compileScene(scene) {
     return {id:scene.id,title:scene.title,code:codeFrames.filter(frame=>frame.at<=time).at(-1)?.code??scene.code,
       ...(reveal?{codeReveal:{prefix:reveal.prefix,suffix:reveal.suffix,opacity:clamp((time-reveal.at)/reveal.duration)}}:{}),
       width,height,textScale:graph.textScale??textScaleFor(scene),labelScale:graph.labelScale??labelScaleFor(scene),time,logicalTime,nodes:nodeStates,edges:edgeStates,tokens,histories,
-      ...(laneRecords.length?{laneTrails:laneTrails(time)}:{}),
       panels:(graph.panels||[]).map((panel,i)=>panelShownAt[i]===undefined?panel:{...panel,shownAt:panelShownAt[i],visible:time>=panelShownAt[i]}),cards:scene.kind==='cards'?scene.items:[],caption:captionAt(captions,time),
       ...executionState,
       metrics:(scene.metrics||[]).map(m=>({label:m.label,value:m.count?executionState.executionCounts[m.count]:m.value(logicalTime)})),
