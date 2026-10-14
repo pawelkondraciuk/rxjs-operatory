@@ -65,3 +65,10 @@ test('definition is idle before subscribe; first next stops before complete; rew
  assert.equal(node(first,'observer').notification,null);assert.equal(node(first,'http').notification,null);
  c.snapshot(c.duration);assert.deepEqual(c.snapshot(0),ready);
 });
+
+test('.subscribe() A appears with the receiver and fades before the request stop',async()=>{
+ const {c}=await http('4:3'),shown=t=>Array.from(c.snapshot(t).callouts||[],k=>k.text+' '+k.label);
+ const sub=c.events.find(e=>e.type==='subscribe'&&e.edge==='http-observer');
+ assert.deepEqual(shown(sub.at),['.subscribe() A']);assert.deepEqual(shown(0),[]);
+ for(const stop of c.stops)assert.deepEqual(shown(stop.time),[],stop.id);
+});

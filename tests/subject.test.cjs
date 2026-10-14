@@ -11,7 +11,7 @@ async function subject(format){
 
 test('A is emitted without listeners and never delivered; histories start empty',async()=>{
  const {compiled:c}=await subject(),ready=c.snapshot(0);
- assert.equal(ready.panels.length,3);assert.ok(ready.histories.every(h=>h.values.length===0));
+ assert.equal(ready.panels.length,1);assert.equal(ready.panels[0].visible,false);assert.ok(ready.histories.every(h=>h.values.length===0));
  assert.ok(ready.edges.every(e=>!e.visible));
  const a=c.snapshot(c.stops[0].time);
  assert.deepEqual(values(a,'source'),['A']);assert.deepEqual(values(a,'sink'),[]);assert.deepEqual(values(a,'sink2'),[]);
@@ -34,7 +34,7 @@ test('B reaches only the first listener; the second subscribes without replay an
  assert.ok(second.edges.every(e=>e.visible&&e.phase==='subscribed'));
  const final=c.snapshot(c.duration);
  assert.deepEqual(values(final,'source'),['A','B','C']);assert.deepEqual(values(final,'sink'),['B','C']);assert.deepEqual(values(final,'sink2'),['C']);
- assert.match(final.caption,/Log emisji.*Odbiorca 1.*Odbiorca 2/);
+ assert.match(final.caption,/Log emisji.*Odbiorca A.*Odbiorca B/);
  assert.equal(c.events.some(e=>e.type==='stream-complete'||e.type==='inner-unsubscribe'),false);
  assert.ok(final.nodes.every(n=>n.notification===null&&!n.showProgress));
 });
@@ -58,19 +58,40 @@ test('Subject holds FINISHED and rewind removes later listeners and receipts',as
  player.seek(player.stops[0].time);assert.equal(JSON.stringify(player.snapshot),before);
 });
 
-test('vertical fanout reserves three readable boxes inside both formats; boxes appear on first emission or delivery',async()=>{
+test('lane layout: Subject rows A/B grow on subscribe, receivers keep balls and the log appears with the first emission',async()=>{
  for(const format of ['4:3','16:9']){
-  const {compiled:c,m}=await subject(format),f=c.snapshot(c.duration);
-  assert.equal(f.nodes.find(n=>n.id==='sink').x,f.nodes.find(n=>n.id==='sink2').x);
-  assert.ok(f.nodes.find(n=>n.id==='sink').y<f.nodes.find(n=>n.id==='sink2').y);
-  assert.ok(f.nodes.every(n=>n.w>=400&&n.h>=90));
-  for(const p of f.panels){assert.ok(p.x>=0&&p.x+p.w<=f.width);assert.ok(p.y>=0&&p.y+p.h<=f.height);}
-  assert.ok(f.histories.every(h=>h.lines===1));
-  assert.ok(c.snapshot(0).panels.every(p=>!p.visible));
-  for(const [i,type,edge,value] of [[0,'source-next',undefined,'A'],[1,'deliver-next','source-sink','B'],[2,'deliver-next','source-sink2','C']]){
-   const event=c.events.find(e=>e.type===type&&e.value===value&&(!edge||e.edge===edge));
-   assert.equal(c.snapshot(event.at-.001).panels[i].visible,false);assert.equal(c.snapshot(event.at).panels[i].visible,true);
+  const {compiled:c,m}=await subject(format),f=c.snapshot(c.duration),node=id=>f.nodes.find(n=>n.id===id);
+  assert.equal(f.textScale,1.42);assert.equal(node('source').label,'Subject');assert.equal(node('source').fill,'#8FC9D4');
+  const lanes=node('source').laneStates;
+  assert.deepEqual(Array.from(lanes,l=>l.subscriber).sort(),['A','B']);
+  for(const [sink,id] of [['sink','A'],['sink2','B']]){
+   const y=lanes.find(l=>l.subscriber===id).y;
+   assert.equal(node(sink).laneStates[0].y,y);assert.equal(f.histories.find(h=>h.anchor===sink).y,y);
+   assert.ok(f.histories.find(h=>h.anchor===sink).balls);
   }
-  assert.doesNotMatch(m.renderer.renderScene(f),/NaN|Infinity|data-work-progress/);
+  assert.equal(node('sink').x,node('sink2').x);assert.ok(node('sink').y<node('sink2').y);
+  // Wiersz B w Subject rośnie dopiero z subskrypcją B; wcześniej tylko A.
+  assert.equal(c.snapshot(c.stops[2].time).nodes.find(n=>n.id==='source').laneRows.length,1);
+  const log=f.panels[0];assert.equal(log.label,'log emisji (bez bufora)');
+  assert.ok(log.y+log.h<=node('source').y-node('source').h/2,'log nad nagłówkiem Subject');
+  for(const p of f.panels){assert.ok(p.x>=0&&p.x+p.w<=f.width);assert.ok(p.y>=0&&p.y+p.h<=f.height);}
+  const event=c.events.find(e=>e.type==='source-next'&&e.value==='A');
+  assert.equal(c.snapshot(event.at-.001).panels[0].visible,false);assert.equal(c.snapshot(event.at).panels[0].visible,true);
+  for(const [edge,value,anchor] of [['source-sink','B','sink'],['source-sink2','C','sink2']]){
+   const got=c.events.find(e=>e.type==='deliver-next'&&e.edge===edge&&e.value===value);
+   assert.ok(!values(c.snapshot(got.at-.001),anchor).includes(value));assert.ok(values(c.snapshot(got.at),anchor).includes(value));
+  }
+  const svg=m.renderer.renderScene(f);
+  assert.doesNotMatch(svg,/NaN|Infinity|data-work-progress|>…</);
  }
+});
+
+test('.subscribe() A and B appear above the receiver column at their own subscriptions only',async()=>{
+ const {compiled:c}=await subject('4:3'),shown=t=>Array.from(c.snapshot(t).callouts||[],k=>k.text+' '+k.label);
+ for(const [edge,label] of [['source-sink','A'],['source-sink2','B']]){
+  const sub=c.events.find(e=>e.type==='subscribe'&&e.edge===edge);assert.deepEqual(shown(sub.at),['.subscribe() '+label]);
+ }
+ for(const stop of c.stops)assert.deepEqual(shown(stop.time),[],stop.id);
+ const f=c.snapshot(c.events.find(e=>e.type==='subscribe'&&e.edge==='source-sink').at),k=f.callouts[0];
+ assert.ok(k.y<f.nodes.find(n=>n.id==='sink').y-f.nodes.find(n=>n.id==='sink').h/2);
 });

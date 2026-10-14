@@ -73,6 +73,7 @@ export function mapGraph(scene) {
     subscribers:{A:laneSubscribers.A},nodes,
     edges:[{from:'source',to:'map',logicalStart:0,subscriber:'A'},{from:'map',to:'observer',logicalStart:0,subscriber:'A'}],
     trays:[laneTray('observer',receiver,3)],
+    callouts:[subscribeCallout('A','map-observer','source-map',{y:top/2})],
     schedule:{
       'source-map':{start:seconds(subscribe+halfSubscribe),connectDuration:halfSubscribe,
         end:{at:complete,logicalAt:0,kind:'complete',duration:seconds(complete+halfTerminal)-complete},
@@ -138,6 +139,11 @@ function laneReceiver(id,subscriber,{x,w,y},extra={}) {
   return {id,x,y,w,h:laneLook.rowH-2*gap,top:y-laneLook.rowH/2+gap,defH:0,rowH:laneLook.rowH-2*gap,
     laneSlots:{[subscriber]:0},...laneTiles.receiver,label:'',subscriber,terminalBadge:true,detail:'',inbox:laneInbox(),rx:laneLook.rx,...extra};
 }
+// Chwilowy napis zdarzenia (.subscribe() / .unsubscribe()) z badge'em toru; from/to to selektory zdarzeń jak w postojach.
+const laneEvent=(type,edge,offset)=>({type,edge,...(offset?{offset}:{})});
+const laneCallout=(text,subscriber,from,to,pos)=>({text,subscriber,size:45,...pos,from,to});
+// .subscribe() od pojawienia się odbiorcy (0,3 s przed subscribe) do zestawienia połączenia ze źródłem.
+const subscribeCallout=(subscriber,edge,source,pos)=>laneCallout('.subscribe()',subscriber,laneEvent('subscribe',edge,-.3),laneEvent('connected',source),pos);
 function laneTray(anchor,{x,w,y},max,ball=laneLook.ball) {
   const k=laneLook.textScale,inbox=laneInbox();
   return {anchor,x:x-w/2+inbox.left+laneLook.icon+8*k+22*k+12+ball.r,y,balls:true,max,gap:laneLook.ballGap};
@@ -252,8 +258,7 @@ export function lanesGraph(scene) {
   // Chwilowy napis zdarzenia: .subscribe() od pojawienia się odbiorcy (0,3 s przed subscribe) do dotarcia impulsu
   // do źródła (cold: HTTP; share: A do HTTP, B tylko do share, bo upstream już działa). Ręczne .unsubscribe()
   // trwa od wywołania do końca animacji anulowania. Pas nad pipeline'em jest pusty, więc napis niczego nie zasłania.
-  const callout=(text,id,from,to)=>({text,subscriber:id,y:g.top/2,size:45,from,to});
-  const ev=(type,edge,offset)=>({type,edge,...(offset?{offset}:{})});
+  const callout=(text,id,from,to)=>laneCallout(text,id,from,to,{y:g.top/2}),ev=laneEvent;
   // share: subscribe inicjatora trwa do dotarcia impulsu do HTTP, kolejnych — tylko do share; unsubscribe ostatniego
   // aktywnego trwa, aż anulowanie dotrze do HTTP.
   const callouts=shared?plan.subs.flatMap(sub=>[
@@ -304,17 +309,22 @@ export function configureTimers(scene) {
 // Wygląd torów: dwa niezależne rzędy źródło → odbiorca (A: timer, B: interval). Stan wykonania niesie wiersz:
 // timer kończy się complete, interval zostaje odsubskrybowany (szary wiersz, bez complete).
 export function timersGraph(scene) {
-  const tall=scene.format==='4:3',tops=tall?[108,336]:[42,250],nodes=[],trays=[],edges=[];
+  const tall=scene.format==='4:3',tops=tall?[108,336]:[42,250],nodes=[],trays=[],edges=[],callouts=[];
   [['timer','timerSink','timer(1000)','A',0],['interval','intervalSink','interval(1000)','B',2]].forEach(([id,sinkId,label,lane,ri],i)=>{
     const top=tops[i],receiver={x:910,w:400,y:laneRowY(top,0)},fill=laneSubscribers[lane].fill;
     nodes.push({id,x:340,w:420,label,terminalEdge:id+'-'+sinkId,...laneTile('source',top,{[lane]:0},1)},
       laneReceiver(sinkId,lane,receiver,{ready:false}));
     trays.push(laneTray(sinkId,receiver,3));
+    // Dwa rzędy: napis stoi nad wierszem swojego odbiorcy, na wysokości nagłówka źródła.
+    const above={x:receiver.x,y:top+laneLook.defH/2},edge=id+'-'+sinkId;
+    callouts.push(subscribeCallout(lane,edge,edge,above),
+      // .unsubscribe() startuje dokładnie z rezygnacją (bez wyprzedzenia), żeby postój third nie zdradzał odpowiedzi.
+      ...(i?[laneCallout('.unsubscribe()',lane,laneEvent('inner-unsubscribe',edge),laneEvent('disconnected',edge),above)]:[]));
     edges.push({from:id,to:sinkId,subscriber:lane,logicalStart:0,events:scene.rows[ri].events.map(e=>({...e,color:fill})),
       logicalEnd:i?{at:scene.unsubscribeAt,kind:'unsubscribe'}:{at:scene.rows[0].completeAt,kind:'complete'}});
   });
   return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),
-    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B},nodes,trays,edges};
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B},nodes,trays,edges,callouts};
 }
 
 // Wariant HTTP: subskrypcja uruchamia request (praca tylko w kafelku HTTP), odpowiedź „dane” trafia do boxu pod odbiorcą,
@@ -345,54 +355,57 @@ export function httpGraph(scene) {
     nodes:[{id:'http',x:340,w:420,label:'HTTP GET',workLanes:true,progressUntilNext:true,terminalEdge:'http-observer',...laneTile('source',top,{A:0},1)},
       laneReceiver('observer','A',receiver,{ready:false,born:1})],
     trays:[laneTray('observer',receiver,1,ball)],
+    callouts:[subscribeCallout('A','http-observer','http-observer',{y:top/2})],
     edges:[{from:'http',to:'observer',subscriber:'A',events:scene.rows[0].events,logicalStart:1.3}],
     schedule:{'http-observer':{start:1.3,connectDuration:.8,events:[{...scene.rows[0].events[0],color:fill,arrival:7.8}],end:{at:8.3,logicalAt:7,kind:'complete',duration:.8}}}};
 }
 
-// Wariant Subject: emisja może nastąpić także bez podłączonego odbiorcy.
+// Wariant Subject: emisja może nastąpić także bez podłączonego odbiorcy. Wygląd torów jak w 04a: kafelek Subject
+// dostaje wiersz A/B, gdy odbiorca subskrybuje; log emisji (bez bufora) stoi nad nagłówkiem definicji.
 export function configureSubject(scene) {
   const at={a:1,subscribe:2.5,b:4,second:5,c:6.5},received=[E(at.b,'B','b'),E(at.c,'C','c')];
   const emitted=[E(at.a,'A'),...received];
   // Zachowujemy indeksy wierszy wariantu katalogowego; drugi odbiorca ma własną historię.
-  scene.rows=scene.rows.map((row,i)=>i===2?R('Subject — log emisji',emitted):i===3?R('Odbiorca 1',received):row);
-  scene.rows.push(R('Odbiorca 2',[emitted[2]]));
+  scene.rows=scene.rows.map((row,i)=>i===2?R('Subject — log emisji',emitted):i===3?R('Odbiorca A',received):row);
+  scene.rows.push(R('Odbiorca B',[emitted[2]]));
   Object.assign(scene,{graph:subjectGraph,playerLayout:'expanded',metrics:[],subscribeAt:at.subscribe,secondSubscribeAt:at.second,duration:at.c+1,
+    ink:'#26323B',playerClass:'rx-flat-tiles',timing:{subscribe:.8,travel:1,terminal:.8,gap:.5},
     title:'Subject: wartości dla obecnych odbiorców',code:'const subject$ = new Subject()',
     captions:[[0,'Subject emituje do obecnych odbiorców. Log diagramu nie jest buforem'],
       [at.a,'A bez odbiorców: nikt nie otrzymuje tej wartości'],
-      [at.subscribe,'Odbiorca 1 dołącza. Wcześniejsze A nie wraca'],
-      [at.b,'B trafia wyłącznie do odbiorcy 1'],[at.second,'Odbiorca 2 dołącza. Nie dostaje wcześniejszych A ani B'],
+      [at.subscribe,'Odbiorca A dołącza. Wcześniejsze A nie wraca'],
+      [at.b,'B trafia wyłącznie do odbiorcy A'],[at.second,'Odbiorca B dołącza. Nie dostaje wcześniejszych A ani B'],
       [at.c,'C trafia do obu aktywnych odbiorców']],
     playback:manual([
       {id:'unobserved',event:{type:'source-next',node:'source',value:'A'},offset:.35,caption:'A bez subskrypcji: jedna emisja, zero odbiorów'},
-      {id:'subscribed',event:{type:'connected',edge:'source-sink'},caption:'Odbiorca 1 subskrybuje. A nie wraca'},
-      {id:'first',event:{type:'deliver-next',edge:'source-sink',value:'B'},offset:.35,caption:'B otrzymał tylko odbiorca 1'},
-      {id:'second',event:{type:'connected',edge:'source-sink2'},caption:'Odbiorca 2 dołączył. Dostanie dopiero kolejne wartości'},
+      {id:'subscribed',event:{type:'connected',edge:'source-sink'},offset:.35,caption:'Odbiorca A subskrybuje. A nie wraca'},
+      {id:'first',event:{type:'deliver-next',edge:'source-sink',value:'B'},offset:.35,caption:'B otrzymał tylko odbiorca A'},
+      {id:'second',event:{type:'connected',edge:'source-sink2'},offset:.35,caption:'Odbiorca B dołączył. Dostanie dopiero kolejne wartości'},
     ]),
   });
 }
 
 export function subjectGraph(scene) {
-  const emitted=scene.rows[2].events,frame=frameFor(scene),large=scene.format==='4:3';
-  const tileH=large?130:90,boxH=large?100:76,sourceY=large?220:155;
-  const sinkRows=large?[120,390]:[85,300],sourceX=260,sinkX=900,tileW=400;
-  const tile={h:tileH,w:tileW,ready:true,statusInside:true};
-  const source={id:'source',x:sourceX,y:sourceY,...tile,label:'Subject',ri:2,color:'source',
-    detail:t=>t<scene.subscribeAt?'0 odbiorców':t<scene.secondSubscribeAt?'1 odbiorca':'2 odbiorców'};
-  const nodes=[source,...sinkRows.map((y,i)=>({id:i?'sink2':'sink',x:sinkX,y,...tile,label:'Odbiorca '+(i+1),ri:i?4:3,color:'http',
-    detail:t=>t<(i?scene.secondSubscribeAt:scene.subscribeAt)?'nie subskrybuje':'subskrybuje'}))];
-  const panels=nodes.map((n,i)=>({x:n.x-tileW/2,y:n.y+tileH/2+20,w:tileW,h:i===0?(large?150:110):boxH,from:{x:n.x,y:n.y+tileH/2},
-    ...(i===0?{label:'log emisji (bez bufora)'}:{}),
-    showOn:i?{type:'deliver-next',edge:i===1?'source-sink':'source-sink2',value:i===1?'B':'C'}:{type:'source-next',node:'source',value:'A'}}));
-  const trays=nodes.map((n,i)=>({anchor:n.id,x:n.x,y:panels[i].y+(i===0?(large?100:72):boxH/2),w:tileW-20,lines:1,
-    ...(i===0?{events:emitted,modelTime:true}:{})}));
-  return {layout:'fixed',formatAware:true,width:1240,height:frame.height,
-    ...(large?{textScale:1.65,labelScale:2}:{}),nodes,panels,trays,
-    edges:[{id:'source-sink',from:'source',to:'sink',logicalStart:scene.subscribeAt,events:scene.rows[3].events},
-      {id:'source-sink2',from:'source',to:'sink2',logicalStart:scene.secondSubscribeAt,events:scene.rows[4].events}],
+  const emitted=scene.rows[2].events,tall=scene.format==='4:3';
+  // Log nad kafelkiem, kafelek z dwoma zarezerwowanymi wierszami; całość wyśrodkowana w pionie.
+  const top=tall?250:167,log={x:130,y:tall?100:37,w:420,h:110};
+  const receivers=[['sink','A'],['sink2','B']].map(([id,lane],slot)=>({id,lane,at:{x:910,w:400,y:laneRowY(top,slot)}}));
+  const ballR=laneLook.ball.r;
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B},
+    nodes:[{id:'source',x:340,w:420,label:'Subject',...laneTile('source',top,{A:0,B:1},2)},
+      ...receivers.map(r=>laneReceiver(r.id,r.lane,r.at,{ready:false}))],
+    // Log emisji pojawia się z pierwszą emisją; to zapis diagramu, nie bufor Subject.
+    panels:[{...log,label:'log emisji (bez bufora)',showOn:{type:'source-next',node:'source',value:'A'}}],
+    trays:[{anchor:'source',x:log.x+28+ballR,y:log.y+log.h-14-ballR,balls:true,max:3,gap:laneLook.ballGap,events:emitted,modelTime:true},
+      ...receivers.map(r=>laneTray(r.id,r.at,3))],
+    // A i B subskrybują w różnych chwilach, więc napis stoi w jednym miejscu: nad kolumną odbiorców, na wysokości logu.
+    callouts:[['A','source-sink'],['B','source-sink2']].map(([lane,edge])=>subscribeCallout(lane,edge,edge,{x:910,y:log.y+log.h/2})),
+    edges:[{id:'source-sink',from:'source',to:'sink',subscriber:'A',logicalStart:scene.subscribeAt,events:scene.rows[3].events},
+      {id:'source-sink2',from:'source',to:'sink2',subscriber:'B',logicalStart:scene.secondSubscribeAt,events:scene.rows[4].events}],
     timeline:[{at:emitted[0].at,type:'source-next',node:'source',value:'A'},
       {type:'subject-summary',event:{type:'deliver-next',edge:'source-sink2',value:'C'},offset:.35,
-        caption:'Log emisji: A, B, C. Odbiorca 1: B, C. Odbiorca 2: C. Subject nie odtwarza historii'}],
+        caption:'Log emisji: A, B, C. Odbiorca A: B, C. Odbiorca B: C. Subject nie odtwarza historii'}],
   };
 }
 

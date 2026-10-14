@@ -159,6 +159,14 @@ test('custom timing preserves the storyboard and all checkpoint snapshots are de
   assert.deepEqual(history(c.snapshot(c.duration)),['2','4','6']);
 });
 
+test('.subscribe() A shows while the subscription travels upstream, not in the code and not at stops',async()=>{
+  const {compiled:c}=await subject(),shown=t=>Array.from(c.snapshot(t).callouts||[],k=>k.text+' '+k.label);
+  const down=c.plan.records.get('map-observer'),up=c.plan.records.get('source-map');
+  assert.deepEqual(shown(down.start),['.subscribe() A']);assert.deepEqual(shown(up.start+up.connectDuration/2),['.subscribe() A']);
+  for(const stop of c.stops)assert.deepEqual(shown(stop.time),[],stop.id);
+  assert.doesNotMatch(c.snapshot(down.start).code,/subscribe/);
+});
+
 // Wyświetlany kod: HTML z <wbr> jako punktami łamania, bez zmiany treści.
 const shownCode=element=>element.innerHTML.replace(/<span[^>]*aria-hidden="true"[^>]*>[^]*?<\/span>/g,'').replace(/<\/?span[^>]*>/g,'').replace(/<wbr>/g,'').replace(/&gt;/g,'>').replace(/&lt;/g,'<').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&');
 test('manual first delivery, pause, AUTO, backwards and reset restore the displayed code and receiver history',async()=>{

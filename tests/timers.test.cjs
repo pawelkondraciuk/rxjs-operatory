@@ -72,3 +72,15 @@ test('lane layout: two centred pipelines A and B, receiver rows with balls; shar
   assert.deepEqual(values(c.snapshot(first.at-.01),anchor),[]);assert.deepEqual(values(c.snapshot(first.at),anchor),['0']);
  }
 });
+
+test('.subscribe() A/B nad wierszami odbiorców i .unsubscribe() B dopiero po postoju third',async()=>{
+ const {c}=await timers('4:3'),shown=t=>Array.from(c.snapshot(t).callouts||[],k=>k.text+' '+k.label);
+ const sub=c.events.find(e=>e.type==='subscribe'&&e.edge==='interval-intervalSink');
+ assert.deepEqual(shown(sub.at).sort(),['.subscribe() A','.subscribe() B']);
+ const [first,question,third,unsubscribed]=c.stops;
+ for(const stop of [first,question,third])assert.deepEqual(shown(stop.time),[],stop.id);
+ assert.deepEqual(shown(unsubscribed.time),['.unsubscribe() B']);
+ const f=c.snapshot(sub.at);
+ for(const k of f.callouts){const sink=f.nodes.find(n=>n.id===(k.label==='A'?'timerSink':'intervalSink'));
+  assert.equal(k.x,sink.x);assert.ok(k.y<sink.y-sink.h/2,'napis nad wierszem odbiorcy');}
+});
