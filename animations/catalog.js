@@ -26,28 +26,7 @@ add("06-subskrypcja","Co uruchamia pracę?","const data$ = http.get('/api/data')
  R("HTTP",[E(12,"dane","http")],[B(6,12,"request")],{completeAt:12}),
  R("odbiorca",[E(12,"dane","b")],[],{completeAt:12})
 ],[[0,"Budujemy Observable HTTP."],[1,"Samo utworzenie tego Observable nie wysyła żądania."],[6,"Subskrypcja uruchamia request."],[12,"Odpowiedź, a następnie complete."]],"Przykład dotyczy zimnego Observable z Angular HttpClient. Nie generalizuj leniwości na już uruchomiony Promise.");
-// A subskrybuje od razu (jak w 06a), B po 2 s; pierwszy krok nie zaczyna się od pustej sekundy.
-const shareWithoutRows=[
- R("HTTP #1",[E(6,"dane","a")],[B(0,6,"request A","a")],{completeAt:6}),
- R("HTTP #2",[E(8,"dane","b")],[B(2,8,"request B","b")],{completeAt:8}),
- R("odbiorca A",[E(6,"dane","a")],[B(0,6,"słucha","a","subscription")],{completeAt:6}),
- R("odbiorca B",[E(8,"dane","b")],[B(2,8,"słucha","b","subscription")],{completeAt:8})
-];
-const shareSharedRows=[
- R("wspólne HTTP",[E(6,"dane","http")],[B(0,6,"wspólny request","http")],{completeAt:6}),
- R("brak drugiego requestu"),
- R("odbiorca A",[E(6,"dane","http")],[B(0,6,"słucha","a","subscription")],{completeAt:6}),
- R("odbiorca B",[E(6,"dane","http")],[B(2,6,"słucha","b","subscription")],{completeAt:6})
-];
-const shareWithoutCaptions=[[0,"Ten sam Observable HTTP. A subskrybuje — rusza pierwszy request."],[2,"B subskrybuje — rusza drugi request."],[6,"A ma odpowiedź. Request B nadal trwa."],[8,"Dwie subskrypcje uruchomiły dwa requesty."]];
-const shareSharedCaptions=[[0,"Ta sama instancja data$ z share(). A subskrybuje — rusza wspólny request."],[2,"B dołącza do trwającego wykonania."],[6,"Jedna odpowiedź trafia do A i B."],[8,"Dwie subskrypcje współdzieliły jeden request."]];
-add("07-hot-cold","Dwie subskrypcje — bez share czy z share?","const data$ = http.get('/api/data')",21,shareWithoutRows,shareWithoutCaptions,"Porównaj warianty na kolejnych slajdach. A subskrybuje od razu, B po 2 s. Każdy request trwa 6 s od uruchomienia. Bez share każdy odbiorca uruchamia własne zimne wykonanie. Z share obaj korzystają z tej samej instancji data$ i nakładających się subskrypcji; B dołącza przed odpowiedzią w 6 s. Zwykły share nie przechowuje wyniku dla spóźnionego odbiorcy i domyślnie resetuje po complete.",{
- metrics:[{label:"uruchomione requesty",value:t=>1+(t>=2?1:0)}],
- variants:{
-  without:{rows:shareWithoutRows,captions:shareWithoutCaptions,code:"const data$ = http.get('/api/data')",metrics:[{label:"uruchomione requesty",value:t=>1+(t>=2?1:0)}]},
-  shared:{rows:shareSharedRows,captions:shareSharedCaptions,code:"const data$ = http.get('/api/data').pipe(share())",metrics:[{label:"uruchomione requesty",value:t=>1}]}
- }
-});
+
 add("08-map-strumienie","A jeśli wartością jest Observable?","map(id => request$(id)) → concatAll()",22,[
  R("wejście",[E(1,"a"),E(4,"b","b")]),
  R("po map",[E(1,"A$"),E(4,"B$","b")]),
@@ -183,25 +162,17 @@ revise("18-async",{
  shared:{rows:subRows(true),code:"const user$ = http$.pipe(share());\nuser$.subscribe(observerA); user$.subscribe(observerB);",captions:[[0,"A i B używają tej samej instancji user$ z share()."],[1,"Dwie subskrypcje → jedno wspólne wykonanie HTTP."],[7,"Jedna odpowiedź trafia do obu odbiorców."],[10,"Angular: async pipe. React: subscribe w useEffect + unsubscribe przy sprzątaniu."]],metrics:[{label:"requesty HTTP",value:t=>t>=1?1:0}]}
  }
 });
-const coldRows=[
- R("timer A",[1,4,7,10,13,16,19].map((at,i)=>E(at,String(i),"a")),[B(0,30,"timer A","a")]),
- R("timer B",[7,10,13,16,19].map((at,i)=>E(at,String(i),"b")),[B(6,30,"timer B","b")]),
- R("A",[1,4,7,10,13,16,19].map((at,i)=>E(at,String(i),"a")),[B(0,30,"sub A","a","subscription")]),
- R("B",[7,10,13,16,19].map((at,i)=>E(at,String(i),"b")),[B(6,30,"sub B","b","subscription")])
-];
 const hotRows=[
  R("wspólny timer",[1,4,7,10,13,16,19].map((at,i)=>E(at,String(i),"source")),[B(0,30,"producent","source")]),
  R("bez drugiego timera"),
  R("A",[1,4,7,10,13,16,19].map((at,i)=>E(at,String(i),"a")),[B(0,30,"sub A","a","subscription")]),
  R("B",[7,10,13,16,19].map((at,i)=>E(at,String(i+2),"b")),[B(6,30,"sub B","b","subscription")])
 ];
-add("06a-cold-hot","Cold vs hot — skąd B zaczyna liczyć?","cold: własny timer przy subscribe",22,coldRows,[[0,"A słucha od początku. B dołączy później."],[6,"B dołącza. Cold: powstaje jego własny timer."],[7,"B zaczyna od 0. Timer A jest już przy 2."],[19,"Cold: każde subscribe tworzy własnego producenta."]],"Cold: każdy odbiorca uruchamia własny timer; A subskrybuje w 0 s, B w 6 s, pierwszy tick następuje po 1 s. Hot: jeden timer powstaje niezależnie od odbiorców i nadaje przez zwykły Subject. B subskrybuje w 6 s, więc odbiera 2 w 7 s. Nie odtwarzamy wcześniejszych wartości i nie utożsamiamy hot z replay.",{
- diagram:"coldhot",compareLabels:["Cold","Hot"],
- variants:{
-  without:{rows:coldRows,code:"const timer$ = timer(1000, 3000)",captions:[[0,"A subskrybuje. Jego timer zaczyna liczyć."],[6,"B subskrybuje — powstaje drugi timer."],[7,"A dostaje 2, a B swoje pierwsze 0."],[19,"Każdy odbiorca ma własne wykonanie."]],metrics:[{label:"producenci",value:t=>1+(t>=6?1:0)}]},
-  shared:{rows:hotRows,code:"hot: jeden timer → Subject → A i B",captions:[[0,"Jeden producent nadaje przez Subject."],[6,"B dołącza do istniejącego strumienia."],[7,"A i B dostają 2. B nie otrzymuje wcześniejszych 0 i 1."],[19,"Wspólny producent. Bez odtwarzania historii."]],metrics:[{label:"producenci",value:t=>1}]}
- }
-});
+// Samodzielny dodatek zachowuje historyczne ID wariantu hot.
+add("06a-cold-hot-2","Hot: dołączasz do działającego źródła","hot: jeden timer → Subject → A i B",22,hotRows,
+ [[0,"Jeden producent nadaje przez Subject."],[6,"B dołącza do istniejącego strumienia."],[7,"A i B dostają 2. B nie otrzymuje wcześniejszych 0 i 1."],[19,"Wspólny producent. Bez odtwarzania historii."]],
+ "Jeden timer powstaje niezależnie od odbiorców i nadaje przez zwykły Subject. B subskrybuje w 6 s, więc odbiera 2 w 7 s. Nie odtwarzamy wcześniejszych wartości i nie utożsamiamy hot z replay.",
+ {diagram:"coldhot",comparisonMode:"shared",metrics:[{label:"producenci",value:t=>1}]});
 const completeVariant=mode=>{
  const jobs=mode==="concatMap"?[{at:1,start:1,end:7,value:"A",color:"a"},{at:4,start:7,end:13,value:"B",color:"b"}]:[{at:1,start:1,end:4,value:"A",color:"a",cancelled:true},{at:4,start:4,end:10,value:"B",color:"b"}];
  const out=jobs.flatMap(j=>[1.5,3.5,5.5].filter(d=>j.start+d<j.end).map((d,i)=>E(j.start+d,j.value+(i+1),j.color))).sort((a,b)=>a.at-b.at);
@@ -263,7 +234,7 @@ revise("11-switchmap",{
  notes:"Projection switchMap jest wywoływana po emisji source$. Każda nowa wartość najpierw odsubskrybowuje poprzedni inner, a potem uruchamia nowy. W naszym źródle teardown zatrzymuje emisje. Unsubscribe HTTP może anulować żądanie po stronie klienta, ale nie cofa wykonanych już zmian na serwerze."
 });
 for(const scene of D)if(scene.variants)Object.assign(scene,scene.variants.without);
-for(const [id,after] of [["06a-cold-hot","06-subskrypcja"],["12a-complete","12-exhaustmap"],["21a-share-pozycja","21-share-miejsce"]]){
+for(const [id,after] of [["06a-cold-hot-2","06-subskrypcja"],["12a-complete","12-exhaustmap"],["21a-share-pozycja","21-share-miejsce"]]){
  const item=D.splice(D.findIndex(s=>s.id===id),1)[0];
  D.splice(D.findIndex(s=>s.id===after)+1,0,item);
 }

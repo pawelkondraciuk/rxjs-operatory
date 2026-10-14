@@ -449,7 +449,7 @@
 					<aside class="notes">
                         <p><strong>HTTP — pierwszy slajd części właściwej:</strong> Najpierw istnieje tylko definicja http.get('/api/data'). Samo jej utworzenie nie wysyła requestu. Subscribe dodaje odbiorcę; impuls biegnie do HTTP i uruchamia pracę. Zatrzymaj się przy request, potem przy next. Complete jest osobną notyfikacją po odpowiedzi. Przykład dotyczy cold HTTP, nie już uruchomionego Promise.</p>
                         <p><strong>interval — na żywo:</strong> Na wejściu jest tylko definicja interval(1000); nic nie emituje. Pierwsze prawo: .subscribe() tworzy wykonanie A. Od tej chwili interval emituje 0, 1, 2, 3… co sekundę i sam się nie kończy — mów, ile chcesz, licznik biegnie. Drugie prawo: .unsubscribe() A; szary impuls × biegnie od odbiorcy do interval, emisje ustają, nie ma complete. Trzecie prawo przechodzi dalej. Lewo cofa o etap; po wyjściu ze slajdu wykonanie jest sprzątane i po powrocie zaczyna od zera.</p>
-                        <p><strong>Subject — po przykładzie dwóch HTTP:</strong> A pojawia się bez odbiorców — trafia tylko do logu nad Subject. Odbiorca A dołącza (pod Subject rośnie wiersz A) i odbiera B. Dopiero potem dołącza odbiorca B, więc C dostają obaj. Historie odbiorców: B/C oraz C. Log emisji A/B/C należy do diagramu i nie jest buforem Subject. Nie ma odtworzenia A ani B dla późnego odbiorcy, complete ani unsubscribe.</p>
+                        <p><strong>Subject — po torach wykonania:</strong> A pojawia się bez odbiorców — trafia tylko do logu nad Subject. Odbiorca A dołącza (pod Subject rośnie wiersz A) i odbiera B. Dopiero potem dołącza odbiorca B, więc C dostają obaj. Historie odbiorców: B/C oraz C. Log emisji A/B/C należy do diagramu i nie jest buforem Subject. Nie ma odtworzenia A ani B dla późnego odbiorcy, complete ani unsubscribe.</p>
                         <p><strong>Sterowanie wprowadzeniem:</strong> Prawo uruchamia lub kończy etap, lewo cofa checkpoint także w AUTO. Spacja pauzuje/wznawia, M zmienia tryb, R przywraca zatrzymany początek, U pokazuje sterowanie.</p>
                     </aside>
 				</section>
@@ -463,22 +463,11 @@
 					</aside>
 				</section>
 
-				<section id="06a-cold-hot" class="animation-slide" data-animation="06a-cold-hot">
-					<h2>Cold vs hot — skąd B zaczyna liczyć?</h2>
-					<div class="rx-player" aria-label="Cold vs hot — skąd B zaczyna liczyć?"></div>
+				<section id="06a-cold-hot-2" class="animation-slide" data-extras data-animation="06a-cold-hot-2">
+					<h2>Hot: dołączasz do działającego źródła</h2>
+					<div class="rx-player" aria-label="Hot: dołączasz do działającego źródła"></div>
 					<aside class="notes">
-                        <p><strong>Cold — MAIN:</strong> Kod const timer$ = timer(1000, 3000) definiuje jeden Observable, a każda subskrypcja tworzy własne wykonanie timera. Diagram ma dwa tory timer$ → timer$.subscribe(), a boxy pod odbiorcami przechowują ich osobne wyniki. Górny tor to A, dolny to B. A subskrybuje w 0 s, B w 6 s; pierwszy tick następuje po 1 s. Zapytaj: czy B zacznie od bieżącej wartości A? Nie, dostanie własne 0. Dwa wykonania nie wymagają dwóch definicji Observable.</p>
                         <p><strong>Hot — EXTRAS:</strong> Jeden timer działa niezależnie od odbiorców i nadaje przez zwykły Subject. B dołącza w 6 s i odbiera 2 w 7 s. Nie dostaje wcześniejszych wartości; hot nie oznacza replay.</p>
-                    </aside>
-				</section>
-
-				<section id="07-hot-cold" class="animation-slide" data-animation="07-hot-cold">
-					<h2>Dwie subskrypcje — bez share czy z share?</h2>
-					<div class="rx-player" aria-label="Dwie subskrypcje — bez share czy z share?"></div>
-					<aside class="notes">
-                        <p><strong>Bez share — przed Subject:</strong> Kod const data$ = http.get('/api/data') zawiera jedną definicję. Tak jak na slajdzie cold, dwa tory data$ → data$.subscribe() pokazują osobne wykonania z boxami odpowiedzi; górny tor to A, dolny to B. A subskrybuje od razu, B po 2 s. Na postoju zapytaj salę, ile requestów powstało. Jeden obiekt Observable przechowuje definicję, ale każdy subscribe uruchamia osobne wykonanie HTTP. Każdy request trwa 6 s.</p>
-                        <p><strong>Zaplecze dla prelegenta:</strong> Schematyczny pseudokod: <code>source$.subscribe(mapSubscriber)</code> podłącza upstream; <code>destination.next(project(value))</code> przekazuje wynik downstream. Kolejny Observable zachowuje dostęp do poprzedniego; pipe nie wykonuje HTTP.</p>
-                        <p><strong>Z share — po Subject:</strong> Definicja jest tylko w kodzie. Źródło ma podpis data$, odbiorcy są rozsunięci z osobnymi boxami odpowiedzi, a bloczek share() między nimi pojawia się łagodnym fade-in podczas pierwszego etapu subskrypcji i znów znika po cofnięciu do początku. Share używa wewnętrznego Subject do rozsyłania wyniku aktywnej subskrypcji źródła. Obaj korzystają z tej samej instancji data$ i nakładających się subskrypcji. B dołącza przed odpowiedzią w 6 s, więc jedna praca dostarcza wynik obu. Zwykły share nie zachowuje wyniku dla późnego odbiorcy i domyślnie resetuje po complete. Przejdź do pytania o odbiorcę po odpowiedzi.</p>
                     </aside>
 				</section>
 

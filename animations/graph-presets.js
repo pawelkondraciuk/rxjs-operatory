@@ -7,7 +7,7 @@ export function catalogGraph(s) {
  const edge=(a,b,events=[],extra={})=>edges.push({a,b,events,...extra});
  const tray=(ri,x,y,w=400,label="")=>trays.push({ri,x,y,w,label});
  const caseId=s.rendererId||s.id;
- if(caseId==="07-hot-cold"||s.diagram==="late"||s.diagram==="coldhot"&&s.comparisonMode!=="shared")return executionComparison(s);
+ if(s.diagram==="late")return executionComparison(s);
  if(s.diagram==="subscriptions"||s.diagram==="coldhot"){
   const shared=s.comparisonMode==="shared",coldhot=s.diagram==="coldhot",simultaneous=s.diagram==="subscriptions";
   const source=node("observable",550,70,coldhot?(shared?"jeden producent":"timer$"):(simultaneous?"jeden user$":"jeden data$"),"source",null,{w:300});

@@ -3,7 +3,7 @@ import { configureCatch } from './catch-scenes.js';
 
 // Końcowe ID po rozwinięciu wariantów; otwarcie pozostaje w kolejności HTML.
 export const mainOrder = [
-  '05-zrodla-2','05-zrodla','04-operator','04a-dwa-tory','04a-dwa-tory-2','04a-dwa-tory-3','06a-cold-hot','07-hot-cold','05-zrodla-3','07-hot-cold-2',
+  '05-zrodla-2','05-zrodla','04-operator','04a-dwa-tory','04a-dwa-tory-2','04a-dwa-tory-3','05-zrodla-3',
   '20-sharereplay','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap',
   'b04-catcherror','b04-catcherror-2','14-distinct','16-czas-cztery','25-podsumowanie','pytania',
 ];
@@ -18,12 +18,11 @@ export const extraOrder = [
   '23-angular-alias','24-signals','26-resolver-problem','27-resolver-microtask','28-resolver-batch',
 ];
 export const extraIds = new Set(extraOrder);
-const stagedIds = new Set(['04-operator','05-zrodla','05-zrodla-2','05-zrodla-3','06a-cold-hot',
-  '07-hot-cold','07-hot-cold-2','20-sharereplay','20-sharereplay-2']);
+const stagedIds = new Set(['04-operator','05-zrodla','05-zrodla-2','05-zrodla-3','20-sharereplay','20-sharereplay-2']);
 
 // Sceny z finish:hold kończą się ok. 2 s po ostatnim zdarzeniu modelu, żeby AUTO nie stało długo
 // przed FINISHED (każde „dalej” w bezruchu tylko kończy animację). 22-refcount celowo pokazuje ciszę.
-const trimmedTails = new Set(['06-subskrypcja','07-hot-cold','12a-complete','13-limit','14-distinct','18-async','20-sharereplay']);
+const trimmedTails = new Set(['06-subskrypcja','12a-complete','13-limit','14-distinct','18-async','20-sharereplay']);
 function trimTail(scene) {
   const times=[...scene.rows.flatMap(r=>[...r.events.map(e=>e.at),
     ...r.spans.filter(p=>!['state','subscription'].includes(p.kind)).map(p=>p.end),...(r.completeAt===undefined?[]:[r.completeAt])]),
@@ -49,12 +48,12 @@ export function configureScene(scene) {
   if(id==='05-zrodla'&&scene.sourceExample===2)configureSubject(scene);
   scene.group=extraIds.has(scene.id)?'bonus':'main';
   if(trimmedTails.has(id))trimTail(scene);
-  if(id==='07-hot-cold'||id==='20-sharereplay'||id==='06a-cold-hot'&&scene.comparisonMode!=='shared'){
+  if(id==='20-sharereplay'){
     scene.playerLayout='expanded';
-    scene.metrics=[{label:id==='06a-cold-hot'?'wykonania':'requesty',count:'started'}];
+    scene.metrics=[{label:'requesty',count:'started'}];
   }
-  // Cold/hot i share (06a, 07, oba warianty): płaskie kafelki jak w 04a i 08–12.
-  if(id==='06a-cold-hot'||id==='07-hot-cold')scene.playerClass=[scene.playerClass,'rx-flat-tiles'].filter(Boolean).join(' ');
+  // Zachowany hot w EXTRAS: płaskie kafelki jak w 04a i 08–12.
+  if(id==='06a-cold-hot-2')scene.playerClass=[scene.playerClass,'rx-flat-tiles'].filter(Boolean).join(' ');
   if(scene.flattenLayout||scene.playback?.stops){
     if(stagedIds.has(scene.id))scene.playback={...scene.playback,controller:'stages'};
     return scene;
@@ -69,13 +68,12 @@ export function configureScene(scene) {
     return scene;
   }
   const question={
-    '06-subskrypcja':6,'06a-cold-hot':6,'07-hot-cold':2,'18-async':1,
+    '06-subskrypcja':6,'06a-cold-hot-2':6,'18-async':1,
     '20-sharereplay':10,'22-refcount':10,
     '14-distinct':5,'15-debounce-audit':5,
   }[id];
   const first={
-      '07-hot-cold':{id:'first',modelTime:0,caption:'Pierwszy odbiorca subskrybuje.'},
-      '06a-cold-hot':{id:'first',modelTime:0,caption:'A subskrybuje. B jeszcze nie słucha.'},
+      '06a-cold-hot-2':{id:'first',modelTime:0,caption:'A subskrybuje. B jeszcze nie słucha.'},
       '20-sharereplay':{id:'first',modelTime:6,caption:'Pierwsze HTTP wyemitowało odpowiedź i zakończyło się.'},
       '22-refcount':{id:'first',modelTime:2,caption:'Dwa widoki korzystają z aktywnego timera.'},
     }[id];
@@ -88,8 +86,7 @@ export function configureScene(scene) {
       '14-distinct':{event:{type:'deliver-next',edge:'source-distinct',value:'A',logicalAt:4},offset:-.001},
     }[id]||{modelTime:question}),caption:{
       '06-subskrypcja':'Dopiero subscribe uruchomiło HTTP. Deklaracja nie wykonała requestu.',
-      '06a-cold-hot':'B dołączył. Czy dostanie własny timer, czy wspólne kolejne wartości?',
-      '07-hot-cold':'Obaj odbiorcy już subskrybują. Ile wykonań HTTP?',
+      '06a-cold-hot-2':'B dołączył. Czy dostanie wcześniejsze wartości, czy kolejne emisje wspólnego timera?',
       '18-async':'A i B subskrybują ten sam user$. Ile requestów uruchomili?',
       '20-sharereplay':'B dołączył po complete. Nowe HTTP czy zachowany bufor?',
       '22-refcount':'Odbiorców: 0. Czy źródło nadal pracuje?',

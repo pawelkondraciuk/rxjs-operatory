@@ -17,7 +17,7 @@ Sceny MAIN z pytaniami zaczynają od nieruchomego READY. Prawo / Page Down uruch
 
 W oknie prelegenta (`S`) podgląd następnego slajdu domyślnie pokazuje dużą nazwę, np. **switchMap**, i krótki podtytuł. Wskazuje kolejny slajd, także podczas ręcznych postojów bieżącej animacji. Przełącznik **Podgląd: Tytuł / Slajd** w prawym dolnym rogu tego pola przywraca standardowy podgląd. Wybór jest zapamiętywany w przeglądarce. Notatki pozostają w standardowym polu Notes. Opcjonalne `data-speaker-title` na sekcji ustawia własny podpis wyłącznie dla prelegenta.
 
-Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 68 slajdów daje 84 strony PDF.
+Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 65 slajdów daje 81 stron PDF.
 
 Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przywraca ekran panoramiczny 1280×720. `W` przeładowuje stronę w drugim formacie, zostając na tym samym slajdzie i fragmencie; animacja wraca do stanu tego fragmentu. Linki do EXTRAS i powrót do pytań zachowują wybrany format. Druk działa w obu: `?print-pdf` (4:3) lub `?print-pdf&ratio=16:9`. W 4:3 slajdy wykorzystują pełną wysokość: większe zdjęcia i kody QR, wyższe diagramy, większy tekst i kapsułki w animacjach (×1,15), etykiety kafelków do ×1,3 oraz większy tytuł (64 px; za długi zmniejsza się, by został w jednej linii), kod (42 px, długi łańcuch przechodzi do nowej linii przed .pipe/.subscribe) i podpis.
 
@@ -33,12 +33,12 @@ Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorz
 
 Pełne otwarcie pozostaje bez zmian: społeczność, historia meet.js, fotografie, autor, tytuł i pytania o operatory. Budżet **30–35 minut dotyczy tylko części właściwej**; otwarcie, pytania i dogrywka są dodatkowo.
 
-MAIN ma **33 slajdy (22 animowane)**. EXTRAS zawiera **35 wariantów**. Całość obejmuje 49 bazowych slajdów HTML, 68 po rozwinięciu, 57 animowanych. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
+MAIN ma **30 slajdów (19 animowanych)**. EXTRAS zawiera **35 wariantów**. Całość obejmuje 48 bazowych slajdów HTML, 65 po rozwinięciu, 54 animowane. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
 
 Kolejność po otwarciu:
 
 1. HTTP (`05-zrodla-2`) → interval na żywo (`05-zrodla`) → map, pipe i wykonanie (`04-operator`) → testowe slajdy torów wykonania: cold (`04a-dwa-tory`), share() za map (`-2`) i share z unsubscribe A (`-3`).
-2. Dwa wykonania cold (`06a-cold-hot`) → dwa HTTP (`07-hot-cold`) → Subject (`05-zrodla-3`) → jedno aktywne HTTP z share (`07-hot-cold-2`) → późny odbiorca z share/shareReplay (`20-sharereplay`, `20-sharereplay-2`).
+2. Subject (`05-zrodla-3`) → późny odbiorca z share/shareReplay (`20-sharereplay`, `20-sharereplay-2`). Cold i współdzielenie HTTP pokazują wcześniej tory `04a`; powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
 3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap.
 4. catchError na zewnątrz/wewnątrz → distinctUntilChanged → wspólne porównanie debounceTime i auditTime (`16-czas-cztery`).
 5. Cztery pytania podsumowania → „Pytania?” → rozmowa z salą albo dodatkowe przykłady.
@@ -57,7 +57,7 @@ Na map + concatAll i przejście do concatMap przewidziano około 3 minut z bloku
 
 **EXTRAS to przygotowana dogrywka przy braku pytań**, a także materiał do odpowiedzi na konkretne pytanie. Domyślne wejście prowadzi kolejno przez `12a-complete`, `12a-complete-2` i `13-limit`: complete outer, dalsza praca inner oraz limit współbieżności. Trzy slajdy zajmują około 4–6 minut i przechodzą zwykłym pilotem. Po limicie można wrócić do menu albo wybrać następny blok.
 
-Pozostałe bloki obejmują pozycję share/refCount, dodatkowe porównania subskrypcji, cztery operatory czasu, operatory kombinacyjne, Angular/React i resolver. Wszystkie dotychczasowe demonstracje pozostają dostępne. Menu otwiera `?extras#/id`, a stare bezpośrednie hashe dodatków również włączają EXTRAS. Powrót zachowuje format. Dodatki nigdy nie uruchamiają się automatycznie wskutek braku pytań — wybiera je prelegent.
+Pozostałe bloki obejmują pozycję share/refCount, dodatkowe porównania subskrypcji, cztery operatory czasu, operatory kombinacyjne, Angular/React i resolver. Hot pozostaje w EXTRAS pod ID `06a-cold-hot-2`; refCount i resolver również pozostają dostępne. Menu otwiera `?extras#/id`, a stare bezpośrednie hashe dodatków również włączają EXTRAS. Powrót zachowuje format. Dodatki nigdy nie uruchamiają się automatycznie wskutek braku pytań — wybiera je prelegent.
 
 ## Legenda bloczków
 
@@ -219,7 +219,7 @@ Kontroler `stages`: → zaczyna lub kończy etap, ← cofa checkpoint także w A
 
 ### Źródła — rodzina `05-zrodla`
 
-Warianty zachowują ID, lecz zajmują oddzielne miejsca narracji: **HTTP otwiera część właściwą**, interval jest drugi, Subject pojawia się po dwóch cold HTTP.
+Warianty zachowują ID, lecz zajmują oddzielne miejsca narracji: **HTTP otwiera część właściwą**, interval jest drugi, Subject pojawia się po torach wykonania 04a.
 
 | ID | Kod i zachowanie |
 | --- | --- |
@@ -251,42 +251,21 @@ Subject to kafelek z wierszami A i B, które rosną, gdy odbiorcy subskrybują; 
 
 > Przykład dotyczy zimnego Observable z Angular HttpClient. Nie generalizuj leniwości na już uruchomiony Promise.
 
-### Cold i hot — `06a-cold-hot`
+### Hot: późny odbiorca — `06a-cold-hot-2`
 
-**Temat:** późniejszy odbiorca: własne wykonanie czy dołączenie do istniejącego producenta?
+**EXTRAS — samodzielny dodatek zachowujący historyczne ID wariantu hot.**
+
+**Temat:** dołączenie do już działającego producenta, bez odtwarzania wcześniejszych wartości.
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
-| 06a-cold-hot | Cold: własny timer dla każdego | `const timer$ = timer(1000, 3000)` |
 | 06a-cold-hot-2 | Hot: dołączasz do działającego źródła | `hot: jeden timer → Subject → A i B` |
 
-**Na bloczkach i w animacji:**
-
-- Cold (MAIN): definicja jest tylko w kodzie nad diagramem. Dwa rozsunięte pionowo tory pokazują `timer$` → `timer$.subscribe()`, z boxem odbiorów pod każdym odbiorcą. Dwurzędowe boxy mieszczą cały pokazany przebieg (A: 0–6, B: 0–4). B dołącza w 6 s; w 7 s dostaje własne 0, gdy A dostaje 2. Licznik wykonań rośnie dopiero po zakończeniu podłączania danego źródła.
-- Hot jest w EXTRAS.
-- Hot: „wspólny timer” → „Subject” → „Odbiorca A” i „Odbiorca B”. W 7 s obaj dostają 2; B nie dostaje wcześniejszych 0 i 1. Jeden producent.
+**Na bloczkach:** „wspólny timer” → „Subject” → „Odbiorca A” i „Odbiorca B”. Jeden producent. B dołącza w 6 s; w 7 s obaj dostają 2. B nie dostaje wcześniejszych 0 i 1.
 
 **Speaker notes:**
 
-> Cold: każdy odbiorca uruchamia własny timer; A subskrybuje w 0 s, B w 6 s, pierwszy tick następuje po 1 s. Hot: jeden timer powstaje niezależnie od odbiorców i nadaje przez zwykły Subject. B subskrybuje w 6 s, więc odbiera 2 w 7 s. Nie odtwarzamy wcześniejszych wartości i nie utożsamiamy hot z replay.
-
-### Dwie subskrypcje: bez share i z share — `07-hot-cold`
-
-**Temat:** wpływ współdzielenia na wykonania zimnego HTTP. Warianty rozdziela scena Subject. Bez share definicja jest tylko w kodzie nad diagramem; dwa tory `data$` → `data$.subscribe()` mają układ zgodny z poprzednim slajdem cold i osobne boxy odbiorów. Z share diagram pokazuje jedno wykonanie `data$`, bloczek share pośrodku oraz dwóch rozsuniętych odbiorców z osobnymi boxami. Definicja pozostaje tylko w kodzie. Bloczek `share()` odsłania się łagodnym fade-in podczas pierwszego etapu subskrypcji. Licznik requestów korzysta z faktycznego podłączenia prac, także podczas przelotu subskrypcji.
-
-| ID slajdu | Tytuł na ekranie | Kod nad diagramem |
-| --- | --- | --- |
-| 07-hot-cold | Bez share: dwie subskrypcje, dwa HTTP | `const data$ = http.get('/api/data')` |
-| 07-hot-cold-2 | Z share: dwie subskrypcje, jedno HTTP | `const data$ = http.get('/api/data').pipe(share())` |
-
-**Na bloczkach i w animacji:**
-
-- Bez share: dwa rozsunięte tory `data$` → `data$.subscribe()`, bez górnego kafelka definicji; pod każdym odbiorcą osobny box odpowiedzi. Górny tor to A, dolny to B. A subskrybuje od razu i dostaje dane w 6 s; B w 2 s i dostaje je w 8 s. Licznik 2 requestów.
-- Z share: `data$` → `share()` → „Odbiorca A” i „Odbiorca B”. Źródło ma podpis zmiennej `data$`, a bloczek `share()` jest ukryty w READY i pojawia się fade-in przez 0,3 s po pierwszym prawie. B dołącza w 2 s, przed odpowiedzią; obaj dostają te same dane (jeden kolor) w 6 s. Licznik 1 requestu.
-
-**Speaker notes:**
-
-> Porównaj warianty na kolejnych slajdach. A subskrybuje od razu, B po 2 s. Każdy request trwa 6 s od uruchomienia. Bez share każdy odbiorca uruchamia własne zimne wykonanie. Z share obaj korzystają z tej samej instancji data$ i nakładających się subskrypcji; B dołącza przed odpowiedzią w 6 s. Share rozsyła wynik przez wewnętrzny Subject. Zwykły share nie przechowuje wyniku dla spóźnionego odbiorcy i domyślnie resetuje po complete.
+> Jeden timer powstaje niezależnie od odbiorców i nadaje przez zwykły Subject. B dołącza w 6 s i odbiera 2 w 7 s. Hot nie oznacza replay.
 
 ### A jeśli wartością jest Observable? — `08-map-strumienie`
 
@@ -514,7 +493,7 @@ Podstawa wzmianki o cyklu życia: [Angular AsyncPipe](https://angular.dev/api/co
 
 ### share — `19-share`
 
-**EXTRAS — poza główną ścieżką.** Osobny pokaz zachowany jako dodatek; MAIN porównuje dwa wykonania i jedno współdzielone wykonanie w rodzinie 07, po czym pokazuje późnego odbiorcę.
+**EXTRAS — poza główną ścieżką.** Osobny pokaz zachowany jako dodatek; MAIN porównuje niezależne i współdzielone wykonania na torach `04a`, a potem pokazuje późnego odbiorcę w parze share/shareReplay.
 
 **Temat:** jedno wykonanie podczas nakładających się subskrypcji.
 
@@ -530,7 +509,7 @@ Podstawa wzmianki o cyklu życia: [Angular AsyncPipe](https://angular.dev/api/co
 
 ### share a shareReplay — `20-sharereplay`
 
-**Temat:** odbiorca dołączający po odpowiedzi i complete HTTP. Definicja jest tylko w kodzie nad diagramem; górnego kafelka definicji nie ma. Tory HTTP i odbiorców są rozsunięte tak jak we wcześniejszych porównaniach, a share/shareReplay leży pośrodku między nimi. Boxy odpowiedzi mają więcej miejsca. Postój pytania zatrzymuje B po podłączeniu, ale przed odbiorem odpowiedzi; następny krok odsłania wynik. Licznik requestów opiera się na stanie wykonań; bufor odpowiedzi jest pokazany dopiero po zakończeniu upstream.
+**Temat:** odbiorca dołączający po odpowiedzi i complete HTTP. Definicja jest tylko w kodzie nad diagramem; górnego kafelka definicji nie ma. Tory HTTP i odbiorców są rozsunięte pionowo, a share/shareReplay leży pośrodku między nimi. Boxy odpowiedzi mają więcej miejsca. Postój pytania zatrzymuje B po podłączeniu, ale przed odbiorem odpowiedzi; następny krok odsłania wynik. Licznik requestów opiera się na stanie wykonań; bufor odpowiedzi jest pokazany dopiero po zakończeniu upstream.
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
@@ -867,7 +846,7 @@ Dodatki 12a/13-limit i prototypy QA zachowują poprzednie modele oraz geometrię
 
 W concatMap B pojawia się jako wartość W KOLEJCE; dopiero po complete poprzednika powstaje B$ i jego subskrypcja. concatAll pokazuje istniejące B$ i C$ czekające bez subskrypcji; wpis kolejki wchodzi z fade-in dopiero, gdy Observable utworzone przez map dotrze do concatAll. Wiersze zakończone pozostają zielone; pominięte wejścia exhaustMap nie tworzą wykonań. Standardowa siatka ma cztery miejsca; przykład limitu używa pięciu. Kapsułki emisji i odbioru wchodzą przez 0,3 s. Postęp jest wyliczany w czasie ilustracji; w MAIN 08–12 kulka najpierw przechodzi po lokalnym wyjściu do prawej granicy panelu, a potem wychodzi z operatora. Dodatki i prototypy zachowują krótki, niewidoczny powrót.
 
-Liczniki uruchomionych i aktywnych inner korzystają ze stanu faktycznych subskrypcji. Sceny z tej rodziny trzymają nieruchomy wynik również w EXTRAS. Nawigacja i postoje Reveal rodziny flatteningu pozostają dotychczasowe. Kontroler `stages` działa w podglądzie prototypów oraz w przebudowanym wprowadzeniu (04, wszystkie 05, cold 06a, oba 07 i oba 20). Spacja pauzuje/wznawia także pozostałe animacje, bez zmiany natywnej obsługi statycznego otwarcia. Zachowano identyfikatory i działające demonstracje; kolejność części właściwej odpowiada opisanej wyżej narracji 30–35 minut.
+Liczniki uruchomionych i aktywnych inner korzystają ze stanu faktycznych subskrypcji. Sceny z tej rodziny trzymają nieruchomy wynik również w EXTRAS. Nawigacja i postoje Reveal rodziny flatteningu pozostają dotychczasowe. Kontroler `stages` działa w podglądzie prototypów oraz w przebudowanym wprowadzeniu (04, wszystkie 05, oba 20). Spacja pauzuje/wznawia także pozostałe animacje, bez zmiany natywnej obsługi statycznego otwarcia. Zachowano identyfikatory i działające demonstracje; kolejność części właściwej odpowiada opisanej wyżej narracji 30–35 minut.
 
 Na migrowanych slajdach diagram zajmuje 480 px wysokości. Większe kafelki mają 76 px wysokości, a odstęp do paneli 60 px; wiersze prac w dodatkach są rozdzielone o 20 px, a MAIN 08–12 ma przylegające wiersze nowego panelu. Mniejszy podpis i liczniki są w stopce przy dole slajdu. U pokazuje kontrolki w miejscu stopki; ukrycie kontrolek przywraca podpis.
 
@@ -876,4 +855,4 @@ W `map + concatAll` górny pipeline ma cztery poziome kolumny: source$ → map �
 W MAIN 08–12 przy complete zielony staje się execution lane, a nagłówek definicji pozostaje pastelowy. Pozostałe migrowane sceny zmieniają tło całego kafelka przy własnym complete. Źródło może zakończyć się wcześniej; *Map pozostaje aktywne aż do zakończenia wymaganych inner i kolejki. Nieobsłużony error daje czerwony operator, a odsubskrybowane źródło zachowuje swój kolor.
 
 
-Płaski styl kafelków obejmuje 04-operator, całą rodzinę 05-zrodla, 04a-dwa-tory (cold, share, share-unsub), 06a-cold-hot (cold i hot), 07-hot-cold (bez i z share) oraz slajdy 08–12 (map + concatAll, concatMap, mergeMap, switchMap i exhaustMap): klasa `rx-flat-tiles` w scene.playerClass (player przyjmuje kilka klas rozdzielonych spacją; 04a ma `rx-lanes rx-flat-tiles`, 06a i 07 dostają ją w configureScene) usuwa obrys i zaokrąglenie głównego prostokąta kafelka. Boksy historii (data-panel-box) w tych slajdach też są płaskie, z ciemniejszym tłem #ECE6DA zamiast ramki. Panel prac 08–12 jest rysowany płasko natywnie. Placeholder kolejki zachowuje przerywany obrys. Geometria, fonty, porty, progress, stany i animacje pozostają bez zmian; pozostałe slajdy nie otrzymują tej klasy.
+Płaski styl kafelków obejmuje 04-operator, całą rodzinę 05-zrodla, 04a-dwa-tory (cold, share, share-unsub), 06a-cold-hot-2 (hot w EXTRAS) oraz slajdy 08–12 (map + concatAll, concatMap, mergeMap, switchMap i exhaustMap): klasa `rx-flat-tiles` w scene.playerClass (player przyjmuje kilka klas rozdzielonych spacją; 04a ma `rx-lanes rx-flat-tiles`, hot dostaje ją w configureScene) usuwa obrys i zaokrąglenie głównego prostokąta kafelka. Boksy historii (data-panel-box) w tych slajdach też są płaskie, z ciemniejszym tłem #ECE6DA zamiast ramki. Panel prac 08–12 jest rysowany płasko natywnie. Placeholder kolejki zachowuje przerywany obrys. Geometria, fonty, porty, progress, stany i animacje pozostają bez zmian; pozostałe slajdy nie otrzymują tej klasy.

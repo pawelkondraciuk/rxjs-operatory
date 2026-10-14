@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {modules}=require('./v2-harness.cjs');
 
-const expectedMain=['05-zrodla-2','05-zrodla','04-operator','04a-dwa-tory','04a-dwa-tory-2','04a-dwa-tory-3','06a-cold-hot','07-hot-cold','05-zrodla-3','07-hot-cold-2',
+const expectedMain=['05-zrodla-2','05-zrodla','04-operator','04a-dwa-tory','04a-dwa-tory-2','04a-dwa-tory-3','05-zrodla-3',
  '20-sharereplay','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap',
  'b04-catcherror','b04-catcherror-2','14-distinct','16-czas-cztery','25-podsumowanie','pytania'];
 
@@ -37,7 +37,7 @@ async function presentation(options={}){
 
 test('MAIN preserves the opening and orders final variants independently, ending on questions',async()=>{
  const {container,opening,scenes}=await presentation();
- assert.equal(container.children.length,33);
+ assert.equal(container.children.length,30);
  assert.deepEqual(container.children.slice(0,10),opening);
  assert.deepEqual(container.children.slice(10).map(s=>s.id),expectedMain);
  for(const slide of container.children){assert.equal(slide.extra,false,slide.id);assert.equal(slide.back,null,slide.id);}
@@ -47,29 +47,50 @@ test('MAIN preserves the opening and orders final variants independently, ending
 test('EXTRAS preserves every demo once and starts with the three-slide follow-up',async()=>{
  const {container,prepared,config}=await presentation({extras:true});
  const ids=container.children.map(s=>s.id);
- assert.equal(ids.length,68);
- assert.deepEqual(ids.slice(10,33),expectedMain);
- assert.deepEqual(ids.slice(33,36),['12a-complete','12a-complete-2','13-limit']);
- assert.deepEqual(ids.slice(33),Array.from(config.extraOrder));
+ assert.equal(ids.length,65);
+ assert.deepEqual(ids.slice(10,30),expectedMain);
+ assert.deepEqual(ids.slice(30,33),['12a-complete','12a-complete-2','13-limit']);
+ assert.deepEqual(ids.slice(30),Array.from(config.extraOrder));
  assert.deepEqual(ids.filter(Boolean).sort(),prepared.map(s=>s.id).filter(Boolean).sort());
  assert.equal(new Set(ids.filter(Boolean)).size,ids.filter(Boolean).length);
- for(const slide of container.children.slice(33)){assert.equal(slide.extra,true,slide.id);assert.ok(slide.back,slide.id);}
+ for(const slide of container.children.slice(30)){assert.equal(slide.extra,true,slide.id);assert.ok(slide.back,slide.id);}
 });
 
-test('direct hashes route exact variants, including split time-operator and cold/hot families',async()=>{
+test('direct hashes route exact variants, including time operators and the standalone hot extra',async()=>{
  for(const requestedId of ['06a-cold-hot-2','16-czas-cztery-2','16-czas-cztery-3','18-async-2','28-resolver-batch']){
-  const {container,route}=await presentation({requestedId});assert.equal(route.extras,true,requestedId);assert.equal(container.children.length,68);
+  const {container,route}=await presentation({requestedId});assert.equal(route.extras,true,requestedId);assert.equal(container.children.length,65);
  }
  for(const requestedId of ['06a-cold-hot','16-czas-cztery','04-operator','unknown']){
-  const {container,route}=await presentation({requestedId});assert.equal(route.extras,false,requestedId);assert.equal(container.children.length,33);
+  const {container,route}=await presentation({requestedId});assert.equal(route.extras,false,requestedId);assert.equal(container.children.length,30);
  }
 });
 
 test('print includes every expanded slide once, with main narration before extras',async()=>{
  const {container,prepared}=await presentation({printMode:true});
- assert.equal(container.children.length,68);
+ assert.equal(container.children.length,65);
  assert.deepEqual(container.children.map(s=>s.id).filter(Boolean).sort(),prepared.map(s=>s.id).filter(Boolean).sort());
- assert.deepEqual(container.children.slice(10,33).map(s=>s.id),expectedMain);
+ assert.deepEqual(container.children.slice(10,30).map(s=>s.id),expectedMain);
+});
+
+test('removed comparisons stay absent from MAIN, EXTRAS, print and direct hashes',async()=>{
+ const removed=['06a-cold-hot','07-hot-cold','07-hot-cold-2'];
+ for(const options of [{},{extras:true},{printMode:true},...removed.map(requestedId=>({requestedId}))]){
+  const {container,scenes,prepared,compile}=await presentation(options);
+  for(const id of removed){
+   assert.ok(!prepared.some(s=>s.id===id),id+' is not generated');
+   assert.ok(!container.children.some(s=>s.id===id),id+' is not routed');
+   assert.equal(scenes.has(id),false,id+' has no catalog scene');
+  }
+  for(const id of ['20-sharereplay','20-sharereplay-2']){
+   assert.equal(container.children.filter(s=>s.id===id).length,1,id);
+   const c=compile(scenes.get(id));
+   assert.equal(c.snapshot(c.duration).executionCounts.started,id.endsWith('-2')?1:2,id);
+  }
+ }
+ const {scenes,compile}=await presentation({requestedId:'06a-cold-hot-2'});
+ const hot=scenes.get('06a-cold-hot-2'),c=compile(hot),end=c.snapshot(c.duration);
+ assert.equal(hot.comparisonMode,'shared');assert.equal(hot.group,'bonus');
+ assert.deepEqual(Array.from(end.histories.find(h=>h.anchor==='receiver1').values,e=>e.value),['2','3','4','5','6']);
 });
 
 test('combined time operators compare the same input and stop on audit before debounce',async()=>{
@@ -90,5 +111,5 @@ test('combined time operators compare the same input and stop on audit before de
  assert.ok(Array.from(c.plan.records.values()).every(e=>!e.end),'ongoing source does not complete');
  assert.equal(scenes.get('16-czas-cztery-2').group,'bonus');
  for(const id of ['08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12a-complete','13-limit'])assert.notEqual(scenes.get(id).playback.controller,'stages',id);
- for(const id of ['04-operator','05-zrodla','05-zrodla-2','05-zrodla-3','06a-cold-hot','07-hot-cold','07-hot-cold-2','20-sharereplay','20-sharereplay-2'])assert.equal(scenes.get(id).playback.controller,'stages',id);
+ for(const id of ['04-operator','05-zrodla','05-zrodla-2','05-zrodla-3','20-sharereplay','20-sharereplay-2'])assert.equal(scenes.get(id).playback.controller,'stages',id);
 });

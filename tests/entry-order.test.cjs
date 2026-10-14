@@ -122,7 +122,7 @@ test('a time window opens only after its subscription is wired',async()=>{
 
 test('a shared value keeps the producer colour at every receiver',async()=>{
  const {scenes,compile}=await deck();
- for(const id of ['07-hot-cold-2','20-sharereplay','20-sharereplay-2','19-share','23-angular-alias','06a-cold-hot-2','18-async-2']){
+ for(const id of ['20-sharereplay','20-sharereplay-2','19-share','23-angular-alias','06a-cold-hot-2','18-async-2']){
   const colours=new Map();
   for(const r of compile(scenes.get(id)).plan.records.values())for(const e of r.events){
    colours.set(e.value,colours.get(e.value)||new Set());colours.get(e.value).add(e.color);
@@ -131,7 +131,7 @@ test('a shared value keeps the producer colour at every receiver',async()=>{
  }
 });
 
-test('held scenes finish shortly after the last change; the first step of 07 starts immediately',async()=>{
+test('held scenes finish shortly after the last change',async()=>{
  const {scenes,compile}=await deck();
  for(const scene of scenes.values()){
   if(scene.playback?.finish!=='hold'||scene.kind==='cards'||scene.id.startsWith('22-refcount'))continue;
@@ -141,9 +141,5 @@ test('held scenes finish shortly after the last change; the first step of 07 sta
   for(let t=0;t<=c.duration;t+=.1){const now=c.snapshot(t).caption;if(now!==caption){caption=now;changed=t;}}
   const last=Math.max(changed,...c.events.map(e=>Math.max(e.at,e.until??0)),...c.stops.map(s=>s.time));
   assert.ok(c.duration-last<=3,`${scene.id}: ${(c.duration-last).toFixed(1)} s bezruchu`);
- }
- for(const id of ['07-hot-cold','07-hot-cold-2']){
-  const c=compile(scenes.get(id));
-  assert.ok(c.snapshot(.3).nodes.some(n=>n.visible&&n.opacity>=.99),id);
  }
 });

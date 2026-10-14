@@ -4,8 +4,6 @@ import { configureScene, mainOrder, extraOrder, extraIds } from './scene-config.
 export function prepareSlides(scenes, { format = '4:3' } = {}) {
   const byId = new Map(scenes.map(scene => [scene.id, scene]));
   const titles = {
-    '06a-cold-hot': ['Cold: własny timer dla każdego', 'Hot: dołączasz do działającego źródła'],
-    '07-hot-cold': ['Bez share: dwie subskrypcje, dwa HTTP', 'Z share: dwie subskrypcje, jedno HTTP'],
     '12a-complete': ['concatMap: complete czeka na kolejkę', 'switchMap: complete czeka na ostatni inner'],
     '18-async': ['Dwie subskrypcje: dwa wykonania HTTP', 'Dwie subskrypcje z share: jedno HTTP'],
     '20-sharereplay': ['share: późny odbiorca uruchamia HTTP', 'shareReplay: późny odbiorca dostaje wynik'],

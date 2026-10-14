@@ -59,7 +59,7 @@ test('all slide variants render through every event and termination without inva
     }
   }
   assert.ok(frames>1000);
-  assert.equal(scenes.get('07-hot-cold-2').comparisonMode,'shared');
+  assert.equal(scenes.get('20-sharereplay-2').comparisonMode,'shared');
   assert.equal(scenes.get('16-czas-cztery-4').seriesIndices[0],4);
 });
 
@@ -102,10 +102,10 @@ test('legend directions, terminal colors and final value delivery',async()=>{
 
 test('only receiver changes terminal color; refCount removes the correct subscriptions',async()=>{
   const {player}=await harness();
-  const complete=player('07-hot-cold');complete.api.finish();
+  const complete=player('20-sharereplay');complete.api.finish();
   let svg=complete.elements.get('.rx-stage').innerHTML;
   assert.match(svg,/data-node="receiver0"[^]*?fill="#087438"/);
-  assert.match(svg,/data-node="work0"[^]*?fill="#ffc15c"/);
+  assert.match(svg,/data-node="http1"[^]*?fill="#ffc15c"/);
   assert.doesNotMatch(svg,/data-connection=/);
   for(const [id,alive] of [['22-refcount',true],['22-refcount-2',false]]){
     const p=player(id);p.api.finish();svg=p.elements.get('.rx-stage').innerHTML;
@@ -203,18 +203,14 @@ test('subscription travels receiver → share → source; values travel source �
   assert.ok(first.end.at>=upstream.end.at+transitionDuration);
 });
 
-test('share fades in before subscription and a value never occupies consecutive connections simultaneously',async()=>{
+test('a shared value never occupies consecutive connections simultaneously',async()=>{
   const {player}=await harness();
-  const {api,elements}=player('07-hot-cold-2');
-  api.seek(.15);
-  let svg=elements.get('.rx-stage').innerHTML;
-  const opacity=Number(svg.match(/data-node="hub" opacity="([^"]+)"/)[1]);
-  assert.ok(Math.abs(opacity-.5)<1e-8);
-  assert.doesNotMatch(svg,/data-connection="work0-hub"/);
+  const {api,elements}=player('20-sharereplay');
+  let svg;
   let sawInput=false,sawOutput=false;
   for(let t=0;t<api.duration;t+=.1){
     api.seek(t);svg=elements.get('.rx-stage').innerHTML;
-    const input=svg.includes('data-value-on="work0-hub"');
+    const input=svg.includes('data-value-on="http1-hub"');
     const output=svg.includes('data-value-on="hub-receiver0"');
     assert.ok(!(input&&output),`simultaneous value at ${t}`);
     if(input)sawInput=true;
