@@ -138,6 +138,21 @@ export function compileScene(scene) {
     if(!match)throw new Error(`${scene.id}: nierozwiązany wpis kodu`);
     return {...frame,at:match.at+(frame.offset||0)};
   }).sort((a,b)=>a.at-b.at);
+  // codeLines (opcjonalne): kod jako linie fragmentów. Fragment może mieć mark (kolor klocka/toru), show (zdarzenie
+  // pojawienia się, fade-in 0,3 s; miejsce jest zarezerwowane od READY) i active ([{from,to}] — selektory zdarzeń,
+  // w których fragment świeci mocniej). Selektory działają jak w postojach; nierozwiązany jest błędem.
+  const eventTime=(selector,label)=>{
+    const {offset=0,last=false,...match}=selector;
+    const matches=events.filter(e=>Object.entries(match).every(([key,value])=>e[key]===value)),found=last?matches.at(-1):matches[0];
+    if(!found)throw new Error(`${scene.id}: nierozwiązany ${label}`);
+    return found.at+offset;
+  };
+  const codeLines=(scene.codeLines||[]).map(line=>line.map(segment=>({...segment,
+    shownAt:segment.show?eventTime(segment.show,'fragment kodu'):0,
+    activeIntervals:(segment.active||[]).map(({from,to})=>[eventTime(from,'start wyróżnienia kodu'),eventTime(to,'koniec wyróżnienia kodu')])})));
+  // graph.callouts: chwilowy napis zdarzenia (np. .subscribe() / .unsubscribe() z identyfikatorem toru) w przedziale
+  // od zdarzenia from do zdarzenia to (selektory jak w postojach); fade-in 0,25 s, fade-out 0,3 s po końcu przedziału.
+  const callouts=(graph.callouts||[]).map(callout=>({...callout,from:eventTime(callout.from,'początek napisu'),to:eventTime(callout.to,'koniec napisu')}));
   const codeReveals=codeFrames.flatMap((frame,i)=>{
     if(!frame.fadeIn)return [];
     const prefix=i?codeFrames[i-1].code:scene.code;
@@ -234,7 +249,9 @@ export function compileScene(scene) {
         progressFill:graph.subscribers?.[subscriber]?.progress??graph.subscribers?.[subscriber]?.fill,
         state,since,status:laneStatus[state==='running'&&role!=='work'?'waiting':state],opacity:clamp((time-from)/fadeDuration)};
       if(role==='work') {
-        const to=out.workUntil!==undefined?plan.timeOf(out.workUntil):out.end?.at??plan.duration;
+        // progressUntilNext: oczekiwanie kończy się z wysłaniem pierwszej wartości (odpowiedź HTTP), nie dopiero z complete.
+        const firstNext=n.progressUntilNext?out.events[0]?.at:undefined;
+        const to=out.workUntil!==undefined?plan.timeOf(out.workUntil):firstNext??out.end?.at??plan.duration;
         lane.progress=state==='completed'?1:clamp(((stoppedAt??time)-from)/Math.max(1e-9,to-from));
       }
       return [lane];
@@ -279,6 +296,19 @@ export function compileScene(scene) {
       tokens.push({x,y,value:e.value,color:e.color||'a',edge:r.id,phase:e.phase||'travel'});
     }
     for(const e of sourceTokens) if(time>=e.at&&time<e.until)tokens.push({...e});
+    // transformBalls: między dotarciem wartości do kafelka a wyjściem wyniku kulka wjeżdża do środka wiersza,
+    // zatrzymuje się, zmienia wartość (krótki puls) i jedzie do portu wyjścia. Czas modelu stoi, to wyłącznie ilustracja.
+    for(const n of nodes) if(n.transformBalls) for(const input of laneRecords.filter(r=>r.b.id===n.id)) {
+      const output=laneRecords.find(r=>r.a.id===n.id&&r.subscriber===input.subscriber);
+      for(const e of output?input.events:[]) {
+        const v=output.events.find(o=>o.logicalAt===e.logicalAt&&o.at>=e.arrival);
+        if(!v||time<e.arrival||time>=v.at)continue;
+        const p=(time-e.arrival)/(v.at-e.arrival),ease=u=>u*u*(3-2*u),left=n.x-n.w/2,right=n.x+n.w/2;
+        const x=p<.3?left+(n.x-left)*ease(p/.3):p<.7?n.x:n.x+(right-n.x)*ease((p-.7)/.3),changed=p>=.5;
+        tokens.push({x,y:laneY(n,input.subscriber),value:changed?v.value:e.value,color:changed?v.color||'a':e.color||'a',
+          phase:'transform',scale:1+.2*Math.max(0,1-Math.abs(p-.5)/.12)});
+      }
+    }
     const nodeStates=nodes.map(n=>{
       const r=row(n),outgoing=records.filter(e=>e.a.id===n.id),incoming=records.filter(e=>e.b.id===n.id);
       const emitted=outgoing.flatMap(e=>e.events.filter(v=>v.at<=time).map(v=>v.logicalAt));
@@ -363,8 +393,18 @@ export function compileScene(scene) {
     const reveal=codeReveals.find(frame=>frame.index===codeIndex)||codeReveals.find(frame=>frame.index===codeIndex+1);
     return {id:scene.id,title:scene.title,code:codeFrames.filter(frame=>frame.at<=time).at(-1)?.code??scene.code,
       ...(reveal?{codeReveal:{prefix:reveal.prefix,suffix:reveal.suffix,opacity:clamp((time-reveal.at)/reveal.duration)}}:{}),
+      ...(codeLines.length?{codeView:codeLines.map(line=>line.map(({text,mark,shownAt,activeIntervals})=>({text,mark,
+        opacity:shownAt?clamp((time-shownAt)/fadeDuration):1,active:activeIntervals.some(([from,to])=>time>=from&&time<to)})))}:{}),
       width,height,textScale:graph.textScale??textScaleFor(scene),labelScale:graph.labelScale??labelScaleFor(scene),time,logicalTime,nodes:nodeStates,edges:edgeStates,tokens,histories,
       panels:(graph.panels||[]).map((panel,i)=>panelShownAt[i]===undefined?panel:{...panel,shownAt:panelShownAt[i],visible:time>=panelShownAt[i]}),cards:scene.kind==='cards'?scene.items:[],caption:captionAt(captions,time),
+      ...(graph.ball?{ball:graph.ball}:{}),
+      ...(callouts.length?{callouts:callouts.flatMap(callout=>{
+        const opacity=Math.min(clamp((time-callout.from)/.25),1-clamp((time-callout.to)/.3));
+        if(time<callout.from||opacity<=0)return [];
+        const subscriber=graph.subscribers?.[callout.subscriber]||{};
+        return [{text:callout.text,label:callout.subscriber,x:callout.x??width/2,y:callout.y,size:callout.size,opacity,
+          color:subscriber.color||colors.a,ink:subscriber.ink||subscriber.color||'#26323B',fill:subscriber.tint||'#fff'}];
+      })}:{}),
       ...executionState,
       metrics:(scene.metrics||[]).map(m=>({label:m.label,value:m.count?executionState.executionCounts[m.count]:m.value(logicalTime)})),
       queue:graph.queue?evaluate(graph.queue,logicalTime):null};

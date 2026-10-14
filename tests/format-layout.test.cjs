@@ -40,7 +40,8 @@ test('16:9 keeps the previous geometry and SVG of every variant',async()=>{
   const wide=compile(scene),legacy=compile({...scene,format:undefined});
   for(const time of [0,...wide.stops.map(s=>s.time),wide.duration])
    assert.equal(render(wide.snapshot(time)),render(legacy.snapshot(time)),scene.id+' @'+time);
-  assert.equal(wide.snapshot(0).textScale,1);
+  // 04a-dwa-tory (cold) ma w obu formatach wspólne, powiększone wymiary pod projektor (graph.textScale).
+  if(scene.id!=='04a-dwa-tory')assert.equal(wide.snapshot(0).textScale,1);
  }
 });
 

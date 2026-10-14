@@ -61,7 +61,7 @@ test('lanes finish independently and the receiver definition keeps its colour',a
  assert.equal(pulse.color,'#26804E','complete przebiega zielonym impulsem');assert.ok(pulse.at>0&&pulse.at<1);
  assert.equal(node(c.snapshot(sent+.3),'map').laneStates[0].state,'running','map zmienia stan dopiero po dotarciu complete');
  assert.ok(['http','map','A','B'].every(id=>node(end,id).laneStates.every(l=>l.state==='completed')));
- assert.deepEqual(Array.from(end.histories,h=>Array.from(h.values,v=>v.value)),[['widok'],['widok']]);
+ assert.deepEqual(Array.from(end.histories,h=>Array.from(h.values,v=>v.value)),[['42'],['42']]);
  const svg=render(done);
  assert.match(svg,/data-lane="B" data-lane-role="work" data-lane-state="running"/);
  assert.match(svg,/data-lane="A" data-lane-role="operator" data-lane-state="completed"/);
@@ -86,13 +86,58 @@ test('lanes finish independently and the receiver definition keeps its colour',a
  assert.equal(render(c.snapshot(at('second'))),render(c.snapshot(at('second'))),'deterministyczna klatka');
 });
 
-test('code adds each subscribe when it happens, so B visibly joins later',async()=>{
+test('code shows only the pipeline definition, coloured like its blocks',async()=>{
  const {c,at}=await lanes();
- assert.equal(c.snapshot(0).code,'const data$ = http.get(url).pipe(map(f))');
- assert.equal(c.snapshot(at('first')).code.split('\n')[1],'data$.subscribe(A)');
- const subscribeB=c.events.find(e=>e.type==='subscribe'&&e.edge==='map-B').at;
- assert.equal(c.snapshot(subscribeB+.3).code.split('\n')[1],'data$.subscribe(A); data$.subscribe(B)');
- assert.ok(c.snapshot(at('question')).codeReveal.opacity<1,'B dopisuje się dopiero przy swoim subscribe');
+ const view=t=>Array.from(c.snapshot(t).codeView,line=>Array.from(line,part=>({...part})));
+ for(const t of [0,at('first'),at('second'),c.duration]){
+  const v=view(t);
+  assert.equal(v.map(line=>line.map(p=>p.text).join('')).join('\n'),'http.get<number>(url).pipe(map(x => x * 2))','bez linii subscribe');
+ }
+ const marks=Object.fromEntries(view(0).flat().filter(p=>p.mark).map(p=>[p.mark.id,p]));
+ assert.deepEqual(Object.keys(marks).sort(),['http','map']);
+ const arrival=c.events.find(e=>e.type==='deliver-next'&&e.edge==='http-map-A').at,departure=c.events.find(e=>e.type==='source-next'&&e.edge==='map-A').at;
+ assert.ok(view((arrival+departure)/2).flat().find(p=>p.mark?.id==='map').active,'map świeci podczas przekształcenia');
+ assert.deepEqual(Array.from(c.snapshot(0).metrics,m=>m.label),['Pipeline','Requesty HTTP']);
+});
+
+test('cold: a transient .subscribe() overlay per lane, from the receiver appearing until the impulse reaches HTTP',async()=>{
+ const {c,at,render}=await lanes();
+ const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at;
+ const shown=t=>Array.from(c.snapshot(t).callouts||[],x=>x.text+' '+x.label);
+ assert.deepEqual(shown(0),[],'same definicje: brak napisu');
+ for(const id of ['A','B']){
+  const start=ev('subscribe','map-'+id),arrived=ev('connected','http-map-'+id);
+  assert.deepEqual(shown((start+arrived)/2),['.subscribe() '+id],'napis podczas impulsu '+id);
+  assert.ok(arrived-start+.3>=1.5,'napis widoczny wystarczająco długo');
+  assert.deepEqual(shown(arrived+.31),[],'znika po dotarciu impulsu do HTTP, nie czeka na request');
+  assert.equal(c.snapshot(arrived+.31).nodes.find(n=>n.id==='http').laneStates.find(l=>l.subscriber===id).state,'running');
+ }
+ assert.deepEqual(shown(at('first')),[]);assert.deepEqual(shown(at('second')),[]);
+ assert.deepEqual(shown(at('question')),['.subscribe() B']);
+ const callout=c.snapshot(at('question')).callouts[0];
+ assert.equal(callout.color,'#D8840F');
+ for(let t=0;t<=c.duration;t+=.05)assert.ok(!shown(t).some(x=>x.startsWith('.unsubscribe')),'complete nie pokazuje unsubscribe');
+ const svg=render(c.snapshot(at('question')));
+ assert.match(svg,/data-callout="\.subscribe\(\)" data-callout-lane="B"/);
+ const map=c.snapshot(at('question')).nodes.find(n=>n.id==='map');
+ assert.ok(callout.y+45*.78<map.y-map.h/2,'napis nad pipeline\'em, niczego nie zasłania');
+ assert.equal(render(c.snapshot(at('question'))),render(c.snapshot(at('question'))),'deterministycznie');
+});
+
+test('callouts also support a manual .unsubscribe() during the cancel animation (mechanism check on a copy of the share scene)',async()=>{
+ const fs2=require('node:fs');
+ class Slide{constructor(id){this.id=id;this.dataset={animation:id};this.heading={};this.player={setAttribute(){}};}querySelector(s){return s==='h2'?this.heading:this.player;}cloneNode(){return new Slide(this.id);}after(){}}
+ const slides=[...fs2.readFileSync('index.html','utf8').matchAll(/data-animation="([^"]+)"/g)].map(m=>new Slide(m[1]));
+ const m=await require('./v2-harness.cjs').modules(['catalog','presentation','engine'],{document:{querySelectorAll:()=>slides}});
+ const scene=m.presentation.prepareSlides(m.catalog.scenes,{format:'4:3'}).get('04a-dwa-tory-3');
+ const graph=scene.graph(scene);
+ const copy={...scene,graph:{...graph,callouts:[{text:'.unsubscribe()',subscriber:'A',y:60,
+  from:{type:'inner-unsubscribe',edge:'share-A'},to:{type:'disconnected',edge:'share-A'}}]}};
+ const c=m.engine.compileScene(copy),ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at;
+ const from=ev('inner-unsubscribe','share-A'),to=ev('disconnected','share-A');
+ assert.equal(c.snapshot((from+to)/2).callouts[0].text,'.unsubscribe()');
+ assert.equal((c.snapshot(to+.31).callouts||[]).length,0,'znika po animacji anulowania');
+ assert.equal(c.snapshot(ev('stream-complete','share-B')+.1).callouts?.length||0,0,'complete B bez napisu');
 });
 
 test('share() after map: one lane through HTTP and map, a hub fork to A and B, one response for both',async()=>{
@@ -148,8 +193,14 @@ test('producer progress is the row background moving forward, then the row turns
  assert.ok(Number(later[2])>Number(early[2]),'tło przesuwa się do przodu');
  assert.equal(fill(at('done'),'A'),null,'po complete wiersz przejmuje zieleń');
  assert.ok(fill(at('done'),'B'),'tor B nadal pokazuje postęp');
- const http=node(c.snapshot(c.duration),'http');
- assert.ok(http.rowH<=64&&http.defH<=84,'smukłe wiersze');
+ // Wymiary pod projektor: przy 1024×768 (≈0,787 px na jednostkę) nagłówek ~52 px, wiersz ~54 px, pipeline 85–90% szerokości.
+ const end=c.snapshot(c.duration),http=node(end,'http'),receiver=node(end,'A'),px=v=>v*.787;
+ assert.ok(Math.abs(px(http.defH)-62)<2&&Math.abs(px(http.rowH)-70)<2,'nagłówek +20%, wiersz +30%');
+ assert.ok(Math.abs(px(end.ball.r*2)-46)<2,'kulka 46 px');
+ const span=(receiver.x+receiver.w/2-(http.x-http.w/2))/end.width;
+ assert.ok(span>=.88&&span<=.92,'pipeline zajmuje ~90% szerokości: '+span);
+ const map=node(end,'map');
+ assert.ok(Math.abs((map.x-map.w/2)-(http.x+http.w/2)-((receiver.x-receiver.w/2)-(map.x+map.w/2)))<1e-9,'równe odstępy');
 });
 
 test('share(): A unsubscribes while B stays — grey row and cable without a pulse, shared upstream keeps running',async()=>{
@@ -168,4 +219,38 @@ test('share(): A unsubscribes while B stays — grey row and cable without a pul
  assert.deepEqual(lanesOf(end,'B'),['receiver:B:completed']);assert.deepEqual(lanesOf(end,'A'),['receiver:A:cancelled']);
  assert.match(render(cancelled),/data-lane-row="A" data-row-state="cancelled"/);
  assert.equal(cancelled.metrics.find(m=>m.label==='requesty HTTP').value,1);
+});
+
+test('cold: compact receivers on the lanes, value balls, transform inside map and HTTP wait ending with the response',async()=>{
+ for(const format of ['4:3','16:9']){
+  const {c,at,render}=await lanes(format);
+  const end=c.snapshot(c.duration),map=node(end,'map');
+  for(const id of ['A','B']){
+   const r=node(end,id),slot=id==='A'?0:1,laneY=map.top+map.defH+(slot+.5)*map.rowH;
+   assert.equal(r.y,laneY,format+' '+id+': odbiorca na wysokości toru');
+   assert.ok(r.h<=map.rowH&&r.defH===0,'odbiorca bez nagłówka, wysokości wiersza');
+   const e=end.edges.find(e=>e.id==='map-'+id);
+   assert.ok(e.points.every(p=>p[1]===laneY),'połączenie poziome');
+  }
+  const svg=render(c.snapshot(at('done')));
+  assert.match(svg,/data-icon="inbox"/);
+  assert.match(svg,/<circle cx="[^"]+" cy="[^"]+" r="[^"]+"[^>]*\/><text[^>]*>42<\/text>/,'wartość jako kulka');
+  const arrival=c.events.find(e=>e.type==='deliver-next'&&e.edge==='http-map-A').at,departure=c.events.find(e=>e.type==='source-next'&&e.edge==='map-A').at;
+  assert.ok(departure-arrival>=1,'kulka zatrzymuje się w map');
+  const ballAt=t=>c.snapshot(t).tokens.find(t=>t.phase==='transform');
+  assert.equal(ballAt(arrival+(departure-arrival)*.4).value,'21');assert.equal(ballAt(arrival+(departure-arrival)*.6).value,'42');
+  assert.equal(ballAt(arrival+(departure-arrival)*.5).x,map.x,'zatrzymanie na środku map');
+  const sent=c.events.find(e=>e.type==='source-next'&&e.edge==='http-map-A').at;
+  assert.equal(node(c.snapshot(sent),'http').laneStates[0].progress,1,'postęp HTTP kończy się z odpowiedzią');
+ }
+});
+
+test('receiver history keeps at most three latest balls at a constant size',async()=>{
+ const m=await require('./v2-harness.cjs').modules(['renderer']);
+ const values=['1','2','3','4','5'].map((value,i)=>({value,color:'a',shownAt:i}));
+ const frame={width:400,height:100,title:'t',caption:'',time:10,nodes:[],edges:[],tokens:[],panels:[],cards:[],ball:{r:20,font:24},
+  histories:[{anchor:'A',x:50,y:50,balls:true,max:3,gap:6,values}]};
+ const svg=m.renderer.renderScene(frame),radii=[...svg.matchAll(/data-token="received"[^>]*><circle[^>]* r="([^"]+)"/g)].map(x=>x[1]);
+ assert.deepEqual(radii,['20','20','20']);
+ assert.deepEqual([...svg.matchAll(/>(\d)<\/text>/g)].map(x=>x[1]),['3','4','5']);
 });

@@ -140,6 +140,18 @@ function executionPanel(frame,panel) {
   }
   return svg;
 }
+// Kulka wartości o stałym rozmiarze (graph.ball: r, font); scale tylko dla krótkiego pulsu przekształcenia.
+function ball(x,y,value,color,size,scale=1,attrs='') {
+  const r=size.r*scale,label=fitLabel(value,Math.max(1,Math.floor(r*2/(size.font*.58))));
+  const title=label===String(value)?'':`<title>${esc(value)}</title>`;
+  return `<g ${attrs}>${title}<circle cx="${x}" cy="${y}" r="${r}" fill="${colors[color]||color}" stroke="#fff" stroke-width="3"/>${text(x,y+1,label,size.font*scale,'style="font-weight:700"')}</g>`;
+}
+// Ikona odbiorcy „inbox”: tacka z wcięciem, obrys w kolorze tekstu.
+function inboxIcon(x,y,size) {
+  const h=size*.78,top=y-h/2,bottom=y+h/2,mid=top+h*.5,right=x+size,line=`stroke="#26323B" stroke-width="${(size/10).toFixed(2)}" fill="none" stroke-linejoin="round" stroke-linecap="round"`;
+  return `<g data-icon="inbox"><path d="M${x} ${mid}L${x+size*.2} ${top}H${right-size*.2}L${right} ${mid}V${bottom}H${x}Z" ${line}/>`+
+    `<path d="M${x} ${mid}H${x+size*.3}l${size*.08} ${h*.22}H${right-size*.38}l${size*.08} ${-h*.22}H${right}" ${line}/></g>`;
+}
 // Ikona stanu toru: ✓ complete, × error, przekreślony okrąg = odsubskrybowano. Trwający tor: producent (work, np. HTTP)
 // ma obracający się przerywany okrąg (zegar sceny); operator i odbiorca nieruchomy pierścień — podłączony, czeka na next.
 function laneIcon(x,y,lane,k,time=0) {
@@ -191,7 +203,7 @@ export function renderScene(frame,options={}) {
       svg+='</g>';continue;
     }
     const lines=wrapLabel(n.label,Math.floor(n.w/(14*k))),failed=n.workState==='errored';
-    svg+=`<g data-node="${esc(n.id)}" opacity="${opacity}" data-active="${n.active}" data-work-state="${n.workState}"><rect x="${n.x-n.w/2}" y="${n.y-n.h/2}" width="${n.w}" height="${n.h}" rx="5" fill="${n.fill}" stroke="${failed?'#b51e2e':n.active?'#805095':'#26343d'}" stroke-width="${failed||n.active?4:1.5}"/>`;
+    svg+=`<g data-node="${esc(n.id)}" opacity="${opacity}" data-active="${n.active}" data-work-state="${n.workState}"><rect x="${n.x-n.w/2}" y="${n.y-n.h/2}" width="${n.w}" height="${n.h}" rx="${n.rx??5}" fill="${n.fill}" stroke="${failed?'#b51e2e':n.active?'#805095':'#26343d'}" stroke-width="${failed||n.active?4:1.5}"/>`;
     // statusInside trzyma stan w kafelku, gdy pod nim stoi panel (np. EMISJE pod odbiorcą).
     const inside=n.statusInside&&n.status,labelShift=inside?-12*k:0;
     // Etykieta kafelka rośnie do labelScale (4:3), o ile najdłuższa linia mieści się w szerokości; inaczej zostaje przy textScale.
@@ -206,7 +218,7 @@ export function renderScene(frame,options={}) {
     // odcień kafelka), separator 1 px i pasek koloru toru — tożsamość subskrypcji zostaje w każdym stanie.
     // Stan to tło wiersza, bez ikon: trwa — tło bazowe, complete/error — delikatna zieleń/czerwień z krótkim
     // rozbłyskiem akcentu, unsubscribe — szary, przygaszony wiersz. Nagłówek definicji się nie zmienia.
-    const rows=n.laneRows||(n.defH&&n.subscriber?[{subscriber:n.subscriber,color:n.laneColor,
+    const rows=n.laneRows||(n.subscriber&&n.defH!==undefined?[{subscriber:n.subscriber,color:n.laneColor,
       top:n.y-n.h/2+n.defH,h:n.h-n.defH,growth:1}]:[]);
     const stateOf=id=>(n.laneStates||[]).find(l=>l.subscriber===id);
     const rowTint={completed:'#DDF1E1',error:'#F7D9D9',cancelled:'#E7E8E8'},rowAccent={completed:'#26804E',error:'#C54848'};
@@ -250,6 +262,11 @@ export function renderScene(frame,options={}) {
         svg+=`<rect x="${x0}" y="${lane.y-h/2}" width="${x1-x0}" height="${h}" rx="${12*k}" fill="#fff" fill-opacity=".62"/>`;
         svg+=`<circle cx="${x0+20*k}" cy="${lane.y}" r="${7*k}" fill="${lane.color}"/><circle cx="${x1-20*k}" cy="${lane.y}" r="${7*k}" fill="${lane.color}"/>`;
         svg+=laneIcon((x0+x1)/2,lane.y,lane,k,frame.time);
+      } else if(lane.role==='receiver'&&n.inbox) {
+        // Kompaktowy odbiorca: ikona inbox i identyfikator toru; odebrane wartości rysuje historia (kulki).
+        const size=n.inbox.size,x0=n.x-n.w/2+n.inbox.left;
+        svg+=inboxIcon(x0,lane.y,size);
+        if(lane.label)svg+=text(x0+size+8*k,lane.y,lane.label,n.inbox.font,'style="font-weight:700;fill:#43525b;text-anchor:start"');
       } else if(!inRow)svg+=laneIcon(n.x+n.w/2-30*k,n.y+n.h/2-30*k,lane,k,frame.time);
       svg+='</g>';
     }
@@ -265,9 +282,19 @@ export function renderScene(frame,options={}) {
   for(const panel of panels)svg+=executionPanel(frame,panel);
   for(const t of frame.tokens) {
     const edge=reduced&&frame.edges.find(e=>e.id===t.edge),point=edge?.points?.at(-1);
+    if(frame.ball){svg+=ball(point?.[0]??t.x,point?.[1]??t.y,t.value,t.color,frame.ball,reduced?1:t.scale||1,`data-value-on="${esc(t.edge||'source')}" data-token="${esc(t.phase)}"`);continue;}
     svg+=token(point?.[0]??t.x,point?.[1]??t.y,t.value,t.color,`data-value-on="${esc(t.edge||'source')}" data-token="${esc(t.phase)}"`,150*k,Boolean(panels.length),k);
   }
   for(const h of frame.histories) {
+    if(frame.ball&&h.balls) {
+      // Kulki odebranych wartości od lewej, stały rozmiar; najwyżej h.max ostatnich (starsze wypadają), fade-in 0,3 s.
+      const step=frame.ball.r*2+(h.gap??8);
+      h.values.slice(-(h.max||3)).forEach((value,i)=>{
+        const opacity=reduced||value.shownAt===undefined?1:clamp((frame.time-value.shownAt)/.3);
+        svg+=ball(h.x+i*step,h.y,value.value,value.color||'a',frame.ball,1,`data-token="received" opacity="${opacity}"`);
+      });
+      continue;
+    }
     if(h.lines>=1) {
       // Historia w zadanej liczbie linii, również jednej, po kolei w kolejności dotarcia. columns dzieli linię na kolumny;
       // kapsułka szersza niż kolumna zajmuje całą linię. Bez columns kapsułki płyną od lewej. Nadmiar pomija najstarsze linie.
@@ -311,6 +338,17 @@ export function renderScene(frame,options={}) {
       shown.forEach((v,i)=>svg+=token(h.x+(i-(shown.length-1)/2)*gap,h.y,v.value,v.color||'a','data-token="received"',gap-5,false,k));
       if(h.values.length>slots)svg+=text(h.x-h.w/2-8,h.y,'…',24*k);
     }
+  }
+  // Chwilowy napis zdarzenia nad diagramem (warstwa na wierzchu, niczego nie przesuwa): monospace w kolorze toru,
+  // delikatne tło i badge z identyfikatorem toru. Przy ograniczonym ruchu bez przejść.
+  for(const c of frame.callouts||[]) {
+    const size=c.size||45,charW=size*.6,textW=Array.from(c.text).length*charW,badge=size*1.15,gap=size*.32,pad=size*.45;
+    const w=pad+textW+gap+badge+pad,h=size*1.55,x0=c.x-w/2,opacity=reduced?1:c.opacity;
+    svg+=`<g data-callout="${esc(c.text)}" data-callout-lane="${esc(c.label)}" opacity="${+opacity.toFixed(3)}" role="note">`;
+    svg+=`<rect x="${x0}" y="${c.y-h/2}" width="${w}" height="${h}" rx="${h/2}" fill="${c.fill}" stroke="${c.color}" stroke-opacity=".55" stroke-width="2"/>`;
+    svg+=text(x0+pad,c.y+1,c.text,size,`style="text-anchor:start;font-family:Consolas,ui-monospace,monospace;font-weight:700;fill:${c.ink}"`);
+    svg+=`<rect x="${x0+pad+textW+gap}" y="${c.y-badge/2}" width="${badge}" height="${badge}" rx="${badge*.22}" fill="${c.color}"/>`;
+    svg+=text(x0+pad+textW+gap+badge/2,c.y+1,c.label,size*.82,'style="font-weight:700;fill:#fff"')+'</g>';
   }
   if(frame.queue&&!panels.length)svg+=text(frame.width/2,frame.height-20,frame.queue,22*k,'data-queue="true"');
   // Dwa rzędy kart dzielą wysokość diagramu; przy 340 daje to dotychczasowy krok 155 i karty 130.

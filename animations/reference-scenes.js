@@ -90,18 +90,37 @@ export function mapGraph(scene) {
 // jeden wspólny turkusowy tor S do share (jeden request, jedno map), dalej osobne wiersze A i B.
 // share-unsub: jak share, ale A robi unsubscribe przed odpowiedzią — share zostaje podłączony dla B.
 // color — kabel, gniazdo, czoło postępu, pasek wiersza; fill — kapsułki wartości; progress — tło postępu źródła.
-const laneSubscribers={A:{color:'#7457D9',fill:'#cbbff2',progress:'#c4b6f0'},B:{color:'#D8840F',fill:'#f3d09d',progress:'#f0c88c'},
+// ink i tint: ciemniejszy tekst i delikatne tło chwilowego napisu toru (kontrast na projektorze).
+const laneSubscribers={A:{color:'#7457D9',fill:'#cbbff2',progress:'#c4b6f0',ink:'#4f35b0',tint:'#f0ecfc'},
+  B:{color:'#D8840F',fill:'#f3d09d',progress:'#f0c88c',ink:'#8f5100',tint:'#fdf1e0'},
   S:{color:'#238F83',fill:'#a7d8d1',progress:'#7cc4b9',label:''}};
 const laneTiles={source:{headerFill:'#8FC9D4',runtimeFill:'#cde7ec'},operator:{headerFill:'#D8B3E6',runtimeFill:'#eddcf4'},
   receiver:{headerFill:'#EAE4F7',runtimeFill:'#f6f3fc'}};
+function coldCodeLines() {
+  const mark=(id,bg,line)=>({id,bg,line});
+  const http=mark('http','rgba(143,201,212,.4)','#4fa5b5'),map=mark('map','rgba(216,179,230,.45)','#b384c6');
+  const during=(from,to)=>({from,to}),ev=(type,edge)=>({type,edge});
+  const response=id=>during(ev('source-next',`http-map-${id}`),ev('deliver-next',`http-map-${id}`));
+  const transform=id=>during(ev('deliver-next',`http-map-${id}`),ev('source-next',`map-${id}`));
+  // Stała jest tylko definicja; subscribe pokazuje chwilowy napis nad diagramem (graph.callouts w coldLanesGraph).
+  const lines=[
+    [{text:'http.get<number>(url)',mark:http,active:[response('A'),response('B')]},{text:'.pipe('},
+      {text:'map(x => x * 2)',mark:map,active:[transform('A'),transform('B')]},{text:')'}],
+  ];
+  return {codeLines:lines,code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeFrames:[],playerClass:'rx-lanes'};
+}
 export function configureLanes(scene) {
   const mode=scene.lanesMode||'cold',shared=mode!=='cold',unsub=mode==='share-unsub';
   const a=laneSubscribers.A.fill,b=laneSubscribers.B.fill,s=laneSubscribers.S.fill;
-  const definition=shared?'const data$ = http.get(url).pipe(map(f), share())':'const data$ = http.get(url).pipe(map(f))';
+  const definition=shared?'const data$ = http.get(url).pipe(map(f), share())':'const data$ = http.get(url).pipe(map(x => x * 2))';
   const first=unsub?'const a = data$.subscribe(A)':'data$.subscribe(A)';
   const lastB=shared?5:7;
+  // cold: kod pokazuje sam pipeline (bez nazwy data$) i dwa osobne wywołania subscribe na jego wyniku.
+  // Fragmenty mają kolory odpowiadających klocków i torów, pojawiają się z subscribe i świecą, gdy klocek pracuje.
+  const coldCode=shared?{}:coldCodeLines();
   Object.assign(scene,{graph:lanesGraph,playerLayout:'function',duration:lastB+2,ink:'#26323B',
-    timing:{subscribe:shared?2.4:1.6,travel:1,transform:.6,terminal:.8,gap:.5},
+    // cold: dłuższa transformacja — kulka zatrzymuje się w map i zmienia 21 → 42.
+    timing:{subscribe:shared?2.4:1.6,travel:1,transform:shared?.6:1.4,terminal:.8,gap:.5},
     // Subscribe dopisuje się w kodzie w chwili subskrypcji: B pojawia się 2 s po A.
     code:definition,
     codeFrames:[{event:{type:'subscribe',edge:shared?'share-A':'map-A'},code:definition+'\n'+first,fadeIn:.3},
@@ -110,9 +129,9 @@ export function configureLanes(scene) {
       ...(unsub?[{event:{type:'inner-unsubscribe',edge:'share-A'},code:definition+'\na.unsubscribe()   // B nadal słucha'}]:[])],
     rows:shared?[R('HTTP',[E(5,'dane',s)],[B(1,5,'request')],{completeAt:5}),
       R('Odbiorca A',unsub?[]:[E(5,'widok',s)],[],unsub?{}:{completeAt:5}),R('Odbiorca B',[E(5,'widok',s)],[],{completeAt:5})]:
-      [R('HTTP A',[E(5,'dane',a)],[B(1,5,'request A')],{completeAt:5}),
-      R('HTTP B',[E(7,'dane',b)],[B(3,7,'request B')],{completeAt:7}),
-      R('Odbiorca A',[E(5,'widok',a)],[],{completeAt:5}),R('Odbiorca B',[E(7,'widok',b)],[],{completeAt:7})],
+      [R('HTTP A',[E(5,'21',a)],[B(1,5,'request A')],{completeAt:5}),
+      R('HTTP B',[E(7,'21',b)],[B(3,7,'request B')],{completeAt:7}),
+      R('Odbiorca A',[E(5,'42',a)],[],{completeAt:5}),R('Odbiorca B',[E(7,'42',b)],[],{completeAt:7})],
     captions:unsub?[[0,'share() za map: jedna definicja HTTP GET → map → share(). Nic jeszcze nie działa'],
       [1,'A subskrybuje share. share podpina się raz: przez map do HTTP, startuje jeden request'],
       [3,'2 s później B subskrybuje share. Upstream zostaje jeden'],
@@ -125,9 +144,9 @@ export function configureLanes(scene) {
       [[0,'Cold: jedna definicja HTTP GET → map. Nic jeszcze nie działa'],
       [1,'A subskrybuje. Subskrypcja biegnie przez map do HTTP i startuje request A'],
       [3,'2 s później B subskrybuje tę samą definicję. Cold: drugi tor przez map i drugi request'],
-      [5,'Request A kończy się. map na torze A przekształca dane, A dostaje wynik i complete. Tor B trwa'],
+      [5,'Request A zwraca 21. map na torze A zmienia je w 42, A dostaje wynik i complete. Tor B trwa'],
       [7,'Tor B kończy się osobno. Jedna definicja, dwa wykonania']],
-    metrics:[{label:'definicje',value:()=>1},{label:'requesty HTTP',value:t=>shared?Number(t>=1):(t>=1)+(t>=3)},
+    metrics:[{label:shared?'definicje':'Pipeline',value:()=>1},{label:shared?'requesty HTTP':'Requesty HTTP',value:t=>shared?Number(t>=1):(t>=1)+(t>=3)},
       ...(shared?[{label:'odbiorcy share',value:t=>(t>=1)+(t>=3)-(unsub&&t>=4)-(t>=5)*(unsub?1:2)}]:[])],
     playback:manual(unsub?[
       {id:'first',event:{type:'connected',edge:'http-map'},offset:.35,caption:'A subskrybuje: share podpina się przez map do HTTP, startuje jeden request'},
@@ -142,14 +161,50 @@ export function configureLanes(scene) {
       {id:'done',event:{type:'deliver-next',edge:'share-B'},offset:.35,caption:'Jedna odpowiedź, map raz. share rozsyła ten sam wynik do A i B'},
     ]:[
       {id:'first',event:{type:'connected',edge:'http-map-A'},offset:.35,caption:'A subskrybuje: map podpina się do HTTP i startuje request A'},
-      {id:'question',event:{type:'subscribe',edge:'map-B'},caption:'2 s później B subskrybuje tę samą definicję data$. Co stanie się z HTTP?'},
+      {id:'question',event:{type:'subscribe',edge:'map-B'},caption:'2 s później B subskrybuje ten sam pipeline. Co stanie się z HTTP?'},
       {id:'second',event:{type:'connected',edge:'http-map-B'},offset:.35,caption:'Drugi tor: osobny request B. Wspólna jest tylko definicja'},
       {id:'done',event:{type:'disconnected',edge:'map-A'},offset:.75,caption:'Tor A zakończony w HTTP, map i u odbiorcy. Tor B trwa dalej'},
     ]),
   });
+  if(!shared)Object.assign(scene,coldCode);
+}
+
+// Cold: wymiary dla projektora, liczone dla 1024×768 (≈0,787 px ekranu na jednostkę viewBox, czyli ×1,27):
+// nagłówek ~62 px (+20%), wiersz ~70 px (+30%), kulka ~46 px (wartość ~28 px), port 18, kabel 4, narożnik 6;
+// nagłówek ~32 px, litera ~27 px, inbox ~22 px (drugorzędny). Pipeline zajmuje ~90% szerokości, odstępy są równe,
+// a połączenia poziome. Wysokość całości (256) mieści się w obu formatach, więc wymiary są wspólne.
+function coldLanesGraph(scene) {
+  const tall=scene.format==='4:3';
+  const g={top:tall?178:102,defH:79,rowH:89,ball:{r:29,font:35.5},icon:28,portRadius:11.4,laneWire:5,rx:7.6,
+    textScale:1.42,labelScale:1.56,httpX:217,httpW:310,mapX:592,mapW:280,recvX:995,recvW:366,ballGap:10};
+  const k=g.textScale||1,rowY=slot=>g.top+g.defH+(slot+.5)*g.rowH,h=g.defH+2*g.rowH;
+  const grow=kind=>({top:g.top,defH:g.defH,rowH:g.rowH,laneSlots:{A:0,B:1},growRows:true,y:g.top+h/2,h,ready:true,detail:'',rx:g.rx,...laneTiles[kind]});
+  const complete=end=>({at:end,kind:'complete'}),fill=id=>laneSubscribers[id].fill;
+  const lane=(id,start,end)=>[
+    {id:`http-map-${id}`,from:'http',to:'map',subscriber:id,logicalStart:start,logicalEnd:complete(end),events:[E(end,'21',fill(id))]},
+    {id:`map-${id}`,from:'map',to:id,subscriber:id,logicalStart:start,logicalEnd:complete(end),events:[E(end,'42',fill(id))]}];
+  // Odbiorca: kompaktowy wiersz (pasek toru, inbox, litera, kulki wartości), 3 px odstępu od sąsiada.
+  const gap=3,left=6*k+12,inbox={size:g.icon,left,font:24*k};
+  const ballsX=x=>x-g.recvW/2+left+g.icon+8*k+22*k+12+g.ball.r;
+  const receiver=(id,slot)=>({id,x:g.recvX,y:rowY(slot),w:g.recvW,h:g.rowH-2*gap,top:rowY(slot)-g.rowH/2+gap,defH:0,rowH:g.rowH-2*gap,
+    laneSlots:{[id]:0},...laneTiles.receiver,label:'',subscriber:id,terminalBadge:true,detail:'',inbox,rx:g.rx});
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,portRadius:g.portRadius,laneWire:g.laneWire,ball:g.ball,
+    textScale:g.textScale,labelScale:g.labelScale,
+    subscribers:laneSubscribers,
+    nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,progressUntilNext:true,...grow('source')},
+      {id:'map',x:g.mapX,w:g.mapW,label:'map',color:'op',transformBalls:true,...grow('operator')},
+      receiver('A',0),receiver('B',1)],
+    edges:[...lane('A',1,5),...lane('B',3,7)],
+    trays:['A','B'].map((id,slot)=>({anchor:id,x:ballsX(g.recvX),y:rowY(slot),balls:true,max:3,gap:g.ballGap})),
+    // .subscribe() z identyfikatorem toru: od pojawienia się odbiorcy (0,3 s przed wysłaniem subscribe) do dotarcia
+    // impulsu do HTTP. Nie czeka na request. Pas nad pipeline'em jest pusty, więc napis niczego nie zasłania.
+    callouts:['A','B'].map(id=>({text:'.subscribe()',subscriber:id,y:g.top/2,size:45,
+      from:{type:'subscribe',edge:`map-${id}`,offset:-.3},to:{type:'connected',edge:`http-map-${id}`}})),
+  };
 }
 
 export function lanesGraph(scene) {
+  if((scene.lanesMode||'cold')==='cold')return coldLanesGraph(scene);
   const tall=scene.format==='4:3',mode=scene.lanesMode||'cold',shared=mode!=='cold',unsub=mode==='share-unsub';
   // Kompaktowe kafelki: stały nagłówek definicji, pod nim smukły wiersz wykonania na każdą subskrypcję docierającą do kafelka.
   // Proporcje wg makiety (nagłówek ~43, wiersz ~32, port ~15, kabel ~3), przeskalowane do slajdu (4:3 ×1,6, 16:9 ×1,25),

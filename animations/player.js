@@ -10,6 +10,8 @@ root.classList?.toggle('rx-expanded',scene.playerLayout==='expanded');
 root.classList?.toggle('rx-function',scene.playerLayout==='function');
 // Scena może mieć własny kolor tekstu (np. tory wykonania: #26323B); reszta korzysta z domyślnego --ink.
 if(scene.ink)root.style?.setProperty('--ink',scene.ink);
+// playerClass: klasa CSS tylko dla tej sceny (np. większe liczniki), bez zmiany układu innych slajdów.
+if(scene.playerClass)root.classList?.add(scene.playerClass);
 const staged=scene.playback?.controller==='stages', listeners=new Set();
 let controller;
 let time=0, running=false, previous=null, lastPaint=-Infinity, animationFrame=null, stopAt=null;
@@ -33,7 +35,14 @@ function paint(){
  // Kod jest tekstem (esc); <wbr> po „).” pozwala przenieść cały .pipe/.subscribe do nowej linii.
  const codeHtml=code=>esc(code).replace(/\)\./g,')<wbr>.');
  const reveal=snapshot.codeReveal;
- el.code.innerHTML=reveal?codeHtml(reveal.prefix)+`<span data-code-reveal="true" style="opacity:${reducedMotion&&reveal.opacity>0?1:reveal.opacity}" aria-hidden="${reveal.opacity===0}">${codeHtml(reveal.suffix)}</span>`:codeHtml(snapshot.code);
+ // codeView: fragmenty z kolorowym wyróżnieniem (tło + podkreślenie w kolorze klocka/toru), pojawianiem się i aktywnym podświetleniem.
+ const mark=segment=>{
+  const opacity=reducedMotion&&segment.opacity>0?1:segment.opacity,text=codeHtml(segment.text);
+  if(!segment.mark)return opacity<1?`<span style="opacity:${opacity}" aria-hidden="${opacity===0}">${text}</span>`:text;
+  return `<span class="rx-code-mark${segment.active?' rx-code-active':''}" data-mark="${esc(segment.mark.id||'')}" style="--mark-bg:${segment.mark.bg};--mark-line:${segment.mark.line};opacity:${opacity}" aria-hidden="${opacity===0}">${text}</span>`;
+ };
+ if(snapshot.codeView)el.code.innerHTML=snapshot.codeView.map(line=>line.map(mark).join('')).join('\n');
+ else el.code.innerHTML=reveal?codeHtml(reveal.prefix)+`<span data-code-reveal="true" style="opacity:${reducedMotion&&reveal.opacity>0?1:reveal.opacity}" aria-hidden="${reveal.opacity===0}">${codeHtml(reveal.suffix)}</span>`:codeHtml(snapshot.code);
  el.stage.innerHTML=renderScene(snapshot,{reducedMotion});
  el.caption.textContent=snapshot.caption;
  el.metrics.innerHTML=snapshot.metrics.map(m=>'<div class="rx-metric"><span>'+esc(m.label)+'</span><b>'+esc(m.value)+'</b></div>').join('');
