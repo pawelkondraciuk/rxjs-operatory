@@ -18,8 +18,12 @@ test('migrated slides share accepted prototype geometry and retain native Reveal
  for(const [id,mode]of [['09-concatmap','concatMap'],['10-mergemap','mergeMap'],['11-switchmap','switchMap'],['12-exhaustmap','exhaustMap']]){
   const real=scenes.get(id),prototype={...prototypes.find(s=>s.id==='prototype-'+mode),format:real.format},c=compile(real),p=compile(prototype);
   const shape=f=>JSON.stringify({nodes:f.nodes.map(n=>[n.id,n.x,n.y,n.w,n.h]),panels:f.panels,histories:f.histories.map(h=>[h.anchor,h.x,h.y,h.w,h.columns,h.lines,h.lineStep])});
-  assert.equal(shape(c.snapshot(0)),shape(p.snapshot(0)),id);
-  assert.deepEqual(history(c.snapshot(c.duration),'observer'),history(p.snapshot(p.duration),'observer'));
+  if(id==='09-concatmap'){
+   assert.equal(c.snapshot(0).panels[0].frameless,true);
+   assert.equal(p.snapshot(0).innerWorkPanels,undefined); // Prototypy i inne slajdy pozostają bez zmian.
+  }else assert.equal(shape(c.snapshot(0)),shape(p.snapshot(0)),id);
+  if(id==='09-concatmap')assert.deepEqual(history(c.snapshot(c.duration),'observer'),['A','B','C','D']);
+  else assert.deepEqual(history(c.snapshot(c.duration),'observer'),history(p.snapshot(p.duration),'observer'));
   assert.equal(real.playback.controller,undefined);assert.equal(real.playback.entry,'manual');
   assert.deepEqual(Array.from(c.stops,s=>s.id),['subscribe','first','active','question']);
  }
@@ -37,7 +41,7 @@ test('real concatMap queue is visible at the question, while concatAll queues ex
  assert.equal(queued.label,'B (wartość)');assert.equal(queued.opacity,1);assert.equal(q.executionCounts.started,1);
  assert.equal(q.executions.some(e=>e.id==='B'),false);
  const done=render(c.snapshot(c.duration));assert.equal((done.match(/data-inner-state="completed"/g)||[]).length,4);
- assert.doesNotMatch(done,/data-queue=|PRACE WEWNĘTRZNE|EMISJE|ODBIÓR/);
+ assert.match(done,/PRACE WEWNĘTRZNE/);assert.doesNotMatch(done,/data-queue=|EMISJE|ODBIÓR/);
  const all=compile(scenes.get('08-map-strumienie')),f=all.snapshot(all.stops.at(-1).time),svg=render(f);
  assert.equal(f.executionCounts.started,1);assert.match(svg,/<title>B\$ · ◷ w kolejce<\/title>/);
  assert.match(svg,/<title>C\$ · ◷ w kolejce<\/title>/);assert.equal(f.executions.some(e=>e.id==='B'),false);
@@ -90,8 +94,11 @@ test('source and flattening operator turn green at their own complete, not toget
    assert.equal(n.notification,null);
    assert.notEqual(c.snapshot(end.at-.001).nodes.find(n=>n.id===nodeId).fill,'#087438');
    const ended=c.snapshot(end.at).nodes.find(n=>n.id===nodeId);
-   assert.equal(ended.notification,'complete');assert.equal(ended.fill,'#087438');
-   assert.equal(final.nodes.find(n=>n.id===nodeId).fill,'#087438');
+   assert.equal(ended.notification,'complete');
+   if(id==='09-concatmap'){
+    assert.equal(ended.fill,n.fill);assert.equal(ended.laneStates[0].state,'completed');
+    assert.equal(final.nodes.find(n=>n.id===nodeId).fill,n.fill);
+   }else{assert.equal(ended.fill,'#087438');assert.equal(final.nodes.find(n=>n.id===nodeId).fill,'#087438');}
   }
  }
  const c=compile(scenes.get('12a-complete')),source=c.events.find(e=>e.type==='stream-complete'&&e.edge==='source-op');

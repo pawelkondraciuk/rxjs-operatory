@@ -76,7 +76,7 @@ test('4:3 tile labels grow to 1.3× when they fit and keep 1.15× for long names
   const group=svg.match(new RegExp(`<g data-node="${node}"[^>]*>(.*?)</g>`))[1];
   return Number(group.match(/<text[^>]*font-size="([^"]+)"/)[1]);
  };
- assert.equal(label('09-concatmap','source'),33.8);
+ assert.equal(label('09-concatmap','source'),41.6); // Powiększony nagłówek tylko concatMap.
  assert.equal(label('12-exhaustmap','observer'),33.8);
  assert.equal(label('14-distinct','distinct'),29.9);
 });

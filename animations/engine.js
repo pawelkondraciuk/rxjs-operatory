@@ -1,5 +1,6 @@
 import { catalogGraph } from './graph-presets.js';
 import { prepareExecutions, executionSnapshot } from './execution-state.js';
+import { innerWorkPanelSnapshot } from './inner-work-panel.js';
 import { layoutDiagram, stretchGraph, terminal, connectionState, palette, transitionDuration } from './lifecycle.js';
 import { graphHeightFor, textScaleFor, labelScaleFor } from './format.js';
 import { planFlow, fadeDuration } from './flow.js';
@@ -440,6 +441,7 @@ export function compileScene(scene) {
           color:subscriber.color||colors.a,ink:subscriber.ink||subscriber.color||'#26323B',fill:subscriber.tint||'#fff'}];
       })}:{}),
       ...executionState,
+      ...((graph.panels||[]).some(p=>p.innerWork)?{innerWorkPanels:graph.panels.filter(p=>p.innerWork).map(p=>innerWorkPanelSnapshot(p,records,births,time))}:{}),
       metrics:(scene.metrics||[]).map(m=>({label:m.label,value:m.count?executionState.executionCounts[m.count]:m.value(logicalTime)})),
       queue:graph.queue?evaluate(graph.queue,logicalTime):null};
   }

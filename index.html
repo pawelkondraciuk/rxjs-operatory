@@ -583,7 +583,7 @@
 				<section id="09-concatmap" class="animation-slide" data-animation="09-concatmap">
 					<h2>concatMap — Po kolei</h2>
 					<div class="rx-player" aria-label="concatMap — Po kolei"></div>
-					<aside class="notes"><ul><li><strong>Pytanie:</strong> B przychodzi podczas A$ — czy powstało już B$? Nie.</li><li><strong>Kolejka:</strong> B/C/D czekają jako wartości; jeszcze bez projekcji i HTTP.</li><li><strong>Moment:</strong> Complete A$ → projekcja B → subskrypcja B$.</li><li><strong>Wniosek:</strong> Jedna praca naraz; kolejność zachowana, kolejka zwiększa opóźnienie.</li></ul></aside>
+					<aside class="notes"><ul><li><strong>Pytanie:</strong> B przychodzi podczas A$ — czy powstało już B$? Nie.</li><li><strong>Kolejka:</strong> W górnym pipeline jest jeden główny Subscriber S1; źródło nie trzyma wyemitowanych wartości. Każdy HTTP daje jedną odpowiedź; w odbiorcy mieszczą się wszystkie cztery odpowiedzi A/B/C/D w stałym rozmiarze. url(id) wybiera endpoint requestu. Dół pokazuje prace #1–#4. B/C/D mają placeholder W KOLEJCE: bez projekcji, inner, portów i subskrypcji.</li><li><strong>Moment:</strong> Complete A$ → project(B) tworzy inner w miejscu placeholdera → subskrypcja B$ → progress w tle. Nie przesuwamy pozostałych wierszy.</li><li><strong>Wniosek:</strong> Jedna praca naraz; kolejność zachowana, kolejka zwiększa opóźnienie.</li></ul></aside>
 				</section>
 
 				<section id="10-mergemap" class="animation-slide" data-animation="10-mergemap">

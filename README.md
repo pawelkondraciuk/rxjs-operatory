@@ -335,9 +335,9 @@ Subject ma pionowe rozgałęzienie do dwóch odbiorców. Log źródła kończy z
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
-| 09-concatmap | concatMap — Po kolei | `source$.pipe(concatMap(makeInner$))` |
+| 09-concatmap | concatMap — Po kolei | `source$.pipe(concatMap(id => http.get(url(id))))` |
 
-**Na bloczkach:** source$ → concatMap → Odbiorca oraz panel prac. Wspólne wejście A, B, C, D; praca trwa 1,2 s od subskrypcji. A$ ma pasek, oczekujące B/C/D pozostają wartościami, nie aktywnymi HTTP. Po complete poprzednika projekcja tworzy następny inner. Wynik A1, A2, B1, B2, C1, C2, D1, D2.
+**Na bloczkach:** source$ → concatMap → kompaktowy Odbiorca, jeden główny tor S1 w kolorze fioletowym. Źródło i operator mają stały pastelowy nagłówek oraz dynamiczny execution lane. Porty i połączenia są poziome; Wiersz źródła zawiera tylko S1, bez historii emisji. Odbiorca mieści cztery kulki stałego rozmiaru, powiększone o 18%, z białymi literami — po jednej odpowiedzi na request. Kolory prac i odpowiedzi: A indygo #6D4CD3, B pomarańcz #B85D05, C niebieski #087FAD, D malinowy #B73770. Porty, paski i linie zachowują tę paletę; progress jest delikatnym odcieniem pracy, a complete pozostaje jasnozielone. Poniżej poziomego separatora jest PRACE WEWNĘTRZNE, bez otaczającej ramki: stałe, przylegające wiersze #1 · A, #2 · B, #3 · C, #4 · D. Aktywna praca ma postęp w tle, porty i lokalne wyjście do prawej granicy. Oczekująca wartość ma placeholder W KOLEJCE bez inner, subskrypcji i progressu. Po complete poprzednika placeholder zmienia się w utworzoną pracę w tym samym slocie, potem startuje subskrypcja i progress. Nagłówek dolnej kolumny to HTTP GET. url(id) wybiera endpoint; każdy inner emituje jedną odpowiedź i complete. Wspólne wejście A, B, C, D; praca trwa 1,2 s od subskrypcji. Wynik A, B, C, D — jedna wartość na request.
 
 **Speaker notes:**
 
@@ -883,13 +883,15 @@ Podgląd developerski: /work/animation-review.html (lokalna konfiguracja Vite ma
 
 ## Zaakceptowany układ rodziny *Map
 
-Slajdy 08–12, oba warianty `12a-complete` i `13-limit` korzystają teraz z tego samego grafu `flattenGraph` co prototypy. Źródło i odbiorca stoją na końcach; operator jest wyśrodkowany. Pod nimi są trzy boxy bez nagłówków: emisje w jednej kolumnie, stałe wiersze prac oraz odebrane wartości w dwóch kolumnach, w kolejności dotarcia.
+Slajdy 08–12, oba warianty `12a-complete` i `13-limit` korzystają teraz z tego samego grafu `flattenGraph` co prototypy. Źródło i odbiorca stoją na końcach; operator jest wyśrodkowany. Z wyjątkiem concatMap (opis poniżej), pod nimi są trzy boxy bez nagłówków: emisje w jednej kolumnie, stałe wiersze prac oraz odebrane wartości w dwóch kolumnach, w kolejności dotarcia.
 
-W concatMap „B (wartość)” pojawia się z fade-in po dotarciu B do operatora, a po zwolnieniu miejsca zmienia się w B$. concatAll pokazuje istniejące B$ i C$ czekające bez subskrypcji; wpis kolejki wchodzi z fade-in dopiero, gdy Observable utworzone przez map dotrze do concatAll. Wiersze zakończone pozostają zielone; pominięte wejścia exhaustMap nie tworzą wykonań. Standardowa siatka ma cztery miejsca; przykład limitu używa pięciu. Kapsułki emisji i odbioru wchodzą przez 0,3 s. Pasek pracy rośnie również podczas przelotu wartości; wynik wraca do operatora niewidocznie, a widoczna kulka wychodzi z operatora.
+**Wyjątek: concatMap — Po kolei.** Tylko `09-concatmap` ma górny pipeline w stylu Cold/share: jeden S1 z execution lanes, kolorowymi portami i stałymi nagłówkami definicji. Źródło nie trzyma historii emisji; cztery odpowiedzi HTTP są kulkami wewnątrz odbiorcy. Dół zajmuje ponad 90% szerokości diagramu; nagłówek PRACE WEWNĘTRZNE jest oddzielony poziomą linią, bez kontenera i przewodów między poziomami. Wiersze nie mają pionowych odstępów, completed zostaje zielonkawe z przygaszoną linią; kolejka to pełnoszeroki placeholder. Wynik przechodzi do prawej granicy dolnego panelu, a dopiero potem wychodzi z concatMap. Kontrola: #1 aktywny z #2/#3 w kolejce oraz #1 complete, #2 aktywny, #3 nadal czeka. Pozostałe slajdy i prototypy zachowują poprzedni wygląd; catchError jest odłożony.
+
+W concatMap B pojawia się jako wartość W KOLEJCE; dopiero po complete poprzednika powstaje B$ i jego subskrypcja. concatAll pokazuje istniejące B$ i C$ czekające bez subskrypcji; wpis kolejki wchodzi z fade-in dopiero, gdy Observable utworzone przez map dotrze do concatAll. Wiersze zakończone pozostają zielone; pominięte wejścia exhaustMap nie tworzą wykonań. Standardowa siatka ma cztery miejsca; przykład limitu używa pięciu. Kapsułki emisji i odbioru wchodzą przez 0,3 s. Pasek pracy rośnie również podczas przelotu wartości; wynik wraca do operatora niewidocznie, a widoczna kulka wychodzi z operatora.
 
 Liczniki uruchomionych i aktywnych inner korzystają ze stanu faktycznych subskrypcji. Sceny z tej rodziny trzymają nieruchomy wynik również w EXTRAS. Nawigacja i postoje Reveal rodziny flatteningu pozostają dotychczasowe. Kontroler `stages` działa w podglądzie prototypów oraz w przebudowanym wprowadzeniu (04, wszystkie 05, cold 06a, oba 07 i oba 20). Spacja pauzuje/wznawia także pozostałe animacje, bez zmiany natywnej obsługi statycznego otwarcia. Zachowano identyfikatory i działające demonstracje; kolejność części właściwej odpowiada opisanej wyżej narracji 30–35 minut.
 
-Na migrowanych slajdach diagram zajmuje 480 px wysokości. Większe kafelki mają 76 px wysokości, a odstęp do paneli 60 px; wiersze prac są rozdzielone o 20 px. Mniejszy podpis i liczniki są w stopce przy dole slajdu. U pokazuje kontrolki w miejscu stopki; ukrycie kontrolek przywraca podpis.
+Na migrowanych slajdach diagram zajmuje 480 px wysokości. Większe kafelki mają 76 px wysokości, a odstęp do paneli 60 px; wiersze prac są rozdzielone o 20 px, z wyjątkiem przylegających wierszy nowego concatMap. Mniejszy podpis i liczniki są w stopce przy dole slajdu. U pokazuje kontrolki w miejscu stopki; ukrycie kontrolek przywraca podpis.
 
 W `map + concatAll` oba kafelki stoją blisko siebie nad panelem prac: map wyrównuje się do jego lewej krawędzi, concatAll do prawej. Oba mają szerokość 240 px, z 40 px przerwy między nimi.
 

@@ -1,3 +1,4 @@
+import { createInnerWorkPanel } from './inner-work-panel.js';
 // Presety są wyłącznie danymi dla wspólnych Node / Edge / Token / History.
 const E=(at,value,color='a')=>({at,value,color,kind:'value'});
 const R=(label,events=[],spans=[],extra={})=>({label,events,spans,...extra});
@@ -514,7 +515,42 @@ export function flattenGraph(scene) {
     side(frame.observerX),
   ];
   graph.timeline = [...(graph.timeline||[]),...(scene.timeline||[])];
+  if (scene.id==='09-concatmap') configureConcatWorkPanel(graph,scene,frame);
   return graph;
+}
+
+// Wyłącznie concatMap: główny tor S1 nad lokalnymi pracami #1–#4.
+function configureConcatWorkPanel(graph,scene,frame) {
+  const large=scene.format==='4:3',top=large?28:10,defH=large?70:56,rowH=large?74:64;
+  const laneY=top+defH+rowH/2;
+  const main={color:'#7457D9',fill:'#D9CFF5',ink:'#513A9A',label:'S1'};
+  Object.assign(graph,{subscribers:{S1:main},laneWire:5,portRadius:11,ball:{r:25,font:29,textFill:'#fff'},
+    ...(large?{textScale:1.4,labelScale:1.6}:{})});
+  for(const [id,x,w,headerFill] of [['source',205,310,'#8FC9D4'],['op',600,310,'#D8B3E6']]) {
+    Object.assign(graph.nodes.find(n=>n.id===id),{x,w,top,defH,rowH,laneSlots:{S1:0},growRows:true,
+      y:top+(defH+rowH)/2,h:defH+rowH,headerFill,runtimeFill:'#EDE6F8',terminalBadge:true,detail:'',statusInside:false,rx:7});
+  }
+  const receiver=graph.nodes.find(n=>n.id==='observer');
+  Object.assign(receiver,{x:1025,w:370,y:laneY,h:rowH,top:laneY-rowH/2,defH:0,rowH,laneSlots:{S1:0},
+    label:'',detail:'',labelOffset:0,ready:false,born:.3,subscriber:'S1',headerFill:'#EAE4F7',runtimeFill:'#EDE6F8',
+    terminalBadge:true,statusInside:false,inbox:{size:25,left:16,font:30},rx:7});
+  for(const edge of graph.edges.filter(e=>!e.internal))edge.subscriber='S1';
+  graph.trays=[{anchor:'observer',x:970,y:laneY,w:270,balls:true,max:4,gap:8,ball:{r:29.5,font:34.2,textFill:'#fff'}}];
+  const works=scene.jobs.map((job,i)=>({id:'#'+(i+1),slot:i,value:job.value,color:['#6D4CD3','#B85D05','#087FAD','#B73770'][i%4],
+    node:'inner'+i,edge:'inner'+i+'-op',queuedNode:graph.nodes.some(n=>n.id==='queued'+i)?'queued'+i:undefined,
+    duration:job.dur??job.end-job.start,stages:[{column:'source',edge:'inner'+i+'-op',progress:true}]}));
+  const panel=createInnerWorkPanel({works,height:frame.height,large,y:large?228:180,
+    columns:[{id:'source',label:'HTTP GET',fill:'#8FC9D4',runtime:'#E3F0F3'}]});
+  Object.assign(panel,{frameless:true,dividerY:large?204:156,ballText:'#fff'});
+  graph.panels=[panel];
+  for(const node of graph.nodes.filter(n=>n.workRow))Object.assign(node,{x:panel.x+panel.w/2,
+    y:panel.rowsTop+node.slot*panel.rowHeight+panel.rowHeight/2,w:panel.w-32,h:panel.rowHeight});
+  for(const edge of graph.edges.filter(e=>e.from.startsWith('inner')))edge.travel=1;
+  const byValue=new Map(scene.jobs.map((job,i)=>[job.value,works[i].color]));
+  const emitted=new Map(graph.edges.filter(e=>e.from.startsWith('inner')).flatMap(e=>e.events.map(v=>
+    [JSON.stringify([v.at,v.value]),byValue.get(v.execution)])));
+  for(const edge of graph.edges)edge.events=edge.events.map(e=>({...e,
+    color:byValue.get(e.execution)||emitted.get(JSON.stringify([e.at,e.value]))||byValue.get(e.value)||e.color}));
 }
 
 // mergeMap: A i B jak w innych strategiach, ale C pracuje dłużej, a D krócej. Emisje C i D się przeplatają,
@@ -537,7 +573,7 @@ function overlapTail(scene) {
 }
 
 export function configureFlatten(scene,mode) {
-  const all=mode==='concatAll';
+  const all=mode==='concatAll',concatHttp=scene.id==='09-concatmap'&&mode==='concatMap';
   // Wspólne wejście i potencjalny czas pracy dla czterech strategii.
   const input=(all?[1,1.2,1.4]:[1,1.45,1.9,2.7]).map((at,i)=>({at,value:'ABCD'[i],dur:1.2,color:['a','b','c','a'][i]}));
   let end=0;
@@ -550,7 +586,7 @@ export function configureFlatten(scene,mode) {
   const result=[],rows=[R('wejście',input.map(v=>E(v.at,v.value,v.color)),[],{completeAt:3})];
   if(all)rows.push(R('map',input.map(v=>E(v.at,v.value+'$',v.color)),[],{completeAt:3}));
   for(const job of jobs) {
-    const ev=job.ignored?[]:(mode==='switchMap'?[1.1]:[.65,1.05]).filter(offset=>job.start+offset<job.end).map((offset,i)=>E(job.start+offset,job.value+(mode==='switchMap'?'':i+1),job.color));
+    const ev=concatHttp?[E(job.end,job.value,job.color)]:job.ignored?[]:(mode==='switchMap'?[1.1]:[.65,1.05]).filter(offset=>job.start+offset<job.end).map((offset,i)=>E(job.start+offset,job.value+(mode==='switchMap'?'':i+1),job.color));
     result.push(...ev);
     rows.push(R(job.value+'$',ev,job.ignored?[]:[...(job.start>job.at?[B(job.at,job.start,job.value+(all?'$':''),'queue')]:[]),
       B(job.start,job.end,job.value,job.cancelled?'cancel':'work',{duration:job.dur})],{completeAt:job.ignored||job.cancelled?undefined:job.end}));
@@ -560,8 +596,8 @@ export function configureFlatten(scene,mode) {
   rows.push(R('wynik',result,[],{completeAt:completed}));
   const question=all?'A$ pracuje; B$ i C$ już istnieją. Ile requestów uruchomiono?':mode==='switchMap'?'B dotarło podczas HTTP A. Co stanie się z aktywnym requestem?':mode==='concatMap'?'B dotarło podczas A$. Czy B czeka jako wartość?':mode==='mergeMap'?'B dotarło podczas A$. Czy uruchomimy drugą pracę?':'B dotarło podczas A$. Czy powstanie B$?';
   const incoming=all?'projection-op':'source-op';
-  Object.assign(scene,{rows,jobs,operatorName:mode,http:mode==='switchMap',graph:flattenGraph,duration:completed+1.2,
-    code:all?'source$.pipe(map(id => request$(id)), concatAll())':mode==='switchMap'?'id$.pipe(switchMap(id => http.get(`/api/users/${id}`)))':`source$.pipe(${mode}(makeInner$))`,
+  Object.assign(scene,{rows,jobs,operatorName:mode,http:concatHttp||mode==='switchMap',graph:flattenGraph,duration:completed+1.2,
+    code:concatHttp?'source$.pipe(concatMap(id => http.get(url(id))))':all?'source$.pipe(map(id => request$(id)), concatAll())':mode==='switchMap'?'id$.pipe(switchMap(id => http.get(`/api/users/${id}`)))':`source$.pipe(${mode}(makeInner$))`,
     captions:[[0,all?'map tworzy zimne Observable; concatAll subskrybuje po kolei.':mode==='mergeMap'?'Te same A/B/C/D: C pracuje dłużej, D krócej — kolejność wyników może się zmienić.':mode==='switchMap'?'Każde wejście uruchamia HTTP; nowe ID odłącza poprzednią subskrypcję.':'Te same A, B, C, D i czas pracy: 1,2 s od subskrypcji.'],
       [1,'A uruchamia pierwszą pracę.'],[1.45,question],[1.9,all?'B$ i C$ czekają bez pracy HTTP.':mode==='switchMap'?'Unsubscribe przerywa klienta; dopiero potem rusza nowe HTTP.':mode==='exhaustMap'?'B i C pominięte. Ich inner nie powstają.':'Strategia operatora określa kolejkę lub współbieżność.'],
       [2.7,mode==='exhaustMap'?'A$ skończyło się. D może uruchomić nowy inner.':'Wartości z aktywnych inner trafiają do odbiorcy.'],[completed,'Outer i wymagane inner zakończyły się. Wynik: complete.']],
@@ -572,6 +608,10 @@ export function configureFlatten(scene,mode) {
       {id:'question',...(all?{modelTime:1.4}:{event:{type:'deliver-next',edge:incoming,value:'B'}}),caption:question},
     ]),metrics:[{label:'uruchomione',value:t=>jobs.filter(j=>!j.ignored&&j.start<=t).length},{label:'aktywne',value:t=>jobs.filter(j=>!j.ignored&&j.start<=t&&t<j.end).length}],
   });
+  if(concatHttp) {
+    scene.captions[0][1]='Każde ID uruchamia jeden HTTP: jedna odpowiedź i complete. Kolejka czeka przed projekcją.';
+    scene.playback.stops.find(s=>s.id==='active').caption='Pierwszy HTTP jest aktywny; po odpowiedzi zakończy się i zwolni miejsce.';
+  }
   if(mode==='mergeMap')overlapTail(scene);
   configureFlattenPlayback(scene);
 }
