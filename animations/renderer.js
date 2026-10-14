@@ -140,6 +140,16 @@ function executionPanel(frame,panel) {
   }
   return svg;
 }
+// Ikona stanu toru: ✓ complete, × error, przekreślony okrąg = odsubskrybowano. Trwający tor: producent (work, np. HTTP)
+// ma obracający się przerywany okrąg (zegar sceny); operator i odbiorca nieruchomy pierścień — podłączony, czeka na next.
+function laneIcon(x,y,lane,k,time=0) {
+  const r=15*k,mark=color=>`stroke="${color}" stroke-width="${3.5*k}" stroke-linecap="round" stroke-linejoin="round" fill="none"`;
+  if(lane.state==='completed')return `<g data-lane-icon="completed"><circle cx="${x}" cy="${y}" r="${r}" fill="#087438"/><path d="M${x-7*k} ${y}l${5*k} ${5*k} ${9*k} ${-10*k}" ${mark('#fff')}/></g>`;
+  if(lane.state==='error')return `<g data-lane-icon="error"><circle cx="${x}" cy="${y}" r="${r}" fill="#b51e2e"/><path d="M${x-6*k} ${y-6*k}l${12*k} ${12*k}M${x+6*k} ${y-6*k}l${-12*k} ${12*k}" ${mark('#fff')}/></g>`;
+  if(lane.state==='cancelled')return `<g data-lane-icon="cancelled"><circle cx="${x}" cy="${y}" r="${r-1.5*k}" fill="#fff" ${mark('#61717a').replace('fill="none"','')}/><path d="M${x-9*k} ${y+9*k}L${x+9*k} ${y-9*k}" ${mark('#61717a')}/></g>`;
+  if(lane.role==='work')return `<circle data-lane-icon="running" cx="${x}" cy="${y}" r="${r-1.5*k}" fill="none" stroke="${lane.color}" stroke-width="${3*k}" stroke-dasharray="${5*k} ${4*k}" stroke-dashoffset="${(-time*14*k).toFixed(2)}"/>`;
+  return `<circle data-lane-icon="waiting" cx="${x}" cy="${y}" r="${r-1.5*k}" fill="#fff" stroke="${lane.color}" stroke-width="${3.5*k}"/>`;
+}
 export function renderScene(frame,options={}) {
   const reduced=Boolean(options.reducedMotion||frame.reducedMotion);
   // Skala tekstu i kapsułek (4:3 > 1); geometria węzłów i paneli pochodzi z grafu.
@@ -157,6 +167,8 @@ export function renderScene(frame,options={}) {
     svg+=`<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="12" fill="#f1eee7" stroke="#958875" stroke-width="2"/>`;
     if(p.label)svg+=text(p.x+18,p.y+18,p.label,20*k,'style="text-anchor:start;fill:#43525b"');
   }
+  for(const t of frame.laneTrails||[])
+    svg+=`<path data-lane-trail="${esc(t.id)}" data-trail-kind="${t.kind}" d="${t.points.map((p,i)=>(i?'L':'M')+p.join(' ')).join('')}" fill="none" stroke="${t.color}" stroke-width="${3*k}" opacity="${t.opacity}"${t.kind==='unsubscribe'?` stroke-dasharray="${8*k} ${6*k}"`:''}/>`;
   for(const e of frame.edges) if(e.visible&&!(reduced&&e.phase==='unsubscribe')) {
     const d=e.points.map((p,i)=>(i?'L':'M')+p.join(' ')).join('');
     const offset=reduced?(e.phase==='subscribed'?0:-1):e.offset;
@@ -181,11 +193,30 @@ export function renderScene(frame,options={}) {
     // Etykieta kafelka rośnie do labelScale (4:3), o ile najdłuższa linia mieści się w szerokości; inaczej zostaje przy textScale.
     const longest=Math.max(1,...lines.map(line=>Array.from(line).length));
     const labelSize=clamp((n.w-24)/(longest*.55),26*k,26*(frame.labelScale||k)),lineStep=28*labelSize/26;
-    lines.forEach((line,i)=>svg+=text(n.x,n.y+(n.labelOffset||0)+labelShift+(i-(lines.length-1)/2)*lineStep,line,labelSize,n.notification?'style="fill:#fff"':''));
+    lines.forEach((line,i)=>svg+=text(n.x,n.y+(n.labelOffset||0)+labelShift+(i-(lines.length-1)/2)*lineStep,line,labelSize,n.notification&&!n.terminalBadge?'style="fill:#fff"':''));
     if(inside)svg+=text(n.x,n.y+16*k,n.status,20*k,n.notification?'style="fill:#fff"':failed?'style="fill:#b51e2e"':'');
     else if(n.status)svg+=text(n.x,n.y+n.h/2+21*k,n.status,20*k,failed?'style="fill:#b51e2e"':'');
     if(n.showProgress)svg+=`<rect data-work-progress="${n.progress}" x="${n.x-n.w/2}" y="${n.y+n.h/2-9}" width="${n.w*n.progress}" height="9" fill="#132f42"/>`;
     if(n.transform)svg+=text(n.x,n.y+(n.transformOffset??n.h/2+52*k),n.transform,28*k,'data-transformation="true"');
+    // Tory subskrybentów: stan wykonania jako mały element w kafelku definicji (pasek, chip, znaczek), gniazda na krawędziach.
+    for(const lane of n.laneStates||[]) {
+      svg+=`<g data-lane="${esc(lane.subscriber)}" data-lane-role="${lane.role}" data-lane-state="${lane.state}"${lane.progress===undefined?'':` data-work-progress="${lane.progress}"`} opacity="${lane.opacity}"><title>${esc(lane.subscriber+' · '+lane.status)}</title>`;
+      if(lane.role==='work') {
+        const x0=n.x-n.w/2+48*k,x1=n.x+n.w/2-62*k,h=14*k,stopped=lane.state==='error'||lane.state==='cancelled';
+        svg+=text(n.x-n.w/2+24*k,lane.y,lane.subscriber,24*k,'style="font-weight:700;fill:#43525b"');
+        svg+=`<rect x="${x0}" y="${lane.y-h/2}" width="${x1-x0}" height="${h}" rx="${h/2}" fill="#26343d" fill-opacity=".18"/>`;
+        svg+=`<rect x="${x0}" y="${lane.y-h/2}" width="${(x1-x0)*lane.progress}" height="${h}" rx="${h/2}" fill="${stopped?'#b51e2e':lane.color}"/>`;
+        svg+=laneIcon(n.x+n.w/2-34*k,lane.y,lane,k,frame.time);
+      } else if(lane.role==='operator') {
+        const x0=n.x-n.w/2+22*k,x1=n.x+n.w/2-22*k,h=58*k;
+        svg+=`<rect x="${x0}" y="${lane.y-h/2}" width="${x1-x0}" height="${h}" rx="${12*k}" fill="#fff" fill-opacity=".62"/>`;
+        svg+=`<circle cx="${x0+20*k}" cy="${lane.y}" r="${7*k}" fill="${lane.color}"/><circle cx="${x1-20*k}" cy="${lane.y}" r="${7*k}" fill="${lane.color}"/>`;
+        svg+=laneIcon(n.x,lane.y,lane,k,frame.time);
+      } else svg+=laneIcon(n.x+n.w/2-30*k,n.y+n.h/2-30*k,lane,k,frame.time);
+      svg+='</g>';
+    }
+    for(const dot of n.socketDots||[])
+      svg+=`<circle data-socket="${dot.side}" data-subscriber="${esc(dot.subscriber)}" cx="${dot.side==='out'?n.x+n.w/2:n.x-n.w/2}" cy="${dot.y}" r="${13*k}" fill="${dot.color}" stroke="#fff" stroke-width="3" opacity="${dot.opacity}"/>`;
     svg+='</g>';
   }
   for(const panel of panels)svg+=executionPanel(frame,panel);

@@ -17,7 +17,7 @@ Sceny MAIN z pytaniami zaczynają od nieruchomego READY. Prawo / Page Down uruch
 
 W oknie prelegenta (`S`) podgląd następnego slajdu domyślnie pokazuje dużą nazwę, np. **switchMap**, i krótki podtytuł. Wskazuje kolejny slajd, także podczas ręcznych postojów bieżącej animacji. Przełącznik **Podgląd: Tytuł / Slajd** w prawym dolnym rogu tego pola przywraca standardowy podgląd. Wybór jest zapamiętywany w przeglądarce. Notatki pozostają w standardowym polu Notes. Opcjonalne `data-speaker-title` na sekcji ustawia własny podpis wyłącznie dla prelegenta.
 
-Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 67 slajdów daje 83 strony PDF.
+Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 68 slajdów daje 84 strony PDF.
 
 Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przywraca ekran panoramiczny 1280×720. `W` przeładowuje stronę w drugim formacie, zostając na tym samym slajdzie i fragmencie; animacja wraca do stanu tego fragmentu. Linki do EXTRAS i powrót do pytań zachowują wybrany format. Druk działa w obu: `?print-pdf` (4:3) lub `?print-pdf&ratio=16:9`. W 4:3 slajdy wykorzystują pełną wysokość: większe zdjęcia i kody QR, wyższe diagramy, większy tekst i kapsułki w animacjach (×1,15), etykiety kafelków do ×1,3 oraz większy tytuł (64 px; za długi zmniejsza się, by został w jednej linii), kod (42 px, długi łańcuch przechodzi do nowej linii przed .pipe/.subscribe) i podpis.
 
@@ -33,11 +33,11 @@ Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorz
 
 Pełne otwarcie pozostaje bez zmian: społeczność, historia meet.js, fotografie, autor, tytuł, ReactiveX, pytania o operatory i legenda. Budżet **30–35 minut dotyczy tylko części właściwej**; otwarcie, pytania i dogrywka są dodatkowo.
 
-MAIN ma **32 slajdy (19 animowanych)**. EXTRAS zawiera **35 wariantów**. Całość nadal obejmuje 50 bazowych slajdów HTML, 67 po rozwinięciu, 54 animowane. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
+MAIN ma **33 slajdy (20 animowanych)**. EXTRAS zawiera **35 wariantów**. Całość obejmuje 51 bazowych slajdów HTML, 68 po rozwinięciu, 55 animowanych. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
 
 Kolejność po legendzie:
 
-1. HTTP (`05-zrodla-2`) → timer/interval (`05-zrodla`) → map, pipe i wykonanie (`04-operator`).
+1. HTTP (`05-zrodla-2`) → timer/interval (`05-zrodla`) → map, pipe i wykonanie (`04-operator`) → testowy slajd torów subskrybentów (`04a-dwa-tory`).
 2. Dwa wykonania cold (`06a-cold-hot`) → dwa HTTP (`07-hot-cold`) → Subject (`05-zrodla-3`) → jedno aktywne HTTP z share (`07-hot-cold-2`) → późny odbiorca z share/shareReplay (`20-sharereplay`, `20-sharereplay-2`).
 3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap.
 4. catchError na zewnątrz/wewnątrz → distinctUntilChanged → wspólne porównanie debounceTime i auditTime (`16-czas-cztery`).
@@ -220,6 +220,16 @@ Pierwsza wartość przechodzi ręcznie: 1 → map → 2. Jeden RxJS map podwaja 
 **Speaker notes:** Najpierw źródło trzech osobnych wartości, potem składanie definicji przez pipe i uruchomienie przez subscribe. Operator dostaje Observable i zwraca Observable; map(project) tworzy funkcję przekazaną do pipe. Projekcja x => x * 2 przekształca pojedynczą liczbę. of, projekcja i odbiór są synchroniczne; postoje i przeloty dotyczą ilustracji.
 
 Kontroler `stages`: → zaczyna lub kończy etap, ← cofa checkpoint także w AUTO, Spacja pauzuje/wznawia, M zmienia tryb, R przywraca zatrzymany READY w wybranym trybie. Fade-in cofa się i resetuje razem z kodem i diagramem. Tempo ilustracji: etap pipe 0,65 s, subscribe 3,2 s, przelot 1,2 s, transformacja 1,4 s, zatrzymanie odbioru 0,5 s, terminal 1,2 s.
+
+### Cold: jedna definicja, dwa wykonania — `04a-dwa-tory` (slajd testowy)
+
+**MAIN — zaraz po 04-operator, test zapisu torów wykonania.** READY ma kod `const data$ = http.get(url).pipe(map(f))`; `data$.subscribe(A)` dopisuje się w chwili subscribe A, a `; data$.subscribe(B)` 2 s później przy subscribe B — dlatego A kończy się wcześniej. Cold, bez share, więc dwa tory biegną przez cały pipeline. Diagram: „HTTP GET” → „map” → „Odbiorca A” i „Odbiorca B”.
+
+**Definicja vs wykonanie.** Duże kafelki to definicja: HTTP i map widać od READY, odbiorcy pojawiają się przy swoim subscribe, a ich kafelki nie zmieniają koloru po complete. Wykonanie to małe elementy w kolorze odbiorcy (A fioletowy, B pomarańczowy): w HTTP litera toru, pasek requestu i ikona stanu; w map chip subskrypcji operatora (wejście, wyjście, ikona); u odbiorcy znaczek stanu i odebrana wartość `widok` w kafelku. Ikony: obracający się przerywany okrąg tylko przy HTTP (praca trwa); w map i u odbiorcy nieruchomy pierścień w kolorze toru (podłączony, czeka na next — map nie pracuje w tym czasie); zielony ✓ = complete, czerwony × = error, szary przekreślony okrąg = odsubskrybowano; opis tekstowy jest w tytule elementu. Kropki-gniazda na krawędziach i kable toru mają kolor odbiorcy. Po complete kabel zwija się na zielono, a tor zostaje przygaszony (cienka półprzezroczysta linia i gniazda), chipy zostają z ✓ — obok trwającego B widać historię A.
+
+A subskrybuje w 1 s, B w 3 s; każde HTTP trwa 4 s. Tor A kończy się w 5 s (HTTP, map, odbiorca), tor B trwa dalej i kończy się osobno w 7 s. Liczniki: 1 definicja, 2 requesty HTTP. Postoje: first (request A), question (B zaczyna subscribe — co z HTTP?), second (drugi tor i drugi request), done (tor A zakończony, B trwa), potem AUTO/hold.
+
+**Speaker notes:** Duże kafelki to jedna definicja data$, kolorowe tory to wykonania. Cold: każdy subscribe tworzy własną subskrypcję map i własny request. Na pytaniu zapytaj, czy B dołączy do requestu A. Każdy tor kończy się osobno; complete dotyczy subskrypcji, nie definicji. Wariant ze share pokazałby jeden tor HTTP i rozgałęzienie dopiero za share.
 
 ### Źródła — rodzina `05-zrodla`
 

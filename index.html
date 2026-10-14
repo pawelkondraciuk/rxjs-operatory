@@ -523,6 +523,15 @@
                     </aside>
 				</section>
 
+				<section id="04a-dwa-tory" class="animation-slide" data-animation="04a-dwa-tory">
+					<h2>Cold: jedna definicja, dwa wykonania</h2>
+					<div class="rx-player" aria-label="Cold: jedna definicja, dwa wykonania"></div>
+					<aside class="notes">
+                        <p><strong>Slajd testowy — cold, tory wykonania:</strong> Duże kafelki HTTP GET → map → odbiorcy to definicja data$. Małe elementy w kolorze odbiorcy (A fioletowy, B pomarańczowy) to wykonanie: w HTTP pasek requestu i ikona stanu, w map chip subskrypcji operatora, u odbiorcy znaczek stanu i odebrana wartość. Obracający się okrąg jest tylko przy HTTP (request trwa); w map i u odbiorcy nieruchomy pierścień znaczy: podłączony, czeka na next — map nie pracuje w tym czasie. Zielony ✓ to complete tej subskrypcji, nie definicji; zakończony tor zostaje przygaszony.</p>
+                        <p><strong>Przebieg:</strong> A subskrybuje w 1 s: subscribe biegnie przez map do HTTP, każdy kafelek dostaje gniazdo i element toru A. B subskrybuje 2 s później, w 3 s; kod dopisuje każde subscribe w chwili subskrypcji. Na pytaniu zapytaj, czy B dołączy do requestu A. Cold: powstaje drugi tor przez map i drugi request. Każde HTTP trwa 4 s; tor A kończy się w 5 s, tor B trwa i kończy się osobno w 7 s. Ze share HTTP miałoby jeden tor, a rozgałęzienie byłoby dopiero za share.</p>
+                    </aside>
+				</section>
+
 				<section id="05-zrodla" class="animation-slide" data-animation="05-zrodla">
 					<h2>Skąd płyną wartości?</h2>
 					<div class="rx-player" aria-label="Skąd płyną wartości?"></div>

@@ -85,6 +85,60 @@ export function mapGraph(scene) {
   };
 }
 
+// Cold: jedna definicja HTTP GET → map, dwa niezależne wykonania A i B przez cały pipeline.
+// Kafelki są definicją; tory w kolorach odbiorców pokazują wykonania: pasek w HTTP, chip w map, znaczek u odbiorcy.
+const laneSubscribers={A:{color:'#7d5bd0',fill:'#d4c6f4',tile:'#efeafb'},B:{color:'#d9800f',fill:'#ffd08a',tile:'#fcebd3'}};
+export function configureLanes(scene) {
+  const a=laneSubscribers.A.fill,b=laneSubscribers.B.fill;
+  Object.assign(scene,{graph:lanesGraph,playerLayout:'function',duration:9,
+    timing:{subscribe:1.6,travel:1,transform:.6,terminal:.8,gap:.5},
+    // Subscribe dopisuje się w kodzie w chwili subskrypcji: B pojawia się 2 s po A, więc A może skończyć wcześniej.
+    code:'const data$ = http.get(url).pipe(map(f))',
+    codeFrames:[{event:{type:'subscribe',edge:'map-A'},code:'const data$ = http.get(url).pipe(map(f))\ndata$.subscribe(A)',fadeIn:.3},
+      {event:{type:'subscribe',edge:'map-B'},code:'const data$ = http.get(url).pipe(map(f))\ndata$.subscribe(A); data$.subscribe(B)',fadeIn:.3}],
+    rows:[R('HTTP A',[E(5,'dane',a)],[B(1,5,'request A')],{completeAt:5}),
+      R('HTTP B',[E(7,'dane',b)],[B(3,7,'request B')],{completeAt:7}),
+      R('Odbiorca A',[E(5,'widok',a)],[],{completeAt:5}),R('Odbiorca B',[E(7,'widok',b)],[],{completeAt:7})],
+    captions:[[0,'Cold: jedna definicja HTTP GET → map. Nic jeszcze nie działa'],
+      [1,'A subskrybuje. Subskrypcja biegnie przez map do HTTP i startuje request A'],
+      [3,'2 s później B subskrybuje tę samą definicję. Cold: drugi tor przez map i drugi request'],
+      [5,'Request A kończy się. map na torze A przekształca dane, A dostaje wynik i complete. Tor B trwa'],
+      [7,'Tor B kończy się osobno. Jedna definicja, dwa wykonania']],
+    metrics:[{label:'definicje',value:()=>1},{label:'requesty HTTP',value:t=>(t>=1)+(t>=3)}],
+    playback:manual([
+      {id:'first',event:{type:'connected',edge:'http-map-A'},offset:.35,caption:'A subskrybuje: map podpina się do HTTP i startuje request A'},
+      {id:'question',event:{type:'subscribe',edge:'map-B'},caption:'2 s później B subskrybuje tę samą definicję data$. Co stanie się z HTTP?'},
+      {id:'second',event:{type:'connected',edge:'http-map-B'},offset:.35,caption:'Drugi tor: osobny request B. Wspólna jest tylko definicja'},
+      {id:'done',event:{type:'disconnected',edge:'map-A'},offset:.3,caption:'Tor A zakończony w HTTP, map i u odbiorcy. Tor B trwa dalej'},
+    ]),
+  });
+}
+
+export function lanesGraph(scene) {
+  const tall=scene.format==='4:3';
+  const g=tall?{top:110,laneA:245,laneB:425,bottom:510,recvH:156,httpX:200,httpW:300,mapX:605,mapW:270,recvX:1045,recvW:330,textScale:1.3,labelScale:1.7}:
+    {top:60,laneA:190,laneB:330,bottom:390,recvH:120,httpX:180,httpW:280,mapX:590,mapW:260,recvX:1030,recvW:300};
+  const h=g.bottom-g.top,y=(g.top+g.bottom)/2,k=g.textScale||1;
+  const lanes={laneIds:['A','B'],laneTop:g.laneA-y,laneStep:g.laneB-g.laneA,labelOffset:-h/2+48*k,detail:''};
+  const fill=id=>laneSubscribers[id].fill;
+  const lane=(id,start,end,color)=>[
+    {id:`http-map-${id}`,from:'http',to:'map',subscriber:id,logicalStart:start,logicalEnd:{at:end,kind:'complete'},events:[E(end,'dane',color)]},
+    {id:`map-${id}`,from:'map',to:id,subscriber:id,logicalStart:start,logicalEnd:{at:end,kind:'complete'},events:[E(end,'widok',color)]}];
+  // Kafelek odbiorcy jest definicją: nie zmienia koloru po complete; stan pokazuje znaczek, wynik leży w kafelku.
+  const receiver=(id,laneAt)=>({id,x:g.recvX,y:laneAt,w:g.recvW,h:g.recvH,label:`Odbiorca ${id}`,subscriber:id,
+    terminalBadge:true,labelOffset:-g.recvH/2+34*k,detail:''});
+  const tray=(id,laneAt)=>({anchor:id,x:g.recvX-g.recvW/2+80*k,y:laneAt+g.recvH/2-34*k,w:140*k,lines:1});
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,
+    ...(tall?{textScale:g.textScale,labelScale:g.labelScale}:{}),
+    subscribers:laneSubscribers,
+    nodes:[{id:'http',x:g.httpX,y,w:g.httpW,h,label:'HTTP GET',ready:true,workLanes:true,...lanes},
+      {id:'map',x:g.mapX,y,w:g.mapW,h,label:'map',color:'op',ready:true,...lanes},
+      receiver('A',g.laneA),receiver('B',g.laneB)],
+    edges:[...lane('A',1,5,fill('A')),...lane('B',3,7,fill('B'))],
+    trays:[tray('A',g.laneA),tray('B',g.laneB)],
+  };
+}
+
 // Wariant timer/interval: timer(1000) emituje 0 i kończy się complete. interval(1000) emituje 0, 1, 2 i sam się nie kończy,
 // więc odbiorca ręcznie robi unsubscribe (3,5 s): kabel się odłącza, bez complete. Trzy wartości mieszczą się w boxie.
 export function configureTimers(scene) {
@@ -414,6 +468,7 @@ export function configureFlattenPlayback(scene) {
 
 export function configureReferences(scenes) {
   configureOperator(scenes.find(s=>s.id==='04-operator'));
+  configureLanes(scenes.find(s=>s.id==='04a-dwa-tory'));
   configureFlatten(scenes.find(s=>s.id==='08-map-strumienie'),'concatAll');
   configureFlatten(scenes.find(s=>s.id==='11-switchmap'),'switchMap');
   const share=scenes.find(s=>s.id==='19-share');

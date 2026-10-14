@@ -106,6 +106,7 @@ test('subscription chains have no gaps: a receiver never waits for its upstream 
   const records=[...compile(scene).plan.records.values()];
   for(const r of records.filter(r=>!r.gateWork))for(const down of records.filter(d=>d.a.id===r.b.id)){
    if(scene.id.startsWith('20-sharereplay')&&r.id==='http2-hub')continue; // share po resecie: nowe HTTP dla B
+   if(r.subscriber&&down.subscriber&&r.subscriber!==down.subscriber)continue; // osobne tory subskrybentów
    assert.ok(r.logicalStart<=down.logicalStart+1e-6,`${scene.id}: ${down.id} @${down.logicalStart}, ${r.id} @${r.logicalStart}`);
   }
  }

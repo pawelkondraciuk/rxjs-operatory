@@ -8,6 +8,7 @@ import { clamp, colors, geometry, pointAt } from './primitives.js';
 const empty={events:[],spans:[]};
 const evaluate=(value,time)=>typeof value==='function'?value(time):value;
 const captionAt=(captions,time)=>(captions||[]).filter(c=>c[0]<=time).at(-1)?.[1]||'';
+const laneY=(n,id)=>{const i=(n.laneIds||[]).indexOf(id);return i<0?n.y:n.y+(n.laneTop||0)+i*(n.laneStep||0);};
 const workSpans=row=>(row.spans||[]).filter(p=>!['queue','state','window','subscription'].includes(p.kind));
 
 // Kompilacja wykonuje się raz. Cały graf (także niewidoczne inner) rezerwuje miejsca.
@@ -43,6 +44,11 @@ export function compileScene(scene) {
       if(edge.until!==undefined&&(!end||edge.until<end.at))end={at:edge.until,kind:'unsubscribe'};
       edge.logicalEnd=end;
     }
+  }
+  // Tory subskrybentów: krawędź z subscriber łączy gniazda na wysokości toru (laneIds/laneTop/laneStep kafelka).
+  for(const edge of edges) if(edge.subscriber&&!edge.points) {
+    const sx=edge.a.x+edge.a.w/2,ex=edge.b.x-edge.b.w/2,mid=(sx+ex)/2,y1=laneY(edge.a,edge.subscriber),y2=laneY(edge.b,edge.subscriber);
+    edge.points=[[sx,y1],[mid,y1],[mid,y2],[ex,y2]];
   }
   for(let i=0;i<edges.length;i++) for(const edge of edges) {
     const downstream=edges.filter(next=>next.a===edge.b&&!next.gateWork);
@@ -120,7 +126,13 @@ export function compileScene(scene) {
     return {...stop,time:time+(stop.offset||0)};
   });
   const checkpoints=[...new Set([0,plan.duration,...events.map(e=>e.at),...stops.map(s=>s.time),...(scene.checkpoints||[]).map(plan.timeOf)])].filter(Number.isFinite).sort((a,b)=>a-b);
-  const codeFrames=[...(scene.codeFrames||[])].sort((a,b)=>a.at-b.at);
+  // Wpis kodu może wskazać zdarzenie (jak postój) zamiast czasu ilustracji, np. dopisanie subscribe w chwili subskrypcji.
+  const codeFrames=(scene.codeFrames||[]).map(frame=>{
+    if(!frame.event)return frame;
+    const match=events.find(e=>Object.entries(frame.event).every(([key,value])=>e[key]===value));
+    if(!match)throw new Error(`${scene.id}: nierozwiązany wpis kodu`);
+    return {...frame,at:match.at+(frame.offset||0)};
+  }).sort((a,b)=>a.at-b.at);
   const codeReveals=codeFrames.flatMap((frame,i)=>{
     if(!frame.fadeIn)return [];
     const prefix=i?codeFrames[i-1].code:scene.code;
@@ -149,13 +161,74 @@ export function compileScene(scene) {
     return match.at;
   });
 
+  // Gniazda: kropka subskrybenta na prawej krawędzi nadawcy (po dotarciu subscribe) i lewej odbiorcy (od wysłania subscribe).
+  // Znikają razem z połączeniem: complete/error najpierw u nadawcy, unsubscribe najpierw u odbiorcy.
+  const subscriberColor=id=>graph.subscribers?.[id]?.color||colors.a;
+  const laneRecords=records.filter(r=>r.subscriber&&!r.internal);
+  const connectedAt=r=>r.start+(r.connectDuration||transitionDuration);
+  const hideAt=r=>{
+    if(!r.end)return {out:Infinity,in:Infinity};
+    const duration=r.end.duration||transitionDuration;
+    if(r.end.kind==='unsubscribe')return {in:r.end.at,out:r.end.at+duration};
+    const finish=Math.max(r.end.at,...r.events.filter(e=>e.at<=r.end.at).map(e=>e.arrival));
+    return {out:finish,in:finish+duration};
+  };
+  // Zakończony tor zostaje przygaszony (trail): gniazda i cienka linia pokazują historię wykonania obok trwających torów.
+  const trail=.4;
+  const presence=(time,shown,hidden)=>Math.min(clamp((time-shown)/fadeDuration),1-(1-trail)*clamp((time-hidden)/fadeDuration));
+  function laneTrails(time) {
+    return laneRecords.filter(r=>r.end).flatMap(r=>{
+      const duration=r.end.duration||transitionDuration;
+      const from=r.end.kind==='unsubscribe'?r.end.at:Math.max(r.end.at,...r.events.filter(e=>e.at<=r.end.at).map(e=>e.arrival));
+      const opacity=trail*clamp((time-from)/duration);
+      return opacity>0?[{id:r.id,subscriber:r.subscriber,kind:r.end.kind,points:r.points||geometry(r.a,r.b),color:subscriberColor(r.subscriber),opacity}]:[];
+    });
+  }
+  function socketsOf(n,time) {
+    return laneRecords.flatMap(r=>{
+      const hidden=hideAt(r),side=r.a.id===n.id?'out':r.b.id===n.id?'in':null;
+      if(!side)return [];
+      const opacity=side==='out'?presence(time,connectedAt(r),hidden.out):presence(time,r.start,hidden.in);
+      return opacity>0?[{side,subscriber:r.subscriber,edge:r.id,y:laneY(n,r.subscriber),color:subscriberColor(r.subscriber),opacity}]:[];
+    });
+  }
+  // Stan wykonania na torze (mały element w kafelku definicji): work — pasek i ikona producenta (np. HTTP),
+  // operator — chip subskrypcji operatora, receiver — znaczek odbiorcy. Kafelek pozostaje definicją.
+  // workUntil (czas modelu) zachowuje niedokończony pasek po anulowaniu.
+  const laneStatus={running:'w trakcie',waiting:'podłączony, czeka na next',completed:'✓ complete',error:'× error',cancelled:'odsubskrybowano'};
+  function laneStatesOf(n,time) {
+    const ids=[...new Set(laneRecords.filter(r=>r.a.id===n.id||r.b.id===n.id).map(r=>r.subscriber))];
+    return ids.flatMap(subscriber=>{
+      const out=laneRecords.find(r=>r.a.id===n.id&&r.subscriber===subscriber),input=laneRecords.find(r=>r.b.id===n.id&&r.subscriber===subscriber);
+      const role=out&&n.workLanes?'work':out&&input?'operator':input&&!out?'receiver':null;
+      if(!role)return [];
+      const from=role==='receiver'?input.start:connectedAt(out);
+      if(time<from)return [];
+      let state='running',stoppedAt;
+      if(role==='receiver') {
+        const end=input.end,arrival=end&&(end.kind==='unsubscribe'?end.at:end.at+(end.duration||transitionDuration));
+        if(end&&time>=arrival)state=end.kind==='complete'?'completed':end.kind==='error'?'error':'cancelled';
+      } else if(out.end&&time>=out.end.at) {
+        state=out.end.kind==='complete'?'completed':out.end.kind==='error'?'error':'cancelled';stoppedAt=out.end.at;
+      }
+      const lane={role,subscriber,y:laneY(n,subscriber),color:subscriberColor(subscriber),fill:graph.subscribers?.[subscriber]?.fill,
+        state,status:laneStatus[state==='running'&&role!=='work'?'waiting':state],opacity:clamp((time-from)/fadeDuration)};
+      if(role==='work') {
+        const to=out.workUntil!==undefined?plan.timeOf(out.workUntil):out.end?.at??plan.duration;
+        lane.progress=state==='completed'?1:clamp(((stoppedAt??time)-from)/Math.max(1e-9,to-from));
+      }
+      return [lane];
+    });
+  }
+
   function snapshot(time) {
     time=clamp(time,0,plan.duration);
     const logicalTime=plan.logicalTime(time);
     const executionState=executionSnapshot(executionDefinitions,records,events,time,logicalTime,Boolean(graph.illustratedWork));
     const edgeStates=records.map(r=>{
       const state=connectionState(time,r.start,r.end,r.events,r.connectDuration);
-      return {...state,id:r.id,from:r.a.id,to:r.b.id,points:r.points||geometry(r.a,r.b),visible:!r.internal&&time>=r.start&&!state.done,
+      const color=r.subscriber&&state.phase==='subscribed'?subscriberColor(r.subscriber):state.color;
+      return {...state,color,subscriber:r.subscriber,id:r.id,from:r.a.id,to:r.b.id,points:r.points||geometry(r.a,r.b),visible:!r.internal&&time>=r.start&&!state.done,
         progress:1-Math.abs(state.offset)};
     });
     const stateByEdge=new Map(edgeStates.map(e=>[e.id,e]));
@@ -207,7 +280,7 @@ export function compileScene(scene) {
       const wires=incoming.filter(e=>!e.internal);
       const wired=!wires.length||wires.some(e=>time>=e.start+(e.connectDuration||transitionDuration)&&!(e.end&&time>=e.end.at));
       const subscribed=wired&&r.spans.some(p=>p.kind==='subscription'&&p.start<=t&&p.end>t);
-      let status=notification?(notification==='complete'?'✓ complete':'× error'):detail;
+      let status=notification&&!n.terminalBadge?(notification==='complete'?'✓ complete':'× error'):detail;
       if(status===undefined)status=canceled?(n.cancelLabel||'odsubskrybowano'):errored?'× error':queued?'czeka w kolejce':stateSpan?.label||
         (active?(n.timer?'okno otwarte':'praca trwa'):completed?'complete':graph.illustratedWork&&workEdge&&!started||subscribed?'subskrybuje':'');
       const lastInput=incoming.flatMap(e=>e.events.filter(v=>v.arrival<=time)).sort((a,b)=>a.arrival-b.arrival).at(-1);
@@ -226,11 +299,12 @@ export function compileScene(scene) {
         else if(to>from)progress=clamp((time-from)/(to-from))*share;
         else progress=clamp((t-span.start)/(span.end-span.start))*share;
       }
-      const fill=notification?palette[notification]:queued||n.workRow&&!active&&!canceled&&!completed&&!errored?colors.muted:n.work||n.inner?palette.work:receiver?palette.observer:!incoming.length?palette.source:colors[n.color]||colors.op;
+      const fill=notification&&!n.terminalBadge?palette[notification]:n.subscriber&&graph.subscribers?.[n.subscriber]?graph.subscribers[n.subscriber].tile||graph.subscribers[n.subscriber].fill||subscriberColor(n.subscriber):queued||n.workRow&&!active&&!canceled&&!completed&&!errored?colors.muted:n.work||n.inner?palette.work:receiver?palette.observer:!incoming.length?palette.source:colors[n.color]||colors.op;
       return {...n,label:evaluate(n.label,t),visible:time>=births.get(n.id)&&(n.until===undefined||t<n.until),
         opacity:n.ready||n.instant?1:clamp((time-births.get(n.id))/fadeDuration),fill,status,notification,workState,
         active:activity||Boolean(transform&&time<transform.until),progress,showProgress:Boolean(span&&(active||canceled)),transform:transform?.label,
-        disabled:evaluate(n.disabled,t)};
+        disabled:evaluate(n.disabled,t),
+        ...(laneRecords.length?{socketDots:socketsOf(n,time),laneStates:laneStatesOf(n,time)}:{})};
     });
     const histories=trays.map(q=>{
       const values=records.filter(e=>e.b.id===q.anchor).flatMap(e=>e.events.filter(v=>v.arrival<=time));
@@ -249,6 +323,7 @@ export function compileScene(scene) {
     return {id:scene.id,title:scene.title,code:codeFrames.filter(frame=>frame.at<=time).at(-1)?.code??scene.code,
       ...(reveal?{codeReveal:{prefix:reveal.prefix,suffix:reveal.suffix,opacity:clamp((time-reveal.at)/reveal.duration)}}:{}),
       width,height,textScale:graph.textScale??textScaleFor(scene),labelScale:graph.labelScale??labelScaleFor(scene),time,logicalTime,nodes:nodeStates,edges:edgeStates,tokens,histories,
+      ...(laneRecords.length?{laneTrails:laneTrails(time)}:{}),
       panels:(graph.panels||[]).map((panel,i)=>panelShownAt[i]===undefined?panel:{...panel,shownAt:panelShownAt[i],visible:time>=panelShownAt[i]}),cards:scene.kind==='cards'?scene.items:[],caption:captionAt(captions,time),
       ...executionState,
       metrics:(scene.metrics||[]).map(m=>({label:m.label,value:m.count?executionState.executionCounts[m.count]:m.value(logicalTime)})),
