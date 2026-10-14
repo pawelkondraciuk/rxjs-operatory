@@ -91,7 +91,7 @@ function slotPanel(frame,panel) {
   return svg;
 }
 function executionPanel(frame,panel,reduced=false) {
-  if(panel.innerWork)return innerWorkPanel(frame.innerWorkPanels.find(p=>p.id===panel.id),reduced);
+  if(panel.innerWork)return innerWorkPanel(frame.innerWorkPanels.find(p=>p.id===panel.id),frame,reduced);
   if(panel.slots)return slotPanel(frame,panel);
   const {rows,hidden,focused,executions}=executionPanelRows(frame,panel);
   const header=panel.recipe?66:38,rowHeight=panel.rowHeight||42,gap=4,detailsHeight=panel.detailsHeight||0;
@@ -142,54 +142,65 @@ function executionPanel(frame,panel,reduced=false) {
   return svg;
 }
 
-// Jeden konfigurowalny widok mini-pipeline'u; stany i czasy są już wyliczone w snapshocie.
-function innerWorkPanel(panel,reduced=false) {
-  const {x,y,w,rowsTop,rowHeight,headerH,identifierW,stageGap,exitW,font}=panel;
-  const left=x+identifierW+24,right=x+w-18,count=panel.columns.length;
-  const stageW=Math.min(count===1?560:Infinity,(right-left-exitW-stageGap*(count-1))/count);
-  const stageX=i=>left+i*(stageW+stageGap),titleY=rowsTop-headerH;
-  const fills={completed:'#DDF1E1',cancelled:'#E7E8E8',errored:'#F7D9D9'};
+// Kafelek prac wygląda jak kafelki głównego toru: płaski nagłówek definicji (HTTP GET) o wysokości nagłówka u góry
+// i wiersze wykonań z paskiem koloru pracy, etykietą, postępem w tle i stanem tekstem. Stany i czasy są już w snapshocie.
+function innerWorkPanel(panel,frame,reduced=false) {
+  const {x,w,rowsTop,rowHeight,headerH,identifierW,stageGap,font,tileLeft,tileRight}=panel;
+  const k=frame.textScale||1,right=x+w-18,count=panel.columns.length,bar=6*k,titleY=rowsTop-headerH;
+  const portR=panel.portRadius||8,wireW=panel.wire||4;
+  // Jedna kolumna zajmuje cały wiersz (postęp za etykietą, jak w HTTP GET toru); kilka dzieli miejsce za identyfikatorem.
+  const stageW=count===1?tileRight-tileLeft:(tileRight-tileLeft-identifierW-stageGap*(count-1))/count;
+  const stageX=i=>count===1?tileLeft:tileLeft+identifierW+i*(stageW+stageGap);
+  const fills={completed:'#DDF1E1',cancelled:'#E7E8E8',errored:'#F7D9D9'},accent={completed:'#26804E',errored:'#C54848'};
   const status={completed:'complete',cancelled:'anulowane',errored:'error',subscribing:'subskrybuje',idle:'oczekuje'};
+  const waiting=(row,label,dashed)=>{
+    const px=tileLeft+identifierW,pw=tileRight-px-10;
+    return `<rect data-inner-placeholder="${row.state}" x="${px}" y="${row.y+6}" width="${pw}" height="${rowHeight-13}" fill="#EEEBE9"${dashed?' stroke="#BEB4BF" stroke-width="2" stroke-dasharray="8 6"':''}/>`+
+      text(px+pw/2,row.y+rowHeight/2,label,font,'style="fill:#746B76;font-weight:600"');
+  };
   let svg=`<g data-inner-work-panel="${esc(panel.id)}">`;
   panel.columns.forEach((column,i)=>{
-    svg+=`<rect x="${stageX(i)}" y="${titleY}" width="${stageW}" height="${headerH-4}" rx="5" fill="${column.fill}"/>`;
-    svg+=text(stageX(i)+stageW/2,titleY+(headerH-4)/2,column.label,font,'style="fill:#26323B"');
+    const labelSize=clamp((stageW-24)/(Math.max(1,column.label.length)*.55),26*k,26*(frame.labelScale||k));
+    svg+=`<rect x="${stageX(i)}" y="${titleY}" width="${stageW}" height="${headerH}" fill="${column.fill}"/>`;
+    svg+=text(stageX(i)+stageW/2,titleY+headerH/2,column.label,labelSize,'style="fill:#26323B"');
   });
   for(const row of panel.rows) {
-    const cy=row.y+rowHeight/2,muted=row.state==='cancelled',identity=muted?'#808890':row.color;
+    const cy=row.y+rowHeight/2,h=rowHeight-1,muted=row.state==='cancelled',identity=muted?'#808890':row.color;
+    const idLabel=text(tileLeft+bar+14,cy,row.id+' · '+row.value,font,`style="text-anchor:start;fill:${identity};font-weight:700"`);
     svg+=`<g data-inner-work="${esc(row.id)}" data-inner-state="${row.state}" data-row-slot="${row.slot}" opacity="${reduced?1:row.opacity}">`;
     svg+=`<title>${esc(row.id+' · '+row.value+' · '+row.state)}</title>`;
-    svg+=`<rect x="${x+16}" y="${row.y}" width="${identifierW-8}" height="${rowHeight}" fill="#FFFBF4" stroke="#D2C9C4" stroke-width="1"/>`;
-    svg+=`<rect x="${x+16}" y="${row.y}" width="7" height="${rowHeight}" fill="${identity}"/>`;
-    svg+=text(x+32,cy,row.id+' · '+row.value,font,`style="text-anchor:start;fill:${identity};font-weight:600"`);
+    svg+=`<rect x="${tileLeft}" y="${row.y}" width="${tileRight-tileLeft}" height="${h}" fill="#F4F1EE"/>`;
     if(row.state==='queued'||row.state==='ignored') {
       const queued=row.state==='queued';
-      svg+=`<rect data-inner-placeholder="${row.state}" x="${left}" y="${row.y}" width="${right-left}" height="${rowHeight}" fill="${queued?'#EEEBE9':'#F2EDEA'}"${queued?' stroke="#BEB4BF" stroke-width="2" stroke-dasharray="8 6"':''}/>`;
-      svg+=text((left+right)/2,cy,queued?row.queueLabel||'W KOLEJCE':'pominięte',font,'style="fill:#746B76;font-weight:600"');
-      svg+='</g>';continue;
+      svg+=`<rect x="${tileLeft}" y="${row.y}" width="${bar}" height="${h}" fill="${identity}"${queued?'':' opacity=".45"'}/>`+idLabel;
+      svg+=waiting(row,queued?row.queueLabel||'W KOLEJCE':'pominięte',queued);
+      svg+=`<path d="M${tileLeft} ${row.y}H${tileRight}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/></g>`;continue;
     }
-    if(row.reveal<1&&!reduced) {
-      svg+=`<g opacity="${1-row.reveal}"><rect x="${left}" y="${row.y}" width="${right-left}" height="${rowHeight}" fill="#EEEBE9" stroke="#BEB4BF" stroke-dasharray="8 6"/>`;
-      svg+=text((left+right)/2,cy,row.queueLabel||'W KOLEJCE',font,'style="fill:#746B76;font-weight:600"')+'</g>';
-    }
+    // Wpis kolejki ustępuje płynnie miejscu wykonania w tym samym slocie.
+    if(row.reveal<1&&!reduced)svg+=`<g opacity="${1-row.reveal}">${waiting({...row,state:'queued'},row.queueLabel||'W KOLEJCE',true)}</g>`;
     svg+=`<g opacity="${reduced?1:row.reveal}">`;
     row.stages.forEach((stage,i)=>{
       const column=panel.columns[i],sx=stageX(i),fill=fills[stage.state]||column.runtime;
-      svg+=`<g data-inner-stage="${esc(column.id)}" data-stage-state="${stage.state}"><rect x="${sx}" y="${row.y}" width="${stageW}" height="${rowHeight}" fill="${fill}" stroke="#BFC9CB" stroke-width="1"/>`;
+      const glow=accent[stage.state]&&!reduced&&stage.since!==undefined?.28*(1-clamp((frame.time-stage.since)/.6)):0;
+      svg+=`<g data-inner-stage="${esc(column.id)}" data-stage-state="${stage.state}"><rect x="${sx}" y="${row.y}" width="${stageW}" height="${h}" fill="${fill}"/>`;
+      if(glow>0)svg+=`<rect data-row-flash="${stage.state}" x="${sx}" y="${row.y}" width="${stageW}" height="${h}" fill="${accent[stage.state]}" opacity="${glow.toFixed(3)}"/>`;
       if(stage.hasProgress&&['active','cancelled'].includes(stage.state)) {
-        svg+=`<rect data-inner-progress="${stage.progress}" x="${sx}" y="${row.y}" width="${stageW*stage.progress}" height="${rowHeight}" fill="${row.color}" opacity="${stage.state==='cancelled'?.12:.25}"/>`;
+        const pw=(stageW-bar)*stage.progress;
+        svg+=`<rect data-inner-progress="${stage.progress}" x="${sx+bar}" y="${row.y}" width="${pw}" height="${h}" fill="${muted?'#808890':row.color}" opacity="${muted?.18:.25}"/>`;
+        if(stage.state==='active'&&stage.progress>0&&stage.progress<1)svg+=`<rect x="${sx+bar+pw-3*k}" y="${row.y}" width="${3*k}" height="${h}" fill="${row.color}"/>`;
       }
-      svg+=`<rect x="${sx}" y="${row.y}" width="7" height="${rowHeight}" fill="${stage.state==='cancelled'?'#808890':row.color}"/>`;
+      svg+=`<rect x="${sx}" y="${row.y}" width="${bar}" height="${h}" fill="${identity}"/>`;
       const label=status[stage.state]||(stage.hasProgress?'w trakcie':'oczekuje');
-      svg+=text(sx+stageW/2,cy,label,font,`style="fill:${stage.state==='completed'?'#26804E':stage.state==='errored'?'#C54848':'#26323B'}"`);
+      svg+=text(sx+stageW-18,cy,label,font,`style="text-anchor:end;fill:${stage.state==='completed'?'#26804E':stage.state==='errored'?'#C54848':'#26323B'}"`);
       svg+='</g>';
     });
+    svg+=idLabel+`<path d="M${tileLeft} ${row.y}H${tileRight}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/>`;
     for(const wire of row.wires) {
       if(!wire.visible)continue;
       const sx=stageX(wire.index)+stageW,ex=wire.index<count-1?stageX(wire.index+1):right;
-      svg+=`<path data-inner-wire="${esc(row.id)}-${wire.index}" d="M${sx} ${cy}H${ex}" fill="none" stroke="${wire.color}" stroke-width="4" opacity="${wire.opacity}" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${reduced?0:-(1-wire.subscribe)}"/>`;
-      if(wire.pulse&&!reduced)svg+=`<path data-inner-pulse="${esc(row.id)}-${wire.index}" d="M${sx} ${cy}H${ex}" fill="none" stroke="${wire.pulse.color}" stroke-width="8" pathLength="1" stroke-dasharray=".22 2" stroke-dashoffset="${.22-wire.pulse.at*1.22}"/>`;
-      for(const port of [sx,ex])svg+=`<circle data-inner-port="true" cx="${port}" cy="${cy}" r="8" fill="${wire.color}" opacity="${wire.opacity*wire.subscribe}"/>`;
+      svg+=`<path data-inner-wire="${esc(row.id)}-${wire.index}" d="M${sx} ${cy}H${ex}" fill="none" stroke="${wire.color}" stroke-width="${wireW}" opacity="${wire.opacity}" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${reduced?0:-(1-wire.subscribe)}"/>`;
+      if(wire.pulse&&!reduced)svg+=`<path data-inner-pulse="${esc(row.id)}-${wire.index}" d="M${sx} ${cy}H${ex}" fill="none" stroke="${wire.pulse.color}" stroke-width="${wireW*2}" stroke-linecap="round" pathLength="1" stroke-dasharray=".18 2" stroke-dashoffset="${(.18-wire.pulse.at*1.18).toFixed(4)}"/>`;
+      for(const port of [sx,ex])svg+=`<circle data-inner-port="true" cx="${port}" cy="${cy}" r="${portR}" fill="${wire.color}" stroke="#fff" stroke-width="3" opacity="${wire.opacity*wire.subscribe}"/>`;
     }
     for(const t of row.tokens) {
       const sx=stageX(t.stage)+stageW,ex=t.stage<count-1?stageX(t.stage+1):right;
@@ -198,7 +209,7 @@ function innerWorkPanel(panel,reduced=false) {
         const scale=font/25,bubbleW=Math.min(stageW-24,(String(t.value).length*13+20)*scale);
         svg+=token(Math.min(tx,right-bubbleW/2),cy,t.value,t.color,'data-inner-next="true"',stageW-24,true,scale);
       }
-      else svg+=ball(tx,cy,t.value,t.color,{r:Math.min(26,rowHeight*.4),font:font*.92,textFill:panel.ballText},1,'data-inner-next="true"');
+      else svg+=ball(tx,cy,t.value,t.color,panel.ball?{...panel.ball,textFill:panel.ballText}:{r:Math.min(26,rowHeight*.4),font:font*.92,textFill:panel.ballText},1,'data-inner-next="true"');
     }
     svg+='</g></g>';
   }
@@ -239,7 +250,9 @@ export function renderScene(frame,options={}) {
   for(const p of visiblePanels) {
     if(p.frameless) {
       svg+=`<path data-panel-divider="true" d="M${p.x} ${p.dividerY}H${p.x+p.w}" stroke="#C7BDCD" stroke-width="2"/>`;
-      if(p.label)svg+=text(p.x+16,p.y+18,p.label,24*k,'style="text-anchor:start;fill:#65566C"');
+      // labelY: napis przy prawej krawędzi na zadanej wysokości (np. obok nagłówka kafelka prac).
+      if(p.label)svg+=p.labelY===undefined?text(p.x+16,p.y+18,p.label,24*k,'style="text-anchor:start;fill:#65566C"'):
+        text(p.x+p.w-16,p.labelY,p.label,24*k,'style="text-anchor:end;fill:#65566C"');
       continue;
     }
     // Łącznik pionowy do górnej krawędzi panelu albo poziomy, gdy panel stoi obok kafelka.

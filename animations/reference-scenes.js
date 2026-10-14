@@ -546,13 +546,18 @@ function configureHttpWorkPanel(graph,scene,frame) {
     ...(all?{value:job.value+'$',queueObservable:true,queueLabel:'W KOLEJCE · Observable'}:{}),
     ...(job.ignored?{ignoredNode:'ignored'+i}:{}),
     duration:job.dur??job.end-job.start,stages:[{column:'source',edge:'inner'+i+'-op',progress:true}]}));
-  const panel=createInnerWorkPanel({works,height:frame.height,large,y:large?228:180,
+  // Kafelek prac stoi pod źródłem i operatorem (lewa krawędź źródła – prawa krawędź operatora), z nagłówkiem
+  // i wierszami tej samej wysokości co u góry; porty i kabel wyniku jak w głównym torze.
+  const source=graph.nodes.find(n=>n.id==='source'),op=graph.nodes.find(n=>n.id==='op');
+  const panel=createInnerWorkPanel({works,height:frame.height,large,headerH:defH,rowH,
+    tileLeft:source.x-source.w/2,tileRight:op.x+op.w/2,
     columns:[{id:'source',label:'HTTP GET',fill:'#8FC9D4',runtime:'#E3F0F3'}]});
-  Object.assign(panel,{frameless:true,dividerY:large?204:156,ballText:'#fff'});
+  Object.assign(panel,{ballText:'#fff',portRadius:11,wire:5,ball:graph.ball});
   graph.panels=[panel];
   for(const node of graph.nodes.filter(n=>n.workRow))Object.assign(node,{x:panel.x+panel.w/2,
     y:panel.rowsTop+node.slot*panel.rowHeight+panel.rowHeight/2,w:panel.w-32,h:panel.rowHeight});
-  for(const edge of graph.edges.filter(e=>e.from.startsWith('inner')))edge.travel=1;
+  // Subscribe inner trwa tyle co jeden krok głównego toru (0,8 s), nie cały łańcuch.
+  for(const edge of graph.edges.filter(e=>e.from.startsWith('inner')))Object.assign(edge,{travel:1,connect:.8});
   const byValue=new Map(scene.jobs.flatMap((job,i)=>[[job.value,works[i].color],[job.value+'$',works[i].color]]));
   const emitted=new Map(graph.edges.filter(e=>e.from.startsWith('inner')).flatMap(e=>e.events.map(v=>
     [JSON.stringify([v.at,v.value]),byValue.get(v.execution)])));
@@ -606,7 +611,8 @@ export function configureFlatten(scene,mode) {
   const question=all?'A$ pracuje; B$ i C$ już istnieją. Ile requestów uruchomiono?':mode==='switchMap'?'B dotarło podczas HTTP A. Co stanie się z aktywnym requestem?':mode==='concatMap'?'B dotarło podczas A$. Czy B czeka jako wartość?':mode==='mergeMap'?'B dotarło podczas A$. Czy uruchomimy drugą pracę?':'B dotarło podczas A$. Czy powstanie B$?';
   const incoming=all?'projection-op':'source-op';
   Object.assign(scene,{rows,jobs,operatorName:mode,http:httpWork||mode==='switchMap',graph:flattenGraph,duration:completed+1.2,
-    ...(httpWorkSlides.has(scene.id)?{playerClass:'rx-flatten-flat'}:{}),
+    // Tempo ilustracji jak w 04a (cold HTTP): krok subscribe 0,8 s, przelot 1 s, przekształcenie w map 1,4 s, terminal 0,8 s.
+    ...(httpWork?{playerClass:'rx-flatten-flat',timing:{subscribe:all?2.4:1.6,travel:1,transform:1.4,terminal:.8,gap:.5}}:{}),
     code:httpWork?(all?'source$.pipe(map(id => http.get(url(id))), concatAll())':`${mode==='switchMap'?'id$':'source$'}.pipe(${mode}(id => http.get(url(id))))`):all?'source$.pipe(map(id => request$(id)), concatAll())':mode==='switchMap'?'id$.pipe(switchMap(id => http.get(`/api/users/${id}`)))':`source$.pipe(${mode}(makeInner$))`,
     captions:[[0,all?'map tworzy zimne Observable; concatAll subskrybuje po kolei.':mode==='mergeMap'?'Te same A/B/C/D: C pracuje dłużej, D krócej — kolejność wyników może się zmienić.':mode==='switchMap'?'Każde wejście uruchamia HTTP; nowe ID odłącza poprzednią subskrypcję.':'Te same A, B, C, D i czas pracy: 1,2 s od subskrypcji.'],
       [1,'A uruchamia pierwszą pracę.'],[1.45,question],[1.9,all?'B$ i C$ czekają bez pracy HTTP.':mode==='switchMap'?'Unsubscribe przerywa klienta; dopiero potem rusza nowe HTTP.':mode==='exhaustMap'?'B i C pominięte. Ich inner nie powstają.':'Strategia operatora określa kolejkę lub współbieżność.'],

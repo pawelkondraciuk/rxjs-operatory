@@ -48,8 +48,9 @@ export function planFlow(nodes, links, modelDuration, timingOverrides) {
         const fade = Math.max(reveal(e.b.id,ready),reveal(e.a.id,ready));
         const record=records.get(e.id);
         record.start=ready+fade;
-        record.connectDuration=connectDuration;
-        const done=record.start+connectDuration;
+        // edge.connect: własny czas zestawienia jednego połączenia (np. subscribe inner tempem kroku głównego toru).
+        record.connectDuration=e.connect??connectDuration;
+        const done=record.start+record.connectDuration;
         finished.set(e,done);
         return done;
       }

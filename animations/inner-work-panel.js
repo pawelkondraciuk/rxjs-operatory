@@ -1,11 +1,16 @@
 const clamp = value => Math.max(0,Math.min(1,value));
 
-export function createInnerWorkPanel({works,columns,height,large=false,y=large?240:202,id='jobs',minRows=4}) {
-  const x=28,w=1184,headerH=large?46:36,rowsTop=y+(large?86:70);
-  const slots=Math.max(minRows,works.length),rowHeight=(height-20-rowsTop)/slots;
-  return {id,innerWork:true,label:'PRACE WEWNĘTRZNE',x,y,w,h:height-20-y,
-    slots:works.length,rowsTop,rowStep:rowHeight,rowHeight,headerH,
-    identifierW:large?184:172,stageGap:72,exitW:110,font:large?30:25,columns,works};
+// Geometria jak w kafelkach głównego toru: nagłówek HTTP GET ma wysokość nagłówka definicji (headerH), wiersz — wysokość
+// toru (rowH), o ile wszystkie sloty mieszczą się nad dolnym marginesem. Linia podziału stoi w połowie odstępu od kafelków,
+// napis panelu — na wysokości nagłówka, przy prawej krawędzi, nad kablami wyników. Kafelek prac zajmuje zakres
+// tileLeft–tileRight, a wynik biegnie od jego prawej krawędzi do granicy panelu.
+export function createInnerWorkPanel({works,columns,height,large=false,id='jobs',minRows=4,headerH=large?70:56,rowH=large?74:64,
+  dividerY=large?203:146,headerTop=large?234:162,tileLeft=44,tileRight=796}) {
+  const x=28,w=1184,bottom=height-(large?12:8),rowsTop=headerTop+headerH;
+  const slots=Math.max(minRows,works.length),rowHeight=Math.min(rowH,(bottom-rowsTop)/slots);
+  return {id,innerWork:true,frameless:true,label:'PRACE WEWNĘTRZNE',labelY:headerTop+headerH/2,x,y:dividerY,w,h:bottom-dividerY,dividerY,
+    slots:works.length,rowsTop,rowStep:rowHeight,rowHeight,headerH,tileLeft,tileRight,
+    identifierW:large?184:172,stageGap:72,font:large?30:25,columns,works};
 }
 
 // Widok lokalnego pipeline'u z istniejącego planu. Nie planuje subskrypcji ani nie prowadzi zegara.
@@ -39,11 +44,13 @@ export function innerWorkPanelSnapshot(panel, records, births, time) {
     const stages = work.stages.map((stage, i) => {
       const r = record(stage.edge || work.edge), start = connected(r);
       const state = stateOf(r, stage.receiver);
+      // Postęp kończy się z odpowiedzią (pierwszy next), jak w kafelku HTTP GET toru; complete przychodzi po niej.
       // Przy anulowaniu zachowujemy potencjalny czas pracy, więc pasek nigdy nie udaje complete.
-      const stop = r?.end?.at ?? start + work.duration;
+      const stop = r?.events[0]?.at ?? r?.end?.at ?? start + work.duration;
       const fraction = r?.end?.kind === 'unsubscribe' ? clamp((r.end.logicalAt-r.logicalStart)/work.duration) : 1;
       const progress = state === 'subscribing' || state === 'idle' ? 0 : clamp((time-start)/Math.max(.001,stop-start))*fraction;
-      return {...stage,index:i,state,hasProgress:Boolean(stage.progress),progress};
+      const since = r?.end ? r.end.at + (stage.receiver ? r.end.duration : 0) : undefined;
+      return {...stage,index:i,state,hasProgress:Boolean(stage.progress),progress,since};
     });
     const establishing=time<Math.max(connected(output),...work.stages.map(s=>connected(record(s.edge||work.edge))));
     const state=establishing?'subscribing':stateOf(output), reveal=clamp((time-(work.queueObservable?output.start:born))/.3);
