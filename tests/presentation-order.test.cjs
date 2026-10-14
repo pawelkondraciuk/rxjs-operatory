@@ -26,7 +26,7 @@ async function presentation(options={}){
   const id=tag.match(/\bid="([^"]+)"/)?.[1]||'',animation=tag.match(/data-animation="([^"]+)"/)?.[1];
   container.append(new Slide(id,animation,/data-extras/.test(tag)));
  }
- const opening=container.children.slice(0,12);
+ const opening=container.children.slice(0,10);
  const document={querySelector:()=>container,querySelectorAll:()=>container.children.filter(s=>s.dataset.animation),createElement:()=>({})};
  const m=await modules(['catalog','presentation','scene-config','engine'],{document});
  const scenes=m.presentation.prepareSlides(m.catalog.scenes);
@@ -37,9 +37,9 @@ async function presentation(options={}){
 
 test('MAIN preserves the opening and orders final variants independently, ending on questions',async()=>{
  const {container,opening,scenes}=await presentation();
- assert.equal(container.children.length,35);
- assert.deepEqual(container.children.slice(0,12),opening);
- assert.deepEqual(container.children.slice(12).map(s=>s.id),expectedMain);
+ assert.equal(container.children.length,33);
+ assert.deepEqual(container.children.slice(0,10),opening);
+ assert.deepEqual(container.children.slice(10).map(s=>s.id),expectedMain);
  for(const slide of container.children){assert.equal(slide.extra,false,slide.id);assert.equal(slide.back,null,slide.id);}
  for(const id of expectedMain.filter(id=>id!=='pytania'))assert.equal(scenes.get(id).group,'main',id);
 });
@@ -47,29 +47,29 @@ test('MAIN preserves the opening and orders final variants independently, ending
 test('EXTRAS preserves every demo once and starts with the three-slide follow-up',async()=>{
  const {container,prepared,config}=await presentation({extras:true});
  const ids=container.children.map(s=>s.id);
- assert.equal(ids.length,70);
- assert.deepEqual(ids.slice(12,35),expectedMain);
- assert.deepEqual(ids.slice(35,38),['12a-complete','12a-complete-2','13-limit']);
- assert.deepEqual(ids.slice(35),Array.from(config.extraOrder));
+ assert.equal(ids.length,68);
+ assert.deepEqual(ids.slice(10,33),expectedMain);
+ assert.deepEqual(ids.slice(33,36),['12a-complete','12a-complete-2','13-limit']);
+ assert.deepEqual(ids.slice(33),Array.from(config.extraOrder));
  assert.deepEqual(ids.filter(Boolean).sort(),prepared.map(s=>s.id).filter(Boolean).sort());
  assert.equal(new Set(ids.filter(Boolean)).size,ids.filter(Boolean).length);
- for(const slide of container.children.slice(35)){assert.equal(slide.extra,true,slide.id);assert.ok(slide.back,slide.id);}
+ for(const slide of container.children.slice(33)){assert.equal(slide.extra,true,slide.id);assert.ok(slide.back,slide.id);}
 });
 
 test('direct hashes route exact variants, including split time-operator and cold/hot families',async()=>{
  for(const requestedId of ['06a-cold-hot-2','16-czas-cztery-2','16-czas-cztery-3','18-async-2','28-resolver-batch']){
-  const {container,route}=await presentation({requestedId});assert.equal(route.extras,true,requestedId);assert.equal(container.children.length,70);
+  const {container,route}=await presentation({requestedId});assert.equal(route.extras,true,requestedId);assert.equal(container.children.length,68);
  }
  for(const requestedId of ['06a-cold-hot','16-czas-cztery','04-operator','unknown']){
-  const {container,route}=await presentation({requestedId});assert.equal(route.extras,false,requestedId);assert.equal(container.children.length,35);
+  const {container,route}=await presentation({requestedId});assert.equal(route.extras,false,requestedId);assert.equal(container.children.length,33);
  }
 });
 
 test('print includes every expanded slide once, with main narration before extras',async()=>{
  const {container,prepared}=await presentation({printMode:true});
- assert.equal(container.children.length,70);
+ assert.equal(container.children.length,68);
  assert.deepEqual(container.children.map(s=>s.id).filter(Boolean).sort(),prepared.map(s=>s.id).filter(Boolean).sort());
- assert.deepEqual(container.children.slice(12,35).map(s=>s.id),expectedMain);
+ assert.deepEqual(container.children.slice(10,33).map(s=>s.id),expectedMain);
 });
 
 test('combined time operators compare the same input and stop on audit before debounce',async()=>{

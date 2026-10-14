@@ -4,7 +4,7 @@
 
 Polska prezentacja „RxJS — Operatory, które znasz, ale bałeś się zagadać”, oparta na Reveal.js. Najpierw przeczytaj ten dokument i README.md (treści, kolejność, speaker notes). Czytaj kod potrzebny do konkretnej zmiany. Zachowuj język polski, identyfikatory slajdów i semantykę RxJS 7.8.2. Po zmianie treści aktualizuj README; po zmianie animacji, architektury lub sterowania także ten plik.
 
-Całość: 51 bazowych slajdów HTML, 70 po rozwinięciu wariantów, 57 animowanych. MAIN: 35 slajdów (22 animowane), EXTRAS: 35 wariantów. 04a-dwa-tory, -2 i -3 (po 04-operator) to testowe slajdy zapisu torów wykonania: cold, share() za map i share z unsubscribe A. Pełne otwarcie przed 04-operator pozostaje niezmienione w HTML (włącznie z legendą); czas 30–35 minut obejmuje wyłącznie część właściwą. Map + concatAll (08-map-strumienie) jest kluczową częścią MAIN bezpośrednio przed concatMap. Notatki są wspólne dla wariantów sekcji i mają opisane części dla wariantów. Scena katalogowa 01-tytul nie jest podpięta do HTML.
+Całość: 49 bazowych slajdów HTML, 68 po rozwinięciu wariantów, 57 animowanych. MAIN: 33 slajdy (22 animowane), EXTRAS: 35 wariantów. 04a-dwa-tory, -2 i -3 (po 04-operator) to testowe slajdy zapisu torów wykonania: cold, share() za map i share z unsubscribe A. Pełne otwarcie przed 04-operator pozostaje niezmienione w HTML (bez slajdów ReactiveX i legendy animacji); czas 30–35 minut obejmuje wyłącznie część właściwą. Map + concatAll (08-map-strumienie) jest kluczową częścią MAIN bezpośrednio przed concatMap. Notatki są wspólne dla wariantów sekcji i mają opisane części dla wariantów. Scena katalogowa 01-tytul nie jest podpięta do HTML.
 
 EXTRAS są przygotowaną dogrywką przy braku pytań oraz materiałem do odpowiedzi. Pierwsze trzy slajdy: 12a-complete, 12a-complete-2, 13-limit (4–6 minut). Brak pytań nie uruchamia niczego automatycznie; prelegent wybiera wejście w menu. Po limicie jest naturalny punkt zakończenia. Resolver i refCount pozostają działającymi dodatkami.
 
@@ -20,7 +20,7 @@ Uruchomienie: npm ci, npm run dev. Weryfikacja: npm test, npm run build. Podglą
 
 | Plik | Odpowiedzialność |
 | --- | --- |
-| index.html | Bazowe sekcje, zdjęcia, legenda, kolejność MAIN/EXTRAS, speaker notes HTML. |
+| index.html | Bazowe sekcje, zdjęcia, kolejność MAIN/EXTRAS, speaker notes HTML. |
 | main.js | Reveal, fragmenty/postoje, aktywacja, pauza, klawiatura, druk, wybór ścieżki. |
 | animations/format.js | Format sceny: 4:3 (1280×960) domyślnie, ?ratio=16:9 (1280×720); linki z zachowanym formatem i URL klawisza W. |
 | animations/speaker-preview.js | Duży tytuł kolejnego slajdu w ramce Upcoming okna Notes; przełącznik Tytuł/Slajd. |
@@ -38,7 +38,7 @@ Uruchomienie: npm ci, npm run dev. Weryfikacja: npm test, npm run build. Podglą
 | animations/player.js | Jedyny RAF, DOM odtwarzacza, transport, suwak, podpis i liczniki. |
 | animations/resolver.js | Czyste modele microtask, bufora, cache, in-flight, wyników i błędów. |
 | animations/resolver-scenes.js | Trzy sceny finału korzystające z tego samego silnika. |
-| animations/reveal.css | Slajdy techniczne, sterowanie, legenda, czytelność, druk. |
+| animations/reveal.css | Slajdy techniczne, sterowanie, czytelność, druk. |
 | custom.css, public/ | Ogólna estetyka i zasoby statyczne. |
 | animations/inner-work-panel.js | Konfiguracja i czysty snapshot lokalnych etapów prac; opt-in dla MAIN 08–12: HTTP, kolejka wartości/Observable, anulowanie i ignorowanie. |
 | animations/execution-state.js | Stan wykonań inner (running/completed/cancelled/error, HTTP osobno), liczniki z tego samego stanu. |
@@ -142,11 +142,9 @@ Diagramy 4:3: GRAPH_HEIGHT w format.js daje wysokość viewBox (zwykły 535, exp
 
 Używane API Reveal: getCurrentSlide, getSlides, getSlidePath, next/prev, navigateFragment(-1 oznacza początek), sync, addKeyBinding, isOverview/isPaused, initialize. Zdarzenia: slidechanged, fragmentshown/hidden, overviewshown/hidden, paused/resumed. Zdjęcia zachowują natywne fragment/fade-out/current-visible, data-fragment-index i r-stack. Notatki czyta plugin Notes z aside.notes w HTML, nie pole notes katalogu. speaker-preview działa wyłącznie wewnątrz iframe #upcoming-slide standardowego okna Notes. Na wiadomość setState od okna nadrzędnego wybiera kolejny slajd z getSlides(), pomijając fragmenty; nazwę bierze z data-speaker-title lub nagłówka (część po myślniku jest podtytułem). Przełącznik Tytuł/Slajd zapamiętuje wybór w localStorage. Nie modyfikuj kodu Notes w node_modules ani widoku projektora.
 
-## MAIN, EXTRAS, druk i legenda
+## MAIN, EXTRAS i druk
 
-prepareSlides rozwija wszystkie warianty przed filtrowaniem. mainOrder/extraOrder w scene-config.js zawierają końcowe ID; ta sama bazowa sekcja może mieć warianty w MAIN i EXTRAS. arrangeSlides(sceneById,{extras,printMode,requestedId}) pozostawia pełne otwarcie w kolejności HTML, porządkuje część właściwą i ustawia data-extras oraz linki powrotne per wariant. Grupa sceny również zależy od końcowego ID, nie rendererId. main.js zachowuje format w linkach dopiero po dodaniu linków powrotnych. Menu ?extras#/id i bezpośredni hash dodatku włączają całość z dogrywką po MAIN; main.js normalizuje bezpośredni hash dodatku do query extras przez history.replaceState, aby link powrotu przeładował ścieżkę MAIN; powrót ./#/pytania przywraca MAIN. ?print-pdf zawiera wszystkie 70 slajdów (86 stron po uwzględnieniu natywnych fragmentów otwarcia), bez ręcznych fragmentów/kontrolek animacji; każdy odtwarzacz dostaje finish(). Pilot zwykłego MAIN kończy na pytania.
-
-Legenda pozostaje HTML/SVG/CSS: pętle 6 s tylko na present, pauza w overview/Reveal pause, wyłączenie w druku i prefers-reduced-motion. Ograniczenie ruchu dotyczy legendy; JS korzysta z wyboru trybu i pauzy.
+prepareSlides rozwija wszystkie warianty przed filtrowaniem. mainOrder/extraOrder w scene-config.js zawierają końcowe ID; ta sama bazowa sekcja może mieć warianty w MAIN i EXTRAS. arrangeSlides(sceneById,{extras,printMode,requestedId}) pozostawia pełne otwarcie w kolejności HTML, porządkuje część właściwą i ustawia data-extras oraz linki powrotne per wariant. Grupa sceny również zależy od końcowego ID, nie rendererId. main.js zachowuje format w linkach dopiero po dodaniu linków powrotnych. Menu ?extras#/id i bezpośredni hash dodatku włączają całość z dogrywką po MAIN; main.js normalizuje bezpośredni hash dodatku do query extras przez history.replaceState, aby link powrotu przeładował ścieżkę MAIN; powrót ./#/pytania przywraca MAIN. ?print-pdf zawiera wszystkie 68 slajdów (84 strony po uwzględnieniu natywnych fragmentów otwarcia), bez ręcznych fragmentów/kontrolek animacji; każdy odtwarzacz dostaje finish(). Pilot zwykłego MAIN kończy na pytania.
 
 ## Wprowadzanie zmian i weryfikacja
 

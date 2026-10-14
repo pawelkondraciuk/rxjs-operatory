@@ -17,7 +17,7 @@ Sceny MAIN z pytaniami zaczynają od nieruchomego READY. Prawo / Page Down uruch
 
 W oknie prelegenta (`S`) podgląd następnego slajdu domyślnie pokazuje dużą nazwę, np. **switchMap**, i krótki podtytuł. Wskazuje kolejny slajd, także podczas ręcznych postojów bieżącej animacji. Przełącznik **Podgląd: Tytuł / Slajd** w prawym dolnym rogu tego pola przywraca standardowy podgląd. Wybór jest zapamiętywany w przeglądarce. Notatki pozostają w standardowym polu Notes. Opcjonalne `data-speaker-title` na sekcji ustawia własny podpis wyłącznie dla prelegenta.
 
-Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 70 slajdów daje 86 stron PDF.
+Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 68 slajdów daje 84 strony PDF.
 
 Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przywraca ekran panoramiczny 1280×720. `W` przeładowuje stronę w drugim formacie, zostając na tym samym slajdzie i fragmencie; animacja wraca do stanu tego fragmentu. Linki do EXTRAS i powrót do pytań zachowują wybrany format. Druk działa w obu: `?print-pdf` (4:3) lub `?print-pdf&ratio=16:9`. W 4:3 slajdy wykorzystują pełną wysokość: większe zdjęcia i kody QR, wyższe diagramy, większy tekst i kapsułki w animacjach (×1,15), etykiety kafelków do ×1,3 oraz większy tytuł (64 px; za długi zmniejsza się, by został w jednej linii), kod (42 px, długi łańcuch przechodzi do nowej linii przed .pipe/.subscribe) i podpis.
 
@@ -31,11 +31,11 @@ Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorz
 
 ## Ścieżka MAIN i czas
 
-Pełne otwarcie pozostaje bez zmian: społeczność, historia meet.js, fotografie, autor, tytuł, ReactiveX, pytania o operatory i legenda. Budżet **30–35 minut dotyczy tylko części właściwej**; otwarcie, pytania i dogrywka są dodatkowo.
+Pełne otwarcie pozostaje bez zmian: społeczność, historia meet.js, fotografie, autor, tytuł i pytania o operatory. Budżet **30–35 minut dotyczy tylko części właściwej**; otwarcie, pytania i dogrywka są dodatkowo.
 
-MAIN ma **35 slajdów (22 animowane)**. EXTRAS zawiera **35 wariantów**. Całość obejmuje 51 bazowych slajdów HTML, 70 po rozwinięciu, 57 animowanych. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
+MAIN ma **33 slajdy (22 animowane)**. EXTRAS zawiera **35 wariantów**. Całość obejmuje 49 bazowych slajdów HTML, 68 po rozwinięciu, 57 animowanych. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
 
-Kolejność po legendzie:
+Kolejność po otwarciu:
 
 1. HTTP (`05-zrodla-2`) → timer/interval (`05-zrodla`) → map, pipe i wykonanie (`04-operator`) → testowe slajdy torów wykonania: cold (`04a-dwa-tory`), share() za map (`-2`) i share z unsubscribe A (`-3`).
 2. Dwa wykonania cold (`06a-cold-hot`) → dwa HTTP (`07-hot-cold`) → Subject (`05-zrodla-3`) → jedno aktywne HTTP z share (`07-hot-cold-2`) → późny odbiorca z share/shareReplay (`20-sharereplay`, `20-sharereplay-2`).
@@ -163,16 +163,6 @@ Kolory wartości rozróżniają też gałęzie A/B/C. Unsubscribe nie oznacza co
 
 ## Wprowadzenie do RxJS
 
-### ReactiveX jest wszędzie — `reactivex-jest-wszedzie`
-
-**Temat:** ReactiveX jest koncepcją obecną w wielu językach, nie tylko w JavaScripcie.
-
-**Na ekranie:** siatka nazw 16 języków: C#, Java, JavaScript, Kotlin, Swift, Scala, C++, Python, Go, Ruby, PHP, Dart, Groovy, Clojure, Objective-C i F#. Plansza nie podaje nazw implementacji.
-
-**Speaker notes:**
-
-> Zanim zaczniemy, mała ciekawostka. ReactiveX nie powstał w JavaScripcie, tylko w .NET. Dzisiaj znajdziemy jego implementacje w ponad 20 językach. Nie wszędzie jest tak popularny jak w Angularze, ale sam koncept jest znacznie szerszy.
-
 ### Jakie znasz operatory RxJS? — `02-znane-operatory`
 
 **Temat:** rozmowa z publicznością o znanych operatorach.
@@ -192,20 +182,6 @@ Kolory wartości rozróżniają też gałęzie A/B/C. Unsubscribe nie oznacza co
 **Speaker notes:**
 
 Brak notatek w HTML.
-
-### Jak czytać animacje? — `legenda`
-
-**Temat:** wspólny język wizualny kolejnych diagramów.
-
-**Na bloczkach:** cztery przykłady połączeń A → B: `subscribe`, `unsubscribe`, `complete`, `error`. Niżej bloczek HTTP z paskiem „in progress / Praca trwa” oraz kółko wartości next. A oznacza źródło, B odbiorcę. Legenda powtarza animacje co 6 s.
-
-**Speaker notes:**
-
-> To legenda dla kolejnych diagramów. A oznacza źródło, B odbiorcę. Czarna kreska pokazuje połączenie: przy subscribe wydłuża się od odbiorcy B do źródła A, a przy unsubscribe skraca się i znika. Sama subskrypcja nie musi uruchamiać producenta, na przykład przy już działającym źródle hot.
-
-> Przy complete i error linia skraca się i znika od źródła A do odbiorcy B: zielona przy complete i czerwona przy error. To kierunek przeciwny do unsubscribe. Tylko klocek odbiorcy B ma kolor zakończenia; źródło A zachowuje swój kolor. Oba powiadomienia są terminalne: ta subskrypcja nie dostanie już kolejnych wartości. Unsubscribe to rezygnacja odbiorcy i samo nie wywołuje jego callbacku complete. Nie musi również zatrzymać współdzielonego producenta.
-
-> Blok HTTP z rosnącym paskiem na dole oznacza pracę w toku (in progress). Pasek jest umowną ilustracją czasu pracy, nie pomiarem postępu prawdziwego żądania HTTP. Kółka z liczbami pokazują next, czyli wartości. Animacje legendy powtarzają się co sześć sekund, aby można było spokojnie je omówić. Każda pętla przedstawia nowy przykład, a nie wznowienie zakończonej subskrypcji. Ruch jest ilustracją, nie opóźnieniem RxJS.
 
 ## Źródła, subskrypcje i operatory
 

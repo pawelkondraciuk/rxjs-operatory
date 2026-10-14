@@ -399,32 +399,6 @@
 					</aside>
 				</section>
 
-				<section id="reactivex-jest-wszedzie" class="reactivex-landscape-slide">
-					<h2>ReactiveX jest wszędzie</h2>
-					<p class="reactivex-landscape-intro">Jedna idea. Wiele języków.</p>
-					<div class="reactivex-language-grid" aria-label="Języki programowania">
-						<span>C#</span>
-						<span>Java</span>
-						<span>JavaScript</span>
-						<span>Kotlin</span>
-						<span>Swift</span>
-						<span>Scala</span>
-						<span>C++</span>
-						<span>Python</span>
-						<span>Go</span>
-						<span>Ruby</span>
-						<span>PHP</span>
-						<span>Dart</span>
-						<span>Groovy</span>
-						<span>Clojure</span>
-						<span>Objective-C</span>
-						<span>F#</span>
-					</div>
-					<aside class="notes">
-						<p>Zanim zaczniemy, mała ciekawostka. ReactiveX nie powstał w JavaScripcie, tylko w .NET. Dzisiaj znajdziemy jego implementacje w ponad 20 językach. Nie wszędzie jest tak popularny jak w Angularze, ale sam koncept jest znacznie szerszy.</p>
-					</aside>
-				</section>
-
 				<!-- Część merytoryczna. Kolejność, tytuły i notatki edytujemy tutaj. -->
 
 				<section id="02-znane-operatory" class="known-operators-slide">
@@ -442,72 +416,6 @@
 
 				<section id="03-a-share" class="single-question-slide">
 					<h2>A share?</h2>
-				</section>
-
-				<section id="legenda" class="legend-slide">
-					<h2>Jak czytać animacje?</h2>
-					<p class="legend-intro">A: źródło &nbsp; B: odbiorca</p>
-					<div class="legend-examples">
-						<div class="legend-example legend-subscribe">
-							<h3>subscribe</h3>
-							<svg viewBox="0 0 220 270" role="img" aria-label="Subscribe: prosta linia rośnie od odbiorcy B do źródła A">
-								<line class="legend-wire" x1="110" y1="180" x2="110" y2="90" pathLength="1"/>
-								<rect class="legend-source" x="70" y="10" width="80" height="80"/>
-								<rect class="legend-observer" x="70" y="180" width="80" height="80"/>
-								<text x="110" y="50">A</text><text class="legend-observer-label" x="110" y="220">B</text>
-							</svg>
-							<p>Zaczynamy<br>odbierać wartości.</p>
-						</div>
-						<div class="legend-example legend-unsubscribe">
-							<h3>unsubscribe</h3>
-							<svg viewBox="0 0 220 270" role="img" aria-label="Unsubscribe: prosta linia skraca się i odłącza odbiorcę B">
-								<line class="legend-wire" x1="110" y1="90" x2="110" y2="180" pathLength="1"/>
-								<rect class="legend-source" x="70" y="10" width="80" height="80"/>
-								<rect class="legend-observer" x="70" y="180" width="80" height="80"/>
-								<text x="110" y="50">A</text><text class="legend-observer-label" x="110" y="220">B</text>
-							</svg>
-							<p>Odbiorca rezygnuje.<br>Połączenie znika.</p>
-						</div>
-						<div class="legend-example legend-complete">
-							<h3>complete</h3>
-							<svg viewBox="0 0 220 270" role="img" aria-label="Complete: zielona linia znika od A do B, odbiorca B jest zielony">
-								<line class="legend-signal" x1="110" y1="90" x2="110" y2="180" pathLength="1"/>
-								<rect class="legend-source" x="70" y="10" width="80" height="80"/>
-								<rect class="legend-observer" x="70" y="180" width="80" height="80"/>
-								<text x="110" y="50">A</text><text class="legend-observer-label" x="110" y="220">B</text>
-								<text class="legend-terminal-mark" x="170" y="220">✓</text>
-							</svg>
-							<p>Koniec strumienia.<br>Bez błędu.</p>
-						</div>
-						<div class="legend-example legend-error">
-							<h3>error</h3>
-							<svg viewBox="0 0 220 270" role="img" aria-label="Error: czerwona linia znika od A do B, odbiorca B jest czerwony">
-								<line class="legend-signal" x1="110" y1="90" x2="110" y2="180" pathLength="1"/>
-								<rect class="legend-source" x="70" y="10" width="80" height="80"/>
-								<rect class="legend-observer" x="70" y="180" width="80" height="80"/>
-								<text x="110" y="50">A</text><text class="legend-observer-label" x="110" y="220">B</text>
-								<text class="legend-terminal-mark" x="170" y="220">×</text>
-							</svg>
-							<p>Koniec strumienia.<br>Z błędem.</p>
-						</div>
-					</div>
-					<div class="legend-bottom">
-                        <div class="legend-progress">
-                            <div><h3>in progress</h3><p>Praca trwa</p></div>
-                            <svg viewBox="0 0 260 110" role="img" aria-label="HTTP w trakcie pracy: pasek postępu rośnie u dołu bloku">
-                                <rect class="legend-work-block" x="10" y="5" width="240" height="100"/>
-                                <text x="130" y="46">HTTP</text>
-                                <rect class="legend-progress-track" x="10" y="85" width="240" height="20"/>
-                                <rect class="legend-progress-fill" x="10" y="85" width="240" height="20"/>
-                            </svg>
-                        </div>
-                        <p class="legend-values"><span aria-hidden="true">1</span> Wartość płynąca<br>do odbiorcy</p>
-                    </div>
-					<aside class="notes">
-						<p>To legenda dla kolejnych diagramów. A oznacza źródło, B odbiorcę. Czarna kreska pokazuje połączenie: przy subscribe wydłuża się od odbiorcy B do źródła A, a przy unsubscribe skraca się i znika. Sama subskrypcja nie musi uruchamiać producenta, na przykład przy już działającym źródle hot.</p>
-						<p>Przy complete i error linia skraca się i znika od źródła A do odbiorcy B: zielona przy complete i czerwona przy error. To kierunek przeciwny do unsubscribe. Tylko klocek odbiorcy B ma kolor zakończenia; źródło A zachowuje swój kolor. Oba powiadomienia są terminalne: ta subskrypcja nie dostanie już kolejnych wartości. Unsubscribe to rezygnacja odbiorcy i samo nie wywołuje jego callbacku complete. Nie musi również zatrzymać współdzielonego producenta.</p>
-						<p>Blok HTTP z rosnącym paskiem na dole oznacza pracę w toku (in progress). Pasek jest umowną ilustracją czasu pracy, nie pomiarem postępu prawdziwego żądania HTTP. Kółka z liczbami pokazują next, czyli wartości. Animacje legendy powtarzają się co sześć sekund, aby można było spokojnie je omówić. Każda pętla przedstawia nowy przykład, a nie wznowienie zakończonej subskrypcji. Ruch jest ilustracją, nie opóźnieniem RxJS.</p>
-					</aside>
 				</section>
 
 				<section id="04-operator" class="animation-slide" data-animation="04-operator">
