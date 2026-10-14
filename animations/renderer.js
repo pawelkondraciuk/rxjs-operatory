@@ -198,24 +198,54 @@ export function renderScene(frame,options={}) {
     else if(n.status)svg+=text(n.x,n.y+n.h/2+21*k,n.status,20*k,failed?'style="fill:#b51e2e"':'');
     if(n.showProgress)svg+=`<rect data-work-progress="${n.progress}" x="${n.x-n.w/2}" y="${n.y+n.h/2-9}" width="${n.w*n.progress}" height="9" fill="#132f42"/>`;
     if(n.transform)svg+=text(n.x,n.y+(n.transformOffset??n.h/2+52*k),n.transform,28*k,'data-transformation="true"');
-    // Tory subskrybentów: stan wykonania jako mały element w kafelku definicji (pasek, chip, znaczek), gniazda na krawędziach.
-    // Hub (np. share): wspólne wejście bez własnego chipu; chipy wyjść są przesunięte, żeby zmieściło się rozwidlenie.
+    // Wiersze wykonań pod nagłówkiem definicji (rosnący kafelek albo odbiorca z defH): separator i pasek koloru toru.
+    // Stan wykonania to tło wiersza, bez ikon: trwa — naturalne tło kafelka, complete — subtelna zieleń z krótkim
+    // rozbłyskiem, error — subtelna czerwień, unsubscribe — szary, przygaszony wiersz. Nagłówek definicji się nie zmienia.
+    const rows=n.laneRows||(n.defH&&n.subscriber?[{subscriber:n.subscriber,color:n.laneColor,
+      top:n.y-n.h/2+n.defH,h:n.h-n.defH,growth:1}]:[]);
+    const stateOf=id=>(n.laneStates||[]).find(l=>l.subscriber===id);
+    for(const row of rows) {
+      const left=n.x-n.w/2,h=Math.max(0,row.h*row.growth-1),lane=stateOf(row.subscriber),state=lane?.state||'running';
+      const tint={completed:'#d6eedc',error:'#f6d6da',cancelled:'#dfe3e6'}[state],flash={completed:'#8fd3a3',error:'#ee9aa3'}[state];
+      const glow=flash&&!reduced?.85*(1-clamp((frame.time-lane.since)/.7)):0;
+      svg+=`<g data-lane-row="${esc(row.subscriber)}" data-row-state="${state}" opacity="${row.growth}">`;
+      if(tint)svg+=`<rect x="${left+1}" y="${row.top}" width="${n.w-2}" height="${h}" fill="${tint}"/>`;
+      if(glow>0)svg+=`<rect data-row-flash="${state}" x="${left+1}" y="${row.top}" width="${n.w-2}" height="${h}" fill="${flash}" opacity="${glow.toFixed(3)}"/>`;
+      svg+=`<rect x="${left+1}" y="${row.top}" width="${7*k}" height="${h}" fill="${row.color}"${state==='cancelled'?' opacity=".5"':''}/>`;
+      svg+=`<path d="M${left} ${row.top}H${left+n.w}" stroke="#26343d" stroke-opacity=".45" stroke-width="1.5"/></g>`;
+    }
+    // Tory subskrybentów: stan wykonania jako mały element w kafelku definicji, gniazda na krawędziach.
+    // Hub (np. share): wspólne wejście bez własnego wiersza rozwidla się do wierszy wyjść, przesuniętych w prawo.
     const hubInputs=(n.socketDots||[]).filter(d=>d.side==='in'&&!(n.laneStates||[]).some(l=>l.subscriber===d.subscriber));
-    const chipLeft=n.x-n.w/2+(hubInputs.length?50:22)*k;
+    const chipLeft=n.x-n.w/2+(hubInputs.length?50:22)*k,inRow=Boolean(rows.length);
     for(const lane of n.laneStates||[]) {
-      svg+=`<g data-lane="${esc(lane.subscriber)}" data-lane-role="${lane.role}" data-lane-state="${lane.state}"${lane.progress===undefined?'':` data-work-progress="${lane.progress}"`} opacity="${lane.opacity}"><title>${esc((lane.label||lane.subscriber)+' · '+lane.status)}</title>`;
-      if(lane.role==='work') {
-        const x0=n.x-n.w/2+(lane.label?48:22)*k,x1=n.x+n.w/2-62*k,h=14*k,stopped=lane.state==='error'||lane.state==='cancelled';
-        if(lane.label)svg+=text(n.x-n.w/2+24*k,lane.y,lane.label,24*k,'style="font-weight:700;fill:#43525b"');
+      const dim=lane.state==='cancelled'?.55:1;
+      svg+=`<g data-lane="${esc(lane.subscriber)}" data-lane-role="${lane.role}" data-lane-state="${lane.state}"${lane.progress===undefined?'':` data-work-progress="${lane.progress}"`} opacity="${lane.opacity*dim}"><title>${esc((lane.label||lane.subscriber)+' · '+lane.status)}</title>`;
+      if(lane.role==='work'&&inRow) {
+        // Postęp producenta to tło wiersza w kolorze toru, przesuwające się do przodu z wyraźnym czołem;
+        // po complete wiersz przejmuje zieleń (tło wiersza), po error czerwień, po unsubscribe zostaje szary ślad.
+        const row=rows.find(r=>r.subscriber===lane.subscriber),left=n.x-n.w/2+1+7*k,width=n.w-2-7*k;
+        if(row&&lane.state!=='completed'&&lane.state!=='error') {
+          const h=Math.max(0,row.h*row.growth-1),w=width*lane.progress,fill=lane.state==='cancelled'?'#c3cacf':lane.progressFill||lane.fill||lane.color;
+          svg+=`<rect data-work-fill="${lane.progress}" x="${left}" y="${row.top}" width="${w}" height="${h}" fill="${fill}"/>`;
+          if(lane.state==='running'&&lane.progress>0&&lane.progress<1)svg+=`<rect x="${left+w-3*k}" y="${row.top}" width="${3*k}" height="${h}" fill="${lane.color}"/>`;
+        }
+        if(lane.label)svg+=text(n.x-n.w/2+26*k,lane.y,lane.label,24*k,'style="font-weight:700;fill:#43525b"');
+      } else if(lane.role==='work') {
+        const x0=n.x-n.w/2+(lane.label?48:26)*k,x1=n.x+n.w/2-(inRow?30:62)*k,h=14*k,stopped=lane.state==='error'||lane.state==='cancelled';
+        if(lane.label)svg+=text(n.x-n.w/2+26*k,lane.y,lane.label,24*k,'style="font-weight:700;fill:#43525b"');
         svg+=`<rect x="${x0}" y="${lane.y-h/2}" width="${x1-x0}" height="${h}" rx="${h/2}" fill="#26343d" fill-opacity=".18"/>`;
         svg+=`<rect x="${x0}" y="${lane.y-h/2}" width="${(x1-x0)*lane.progress}" height="${h}" rx="${h/2}" fill="${stopped?'#b51e2e':lane.color}"/>`;
-        svg+=laneIcon(n.x+n.w/2-34*k,lane.y,lane,k,frame.time);
+        if(!inRow)svg+=laneIcon(n.x+n.w/2-34*k,lane.y,lane,k,frame.time);
+      } else if(lane.role==='operator'&&inRow) {
+        // Wiersz operatora: sama litera toru; stan niesie tło wiersza.
+        if(lane.label)svg+=text(chipLeft+(hubInputs.length?18:6)*k,lane.y,lane.label,24*k,'style="font-weight:700;fill:#43525b;text-anchor:start"');
       } else if(lane.role==='operator') {
         const x0=chipLeft,x1=n.x+n.w/2-22*k,h=58*k;
         svg+=`<rect x="${x0}" y="${lane.y-h/2}" width="${x1-x0}" height="${h}" rx="${12*k}" fill="#fff" fill-opacity=".62"/>`;
         svg+=`<circle cx="${x0+20*k}" cy="${lane.y}" r="${7*k}" fill="${lane.color}"/><circle cx="${x1-20*k}" cy="${lane.y}" r="${7*k}" fill="${lane.color}"/>`;
         svg+=laneIcon((x0+x1)/2,lane.y,lane,k,frame.time);
-      } else svg+=laneIcon(n.x+n.w/2-30*k,n.y+n.h/2-30*k,lane,k,frame.time);
+      } else if(!inRow)svg+=laneIcon(n.x+n.w/2-30*k,n.y+n.h/2-30*k,lane,k,frame.time);
       svg+='</g>';
     }
     // Rozwidlenie huba: wspólne wejście → chip każdej subskrypcji wyjścia.

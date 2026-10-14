@@ -89,7 +89,7 @@ export function mapGraph(scene) {
 // cold: HTTP GET → map → A/B, dwa niezależne tory przez cały pipeline. share: HTTP GET → map → share() → A/B,
 // jeden wspólny tor S do share (jeden request, jedno map), dalej dwa wejścia downstream. B dołącza 2 s po A, przed odpowiedzią.
 const laneSubscribers={A:{color:'#7d5bd0',fill:'#d4c6f4',tile:'#efeafb'},B:{color:'#d9800f',fill:'#ffd08a',tile:'#fcebd3'},
-  S:{color:'#3f6577',fill:'#c4dbe4',label:''}};
+  S:{color:'#3f6577',fill:'#c4dbe4',progress:'#6f8a9b',label:''}};
 export function configureLanes(scene) {
   const shared=scene.lanesMode==='share',a=laneSubscribers.A.fill,b=laneSubscribers.B.fill,s=laneSubscribers.S.fill;
   const definition=shared?'const data$ = http.get(url).pipe(map(f), share())':'const data$ = http.get(url).pipe(map(f))';
@@ -125,20 +125,26 @@ export function configureLanes(scene) {
       {id:'first',event:{type:'connected',edge:'http-map-A'},offset:.35,caption:'A subskrybuje: map podpina się do HTTP i startuje request A'},
       {id:'question',event:{type:'subscribe',edge:'map-B'},caption:'2 s później B subskrybuje tę samą definicję data$. Co stanie się z HTTP?'},
       {id:'second',event:{type:'connected',edge:'http-map-B'},offset:.35,caption:'Drugi tor: osobny request B. Wspólna jest tylko definicja'},
-      {id:'done',event:{type:'disconnected',edge:'map-A'},offset:.3,caption:'Tor A zakończony w HTTP, map i u odbiorcy. Tor B trwa dalej'},
+      {id:'done',event:{type:'disconnected',edge:'map-A'},offset:.75,caption:'Tor A zakończony w HTTP, map i u odbiorcy. Tor B trwa dalej'},
     ]),
   });
 }
 
 export function lanesGraph(scene) {
   const tall=scene.format==='4:3',shared=scene.lanesMode==='share';
-  const g=shared?(tall?{top:110,laneA:245,laneB:425,bottom:510,recvH:156,httpX:148,httpW:236,mapX:403,mapW:174,shareX:665,shareW:250,recvX:1035,recvW:320,textScale:1.3,labelScale:1.7}:
-    {top:60,laneA:190,laneB:330,bottom:390,recvH:120,httpX:130,httpW:200,mapX:380,mapW:180,shareX:650,shareW:240,recvX:1020,recvW:300}):
-    tall?{top:110,laneA:245,laneB:425,bottom:510,recvH:156,httpX:200,httpW:300,mapX:605,mapW:270,recvX:1045,recvW:330,textScale:1.3,labelScale:1.7}:
-    {top:60,laneA:190,laneB:330,bottom:390,recvH:120,httpX:180,httpW:280,mapX:590,mapW:260,recvX:1030,recvW:300};
-  const h=g.bottom-g.top,y=(g.top+g.bottom)/2,k=g.textScale||1,mid=(g.laneA+g.laneB)/2;
-  const tile={y,h,ready:true,labelOffset:-h/2+48*k,detail:''};
-  const lanes=shared?{laneIds:['S'],laneTop:mid-y}:{laneIds:['A','B'],laneTop:g.laneA-y,laneStep:g.laneB-g.laneA};
+  // Rosnące kafelki: stała góra i niski nagłówek definicji, pod nim smukły wiersz wykonania na każdą subskrypcję.
+  // Odbiorcy (nagłówek + wiersz z wartością) są wyżsi niż wiersz, więc stoją z odstępem; kabel B ma załamanie.
+  const v=tall?{top:160,defH:84,rowH:64,recvDef:58,recvRow:72,recvGap:14,textScale:1.3,labelScale:1.6}:
+    {top:120,defH:56,rowH:46,recvDef:42,recvRow:54,recvGap:10};
+  const x=shared?(tall?{httpX:148,httpW:236,mapX:403,mapW:174,shareX:665,shareW:250,recvX:1035,recvW:320}:
+    {httpX:130,httpW:200,mapX:380,mapW:180,shareX:650,shareW:240,recvX:1020,recvW:300}):
+    tall?{httpX:200,httpW:300,mapX:605,mapW:270,recvX:1045,recvW:330}:{httpX:180,httpW:280,mapX:590,mapW:260,recvX:1030,recvW:300};
+  const g={...v,...x},k=g.textScale||1,rowY=slot=>g.top+g.defH+(slot+.5)*g.rowH;
+  const grow=(slots,rows)=>{const h=g.defH+rows*g.rowH;return {top:g.top,defH:g.defH,rowH:g.rowH,laneSlots:slots,growRows:true,y:g.top+h/2,h,ready:true,detail:''};};
+  const lanes=shared?grow({S:0},1):grow({A:0,B:1},2);
+  g.recvH=g.recvDef+g.recvRow;
+  // Wiersz odbiorcy A leży na torze A; B stoi pod A z odstępem.
+  g.laneA=rowY(0);g.laneB=g.laneA+g.recvH+g.recvGap;
   const fill=id=>laneSubscribers[id].fill;
   const complete=end=>({at:end,kind:'complete'});
   const lane=(id,start,end,color)=>[
@@ -149,17 +155,21 @@ export function lanesGraph(scene) {
     {id:'http-map',from:'http',to:'map',subscriber:'S',logicalStart:1,logicalEnd:complete(5),events:[E(5,'dane',fill('S'))]},
     {id:'map-share',from:'map',to:'share',subscriber:'S',logicalStart:1,logicalEnd:complete(5),events:[E(5,'widok',fill('S'))]},
     ...[['A',1],['B',3]].map(([id,start])=>({id:`share-${id}`,from:'share',to:id,subscriber:id,logicalStart:start,logicalEnd:complete(5),events:[E(5,'widok',fill('S'))]}))];
-  // Kafelek odbiorcy jest definicją: nie zmienia koloru po complete; stan pokazuje znaczek, wynik leży w kafelku.
-  const receiver=(id,laneAt)=>({id,x:g.recvX,y:laneAt,w:g.recvW,h:g.recvH,label:`Odbiorca ${id}`,subscriber:id,
-    terminalBadge:true,labelOffset:-g.recvH/2+34*k,detail:''});
-  const tray=(id,laneAt)=>({anchor:id,x:g.recvX-g.recvW/2+80*k,y:laneAt+g.recvH/2-34*k,w:140*k,lines:1});
+  // Odbiorca: nagłówek z nazwą (definicja) i jeden wiersz wykonania z odebraną wartością; środek wiersza leży na torze.
+  // Kafelek nie zmienia koloru po complete — stan niesie tło wiersza.
+  const receiver=(id,laneAt)=>{
+    const top=laneAt-g.recvDef-g.recvRow/2;
+    return {id,x:g.recvX,y:top+g.recvH/2,w:g.recvW,h:g.recvH,top,defH:g.recvDef,rowH:g.recvRow,laneSlots:{[id]:0},
+      label:`Odbiorca ${id}`,subscriber:id,terminalBadge:true,labelOffset:-g.recvH/2+g.recvDef/2,detail:''};
+  };
+  const tray=(id,laneAt)=>({anchor:id,x:g.recvX-g.recvW/2+80*k,y:laneAt,w:130*k,lines:1});
   return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,
     ...(tall?{textScale:g.textScale,labelScale:g.labelScale}:{}),
     subscribers:laneSubscribers,
-    nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,...tile,...lanes},
-      {id:'map',x:g.mapX,w:g.mapW,label:'map',color:'op',...tile,...lanes},
-      ...(shared?[{id:'share',x:g.shareX,w:g.shareW,label:'share()',color:'op',...tile,
-        laneIds:['A','S','B'],laneTop:g.laneA-y,laneStep:(g.laneB-g.laneA)/2}]:[]),
+    nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,...lanes},
+      {id:'map',x:g.mapX,w:g.mapW,label:'map',color:'op',...lanes},
+      // share: wiersze A i B; wspólne wejście S trafia na wysokość pierwszego wiersza i rozwidla się do obu.
+      ...(shared?[{id:'share',x:g.shareX,w:g.shareW,label:'share()',color:'op',...grow({A:0,B:1,S:0},2)}]:[]),
       receiver('A',g.laneA),receiver('B',g.laneB)],
     edges:shared?sharedEdges:[...lane('A',1,5,fill('A')),...lane('B',3,7,fill('B'))],
     trays:[tray('A',g.laneA),tray('B',g.laneB)],

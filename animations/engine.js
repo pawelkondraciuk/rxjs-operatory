@@ -8,7 +8,12 @@ import { clamp, colors, geometry, pointAt } from './primitives.js';
 const empty={events:[],spans:[]};
 const evaluate=(value,time)=>typeof value==='function'?value(time):value;
 const captionAt=(captions,time)=>(captions||[]).filter(c=>c[0]<=time).at(-1)?.[1]||'';
-const laneY=(n,id)=>{const i=(n.laneIds||[]).indexOf(id);return i<0?n.y:n.y+(n.laneTop||0)+i*(n.laneStep||0);};
+// Rosnący kafelek (laneSlots): góra i część definicji (defH) są stałe, wiersz wykonania slotu i leży pod nią (rowH na wiersz).
+const laneY=(n,id)=>{
+  if(n.laneSlots&&id in n.laneSlots)return n.top+n.defH+(n.laneSlots[id]+.5)*n.rowH;
+  const i=(n.laneIds||[]).indexOf(id);return i<0?n.y:n.y+(n.laneTop||0)+i*(n.laneStep||0);
+};
+const rowGrowth=.35;
 const workSpans=row=>(row.spans||[]).filter(p=>!['queue','state','window','subscription'].includes(p.kind));
 
 // Kompilacja wykonuje się raz. Cały graf (także niewidoczne inner) rezerwuje miejsca.
@@ -206,21 +211,41 @@ export function compileScene(scene) {
       if(!role)return [];
       const from=role==='receiver'?input.start:connectedAt(out);
       if(time<from)return [];
-      let state='running',stoppedAt;
+      let state='running',stoppedAt,since=from;
       if(role==='receiver') {
         const end=input.end,arrival=end&&(end.kind==='unsubscribe'?end.at:end.at+(end.duration||transitionDuration));
-        if(end&&time>=arrival)state=end.kind==='complete'?'completed':end.kind==='error'?'error':'cancelled';
+        if(end&&time>=arrival){state=end.kind==='complete'?'completed':end.kind==='error'?'error':'cancelled';since=arrival;}
       } else if(out.end&&time>=out.end.at) {
+        since=out.end.at;
         state=out.end.kind==='complete'?'completed':out.end.kind==='error'?'error':'cancelled';stoppedAt=out.end.at;
       }
       const lane={role,subscriber,label:graph.subscribers?.[subscriber]?.label??subscriber,y:laneY(n,subscriber),color:subscriberColor(subscriber),fill:graph.subscribers?.[subscriber]?.fill,
-        state,status:laneStatus[state==='running'&&role!=='work'?'waiting':state],opacity:clamp((time-from)/fadeDuration)};
+        progressFill:graph.subscribers?.[subscriber]?.progress??graph.subscribers?.[subscriber]?.fill,
+        state,since,status:laneStatus[state==='running'&&role!=='work'?'waiting':state],opacity:clamp((time-from)/fadeDuration)};
       if(role==='work') {
         const to=out.workUntil!==undefined?plan.timeOf(out.workUntil):out.end?.at??plan.duration;
         lane.progress=state==='completed'?1:clamp(((stoppedAt??time)-from)/Math.max(1e-9,to-from));
       }
       return [lane];
     });
+  }
+
+  // Wiersz wykonania rezerwuje miejsce, gdy subscribe wyrusza do kafelka (kabel trafia w gotowy wiersz);
+  // stan toru wypełnia go po dotarciu. Wiersze zostają po zakończeniu, więc kafelek tylko rośnie.
+  function laneRowsOf(n,time) {
+    const rows=new Map();
+    for(const r of laneRecords) if(r.a.id===n.id&&n.laneSlots?.[r.subscriber]!==undefined) {
+      const slot=n.laneSlots[r.subscriber],growth=clamp((time-r.start)/rowGrowth),eased=growth*growth*(3-2*growth);
+      if(eased>(rows.get(slot)?.growth??0))rows.set(slot,{slot,subscriber:r.subscriber,color:subscriberColor(r.subscriber),growth:eased});
+    }
+    return [...rows.values()].filter(row=>row.growth>0).sort((a,b)=>a.slot-b.slot)
+      .map(row=>({...row,top:n.top+n.defH+row.slot*n.rowH,h:n.rowH}));
+  }
+  function growingTile(n,time) {
+    // growRows: kafelek rośnie z wierszami; bez flagi (odbiorca) ma stałą wysokość i jeden wiersz pod nagłówkiem defH.
+    if(!n.laneSlots||!n.growRows)return {};
+    const rows=laneRowsOf(n,time),h=n.defH+rows.reduce((sum,row)=>sum+row.growth*n.rowH,0);
+    return {y:n.top+h/2,h,labelOffset:-h/2+n.defH/2,laneRows:rows,defH:n.defH};
   }
 
   function snapshot(time) {
@@ -306,7 +331,8 @@ export function compileScene(scene) {
         opacity:n.ready||n.instant?1:clamp((time-births.get(n.id))/fadeDuration),fill,status,notification,workState,
         active:activity||Boolean(transform&&time<transform.until),progress,showProgress:Boolean(span&&(active||canceled)),transform:transform?.label,
         disabled:evaluate(n.disabled,t),
-        ...(laneRecords.length?{socketDots:socketsOf(n,time),laneStates:laneStatesOf(n,time)}:{})};
+        ...(laneRecords.length?{socketDots:socketsOf(n,time),laneStates:laneStatesOf(n,time),...growingTile(n,time),
+          ...(n.subscriber?{laneColor:subscriberColor(n.subscriber)}:{})}:{})};
     });
     const histories=trays.map(q=>{
       const values=records.filter(e=>e.b.id===q.anchor).flatMap(e=>e.events.filter(v=>v.arrival<=time));

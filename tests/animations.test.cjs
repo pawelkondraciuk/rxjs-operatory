@@ -227,7 +227,8 @@ test('every variant has deterministic READY, question, FINISHED and fixed geomet
   const {scenes,engine:{compileScene}}=await harness();
   for(const scene of scenes.values()) {
     const engine=compileScene(scene),initial=engine.snapshot(0);
-    const shape=f=>JSON.stringify(f.nodes.map(n=>[n.id,n.x,n.y,n.w,n.h]));
+    // Rosnący kafelek torów (laneSlots) zachowuje górę, x i szerokość; wysokość rośnie z wierszami wykonań.
+    const shape=f=>JSON.stringify(f.nodes.map(n=>n.laneSlots?[n.id,n.x,n.y-n.h/2,n.w,'rows']:[n.id,n.x,n.y,n.w,n.h]));
     for(const time of [0,...engine.stops.map(s=>s.time),engine.duration]) {
       const frame=engine.snapshot(time);
       assert.equal(shape(frame),shape(initial),scene.id);

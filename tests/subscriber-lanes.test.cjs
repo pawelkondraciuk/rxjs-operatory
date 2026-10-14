@@ -60,11 +60,22 @@ test('lanes finish independently and the receiver definition keeps its colour',a
  assert.match(svg,/data-lane="B" data-lane-role="work" data-lane-state="running"/);
  assert.match(svg,/data-lane="A" data-lane-role="operator" data-lane-state="completed"/);
  assert.match(svg,/<title>A · ✓ complete<\/title>/,'stan toru ma tekst');
+ const mapDone=svg.slice(svg.indexOf('data-node="map"'),svg.indexOf('data-node="A"'));
+ assert.deepEqual([...mapDone.matchAll(/data-row-state="(\w+)"/g)].map(m=>m[1]),['completed','running'],'zielony tylko wiersz A');
+ assert.match(mapDone,/data-row-state="completed"[^>]*><rect[^>]+fill="#d6eedc"/);
+ assert.doesNotMatch(svg,/data-row-flash/,'postój nie łapie rozbłysku');
+ const doneAt=c.events.find(e=>e.type==='stream-complete'&&e.edge==='map-A').at;
+ assert.match(render(c.snapshot(doneAt+.2)),/data-row-flash="completed"/,'complete podkreśla krótki rozbłysk');
+ const receiverDone=svg.slice(svg.indexOf('data-node="A"'),svg.indexOf('data-node="B"'));
+ assert.match(receiverDone,/data-row-state="completed"/);
+ assert.equal(node(done,'map').fill,node(c.snapshot(0),'map').fill,'nagłówek definicji map bez zmian');
  assert.match(svg,/data-socket="out" data-subscriber="B"/);
  assert.match(svg,/data-lane-trail="map-A"/);
  const second=render(c.snapshot(at('second')));
- assert.match(second,/data-lane-role="work"[^]*?data-lane-icon="running"/,'HTTP: obracający się wskaźnik pracy');
- assert.doesNotMatch(second.slice(second.indexOf('data-node="map"'),second.indexOf('data-node="A"')),/data-lane-icon="running"/,'map nie ma wskaźnika pracy');
+ assert.doesNotMatch(second,/data-lane-icon=/,'stan wiersza niesie tło, bez ikon');
+ assert.doesNotMatch(second,/data-row-state="running"[^>]*><rect[^>]+fill="#d6eedc"/);
+ const mapRows=second.slice(second.indexOf('data-node="map"'),second.indexOf('data-node="A"'));
+ assert.deepEqual([...mapRows.matchAll(/data-row-state="(\w+)"/g)].map(m=>m[1]),['running','running']);
  assert.match(second,/<title>A · podłączony, czeka na next<\/title>/);
  assert.equal(render(c.snapshot(at('second'))),render(c.snapshot(at('second'))),'deterministyczna klatka');
 });
@@ -96,4 +107,39 @@ test('share() after map: one lane through HTTP and map, a hub fork to A and B, o
  const received=Array.from(end.histories,h=>Array.from(h.values,v=>v.value+':'+v.color));
  assert.deepEqual(received[0],received[1],'A i B dostają tę samą wartość w kolorze producenta');
  assert.match(c.snapshot(0).code,/share\(\)\)$/);
+});
+
+test('tiles grow: a fixed definition part, then one execution row per subscription reaching the tile',async()=>{
+ const {c,at}=await lanes();
+ const tile=(t,id)=>node(c.snapshot(t),id),http0=tile(0,'http');
+ assert.equal(http0.h,http0.defH,'READY: sama definicja');assert.equal(http0.laneRows.length,0);
+ const top=http0.y-http0.h/2;
+ for(const id of ['first','second','done']){
+  const http=tile(at(id),'http');
+  assert.ok(Math.abs(http.y-http.h/2-top)<1e-9,'góra kafelka stoi');
+ }
+ assert.equal(tile(at('first'),'http').laneRows.length,1);assert.equal(tile(at('first'),'map').h,http0.defH+http0.rowH);
+ assert.deepEqual(Array.from(tile(at('second'),'map').laneRows,r=>r.subscriber),['A','B']);
+ assert.equal(tile(c.duration,'http').h,http0.defH+2*http0.rowH,'wiersze zostają po zakończeniu');
+ const mapSubscribe=c.events.find(e=>e.type==='subscribe'&&e.edge==='map-A').at;
+ assert.equal(tile(mapSubscribe-.01,'map').laneRows.length,0);
+ assert.ok(tile(mapSubscribe+.1,'map').laneRows.length===1&&tile(mapSubscribe+.1,'map').laneStates.length===0,'wiersz rezerwuje miejsce, stan po dotarciu subscribe');
+ const share=await lanes('4:3','04a-dwa-tory-2');
+ const end=share.c.snapshot(share.c.duration);
+ assert.equal(node(end,'http').laneRows.length,1,'share: jeden wiersz w HTTP');
+ assert.equal(node(end,'map').laneRows.length,1);
+ assert.deepEqual(Array.from(node(end,'share').laneRows,r=>r.subscriber),['A','B']);
+});
+
+test('producer progress is the row background moving forward, then the row turns complete',async()=>{
+ const {c,at,render}=await lanes();
+ const fill=(t,id)=>{const svg=render(c.snapshot(t)),part=svg.slice(svg.indexOf('data-node="http"'),svg.indexOf('data-node="map"'));
+  return part.match(new RegExp(`data-lane="${id}"[^>]*>(?:<title>[^<]*</title>)<rect data-work-fill="([^"]+)" x="[^"]+" y="[^"]+" width="([^"]+)"`));};
+ const early=fill(at('first'),'A'),later=fill(at('question'),'A');
+ assert.ok(early&&later,'pasek jest tłem wiersza');
+ assert.ok(Number(later[2])>Number(early[2]),'tło przesuwa się do przodu');
+ assert.equal(fill(at('done'),'A'),null,'po complete wiersz przejmuje zieleń');
+ assert.ok(fill(at('done'),'B'),'tor B nadal pokazuje postęp');
+ const http=node(c.snapshot(c.duration),'http');
+ assert.ok(http.rowH<=64&&http.defH<=84,'smukłe wiersze');
 });
