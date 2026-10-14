@@ -138,15 +138,12 @@
 .rx-player.rx-lanes .rx-metric { font-size:24px; }
 .rx-player.rx-lanes .rx-metric b { font-size:40px; }
 
-/* Lokalny styl rodziny flatteningu: wyłącznie powierzchnie kafelków, bez zmiany geometrii i przepływu. */
-.rx-player.rx-flatten-flat [data-node] > rect:first-of-type,
-.rx-player.rx-flatten-flat [data-inner-stage] > rect:first-of-type,
-.rx-player.rx-flatten-flat [data-inner-work] > rect:first-of-type {
+/* Płaskie kafelki (04a, 06a, 07 i 08–12): bez obrysu i zaokrągleń, wyłącznie powierzchnia; geometria i przepływ bez zmian.
+   Boksy historii obok kafelków też są płaskie; ciemniejsze tło zastępuje ramkę. */
+.rx-player.rx-flat-tiles [data-node] > rect:first-of-type,
+.rx-player.rx-flat-tiles [data-panel-box] {
   stroke: none;
   rx: 0;
   ry: 0;
 }
-.rx-player.rx-flatten-flat [data-inner-work-panel] > rect {
-  rx: 0;
-  ry: 0;
-}
+.rx-player.rx-flat-tiles [data-panel-box] { fill: #ECE6DA; }

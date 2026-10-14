@@ -258,7 +258,7 @@ export function renderScene(frame,options={}) {
     // Łącznik pionowy do górnej krawędzi panelu albo poziomy, gdy panel stoi obok kafelka.
     const beside=p.from&&p.from.y>=p.y&&p.from.y<=p.y+p.h;
     if(p.from&&!p.innerWork)svg+=`<path d="M${p.from.x} ${p.from.y} ${beside?'H'+p.x:'V'+p.y}" stroke="#805095" stroke-width="3" stroke-dasharray="6 5"/>`;
-    svg+=`<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="12" fill="#f1eee7" stroke="#958875" stroke-width="2"/>`;
+    svg+=`<rect data-panel-box="true" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="12" fill="#f1eee7" stroke="#958875" stroke-width="2"/>`;
     if(p.label)svg+=text(p.x+18,p.y+18,p.label,20*k,'style="text-anchor:start;fill:#43525b"');
   }
   for(const e of frame.edges) if(e.visible&&(e.subscriber||!(reduced&&e.phase==='unsubscribe'))) {

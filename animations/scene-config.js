@@ -53,6 +53,8 @@ export function configureScene(scene) {
     scene.playerLayout='expanded';
     scene.metrics=[{label:id==='06a-cold-hot'?'wykonania':'requesty',count:'started'}];
   }
+  // Cold/hot i share (06a, 07, oba warianty): płaskie kafelki jak w 04a i 08–12.
+  if(id==='06a-cold-hot'||id==='07-hot-cold')scene.playerClass=[scene.playerClass,'rx-flat-tiles'].filter(Boolean).join(' ');
   if(scene.flattenLayout||scene.playback?.stops){
     if(stagedIds.has(scene.id))scene.playback={...scene.playback,controller:'stages'};
     return scene;
