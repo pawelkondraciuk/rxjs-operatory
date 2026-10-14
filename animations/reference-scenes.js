@@ -93,61 +93,85 @@ export function mapGraph(scene) {
 // ink i tint: ciemniejszy tekst i delikatne tło chwilowego napisu toru (kontrast na projektorze).
 const laneSubscribers={A:{color:'#7457D9',fill:'#cbbff2',progress:'#c4b6f0',ink:'#4f35b0',tint:'#f0ecfc'},
   B:{color:'#D8840F',fill:'#f3d09d',progress:'#f0c88c',ink:'#8f5100',tint:'#fdf1e0'},
-  S:{color:'#238F83',fill:'#a7d8d1',progress:'#7cc4b9',label:''}};
+  C:{color:'#2F7ED8',fill:'#bcd6f5',progress:'#b0cdf0',ink:'#1f5ca6',tint:'#e8f1fc'}};
+
+// share(): scenariusz to lista Subscriberów {id, start, unsub?} (czas modelu). Pierwsza subskrypcja przy braku aktywnego
+// upstreamu otwiera sesję (jeden request, odpowiedź po requestTime); kolejni dołączają do niej. Odejście ostatniego
+// aktywnego przed odpowiedzią anuluje upstream (HTTP ABORT, bez complete). Nowa subskrypcja po końcu sesji otwiera następną.
+// Sesja k ma tor U{k} w kolorze Subscribera, który ją uruchomił — kolor wykonania, nie właściciela (zarządza nim share).
+export function shareSessions(subscribers,requestTime=4) {
+  const subs=subscribers.map((sub,slot)=>({...sub,slot})),sessions=[];
+  const timeline=subs.flatMap(sub=>[{at:sub.start,type:'sub',sub},...(sub.unsub===undefined?[]:[{at:sub.unsub,type:'unsub',sub}])])
+    .sort((a,b)=>a.at-b.at||(a.type==='unsub'?-1:1));
+  let current=null;
+  for(const {at,type,sub} of timeline) {
+    if(type==='sub') {
+      if(!current||at>=current.end){current={index:sessions.length+1,start:at,initiator:sub.id,response:at+requestTime,end:at+requestTime,active:0};sessions.push(current);}
+      sub.session=current;current.active++;
+    } else if(at<sub.session.response&&sub.session.cancelAt===undefined) {
+      sub.unsubAt=at;
+      if(--sub.session.active===0){sub.session.cancelAt=at;sub.session.end=at;sub.cancelsUpstream=true;if(current===sub.session)current=null;}
+    }
+  }
+  for(const sub of subs)sub.receives=sub.unsubAt===undefined&&sub.session.cancelAt===undefined;
+  return {subs,sessions,end:Math.max(...sessions.map(s=>s.end))};
+}
+const upstreamEdge=(kind,k)=>(kind==='http'?'http-map':'map-share')+(k>1?`-${k}`:'');
 const laneTiles={source:{headerFill:'#8FC9D4',runtimeFill:'#cde7ec'},operator:{headerFill:'#D8B3E6',runtimeFill:'#eddcf4'},
   receiver:{headerFill:'#EAE4F7',runtimeFill:'#f6f3fc'}};
-function coldCodeLines() {
-  const mark=(id,bg,line)=>({id,bg,line});
-  const http=mark('http','rgba(143,201,212,.4)','#4fa5b5'),map=mark('map','rgba(216,179,230,.45)','#b384c6');
+// Kod torów: stale tylko definicja pipeline'u (bez nazwy data$), fragmenty w kolorach klocków; fragment świeci,
+// gdy jego klocek pracuje (HTTP — odpowiedź wylatuje, map — przekształcenie, share — rozdzielenie wartości).
+function laneCodeLines(shared,plan) {
+  const mark=(id,bg,line)=>({id,bg,line}),op=['rgba(216,179,230,.45)','#b384c6'];
+  const http=mark('http','rgba(143,201,212,.4)','#4fa5b5'),map=mark('map',...op),share=mark('share',...op);
   const during=(from,to)=>({from,to}),ev=(type,edge)=>({type,edge});
-  const response=id=>during(ev('source-next',`http-map-${id}`),ev('deliver-next',`http-map-${id}`));
-  const transform=id=>during(ev('deliver-next',`http-map-${id}`),ev('source-next',`map-${id}`));
-  // Stała jest tylko definicja; subscribe pokazuje chwilowy napis nad diagramem (graph.callouts w coldLanesGraph).
-  const lines=[
-    [{text:'http.get<number>(url)',mark:http,active:[response('A'),response('B')]},{text:'.pipe('},
-      {text:'map(x => x * 2)',mark:map,active:[transform('A'),transform('B')]},{text:')'}],
-  ];
+  // share: wyróżnienia dla sesji, które dostarczyły odpowiedź, i Subscriberów, którzy ją dostali (zależne od scenariusza).
+  const sessions=shared?plan.sessions.filter(session=>session.cancelAt===undefined):[];
+  const response=shared?sessions.map(session=>during(ev('source-next',upstreamEdge('http',session.index)),ev('deliver-next',upstreamEdge('http',session.index)))):
+    ['-A','-B'].map(id=>during(ev('source-next',`http-map${id}`),ev('deliver-next',`http-map${id}`)));
+  const transform=shared?sessions.map(session=>during(ev('deliver-next',upstreamEdge('http',session.index)),ev('source-next',upstreamEdge('map',session.index)))):
+    ['-A','-B'].map(id=>during(ev('deliver-next',`http-map${id}`),ev('source-next',`map${id}`)));
+  const split=shared?sessions.flatMap(session=>{const sub=plan.subs.find(x=>x.session===session&&x.receives);
+    return sub?[during(ev('deliver-next',upstreamEdge('map',session.index)),ev('source-next',`share-${sub.id}`))]:[];}):[];
+  // share ma dłuższy pipe, więc łamie się świadomie przed .pipe (bez przypadkowego zawijania w środku wywołania).
+  const lines=shared?[[{text:'http.get<number>(url)',mark:http,active:response}],
+    [{text:'  .pipe('},{text:'map(x => x * 2)',mark:map,active:transform},{text:', '},
+      {text:'share()',mark:share,active:split},{text:')'}]]:
+    [[{text:'http.get<number>(url)',mark:http,active:response},{text:'.pipe('},{text:'map(x => x * 2)',mark:map,active:transform},{text:')'}]];
   return {codeLines:lines,code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeFrames:[],playerClass:'rx-lanes'};
 }
+// Slajdy: -2 — A w 1 s, B w 3 s, jedna odpowiedź w 5 s dla obu; -3 — dodatkowo A robi unsubscribe w 4 s.
+const defaultShareScenario=unsub=>[{id:'A',start:1,...(unsub?{unsub:4}:{})},{id:'B',start:3}];
 export function configureLanes(scene) {
   const mode=scene.lanesMode||'cold',shared=mode!=='cold',unsub=mode==='share-unsub';
-  const a=laneSubscribers.A.fill,b=laneSubscribers.B.fill,s=laneSubscribers.S.fill;
-  const definition=shared?'const data$ = http.get(url).pipe(map(f), share())':'const data$ = http.get(url).pipe(map(x => x * 2))';
-  const first=unsub?'const a = data$.subscribe(A)':'data$.subscribe(A)';
-  const lastB=shared?5:7;
-  // cold: kod pokazuje sam pipeline (bez nazwy data$) i dwa osobne wywołania subscribe na jego wyniku.
-  // Fragmenty mają kolory odpowiadających klocków i torów, pojawiają się z subscribe i świecą, gdy klocek pracuje.
-  const coldCode=shared?{}:coldCodeLines();
-  Object.assign(scene,{graph:lanesGraph,playerLayout:'function',duration:lastB+2,ink:'#26323B',
-    // cold: dłuższa transformacja — kulka zatrzymuje się w map i zmienia 21 → 42.
-    timing:{subscribe:shared?2.4:1.6,travel:1,transform:shared?.6:1.4,terminal:.8,gap:.5},
-    // Subscribe dopisuje się w kodzie w chwili subskrypcji: B pojawia się 2 s po A.
-    code:definition,
-    codeFrames:[{event:{type:'subscribe',edge:shared?'share-A':'map-A'},code:definition+'\n'+first,fadeIn:.3},
-      {event:{type:'subscribe',edge:shared?'share-B':'map-B'},code:definition+'\n'+first+'; data$.subscribe(B)',fadeIn:.3},
-      // Bez fadeIn wpis może zastąpić drugą linię: pokazuje bieżącą instrukcję.
-      ...(unsub?[{event:{type:'inner-unsubscribe',edge:'share-A'},code:definition+'\na.unsubscribe()   // B nadal słucha'}]:[])],
-    rows:shared?[R('HTTP',[E(5,'dane',s)],[B(1,5,'request')],{completeAt:5}),
-      R('Odbiorca A',unsub?[]:[E(5,'widok',s)],[],unsub?{}:{completeAt:5}),R('Odbiorca B',[E(5,'widok',s)],[],{completeAt:5})]:
+  const a=laneSubscribers.A.fill,b=laneSubscribers.B.fill;
+  const plan=shared?shareSessions(scene.shareScenario||defaultShareScenario(unsub)):null;
+  const lastB=shared?plan.end:7;
+  Object.assign(scene,{graph:lanesGraph,playerLayout:'function',duration:lastB+2,ink:'#26323B',...laneCodeLines(shared,plan),
+    // Dłuższa transformacja — kulka zatrzymuje się w map i zmienia 21 → 42.
+    timing:{subscribe:shared?2.4:1.6,travel:1,transform:1.4,terminal:.8,gap:.5},
+    rows:shared?[...plan.sessions.map(session=>R(`HTTP ${session.index}`,session.cancelAt===undefined?[E(session.response,'21',laneSubscribers[session.initiator].fill)]:[],
+        [B(session.start,session.end,'request',session.cancelAt===undefined?'work':'cancel')],session.cancelAt===undefined?{completeAt:session.response}:{})),
+      ...plan.subs.map(sub=>R(`Odbiorca ${sub.id}`,sub.receives?[E(sub.session.response,'42',laneSubscribers[sub.id].fill)]:[],[],sub.receives?{completeAt:sub.session.response}:{}))]:
       [R('HTTP A',[E(5,'21',a)],[B(1,5,'request A')],{completeAt:5}),
       R('HTTP B',[E(7,'21',b)],[B(3,7,'request B')],{completeAt:7}),
       R('Odbiorca A',[E(5,'42',a)],[],{completeAt:5}),R('Odbiorca B',[E(7,'42',b)],[],{completeAt:7})],
-    captions:unsub?[[0,'share() za map: jedna definicja HTTP GET → map → share(). Nic jeszcze nie działa'],
+    captions:unsub?[[0,'share() za map: HTTP GET → map → share(). Nic jeszcze nie działa'],
       [1,'A subskrybuje share. share podpina się raz: przez map do HTTP, startuje jeden request'],
       [3,'2 s później B subskrybuje share. Upstream zostaje jeden'],
       [4,'A robi unsubscribe. share odłącza tylko A — B nadal słucha, więc request trwa'],
-      [5,'Odpowiedź dociera tylko do B. A zrezygnował, wspólny upstream obsłużył B']]:
-      shared?[[0,'share() za map: jedna definicja HTTP GET → map → share(). Nic jeszcze nie działa'],
+      [5,'HTTP zwraca 21, map daje 42. Odpowiedź dociera tylko do B']]:
+      shared?[[0,'share() za map: HTTP GET → map → share(). Nic jeszcze nie działa'],
       [1,'A subskrybuje share. share podpina się raz: przez map do HTTP, startuje jeden request'],
       [3,'2 s później B subskrybuje share. Dostaje własny wiersz, upstream zostaje jeden'],
-      [5,'Jedna odpowiedź, jedno map. share rozsyła ten sam wynik do A i B, potem complete obu']]:
+      [5,'Jedna odpowiedź 21, jedno map → 42. share rozsyła ten sam wynik do A i B, potem complete obu']]:
       [[0,'Cold: jedna definicja HTTP GET → map. Nic jeszcze nie działa'],
       [1,'A subskrybuje. Subskrypcja biegnie przez map do HTTP i startuje request A'],
       [3,'2 s później B subskrybuje tę samą definicję. Cold: drugi tor przez map i drugi request'],
       [5,'Request A zwraca 21. map na torze A zmienia je w 42, A dostaje wynik i complete. Tor B trwa'],
       [7,'Tor B kończy się osobno. Jedna definicja, dwa wykonania']],
-    metrics:[{label:shared?'definicje':'Pipeline',value:()=>1},{label:shared?'requesty HTTP':'Requesty HTTP',value:t=>shared?Number(t>=1):(t>=1)+(t>=3)},
-      ...(shared?[{label:'odbiorcy share',value:t=>(t>=1)+(t>=3)-(unsub&&t>=4)-(t>=5)*(unsub?1:2)}]:[])],
+    metrics:[{label:'Pipeline',value:()=>1},{label:'Requesty HTTP',value:t=>shared?plan.sessions.filter(session=>t>=session.start).length:(t>=1)+(t>=3)},
+      ...(shared?[{label:'Odbiorcy share',value:t=>plan.subs.filter(sub=>t>=sub.start&&t<(sub.unsubAt??sub.session.end)).length}]:[])],
     playback:manual(unsub?[
       {id:'first',event:{type:'connected',edge:'http-map'},offset:.35,caption:'A subskrybuje: share podpina się przez map do HTTP, startuje jeden request'},
       {id:'second',event:{type:'connected',edge:'share-B'},offset:.35,caption:'B ma własny wiersz w share. HTTP i map nadal mają jeden wspólny tor'},
@@ -156,7 +180,7 @@ export function configureLanes(scene) {
       {id:'done',event:{type:'deliver-next',edge:'share-B'},offset:.35,caption:'Odpowiedź dociera tylko do B'},
     ]:shared?[
       {id:'first',event:{type:'connected',edge:'http-map'},offset:.35,caption:'A subskrybuje: share podpina się przez map do HTTP, startuje jeden request'},
-      {id:'question',event:{type:'subscribe',edge:'share-B'},caption:'2 s później B subskrybuje data$ ze share(). Czy powstanie drugi request?'},
+      {id:'question',event:{type:'subscribe',edge:'share-B'},caption:'2 s później B subskrybuje ten sam pipeline ze share(). Czy powstanie drugi request?'},
       {id:'second',event:{type:'connected',edge:'share-B'},offset:.35,caption:'B ma własny wiersz w share. HTTP i map nadal mają jeden wspólny tor'},
       {id:'done',event:{type:'deliver-next',edge:'share-B'},offset:.35,caption:'Jedna odpowiedź, map raz. share rozsyła ten sam wynik do A i B'},
     ]:[
@@ -166,90 +190,75 @@ export function configureLanes(scene) {
       {id:'done',event:{type:'disconnected',edge:'map-A'},offset:.75,caption:'Tor A zakończony w HTTP, map i u odbiorcy. Tor B trwa dalej'},
     ]),
   });
-  if(!shared)Object.assign(scene,coldCode);
+  // Własny scenariusz share (np. kontrola A/B/C) nie ma postojów ani podpisów slajdu — tylko AUTO.
+  if(scene.shareScenario)Object.assign(scene,{captions:[],playback:{entry:'auto',finish:'hold'}});
 }
 
-// Cold: wymiary dla projektora, liczone dla 1024×768 (≈0,787 px ekranu na jednostkę viewBox, czyli ×1,27):
-// nagłówek ~62 px (+20%), wiersz ~70 px (+30%), kulka ~46 px (wartość ~28 px), port 18, kabel 4, narożnik 6;
-// nagłówek ~32 px, litera ~27 px, inbox ~22 px (drugorzędny). Pipeline zajmuje ~90% szerokości, odstępy są równe,
-// a połączenia poziome. Wysokość całości (256) mieści się w obu formatach, więc wymiary są wspólne.
-function coldLanesGraph(scene) {
-  const tall=scene.format==='4:3';
+// Wymiary dla projektora, liczone dla 1024×768 (≈0,787 px ekranu na jednostkę viewBox, czyli ×1,27):
+// nagłówek ~62 px, wiersz ~70 px, kulka ~46 px (wartość ~28 px), port 18, kabel 4, narożnik 6; nagłówek ~32 px,
+// litera ~27 px, inbox ~22 px (drugorzędny). Pipeline zajmuje ~90% szerokości, odstępy są równe, połączenia poziome.
+// Wysokość całości (256) mieści się w obu formatach, więc wymiary są wspólne. share ma cztery kolumny, więc klocki
+// są węższe (odbiorca mieści dwie kulki — share dostarcza jedną odpowiedź).
+export function lanesGraph(scene) {
+  const tall=scene.format==='4:3',mode=scene.lanesMode||'cold',shared=mode!=='cold',unsub=mode==='share-unsub';
   const g={top:tall?178:102,defH:79,rowH:89,ball:{r:29,font:35.5},icon:28,portRadius:11.4,laneWire:5,rx:7.6,
-    textScale:1.42,labelScale:1.56,httpX:217,httpW:310,mapX:592,mapW:280,recvX:995,recvW:366,ballGap:10};
-  const k=g.textScale||1,rowY=slot=>g.top+g.defH+(slot+.5)*g.rowH,h=g.defH+2*g.rowH;
-  const grow=kind=>({top:g.top,defH:g.defH,rowH:g.rowH,laneSlots:{A:0,B:1},growRows:true,y:g.top+h/2,h,ready:true,detail:'',rx:g.rx,...laneTiles[kind]});
+    textScale:1.42,labelScale:1.56,ballGap:10,
+    ...(shared?{httpX:187,httpW:250,mapX:477,mapW:180,shareX:752,shareW:220,recvX:1057,recvW:240,maxBalls:2}:
+      {httpX:217,httpW:310,mapX:592,mapW:280,recvX:995,recvW:366,maxBalls:3})};
+  const k=g.textScale,rowY=slot=>g.top+g.defH+(slot+.5)*g.rowH;
+  const grow=(kind,slots,rows)=>{const h=g.defH+rows*g.rowH;
+    return {top:g.top,defH:g.defH,rowH:g.rowH,laneSlots:slots,growRows:true,y:g.top+h/2,h,ready:true,detail:'',rx:g.rx,...laneTiles[kind]};};
   const complete=end=>({at:end,kind:'complete'}),fill=id=>laneSubscribers[id].fill;
+  const upstreamTile=kind=>shared?grow(kind,Object.fromEntries(plan.sessions.map((session,i)=>[`U${session.index}`,i])),plan.sessions.length):
+    grow(kind,{A:0,B:1},2);
   const lane=(id,start,end)=>[
     {id:`http-map-${id}`,from:'http',to:'map',subscriber:id,logicalStart:start,logicalEnd:complete(end),events:[E(end,'21',fill(id))]},
     {id:`map-${id}`,from:'map',to:id,subscriber:id,logicalStart:start,logicalEnd:complete(end),events:[E(end,'42',fill(id))]}];
+  // share: tor upstreamu sesji (U1, U2…) w kolorze inicjatora przez HTTP i map; w share kulka rozdziela się na
+  // osobne powiadomienia next w kolorach aktywnych Subscriberów (hold: czas rozdzielenia w kafelku).
+  const plan=shared?shareSessions(scene.shareScenario||defaultShareScenario(unsub)):null;
+  const subIds=shared?plan.subs.map(sub=>sub.id):['A','B'];
+  const subscribers={...laneSubscribers,...Object.fromEntries((plan?.sessions||[]).map(session=>
+    [`U${session.index}`,{...laneSubscribers[session.initiator],label:''}]))};
+  const sharedEdges=shared?[...plan.sessions.flatMap(session=>{
+      const id=`U${session.index}`,end=session.cancelAt===undefined?complete(session.response):{at:session.cancelAt,kind:'unsubscribe'};
+      const value=v=>session.cancelAt===undefined?[E(session.response,v,subscribers[id].fill)]:[];
+      return [{id:upstreamEdge('http',session.index),from:'http',to:'map',subscriber:id,logicalStart:session.start,logicalEnd:end,workUntil:session.response,events:value('21')},
+        {id:upstreamEdge('map',session.index),from:'map',to:'share',subscriber:id,logicalStart:session.start,logicalEnd:end,events:value('42')}];
+    }),...plan.subs.map(sub=>({id:`share-${sub.id}`,from:'share',to:sub.id,subscriber:sub.id,logicalStart:sub.start,hold:1.2,
+      logicalEnd:sub.unsubAt===undefined?complete(sub.session.response):{at:sub.unsubAt,kind:'unsubscribe'},
+      events:sub.receives?[E(sub.session.response,'42',fill(sub.id))]:[]}))]:[];
   // Odbiorca: kompaktowy wiersz (pasek toru, inbox, litera, kulki wartości), 3 px odstępu od sąsiada.
   const gap=3,left=6*k+12,inbox={size:g.icon,left,font:24*k};
   const ballsX=x=>x-g.recvW/2+left+g.icon+8*k+22*k+12+g.ball.r;
   const receiver=(id,slot)=>({id,x:g.recvX,y:rowY(slot),w:g.recvW,h:g.rowH-2*gap,top:rowY(slot)-g.rowH/2+gap,defH:0,rowH:g.rowH-2*gap,
-    laneSlots:{[id]:0},...laneTiles.receiver,label:'',subscriber:id,terminalBadge:true,detail:'',inbox,rx:g.rx});
+    laneSlots:{[id]:0},...laneTiles.receiver,label:'',subscriber:id,terminalBadge:true,detail:'',inbox,rx:g.rx,...(shared?{rowTint:true}:{})});
+  // Chwilowy napis zdarzenia: .subscribe() od pojawienia się odbiorcy (0,3 s przed subscribe) do dotarcia impulsu
+  // do źródła (cold: HTTP; share: A do HTTP, B tylko do share, bo upstream już działa). Ręczne .unsubscribe()
+  // trwa od wywołania do końca animacji anulowania. Pas nad pipeline'em jest pusty, więc napis niczego nie zasłania.
+  const callout=(text,id,from,to)=>({text,subscriber:id,y:g.top/2,size:45,from,to});
+  const ev=(type,edge,offset)=>({type,edge,...(offset?{offset}:{})});
+  // share: subscribe inicjatora trwa do dotarcia impulsu do HTTP, kolejnych — tylko do share; unsubscribe ostatniego
+  // aktywnego trwa, aż anulowanie dotrze do HTTP.
+  const callouts=shared?plan.subs.flatMap(sub=>[
+    callout('.subscribe()',sub.id,ev('subscribe',`share-${sub.id}`,-.3),
+      sub.session.initiator===sub.id&&sub.session.start===sub.start?ev('connected',upstreamEdge('http',sub.session.index)):ev('connected',`share-${sub.id}`)),
+    ...(sub.unsubAt===undefined?[]:[callout('.unsubscribe()',sub.id,ev('inner-unsubscribe',`share-${sub.id}`,-.3),
+      sub.cancelsUpstream?ev('disconnected',upstreamEdge('http',sub.session.index)):ev('disconnected',`share-${sub.id}`))])]):
+    ['A','B'].map(id=>callout('.subscribe()',id,ev('subscribe',`map-${id}`,-.3),ev('connected',`http-map-${id}`)));
   return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,portRadius:g.portRadius,laneWire:g.laneWire,ball:g.ball,
     textScale:g.textScale,labelScale:g.labelScale,
-    subscribers:laneSubscribers,
-    nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,progressUntilNext:true,...grow('source')},
-      {id:'map',x:g.mapX,w:g.mapW,label:'map',color:'op',transformBalls:true,...grow('operator')},
-      receiver('A',0),receiver('B',1)],
-    edges:[...lane('A',1,5),...lane('B',3,7)],
-    trays:['A','B'].map((id,slot)=>({anchor:id,x:ballsX(g.recvX),y:rowY(slot),balls:true,max:3,gap:g.ballGap})),
-    // .subscribe() z identyfikatorem toru: od pojawienia się odbiorcy (0,3 s przed wysłaniem subscribe) do dotarcia
-    // impulsu do HTTP. Nie czeka na request. Pas nad pipeline'em jest pusty, więc napis niczego nie zasłania.
-    callouts:['A','B'].map(id=>({text:'.subscribe()',subscriber:id,y:g.top/2,size:45,
-      from:{type:'subscribe',edge:`map-${id}`,offset:-.3},to:{type:'connected',edge:`http-map-${id}`}})),
-  };
-}
-
-export function lanesGraph(scene) {
-  if((scene.lanesMode||'cold')==='cold')return coldLanesGraph(scene);
-  const tall=scene.format==='4:3',mode=scene.lanesMode||'cold',shared=mode!=='cold',unsub=mode==='share-unsub';
-  // Kompaktowe kafelki: stały nagłówek definicji, pod nim smukły wiersz wykonania na każdą subskrypcję docierającą do kafelka.
-  // Proporcje wg makiety (nagłówek ~43, wiersz ~32, port ~15, kabel ~3), przeskalowane do slajdu (4:3 ×1,6, 16:9 ×1,25),
-  // żeby napisy zostały duże. Odbiorcy (nagłówek + wiersz z wartością) stoją z odstępem; kabel B ma załamanie.
-  const v=tall?{top:170,defH:70,rowH:52,recvRow:66,recvGap:14,portRadius:12,laneWire:5,textScale:1.3,labelScale:1.6}:
-    {top:122,defH:56,rowH:42,recvRow:52,recvGap:10,portRadius:9.5,laneWire:4};
-  const x=shared?(tall?{httpX:155,httpW:250,mapX:457.5,mapW:225,shareX:755,shareW:240,recvX:1075,recvW:270}:
-    {httpX:142.5,httpW:205,mapX:453.5,mapW:185,shareX:759.5,shareW:195,recvX:1085.5,recvW:225}):
-    tall?{httpX:175,httpW:290,mapX:617.5,mapW:265,recvX:1062.5,recvW:295}:{httpX:152.5,httpW:225,mapX:617.5,mapW:205,recvX:1085,recvW:230};
-  const g={...v,...x},k=g.textScale||1,rowY=slot=>g.top+g.defH+(slot+.5)*g.rowH;
-  const grow=(slots,rows,kind)=>{const h=g.defH+rows*g.rowH;
-    return {top:g.top,defH:g.defH,rowH:g.rowH,laneSlots:slots,growRows:true,y:g.top+h/2,h,ready:true,detail:'',...laneTiles[kind]};};
-  const upstream=shared?{S:0}:{A:0,B:1},rows=shared?1:2;
-  g.recvH=g.defH+g.recvRow;
-  // Wiersz odbiorcy A leży na torze A; B stoi pod A z odstępem.
-  g.laneA=rowY(0);g.laneB=g.laneA+g.recvH+g.recvGap;
-  const fill=id=>laneSubscribers[id].fill;
-  const complete=end=>({at:end,kind:'complete'});
-  const lane=(id,start,end,color)=>[
-    {id:`http-map-${id}`,from:'http',to:'map',subscriber:id,logicalStart:start,logicalEnd:complete(end),events:[E(end,'dane',color)]},
-    {id:`map-${id}`,from:'map',to:id,subscriber:id,logicalStart:start,logicalEnd:complete(end),events:[E(end,'widok',color)]}];
-  // share: jeden tor S przez HTTP i map, wartość za share zachowuje kolor producenta (ta sama odpowiedź dla A i B).
-  const downstream=[['A',1,unsub?{at:4,kind:'unsubscribe'}:complete(5)],['B',3,complete(5)]];
-  const sharedEdges=[
-    {id:'http-map',from:'http',to:'map',subscriber:'S',logicalStart:1,logicalEnd:complete(5),events:[E(5,'dane',fill('S'))]},
-    {id:'map-share',from:'map',to:'share',subscriber:'S',logicalStart:1,logicalEnd:complete(5),events:[E(5,'widok',fill('S'))]},
-    ...downstream.map(([id,start,end])=>({id:`share-${id}`,from:'share',to:id,subscriber:id,logicalStart:start,logicalEnd:end,
-      events:end.kind==='complete'?[E(5,'widok',fill('S'))]:[]}))];
-  // Odbiorca: nagłówek z nazwą (definicja) i jeden wiersz wykonania z odebraną wartością; środek wiersza leży na torze.
-  const receiver=(id,laneAt)=>{
-    const top=laneAt-g.defH-g.recvRow/2;
-    return {id,x:g.recvX,y:top+g.recvH/2,w:g.recvW,h:g.recvH,top,defH:g.defH,rowH:g.recvRow,laneSlots:{[id]:0},...laneTiles.receiver,
-      label:`Odbiorca ${id}`,subscriber:id,terminalBadge:true,labelOffset:-g.recvH/2+g.defH/2,detail:''};
-  };
-  const tray=(id,laneAt)=>({anchor:id,x:g.recvX-g.recvW/2+80*k,y:laneAt,w:130*k,lines:1});
-  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,portRadius:g.portRadius,laneWire:g.laneWire,
-    ...(tall?{textScale:g.textScale,labelScale:g.labelScale}:{}),
-    subscribers:laneSubscribers,
-    nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,...grow(upstream,rows,'source')},
-      {id:'map',x:g.mapX,w:g.mapW,label:'map',color:'op',...grow(upstream,rows,'operator')},
-      // share: wiersze A i B; wspólne wejście S trafia na wysokość pierwszego wiersza i rozwidla się do obu.
-      ...(shared?[{id:'share',x:g.shareX,w:g.shareW,label:'share()',color:'op',...grow({A:0,B:1,S:0},2,'operator')}]:[]),
-      receiver('A',g.laneA),receiver('B',g.laneB)],
-    edges:shared?sharedEdges:[...lane('A',1,5,fill('A')),...lane('B',3,7,fill('B'))],
-    trays:[tray('A',g.laneA),tray('B',g.laneB)],
+    subscribers,
+    nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,progressUntilNext:true,...upstreamTile('source')},
+      {id:'map',x:g.mapX,w:g.mapW,label:'map',color:'op',transformBalls:true,...upstreamTile('operator')},
+      // share: wiersz na Subscribera (w dół, w kolejności dołączania); wejście sesji trafia na wiersz jej inicjatora.
+      ...(shared?[{id:'share',x:g.shareX,w:g.shareW,label:'share()',color:'op',splitBalls:true,splitAt:.5,hubFan:false,rowTint:true,
+        ...grow('operator',{...Object.fromEntries(plan.subs.map(sub=>[sub.id,sub.slot])),
+          ...Object.fromEntries(plan.sessions.map(session=>[`U${session.index}`,plan.subs.find(sub=>sub.id===session.initiator).slot]))},plan.subs.length)}]:[]),
+      ...subIds.map((id,slot)=>receiver(id,slot))],
+    edges:shared?sharedEdges:[...lane('A',1,5),...lane('B',3,7)],
+    trays:subIds.map((id,slot)=>({anchor:id,x:ballsX(g.recvX),y:rowY(slot),balls:true,max:g.maxBalls,gap:g.ballGap})),
+    callouts,
   };
 }
 

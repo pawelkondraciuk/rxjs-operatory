@@ -247,7 +247,8 @@ export function compileScene(scene) {
       }
       const lane={role,subscriber,label:graph.subscribers?.[subscriber]?.label??subscriber,y:laneY(n,subscriber),color:subscriberColor(subscriber),fill:graph.subscribers?.[subscriber]?.fill,
         progressFill:graph.subscribers?.[subscriber]?.progress??graph.subscribers?.[subscriber]?.fill,
-        state,since,status:laneStatus[state==='running'&&role!=='work'?'waiting':state],opacity:clamp((time-from)/fadeDuration)};
+        state,since,status:laneStatus[state==='running'&&role!=='work'?'waiting':state],opacity:clamp((time-from)/fadeDuration),
+        ...(n.rowTint?{labelColor:graph.subscribers?.[subscriber]?.ink}:{})};
       if(role==='work') {
         // progressUntilNext: oczekiwanie kończy się z wysłaniem pierwszej wartości (odpowiedź HTTP), nie dopiero z complete.
         const firstNext=n.progressUntilNext?out.events[0]?.at:undefined;
@@ -266,7 +267,11 @@ export function compileScene(scene) {
       // Wiersz rozszerza kafelek tuż przed dotarciem subscribe i kończy wzrost razem z nim.
       const grow=Math.max(r.start,connectedAt(r)-rowGrowth);
       const slot=n.laneSlots[r.subscriber],growth=clamp((time-grow)/rowGrowth),eased=growth*growth*(3-2*growth);
-      if(eased>(rows.get(slot)?.growth??0))rows.set(slot,{slot,subscriber:r.subscriber,color:subscriberColor(r.subscriber),growth:eased});
+      // Hub (np. share): lewy pasek wiersza ma kolor wspólnego upstreamu aktywnego w chwili dołączenia Subscribera.
+      // Czas modelu: inicjator dołącza w tej samej chwili, w której share otwiera upstream (w ilustracji subscribe dociera do share wcześniej).
+      const upstream=n.splitBalls&&laneRecords.find(u=>u.b.id===n.id&&u.subscriber!==r.subscriber&&u.logicalStart<=r.logicalStart&&(!u.end||(u.end.logicalAt??u.end.at)>r.logicalStart));
+      if(eased>(rows.get(slot)?.growth??0))rows.set(slot,{slot,subscriber:r.subscriber,color:subscriberColor(r.subscriber),growth:eased,
+        ...(upstream?{stripe:subscriberColor(upstream.subscriber)}:{}),...(n.rowTint?{tint:graph.subscribers?.[r.subscriber]?.tint}:{})});
     }
     return [...rows.values()].filter(row=>row.growth>0).sort((a,b)=>a.slot-b.slot)
       .map(row=>({...row,top:n.top+n.defH+row.slot*n.rowH,h:n.rowH}));
@@ -276,6 +281,25 @@ export function compileScene(scene) {
     if(!n.laneSlots||!n.growRows)return {};
     const rows=laneRowsOf(n,time),h=n.defH+rows.reduce((sum,row)=>sum+row.growth*n.rowH,0);
     return {y:n.top+h/2,h,labelOffset:-h/2+n.defH/2,laneRows:rows,defH:n.defH};
+  }
+
+  // Rozdzielenia w hubie: wejście wspólnego upstreamu → wyjścia z tą samą wartością (logicalAt), które wychodzą po nim.
+  function splitsOf(n) {
+    const left=n.x-n.w/2,right=n.x+n.w/2,x=left+n.w*(n.splitAt??.3);
+    return laneRecords.filter(r=>r.b.id===n.id).flatMap(input=>input.events.map(e=>{
+      const outputs=laneRecords.filter(r=>r.a.id===n.id).flatMap(out=>out.events.filter(v=>v.logicalAt===e.logicalAt&&v.at>=e.arrival)
+        .map(v=>({value:v.value,color:v.color||'a',y:laneY(n,out.subscriber),at:v.at})));
+      return outputs.length?{arrival:e.arrival,departure:Math.min(...outputs.map(o=>o.at)),value:e.value,color:e.color||'a',
+        y:laneY(n,input.subscriber),left,right,x,outputs}:null;
+    })).filter(Boolean);
+  }
+  // Subtelne przerywane ścieżki rozdzielenia — widoczne tylko w trakcie rozdzielania, nie na stałe.
+  function splitGuides(n,time) {
+    return splitsOf(n).flatMap(split=>{
+      if(time<split.arrival||time>=split.departure)return [];
+      const p=(time-split.arrival)/(split.departure-split.arrival),opacity=Math.min(clamp(p/.15),clamp((1-p)/.15));
+      return split.outputs.map(out=>({x1:split.x,y1:split.y,x2:split.right,y2:out.y,color:out.color,opacity}));
+    });
   }
 
   function snapshot(time) {
@@ -298,6 +322,15 @@ export function compileScene(scene) {
     for(const e of sourceTokens) if(time>=e.at&&time<e.until)tokens.push({...e});
     // transformBalls: między dotarciem wartości do kafelka a wyjściem wyniku kulka wjeżdża do środka wiersza,
     // zatrzymuje się, zmienia wartość (krótki puls) i jedzie do portu wyjścia. Czas modelu stoi, to wyłącznie ilustracja.
+    // splitBalls (hub, np. share): jedna kulka wspólnego upstreamu wjeżdża do punktu rozdzielenia, tam rozchodzi się
+    // na osobne powiadomienia next — po jednej kulce w kolorze każdego aktywnego Subscribera — do ich wierszy i wyjść.
+    for(const n of nodes) if(n.splitBalls) for(const split of splitsOf(n)) {
+      if(time<split.arrival||time>=split.departure)continue;
+      const p=(time-split.arrival)/(split.departure-split.arrival),ease=u=>u*u*(3-2*u);
+      if(p<.4)tokens.push({x:split.left+(split.x-split.left)*ease(p/.4),y:split.y,value:split.value,color:split.color,phase:'split-in'});
+      else for(const out of split.outputs)tokens.push({x:split.x+(split.right-split.x)*ease((p-.4)/.6),y:split.y+(out.y-split.y)*ease((p-.4)/.6),
+        value:out.value,color:out.color,phase:'split-out',scale:1+.15*Math.max(0,1-Math.abs(p-.4)/.08)});
+    }
     for(const n of nodes) if(n.transformBalls) for(const input of laneRecords.filter(r=>r.b.id===n.id)) {
       const output=laneRecords.find(r=>r.a.id===n.id&&r.subscriber===input.subscriber);
       for(const e of output?input.events:[]) {
@@ -375,7 +408,8 @@ export function compileScene(scene) {
         active:activity||Boolean(transform&&time<transform.until),progress,showProgress:Boolean(span&&(active||canceled)),transform:transform?.label,
         disabled:evaluate(n.disabled,t),
         ...(laneRecords.length?{socketDots:socketsOf(n,time),laneStates:laneStatesOf(n,time),...growingTile(n,time),
-          ...(n.subscriber?{laneColor:subscriberColor(n.subscriber)}:{})}:{})};
+          ...(n.subscriber?{laneColor:subscriberColor(n.subscriber),...(n.rowTint?{laneTint:graph.subscribers?.[n.subscriber]?.tint}:{})}:{}),
+          ...(n.splitBalls?{splitGuides:splitGuides(n,time)}:{})}:{})};
     });
     const histories=trays.map(q=>{
       const values=records.filter(e=>e.b.id===q.anchor).flatMap(e=>e.events.filter(v=>v.arrival<=time));

@@ -218,7 +218,7 @@ export function renderScene(frame,options={}) {
     // odcień kafelka), separator 1 px i pasek koloru toru — tożsamość subskrypcji zostaje w każdym stanie.
     // Stan to tło wiersza, bez ikon: trwa — tło bazowe, complete/error — delikatna zieleń/czerwień z krótkim
     // rozbłyskiem akcentu, unsubscribe — szary, przygaszony wiersz. Nagłówek definicji się nie zmienia.
-    const rows=n.laneRows||(n.subscriber&&n.defH!==undefined?[{subscriber:n.subscriber,color:n.laneColor,
+    const rows=n.laneRows||(n.subscriber&&n.defH!==undefined?[{subscriber:n.subscriber,color:n.laneColor,tint:n.laneTint,
       top:n.y-n.h/2+n.defH,h:n.h-n.defH,growth:1}]:[]);
     const stateOf=id=>(n.laneStates||[]).find(l=>l.subscriber===id);
     const rowTint={completed:'#DDF1E1',error:'#F7D9D9',cancelled:'#E7E8E8'},rowAccent={completed:'#26804E',error:'#C54848'};
@@ -226,15 +226,19 @@ export function renderScene(frame,options={}) {
       const left=n.x-n.w/2,h=Math.max(0,row.h*row.growth-1),lane=stateOf(row.subscriber),state=lane?.state||'running';
       const glow=rowAccent[state]&&!reduced?.28*(1-clamp((frame.time-lane.since)/.6)):0;
       svg+=`<g data-lane-row="${esc(row.subscriber)}" data-row-state="${state}" opacity="${row.growth}">`;
-      svg+=`<rect x="${left+1}" y="${row.top}" width="${n.w-2}" height="${h}" fill="${rowTint[state]||n.runtimeFill||'#fff'}"${rowTint[state]||n.runtimeFill?'':' fill-opacity=".35"'}/>`;
+      const base=rowTint[state]||row.tint||n.runtimeFill;
+      svg+=`<rect x="${left+1}" y="${row.top}" width="${n.w-2}" height="${h}" fill="${base||'#fff'}"${base?'':' fill-opacity=".35"'}/>`;
       if(glow>0)svg+=`<rect data-row-flash="${state}" x="${left+1}" y="${row.top}" width="${n.w-2}" height="${h}" fill="${rowAccent[state]}" opacity="${glow.toFixed(3)}"/>`;
-      svg+=`<rect x="${left+1}" y="${row.top}" width="${6*k}" height="${h}" fill="${row.color}"${state==='cancelled'?' opacity=".45"':''}/>`;
+      // Pasek po lewej: kolor toru, a w hubie kolor wspólnego upstreamu (row.stripe); anulowany wiersz w hubie szarzeje.
+      const stripe=row.stripe&&state==='cancelled'?'#808890':row.stripe||row.color;
+      svg+=`<rect x="${left+1}" y="${row.top}" width="${6*k}" height="${h}" fill="${stripe}"${state==='cancelled'&&!row.stripe?' opacity=".45"':''}/>`;
       svg+=`<path d="M${left} ${row.top}H${left+n.w}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/></g>`;
     }
     // Tory subskrybentów: stan wykonania jako mały element w kafelku definicji, gniazda na krawędziach.
     // Hub (np. share): wspólne wejście bez własnego wiersza rozwidla się do wierszy wyjść, przesuniętych w prawo.
     const hubInputs=(n.socketDots||[]).filter(d=>d.side==='in'&&!(n.laneStates||[]).some(l=>l.subscriber===d.subscriber));
-    const chipLeft=n.x-n.w/2+(hubInputs.length?50:22)*k,inRow=Boolean(rows.length);
+    // Przesunięcie robi miejsce na stałe rozwidlenie huba; bez niego (hubFan:false) litera stoi przy pasku toru.
+    const chipLeft=n.x-n.w/2+(hubInputs.length&&n.hubFan!==false?50:22)*k,inRow=Boolean(rows.length);
     for(const lane of n.laneStates||[]) {
       const dim=lane.state==='cancelled'?.55:1;
       svg+=`<g data-lane="${esc(lane.subscriber)}" data-lane-role="${lane.role}" data-lane-state="${lane.state}"${lane.progress===undefined?'':` data-work-progress="${lane.progress}"`} opacity="${lane.opacity*dim}"><title>${esc((lane.label||lane.subscriber)+' · '+lane.status)}</title>`;
@@ -256,7 +260,7 @@ export function renderScene(frame,options={}) {
         if(!inRow)svg+=laneIcon(n.x+n.w/2-34*k,lane.y,lane,k,frame.time);
       } else if(lane.role==='operator'&&inRow) {
         // Wiersz operatora: sama litera toru; stan niesie tło wiersza.
-        if(lane.label)svg+=text(chipLeft+(hubInputs.length?18:6)*k,lane.y,lane.label,24*k,'style="font-weight:700;fill:#43525b;text-anchor:start"');
+        if(lane.label)svg+=text(chipLeft+(hubInputs.length&&n.hubFan!==false?18:6)*k,lane.y,lane.label,24*k,`style="font-weight:700;fill:${lane.labelColor||'#43525b'};text-anchor:start"`);
       } else if(lane.role==='operator') {
         const x0=chipLeft,x1=n.x+n.w/2-22*k,h=58*k;
         svg+=`<rect x="${x0}" y="${lane.y-h/2}" width="${x1-x0}" height="${h}" rx="${12*k}" fill="#fff" fill-opacity=".62"/>`;
@@ -266,12 +270,14 @@ export function renderScene(frame,options={}) {
         // Kompaktowy odbiorca: ikona inbox i identyfikator toru; odebrane wartości rysuje historia (kulki).
         const size=n.inbox.size,x0=n.x-n.w/2+n.inbox.left;
         svg+=inboxIcon(x0,lane.y,size);
-        if(lane.label)svg+=text(x0+size+8*k,lane.y,lane.label,n.inbox.font,'style="font-weight:700;fill:#43525b;text-anchor:start"');
+        if(lane.label)svg+=text(x0+size+8*k,lane.y,lane.label,n.inbox.font,`style="font-weight:700;fill:${lane.labelColor||'#43525b'};text-anchor:start"`);
       } else if(!inRow)svg+=laneIcon(n.x+n.w/2-30*k,n.y+n.h/2-30*k,lane,k,frame.time);
       svg+='</g>';
     }
     // Rozwidlenie huba: wspólne wejście → chip każdej subskrypcji wyjścia.
-    for(const input of hubInputs) for(const lane of (n.laneStates||[]).filter(l=>l.role==='operator')) {
+    for(const guide of n.splitGuides||[])
+      svg+=`<path data-split-guide="true" d="M${guide.x1} ${guide.y1}L${guide.x2} ${guide.y2}" stroke="${guide.color}" stroke-width="${2.5*k}" stroke-dasharray="${6*k} ${6*k}" opacity="${(guide.opacity*.7).toFixed(3)}"/>`;
+    if(n.hubFan!==false)for(const input of hubInputs) for(const lane of (n.laneStates||[]).filter(l=>l.role==='operator')) {
       const left=n.x-n.w/2,bend=(chipLeft-left)/2;
       svg+=`<path data-hub-link="${esc(input.subscriber)}-${esc(lane.subscriber)}" d="M${left} ${input.y}C${left+bend} ${input.y} ${chipLeft-bend} ${lane.y} ${chipLeft} ${lane.y}" fill="none" stroke="${input.color}" stroke-width="${3*k}" opacity="${Math.min(input.opacity,lane.opacity)}"/>`;
     }

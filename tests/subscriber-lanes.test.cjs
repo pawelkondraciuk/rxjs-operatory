@@ -140,24 +140,31 @@ test('callouts also support a manual .unsubscribe() during the cancel animation 
  assert.equal(c.snapshot(ev('stream-complete','share-B')+.1).callouts?.length||0,0,'complete B bez napisu');
 });
 
-test('share() after map: one lane through HTTP and map, a hub fork to A and B, one response for both',async()=>{
+test('share() after map: one upstream in the initiator colour, rows per Subscriber, one ball splits into one per active Subscriber',async()=>{
  const {c,at,render}=await lanes('4:3','04a-dwa-tory-2');
  const second=c.snapshot(at('second'));
- assert.deepEqual(lanesOf(second,'http'),['work:S:running'],'jeden request');
- assert.deepEqual(lanesOf(second,'map'),['operator:S:running'],'jedno map');
- assert.deepEqual(lanesOf(second,'share'),['operator:A:running','operator:B:running'],'dwa wejścia downstream');
- assert.deepEqual(dots(second,'share'),['inS','outA','outB'],'jedno połączenie upstream');
- assert.equal(second.metrics.find(m=>m.label==='requesty HTTP').value,1);
+ assert.deepEqual(lanesOf(second,'http'),['work:U1:running'],'jeden request');
+ assert.deepEqual(lanesOf(second,'map'),['operator:U1:running'],'jedno map');
+ assert.deepEqual(lanesOf(second,'share'),['operator:A:running','operator:B:running'],'wiersz na Subscribera');
+ assert.deepEqual(dots(second,'share'),['inU1','outA','outB'],'jedno połączenie upstream');
+ assert.equal(second.edges.find(e=>e.id==='http-map').color,'#7457D9','upstream w kolorze inicjatora A, nie turkus');
+ const rows=Array.from(node(second,'share').laneRows,r=>r.subscriber+':'+r.stripe);
+ assert.deepEqual(rows,['A:#7457D9','B:#7457D9'],'lewy pasek każdego wiersza share = kolor wspólnego upstreamu');
+ assert.equal(second.metrics.find(m=>m.label==='Requesty HTTP').value,1);
  const question=c.snapshot(at('question'));
- assert.deepEqual(lanesOf(question,'http'),['work:S:running'],'pytanie nie pokazuje drugiego requestu');
- assert.equal(node(question,'B').visible,true);
- const svg=render(second);
- assert.match(svg,/data-hub-link="S-A"/);assert.match(svg,/data-hub-link="S-B"/);
+ assert.deepEqual(lanesOf(question,'http'),['work:U1:running'],'pytanie nie pokazuje drugiego requestu');
+ const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at;
+ assert.ok(ev('subscribe','share-B')<ev('connected','share-B')&&!c.events.some(e=>e.type==='subscribe'&&e.edge==='http-map'&&e.at>ev('subscribe','share-B')),'B nie wysyła subscribe do map/HTTP');
+ const arrival=ev('deliver-next','map-share'),departure=ev('source-next','share-B');
+ assert.ok(departure-arrival>=1,'kulka zatrzymuje się w share na rozdzielenie');
+ const tokens=t=>Array.from(c.snapshot(t).tokens.filter(x=>x.phase.startsWith('split')),x=>x.phase+':'+x.color);
+ assert.deepEqual(tokens(arrival+(departure-arrival)*.2),['split-in:#cbbff2'],'jedna kulka upstreamu wchodzi');
+ assert.deepEqual(tokens(arrival+(departure-arrival)*.8),['split-out:#cbbff2','split-out:#f3d09d'],'dwie wychodzą w kolorach A i B');
+ assert.match(render(c.snapshot(arrival+(departure-arrival)*.8)),/data-split-guide/);
+ assert.doesNotMatch(render(second),/data-split-guide|data-hub-link/,'bez stałych przewodów w share');
  const end=c.snapshot(c.duration);
  assert.deepEqual(lanesOf(end,'A'),['receiver:A:completed']);assert.deepEqual(lanesOf(end,'B'),['receiver:B:completed']);
- const received=Array.from(end.histories,h=>Array.from(h.values,v=>v.value+':'+v.color));
- assert.deepEqual(received[0],received[1],'A i B dostają tę samą wartość w kolorze producenta');
- assert.match(c.snapshot(0).code,/share\(\)\)$/);
+ assert.deepEqual(Array.from(end.histories,h=>Array.from(h.values,v=>v.value+':'+v.color)),[['42:#cbbff2'],['42:#f3d09d']],'osobne powiadomienia next w kolorach Subscriberów');
 });
 
 test('tiles grow: a fixed definition part, then one execution row per subscription reaching the tile',async()=>{
@@ -203,22 +210,58 @@ test('producer progress is the row background moving forward, then the row turns
  assert.ok(Math.abs((map.x-map.w/2)-(http.x+http.w/2)-((receiver.x-receiver.w/2)-(map.x+map.w/2)))<1e-9,'równe odstępy');
 });
 
-test('share(): A unsubscribes while B stays — grey row and cable without a pulse, shared upstream keeps running',async()=>{
+test('share(): A unsubscribes while B stays — A greys (stripe too), B keeps the purple upstream, the result splits only to B',async()=>{
  const {c,at,render}=await lanes('4:3','04a-dwa-tory-3');
  const edge=(f,id)=>f.edges.find(e=>e.id===id);
  const cancelled=c.snapshot(at('cancelled'));
  assert.deepEqual(lanesOf(cancelled,'share'),['operator:A:cancelled','operator:B:running']);
  assert.deepEqual(lanesOf(cancelled,'A'),['receiver:A:cancelled']);
- assert.deepEqual(lanesOf(cancelled,'http'),['work:S:running'],'wspólny request trwa dla B');
+ assert.deepEqual(lanesOf(cancelled,'http'),['work:U1:running'],'wspólny request trwa dla B');
  assert.equal(edge(cancelled,'share-A').phase,'unsubscribe');assert.equal(edge(cancelled,'share-A').color,'#808890');
+ assert.equal(edge(cancelled,'http-map').color,'#7457D9','upstream nadal fioletowy');
+ const svg=render(cancelled),share=svg.slice(svg.indexOf('data-node="share"'),svg.indexOf('data-node="A"'));
+ assert.match(share,/data-lane-row="A" data-row-state="cancelled"[^>]*><rect[^>]*\/><rect[^>]*fill="#808890"/,'lewy pasek A szary');
+ assert.match(share,/data-lane-row="B" data-row-state="running"[^>]*><rect[^>]*\/><rect[^>]*fill="#7457D9"/,'lewy pasek B fioletowy');
  const unsubscribedAt=c.events.find(e=>e.type==='inner-unsubscribe'&&e.edge==='share-A').at;
  for(let t=unsubscribedAt;t<at('cancelled');t+=.1)assert.equal(edge(c.snapshot(t),'share-A').pulse,undefined,'unsubscribe bez impulsu');
- assert.equal(node(c.snapshot(unsubscribedAt+.1),'share').laneStates[0].state,'running','share odłącza A po dotarciu unsubscribe');
+ const ev=(type,e)=>c.events.find(x=>x.type===type&&x.edge===e).at,arrival=ev('deliver-next','map-share'),departure=ev('source-next','share-B');
+ assert.deepEqual(Array.from(c.snapshot(arrival+(departure-arrival)*.8).tokens.filter(x=>x.phase==='split-out'),x=>x.color),['#f3d09d'],'tylko kulka dla B');
  const end=c.snapshot(c.duration);
  assert.deepEqual(Array.from(end.histories,h=>h.values.length),[0,1],'odpowiedź tylko dla B');
  assert.deepEqual(lanesOf(end,'B'),['receiver:B:completed']);assert.deepEqual(lanesOf(end,'A'),['receiver:A:cancelled']);
- assert.match(render(cancelled),/data-lane-row="A" data-row-state="cancelled"/);
- assert.equal(cancelled.metrics.find(m=>m.label==='requesty HTTP').value,1);
+ assert.equal(cancelled.metrics.find(m=>m.label==='Requesty HTTP').value,1);
+});
+
+test('share scenarios: C joins the running upstream; the last unsubscribe cancels HTTP; a new Subscriber starts a new session in its colour',async()=>{
+ const fs2=require('node:fs');
+ class Slide{constructor(id){this.id=id;this.dataset={animation:id};this.heading={};this.player={setAttribute(){}};}querySelector(s){return s==='h2'?this.heading:this.player;}cloneNode(){return new Slide(this.id);}after(){}}
+ const slides=[...fs2.readFileSync('index.html','utf8').matchAll(/data-animation="([^"]+)"/g)].map(m=>new Slide(m[1]));
+ const m=await require('./v2-harness.cjs').modules(['catalog','presentation','engine','reference-scenes'],{document:{querySelectorAll:()=>slides}});
+ const base=m.presentation.prepareSlides(m.catalog.scenes,{format:'4:3'}).get('04a-dwa-tory-2');
+ const compile=scenario=>{const scene={...base,shareScenario:scenario};m['reference-scenes'].configureLanes(scene);return m.engine.compileScene(scene);};
+ const ev=(c,type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge)?.at;
+ // C dołącza po odejściu A, B nadal aktywny
+ let c=compile([{id:'A',start:1,unsub:3.5},{id:'B',start:2},{id:'C',start:4}]);
+ let f=c.snapshot(ev(c,'connected','share-C')+.4);
+ assert.deepEqual(lanesOf(f,'http'),['work:U1:running'],'C nie tworzy nowego upstreamu');
+ assert.deepEqual(Array.from(node(f,'share').laneRows,r=>r.subscriber+':'+r.stripe),['A:#7457D9','B:#7457D9','C:#7457D9']);
+ assert.ok(!c.events.some(e=>e.type==='subscribe'&&e.edge==='http-map'&&e.at>ev(c,'subscribe','share-C')));
+ const http=node(f,'http');assert.equal(http.y-http.h/2,node(c.snapshot(0),'http').y-node(c.snapshot(0),'http').h/2,'HTTP nie przesuwa się');
+ const arr=ev(c,'deliver-next','map-share'),dep=ev(c,'source-next','share-B');
+ assert.deepEqual(Array.from(c.snapshot(arr+(dep-arr)*.8).tokens.filter(x=>x.phase==='split-out'),x=>x.color),['#f3d09d','#bcd6f5'],'kulki dla B i C, nie dla A');
+ assert.equal(c.snapshot(c.duration).metrics.find(m=>m.label==='Requesty HTTP').value,1);
+ // ostatni odchodzi → anulowanie upstreamu, bez complete; potem C otwiera nową sesję w swoim kolorze
+ c=compile([{id:'A',start:1,unsub:3},{id:'B',start:2,unsub:3.5},{id:'C',start:5}]);
+ const cancelledAt=ev(c,'disconnected','http-map')+.1;f=c.snapshot(cancelledAt);
+ const up=node(f,'http').laneStates[0];
+ assert.ok(up.subscriber==='U1'&&up.state==='cancelled'&&up.progress<1,'HTTP anulowany z niedokończonym postępem');
+ assert.equal(c.events.filter(e=>e.type==='stream-complete'&&['http-map','map-share'].includes(e.edge)).length,0,'unsubscribe nie pokazuje complete');
+ assert.deepEqual(Array.from(c.snapshot(ev(c,'inner-unsubscribe','share-B')+.4).callouts,x=>x.text+' '+x.label),['.unsubscribe() B']);
+ const end=c.snapshot(c.duration);
+ assert.equal(end.edges.find(e=>e.id==='http-map-2').color,'#2F7ED8','nowa sesja w kolorze C');
+ assert.deepEqual(lanesOf(end,'http'),['work:U1:cancelled','work:U2:completed']);
+ assert.equal(end.metrics.find(m=>m.label==='Requesty HTTP').value,2);
+ assert.deepEqual(Array.from(end.histories,h=>h.values.length),[0,0,1]);
 });
 
 test('cold: compact receivers on the lanes, value balls, transform inside map and HTTP wait ending with the response',async()=>{
@@ -253,4 +296,32 @@ test('receiver history keeps at most three latest balls at a constant size',asyn
  const svg=m.renderer.renderScene(frame),radii=[...svg.matchAll(/data-token="received"[^>]*><circle[^>]* r="([^"]+)"/g)].map(x=>x[1]);
  assert.deepEqual(radii,['20','20','20']);
  assert.deepEqual([...svg.matchAll(/>(\d)<\/text>/g)].map(x=>x[1]),['3','4','5']);
+});
+
+test('share slides use the cold look: pipeline code, transient subscribe/unsubscribe overlays, balls and compact receivers',async()=>{
+ for(const id of ['04a-dwa-tory-2','04a-dwa-tory-3']){
+  const {c,at}=await lanes('4:3',id);
+  const code=Array.from(c.snapshot(0).codeView,line=>Array.from(line,p=>p.text).join('')).join('\n');
+  assert.equal(code,'http.get<number>(url)\n  .pipe(map(x => x * 2), share())',id+': sam pipeline, łamany przed .pipe');
+  const marks=Array.from(c.snapshot(0).codeView).flat().filter(p=>p.mark).map(p=>p.mark.id);
+  assert.deepEqual(marks,['http','map','share']);
+  const shown=t=>Array.from(c.snapshot(t).callouts||[],x=>x.text+' '+x.label);
+  const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at;
+  assert.deepEqual(shown((ev('subscribe','share-A')+ev('connected','http-map'))/2),['.subscribe() A'],'A: impuls do HTTP');
+  assert.deepEqual(shown((ev('subscribe','share-B')+ev('connected','share-B'))/2),['.subscribe() B'],'B: impuls tylko do share');
+  assert.deepEqual(shown(at('first')),[]);assert.deepEqual(shown(at('second')),[]);
+  const end=c.snapshot(c.duration);
+  assert.ok(end.ball&&end.nodes.find(n=>n.id==='A').inbox,'kulki i kompaktowy odbiorca');
+  const map=end.nodes.find(n=>n.id==='map');
+  for(const r of ['A','B'].map(x=>end.nodes.find(n=>n.id===x)))
+   assert.ok(end.edges.find(e=>e.id==='share-'+r.id).points.every(p=>p[1]===r.y),'połączenia poziome');
+  assert.equal(map.laneRows.length,1,'jeden wspólny wiersz map');
+  assert.deepEqual(Array.from(c.snapshot(0).metrics,m=>m.label),['Pipeline','Requesty HTTP','Odbiorcy share']);
+  for(let t=0;t<c.duration;t+=.05)assert.ok(!shown(t).some(x=>x.startsWith('.unsubscribe'))||id.endsWith('-3'),'unsubscribe tylko przy ręcznym wywołaniu');
+ }
+ const {c,at}=await lanes('4:3','04a-dwa-tory-3');
+ const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at;
+ assert.deepEqual(Array.from(c.snapshot(at('question')).callouts,x=>x.text+' '+x.label),['.unsubscribe() A']);
+ assert.equal((c.snapshot(at('cancelled')).callouts||[]).length,0,'po animacji anulowania napis znika');
+ assert.equal((c.snapshot(ev('stream-complete','share-B')+.1).callouts||[]).length,0,'complete bez napisu');
 });

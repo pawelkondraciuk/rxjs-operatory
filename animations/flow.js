@@ -71,7 +71,8 @@ export function planFlow(nodes, links, modelDuration, timingOverrides) {
       e.events.filter(v=>v.at===at).forEach((v,i)=>{
         const upstream=dependencies.flatMap(parent=>records.get(parent.id).events.filter(p=>p.logicalAt===at));
         const matching=upstream.filter(p=>String(p.value)===String(v.value));
-        const ready=Math.max(phase,...(matching.length?matching:upstream).map(p=>p.arrival+(timing&&String(p.value)!==String(v.value)?timing.transform:handoff)));
+        // edge.hold: opcjonalny postój wartości w kafelku przed wyjściem tą krawędzią (np. rozdzielenie w share).
+        const ready=Math.max(phase,...(matching.length?matching:upstream).map(p=>p.arrival+(timing&&String(p.value)!==String(v.value)?timing.transform:handoff)+(e.hold||0)));
         const departure=Math.max(ready,record.start+record.connectDuration,i?arrival+gap:0);
         // Krawędź może mieć własny czas przelotu, np. krótki powrót wyniku inner do operatora.
         arrival=departure+(e.travel??travel);
