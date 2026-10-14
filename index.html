@@ -423,10 +423,10 @@
 					<div class="rx-player" aria-label="Operator to funkcja"></div>
 					<aside class="notes">
                         <p><strong>Definicja:</strong> Operator dostaje Observable i zwraca Observable. map(project) tworzy funkcję operatora przekazaną do pipe. Pipe wywołuje te funkcje podczas składania definicji; nie jest uczestnikiem późniejszego przepływu wartości.</p>
-                        <p><strong>Początek:</strong> of(1, 2, 3) definiuje trzy osobne emisje liczb: 1, 2, 3. READY pokazuje źródło i odbiorcę. Pierwsze prawo łagodnie odsłania pipe z map w kodzie i bloczek map w diagramie. Samo pipe nie uruchamia źródła.</p>
-                        <p><strong>Wykonanie:</strong> Subscribe łączy odbiorcę ze źródłem i uruchamia wykonanie. Subskrypcja biegnie upstream, wartości i complete downstream. Nie pokazujemy dodatkowych opisów Subscriberów.</p>
-                        <p><strong>Pierwsza wartość:</strong> Źródło emituje 1. map(x =&gt; x * 2) podwaja tę wartość, a odbiorca dostaje 2. Kolejne emisje 2 i 3 dają wyniki 4 i 6. Nie ma zagnieżdżonego map. of, projekcja i dostarczenie są synchroniczne. Przeloty i postoje spowalniają wyłącznie ilustrację. Wynik pod map znika, kiedy rusza kapsułka.</p>
-                        <p><strong>Dalej:</strong> Box odbioru pojawia się przy pierwszej wartości. AUTO pokazuje 2 → 4, 3 → 6 i complete bieżącego wykonania; w boxie zostają trzy wyniki 2/4/6. Definicję Observable można subskrybować ponownie.</p>
+                        <p><strong>Początek:</strong> of(1, 2, 3) definiuje trzy osobne emisje liczb: 1, 2, 3. READY pokazuje tylko nagłówek of(1, 2, 3) — definicję. Pierwsze prawo łagodnie odsłania pipe z map w kodzie i nagłówek map w diagramie. Samo pipe nie uruchamia źródła.</p>
+                        <p><strong>Wykonanie:</strong> Subscribe tworzy wykonanie A: pojawia się odbiorca A, a pod nagłówkami map i of(1, 2, 3) rosną wiersze A, gdy subskrypcja do nich dociera. Subskrypcja biegnie upstream, wartości i complete downstream.</p>
+                        <p><strong>Pierwsza wartość:</strong> Źródło emituje 1. map(x =&gt; x * 2) podwaja tę wartość, a odbiorca dostaje 2. Kolejne emisje 2 i 3 dają wyniki 4 i 6. Nie ma zagnieżdżonego map. of, projekcja i dostarczenie są synchroniczne. Przeloty i postoje spowalniają wyłącznie ilustrację. Kulka zatrzymuje się w wierszu map i zmienia 1 w 2.</p>
+                        <p><strong>Dalej:</strong> AUTO pokazuje 2 → 4, 3 → 6 i complete bieżącego wykonania; w wierszu odbiorcy A zostają kulki 2/4/6, wiersze wykonania zielenieją, nagłówki definicji się nie zmieniają. Definicję Observable można subskrybować ponownie.</p>
                         <p><strong>Pilot:</strong> Prawo uruchamia etap, ponowne prawo kończy go. Lewo cofa checkpoint także w AUTO; Spacja pauzuje/wznawia, M wybiera tryb, R przywraca zatrzymany początek, U pokazuje sterowanie.</p>
                     </aside>
 				</section>

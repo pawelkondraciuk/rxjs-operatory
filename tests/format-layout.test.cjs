@@ -40,8 +40,9 @@ test('16:9 keeps the previous geometry and SVG of every variant',async()=>{
   const wide=compile(scene),legacy=compile({...scene,format:undefined});
   for(const time of [0,...wide.stops.map(s=>s.time),wide.duration])
    assert.equal(render(wide.snapshot(time)),render(legacy.snapshot(time)),scene.id+' @'+time);
-  // Slajdy torów 04a-dwa-tory(-2,-3) mają w obu formatach wspólne, powiększone wymiary pod projektor (graph.textScale).
-  if(!scene.id.startsWith('04a-dwa-tory'))assert.equal(wide.snapshot(0).textScale,1);
+  // Slajdy torów (04a-dwa-tory(-2,-3), 04-operator, 05-zrodla, 05-zrodla-2) mają w obu formatach wspólne,
+  // powiększone wymiary pod projektor (graph.textScale).
+  if(!/^(04a-dwa-tory|04-operator$|05-zrodla(-2)?$)/.test(scene.id))assert.equal(wide.snapshot(0).textScale,1);
  }
 });
 
@@ -81,19 +82,17 @@ test('4:3 tile labels grow to 1.3× when they fit and keep 1.15× for long names
  assert.equal(label('14-distinct','distinct'),29.9);
 });
 
-test('04-operator in 4:3 is a large centred pipeline and the receiver box shows 2, 4, 6',async()=>{
+test('04-operator in 4:3 is a centred lane pipeline and the receiver row shows 2, 4, 6',async()=>{
  const {scenes,compile,render}=await deck('4:3');
  const c=compile(scenes.find(s=>s.id==='04-operator')),end=c.snapshot(c.duration);
- assert.equal(end.textScale,1.8);
- const tiles=end.nodes.filter(n=>['source','map','observer'].includes(n.id)),box=end.panels[0];
- assert.ok(tiles.every(n=>n.h>=170&&n.y>end.height/4),'kafelki duże i niżej');
- const top=Math.min(...tiles.map(n=>n.y-n.h/2)),bottom=box.y+box.h;
- assert.ok(Math.abs((top+bottom)/2-end.height/2)<2,'kafelki i box wyśrodkowane w pionie');
- assert.equal(box.x+box.w/2,tiles.find(n=>n.id==='observer').x,'box pod odbiorcą');
+ assert.equal(end.textScale,1.42);
+ const tiles=end.nodes.filter(n=>['source','map','observer'].includes(n.id));
+ const top=Math.min(...tiles.map(n=>n.y-n.h/2)),bottom=Math.max(...tiles.map(n=>n.y+n.h/2));
+ assert.ok(Math.abs((top+bottom)/2-end.height/2)<2,'wyśrodkowane w pionie');
  const left=Math.min(...tiles.map(n=>n.x-n.w/2)),right=Math.max(...tiles.map(n=>n.x+n.w/2));
  assert.ok(Math.abs((left+right)/2-end.width/2)<2,'wyśrodkowane w poziomie');
  const svg=render(end),received=[...svg.matchAll(/data-token="received"[^>]*>.*?<text[^>]*>([^<]*)<\/text>/g)].map(m=>m[1]);
  assert.deepEqual(received,['2','4','6']);
- const label=Number(svg.match(/<g data-node="observer"[^>]*>.*?<text[^>]*font-size="([^"]+)"/)[1]);
- assert.ok(label>=50,String(label));
+ const label=Number(svg.match(/<g data-node="source"[^>]*>.*?<text[^>]*font-size="([^"]+)"/)[1]);
+ assert.ok(label>=40,String(label));
 });

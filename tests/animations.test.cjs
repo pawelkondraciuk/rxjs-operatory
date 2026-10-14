@@ -153,7 +153,7 @@ test('operator function delivers three doubled values and complete without work 
   api.seek(api.stops.at(-1).time);
   assert.deepEqual(Array.from(api.snapshot.histories[0].values,v=>v.value),['2']);
   api.finish();assert.deepEqual(Array.from(api.snapshot.histories[0].values,v=>v.value),['2','4','6']);
-  assert.ok(api.snapshot.edges.every(e=>!e.visible));
+  assert.ok(api.snapshot.edges.every(e=>e.done));
   assert.ok(api.snapshot.nodes.every(n=>!n.showProgress));
   assert.equal(api.snapshot.nodes.find(n=>n.id==='observer').notification,'complete');
   assert.equal(api.snapshot.nodes.find(n=>n.id==='source').notification,'complete');

@@ -9,6 +9,7 @@ async function timers(format){
 }
 const values=(frame,anchor)=>Array.from(frame.histories.find(h=>h.anchor===anchor).values,v=>v.value);
 const node=(frame,id)=>frame.nodes.find(n=>n.id===id);
+const lane=(frame,id)=>node(frame,id).laneStates?.[0];
 
 test('timer emits one value and completes; interval emits 0, 1, 2 until the receiver unsubscribes',async()=>{
  const {scene,c}=await timers();
@@ -18,9 +19,11 @@ test('timer emits one value and completes; interval emits 0, 1, 2 until the rece
  const end=c.snapshot(c.duration);
  assert.deepEqual(values(end,'timerSink'),['0']);
  assert.deepEqual(values(end,'intervalSink'),['0','1','2']);
- assert.equal(node(end,'intervalSink').status,'unsubscribe');assert.equal(node(end,'interval').status,'zatrzymany');
- assert.ok(!end.edges.find(e=>e.id==='interval-intervalSink').visible,'kabel odłączony');
- assert.equal(node(end,'timer').status,'✓ complete');assert.equal(node(end,'timerSink').status,'✓ complete');
+ // Stan wykonania niesie wiersz toru: timer A complete, interval B odsubskrybowany (bez complete).
+ assert.equal(lane(end,'timer').state,'completed');assert.equal(lane(end,'timerSink').state,'completed');
+ assert.equal(lane(end,'interval').state,'cancelled');assert.equal(lane(end,'intervalSink').state,'cancelled');
+ const cable=end.edges.find(e=>e.id==='interval-intervalSink');
+ assert.equal(cable.phase,'unsubscribe');assert.ok(cable.done);assert.equal(cable.color,'#808890');
  assert.notEqual(node(end,'interval').notification,'complete');assert.notEqual(node(end,'intervalSink').notification,'complete');
  assert.ok(c.events.some(e=>e.type==='stream-complete'&&e.edge==='timer-timerSink'));
  assert.ok(!c.events.some(e=>e.type==='stream-complete'&&e.edge==='interval-intervalSink'));
@@ -31,42 +34,41 @@ test('stops: both have 0, timer completes, interval reaches 2 and is unsubscribe
  const {c}=await timers();
  const [first,question,third,unsubscribed]=c.stops,a=c.snapshot(first.time),b=c.snapshot(question.time);
  assert.deepEqual([values(a,'timerSink'),values(a,'intervalSink')],[['0'],['0']]);
- assert.equal(node(b,'timer').status,'✓ complete');
+ assert.equal(lane(b,'timer').state,'completed');assert.equal(lane(b,'timerSink').state,'completed');
  assert.deepEqual(values(b,'intervalSink'),['0']);
  assert.equal(c.snapshot(0).histories.every(h=>h.values.length===0),true);
  // Odbiorca nie pokazuje complete, zanim dotrze do niego sygnał.
- assert.notEqual(node(a,'timerSink').status,'complete');
+ assert.notEqual(lane(a,'timerSink').state,'completed');
  const t=c.snapshot(third.time),u=c.snapshot(unsubscribed.time);
  assert.deepEqual(values(t,'intervalSink'),['0','1','2']);
- assert.ok(t.edges.find(e=>e.id==='interval-intervalSink').visible,'przed unsubscribe kabel jest');
- assert.notEqual(node(t,'intervalSink').status,'unsubscribe');
- assert.ok(!u.edges.find(e=>e.id==='interval-intervalSink').visible);
- assert.equal(node(u,'intervalSink').status,'unsubscribe');
+ assert.equal(t.edges.find(e=>e.id==='interval-intervalSink').phase,'subscribed','przed unsubscribe kabel jest');
+ assert.equal(lane(t,'intervalSink').state,'running');
+ assert.equal(u.edges.find(e=>e.id==='interval-intervalSink').phase,'unsubscribe');
+ assert.equal(lane(u,'intervalSink').state,'cancelled');
  assert.ok(unsubscribed.time<=c.duration,'ostatni postój mieści się w scenie');
 });
 
-test('4:3 layout: two centred rows, receiver boxes on the right, large labels; 16:9 keeps default scale',async()=>{
- const {c,render}=await timers('4:3'),f=c.snapshot(c.duration);
- assert.equal(f.height,612);assert.equal(f.textScale,1.8);
- const rows=[...new Set(f.nodes.map(n=>n.y))];
- assert.equal(rows.length,2);
- const top=Math.min(...f.nodes.map(n=>n.y-n.h/2)),bottom=Math.max(...f.nodes.map(n=>n.y+n.h/2));
- assert.ok(Math.abs((top+bottom)/2-f.height/2)<2);
- for(const [sink,panel] of [['timerSink',f.panels[0]],['intervalSink',f.panels[1]]]){
-  const n=node(f,sink);
-  assert.ok(panel.x>n.x+n.w/2,'box na prawo');assert.equal(panel.y+panel.h/2,n.y,'ten sam rząd');
+test('lane layout: two centred pipelines A and B, receiver rows with balls; shared look in both formats',async()=>{
+ for(const format of ['4:3','16:9']){
+  const {c,render}=await timers(format),f=c.snapshot(c.duration);
+  assert.equal(f.height,format==='4:3'?612:460);assert.equal(f.textScale,1.42);assert.equal(f.panels.length,0);
+  const top=Math.min(...f.nodes.map(n=>n.y-n.h/2)),bottom=Math.max(...f.nodes.map(n=>n.y+n.h/2));
+  assert.ok(Math.abs((top+bottom)/2-f.height/2)<2,format);
+  for(const [source,sink,id] of [['timer','timerSink','A'],['interval','intervalSink','B']]){
+   assert.equal(lane(f,source).subscriber,id);assert.equal(lane(f,source).y,lane(f,sink).y);
+   const h=f.histories.find(x=>x.anchor===sink),n=node(f,sink);
+   assert.equal(h.y,lane(f,sink).y);assert.ok(h.balls&&h.x>n.x-n.w/2&&h.x<n.x+n.w/2);
+  }
+  assert.equal(node(f,'timer').fill,'#8FC9D4','nagłówek definicji bez koloru complete');
+  const svg=render(f);
+  assert.doesNotMatch(svg,/>…</,'pełne wartości w kulkach');
+  assert.doesNotMatch(svg,/>✓ complete<\/text>|rx="12"/);
  }
- const svg=render(f);
- assert.doesNotMatch(svg,/>…</,'bez wielokropka w boxie');
- assert.match(svg,/d="M770 181 H870"/,'poziomy łącznik');
- const size=Number(svg.match(/<g data-node="timer"[^>]*>.*?<text[^>]*font-size="([^"]+)"/)[1]);
- assert.ok(size>=50,String(size));
- // Box w rzędzie pojawia się dopiero przy pierwszym odbiorze w tym rzędzie.
- assert.deepEqual(Array.from(c.snapshot(0).panels,p=>p.visible),[false,false]);
- for(const [i,edge] of ['timer-timerSink','interval-intervalSink'].entries()){
-  const first=c.events.find(e=>e.type==='deliver-next'&&e.edge===edge&&e.value==='0');
-  assert.equal(c.snapshot(first.at-.01).panels[i].visible,false);assert.equal(c.snapshot(first.at).panels[i].visible,true);
+ // Odbiorcy (wiersze wykonań) wchodzą przed subscribe, historia pojawia się dopiero przy odbiorze.
+ const {c}=await timers('4:3');
+ assert.ok(c.snapshot(0).nodes.filter(n=>n.id.endsWith('Sink')).every(n=>!n.visible||n.opacity<1));
+ for(const edge of ['timer-timerSink','interval-intervalSink']){
+  const first=c.events.find(e=>e.type==='deliver-next'&&e.edge===edge&&e.value==='0'),anchor=edge.split('-')[1];
+  assert.deepEqual(values(c.snapshot(first.at-.01),anchor),[]);assert.deepEqual(values(c.snapshot(first.at),anchor),['0']);
  }
- const wide=(await timers('16:9')).c.snapshot(0);
- assert.equal(wide.textScale,1);assert.equal(wide.height,460);
 });

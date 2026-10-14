@@ -8,13 +8,16 @@ const manual=stops=>({entry:'manual',stops,afterLastManualStop:'start-auto',fini
 // Wszystkie next i complete mają logicalAt: 0: of emituje synchronicznie.
 // Poniższe czasy wyłącznie rozciągają ilustrację, bez wykonywania kodu przykładu.
 function mapSequence(scene) {
-  const timing={pipeline:.65,handoff:.05,subscribe:3.2,travel:1.2,transform:1.4,receivedHold:.5,gap:.7,terminal:1.2,...scene.timing};
+  const timing={pipeline:.65,handoff:.05,subscribe:3.2,travel:1.2,transform:1.4,receivedHold:.5,gap:.7,terminal:1.2,settle:.8,reveal:.3,laneReveal:.35,...scene.timing};
   for(const [key,value] of Object.entries(timing)) {
     if(!Number.isFinite(value)||value<=0)throw new Error(`${scene.id}: nieprawidłowy czas ilustracji ${key}`);
   }
   const seconds=value=>Math.round(value*1e9)/1e9;
-  const subscribe=seconds(timing.pipeline+timing.handoff),connected=seconds(subscribe+timing.subscribe);
-  let departure=seconds(connected+timing.handoff);
+  // Odbiorca (wiersz wykonania) pojawia się po etapie pipeline; subscribe rusza, gdy jest w pełni widoczny.
+  const born=seconds(timing.pipeline+timing.handoff),subscribe=seconds(born+timing.reveal),connected=seconds(subscribe+timing.subscribe);
+  // laneReveal: wiersz źródła (litera, port) wchodzi po zestawieniu subskrypcji; postój subscribed czeka na niego.
+  const subscribed=seconds(connected+timing.laneReveal);
+  let departure=seconds(subscribed+timing.handoff);
   const values=[1,2,3].map(value=>{
     const arrival=seconds(departure+timing.travel),output=seconds(arrival+timing.transform);
     const received=seconds(output+timing.travel),held=seconds(received+timing.receivedHold);
@@ -22,19 +25,20 @@ function mapSequence(scene) {
     departure=seconds(held+timing.gap);
     return item;
   });
-  const complete=values.at(-1).held,duration=seconds(complete+timing.terminal);
-  return {timing,seconds,pipeline:timing.pipeline,subscribe,connected,values,complete,duration};
+  // settle: cisza po dotarciu complete, żeby rozbłysk wierszy wygasł przed FINISHED.
+  const complete=values.at(-1).held,finished=seconds(complete+timing.terminal),duration=seconds(finished+timing.settle);
+  return {timing,seconds,pipeline:timing.pipeline,born,subscribe,connected,subscribed,values,complete,finished,duration};
 }
 
 export function configureOperator(scene) {
-  const sequence=mapSequence(scene),{timing,pipeline,subscribe,connected,values,duration}=sequence;
+  const sequence=mapSequence(scene),{timing,pipeline,subscribe,subscribed,values,duration}=sequence;
   const example='of(1, 2, 3)';
   // Pipe składa definicję; subskrypcja tworzy wykonanie.
   const pipelineCaption='pipe składa definicję. map podwoi każdą emitowaną wartość';
   const subscribeCaption='subscribe łączy odbiorcę ze źródłem i uruchamia wykonanie';
   const firstCaption='Źródło emituje 1. map przekształca ją w 2, a odbiorca otrzymuje wynik';
   // Kod pokazuje definicję, a osobny etap ilustruje subskrypcję.
-  Object.assign(scene,{graph:mapGraph,timing,playerLayout:'function',duration,code:example,
+  Object.assign(scene,{graph:mapGraph,timing,playerLayout:'function',duration,code:example,ink:'#26323B',playerClass:'rx-flat-tiles',
     codeFrames:[{at:timing.handoff,code:example+'\n.pipe(map(x => x * 2))',fadeIn:.3}],
     rows:[R('Źródło',values.map(v=>E(0,v.value)),[],{completeAt:0}),
       R('map',values.map(v=>E(0,v.result,'op')),[],{completeAt:0}),
@@ -45,44 +49,38 @@ export function configureOperator(scene) {
         [v.arrival,`map przekształca ${v.value} w ${v.result}. Projekcja działa synchronicznie`],
         [v.received,v.value==='1'?firstCaption:`Odbiorca otrzymuje ${v.result} i zachowuje wcześniejsze wartości`],
       ]),[sequence.complete,'Źródło wysyła complete. Sygnał przechodzi przez map do odbiorcy'],
-      [duration,'map podwoił trzy wartości. Complete zakończyło to wykonanie']],
+      [sequence.finished,'map podwoił trzy wartości. Complete zakończyło to wykonanie']],
     playback:{...manual([
       {id:'pipeline',time:pipeline,caption:pipelineCaption},
-      {id:'subscribed',time:connected,caption:subscribeCaption},
+      {id:'subscribed',time:subscribed,caption:subscribeCaption},
       {id:'first',time:values[0].held,caption:firstCaption},
     ]),controller:'stages'},metrics:[],
   });
 }
 
+// Wygląd torów jak w 04a: of(1, 2, 3) → map → odbiorca A w jednym rzędzie. Kulka wjeżdża do map, staje
+// i zmienia wartość; odebrane wyniki zostają kulkami w wierszu odbiorcy. Czasy z mapSequence (schedule).
 export function mapGraph(scene) {
-  const {timing,seconds,subscribe,values,complete,duration}=mapSequence(scene),frame=frameFor(scene),layout=frame.operator;
-  const halfSubscribe=timing.subscribe/2,halfTerminal=timing.terminal/2;
-  const tile={y:layout.tileY,h:layout.tileH};
+  const {timing,seconds,born,subscribe,values,complete,finished}=mapSequence(scene);
+  const halfSubscribe=timing.subscribe/2,halfTerminal=timing.terminal/2,fill=laneSubscribers.A.fill;
+  const top=scene.format==='4:3'?222:146,y=laneRowY(top,0),receiver={x:995,w:366,y};
   const nodes=[
-    {id:'source',x:layout.sourceX,...tile,w:layout.sideW,label:'Źródło',statusInside:true,terminalEdge:'source-map',ready:true,color:'source'},
-    {id:'map',x:layout.opX,...tile,w:layout.mapW,label:'map',statusInside:true,terminalEdge:'map-observer',born:timing.handoff,color:'op'},
-    {id:'observer',x:layout.observerX,...tile,w:layout.observerW??layout.sideW,label:'Odbiorca',statusInside:true,ready:true,color:'http'},
+    {id:'source',x:217,w:310,label:'of(1, 2, 3)',terminalEdge:'source-map',...laneTile('source',top,{A:0},1)},
+    {id:'map',x:592,w:280,label:'map',color:'op',transformBalls:true,terminalEdge:'map-observer',...laneTile('operator',top,{A:0},1,{ready:false,born:timing.handoff})},
+    laneReceiver('observer','A',receiver,{ready:false,born}),
   ];
-  // Box i kafelek odbiorcy mają te same wymiary; trzy wyniki mieszczą się w jednym rzędzie.
-  const observer=nodes.find(n=>n.id==='observer');
-  const receiverBox={x:observer.x-observer.w/2,y:layout.boxY,w:observer.w,h:layout.boxH??observer.h,shownAt:values[0].received,
-    from:{x:observer.x,y:observer.y+observer.h/2}};
-  return {layout:'fixed',formatAware:true,width:1240,height:frame.height,nodes,
-    ...(layout.textScale?{textScale:layout.textScale,labelScale:layout.labelScale}:{}),
-    edges:[{from:'source',to:'map',logicalStart:0},{from:'map',to:'observer',logicalStart:0}],
-    panels:[receiverBox],
-    trays:[{anchor:'observer',x:observer.x,y:receiverBox.y+receiverBox.h/2,w:receiverBox.w-4,lines:1}],
+  return {layout:'fixed',formatAware:true,width:1240,height:scene.format==='4:3'?612:460,...laneGraphLook(),
+    subscribers:{A:laneSubscribers.A},nodes,
+    edges:[{from:'source',to:'map',logicalStart:0,subscriber:'A'},{from:'map',to:'observer',logicalStart:0,subscriber:'A'}],
+    trays:[laneTray('observer',receiver,3)],
     schedule:{
       'source-map':{start:seconds(subscribe+halfSubscribe),connectDuration:halfSubscribe,
         end:{at:complete,logicalAt:0,kind:'complete',duration:seconds(complete+halfTerminal)-complete},
-        events:values.map(v=>({...E(v.departure,v.value),logicalAt:0,arrival:v.arrival,phase:'to-map'}))},
+        events:values.map(v=>({...E(v.departure,v.value,fill),logicalAt:0,arrival:v.arrival,phase:'to-map'}))},
       'map-observer':{start:subscribe,connectDuration:halfSubscribe,
-        end:{at:seconds(complete+halfTerminal),logicalAt:0,kind:'complete',duration:duration-seconds(complete+halfTerminal)},
-        events:values.map(v=>({...E(v.output,v.result,'op'),logicalAt:0,arrival:v.received,phase:'to-observer'}))},
+        end:{at:seconds(complete+halfTerminal),logicalAt:0,kind:'complete',duration:finished-seconds(complete+halfTerminal)},
+        events:values.map(v=>({...E(v.output,v.result,fill),logicalAt:0,arrival:v.received,phase:'to-observer'}))},
     },
-    activities:[...values.map(v=>({node:'source',at:v.departure,until:v.departure+timing.handoff})),
-      ...values.map(v=>({node:'observer',at:v.received,until:v.held}))],
-    transforms:values.map(v=>({node:'map',at:v.arrival,until:v.output,logicalAt:0,label:`${v.value} → ${v.result}`})),
   };
 }
 
@@ -120,6 +118,30 @@ export function shareSessions(subscribers,requestTime=4) {
 const upstreamEdge=(kind,k)=>(kind==='http'?'http-map':'map-share')+(k>1?`-${k}`:'');
 const laneTiles={source:{headerFill:'#8FC9D4',runtimeFill:'#cde7ec'},operator:{headerFill:'#D8B3E6',runtimeFill:'#eddcf4'},
   receiver:{headerFill:'#EAE4F7',runtimeFill:'#f6f3fc'}};
+// Wspólny wygląd torów (04a, 04, 05, 05-2): wymiary liczone dla 1024×768 i wspólne dla obu formatów.
+// Nagłówek kafelka to definicja, wiersz pod nim — wykonanie; odbiorca to wiersz z ikoną inbox i kulkami wartości.
+const laneLook={defH:79,rowH:89,ball:{r:29,font:35.5},icon:28,portRadius:11.4,laneWire:5,rx:7.6,textScale:1.42,labelScale:1.56,ballGap:10};
+const laneGraphLook=()=>({portRadius:laneLook.portRadius,laneWire:laneLook.laneWire,ball:laneLook.ball,
+  textScale:laneLook.textScale,labelScale:laneLook.labelScale});
+const laneRowY=(top,slot)=>top+laneLook.defH+(slot+.5)*laneLook.rowH;
+// Kafelek rośnie o wiersz, gdy subscribe do niego dociera; rows rezerwuje pełną wysokość. Nagłówek definicji
+// nie przejmuje koloru complete/error (terminalBadge) — stan niesie wiersz wykonania.
+function laneTile(kind,top,slots,rows,extra={}) {
+  const h=laneLook.defH+rows*laneLook.rowH;
+  return {top,defH:laneLook.defH,rowH:laneLook.rowH,laneSlots:slots,growRows:true,y:top+h/2,h,ready:true,detail:'',rx:laneLook.rx,
+    terminalBadge:true,...laneTiles[kind],...extra};
+}
+// Odbiorca: kompaktowy wiersz (pasek toru, inbox, litera, kulki wartości), 3 px odstępu od sąsiada.
+const laneInbox=()=>{const k=laneLook.textScale;return {size:laneLook.icon,left:6*k+12,font:24*k};};
+function laneReceiver(id,subscriber,{x,w,y},extra={}) {
+  const gap=3;
+  return {id,x,y,w,h:laneLook.rowH-2*gap,top:y-laneLook.rowH/2+gap,defH:0,rowH:laneLook.rowH-2*gap,
+    laneSlots:{[subscriber]:0},...laneTiles.receiver,label:'',subscriber,terminalBadge:true,detail:'',inbox:laneInbox(),rx:laneLook.rx,...extra};
+}
+function laneTray(anchor,{x,w,y},max,ball=laneLook.ball) {
+  const k=laneLook.textScale,inbox=laneInbox();
+  return {anchor,x:x-w/2+inbox.left+laneLook.icon+8*k+22*k+12+ball.r,y,balls:true,max,gap:laneLook.ballGap};
+}
 // Kod torów: stale tylko definicja pipeline'u (bez nazwy data$), fragmenty w kolorach klocków; fragment świeci,
 // gdy jego klocek pracuje (HTTP — odpowiedź wylatuje, map — przekształcenie, share — rozdzielenie wartości).
 function laneCodeLines(shared,plan) {
@@ -202,13 +224,10 @@ export function configureLanes(scene) {
 // są węższe (odbiorca mieści dwie kulki — share dostarcza jedną odpowiedź).
 export function lanesGraph(scene) {
   const tall=scene.format==='4:3',mode=scene.lanesMode||'cold',shared=mode!=='cold',unsub=mode==='share-unsub';
-  const g={top:tall?178:102,defH:79,rowH:89,ball:{r:29,font:35.5},icon:28,portRadius:11.4,laneWire:5,rx:7.6,
-    textScale:1.42,labelScale:1.56,ballGap:10,
+  const g={top:tall?178:102,...laneLook,
     ...(shared?{httpX:187,httpW:250,mapX:477,mapW:180,shareX:752,shareW:220,recvX:1057,recvW:240,maxBalls:2}:
       {httpX:217,httpW:310,mapX:592,mapW:280,recvX:995,recvW:366,maxBalls:3})};
-  const k=g.textScale,rowY=slot=>g.top+g.defH+(slot+.5)*g.rowH;
-  const grow=(kind,slots,rows)=>{const h=g.defH+rows*g.rowH;
-    return {top:g.top,defH:g.defH,rowH:g.rowH,laneSlots:slots,growRows:true,y:g.top+h/2,h,ready:true,detail:'',rx:g.rx,...laneTiles[kind]};};
+  const rowY=slot=>laneRowY(g.top,slot),grow=(kind,slots,rows)=>laneTile(kind,g.top,slots,rows);
   const complete=end=>({at:end,kind:'complete'}),fill=id=>laneSubscribers[id].fill;
   const upstreamTile=kind=>shared?grow(kind,Object.fromEntries(plan.sessions.map((session,i)=>[`U${session.index}`,i])),plan.sessions.length):
     grow(kind,{A:0,B:1},2);
@@ -229,11 +248,7 @@ export function lanesGraph(scene) {
     }),...plan.subs.map(sub=>({id:`share-${sub.id}`,from:'share',to:sub.id,subscriber:sub.id,logicalStart:sub.start,hold:1.2,
       logicalEnd:sub.unsubAt===undefined?complete(sub.session.response):{at:sub.unsubAt,kind:'unsubscribe'},
       events:sub.receives?[E(sub.session.response,'42',fill(sub.id))]:[]}))]:[];
-  // Odbiorca: kompaktowy wiersz (pasek toru, inbox, litera, kulki wartości), 3 px odstępu od sąsiada.
-  const gap=3,left=6*k+12,inbox={size:g.icon,left,font:24*k};
-  const ballsX=x=>x-g.recvW/2+left+g.icon+8*k+22*k+12+g.ball.r;
-  const receiver=(id,slot)=>({id,x:g.recvX,y:rowY(slot),w:g.recvW,h:g.rowH-2*gap,top:rowY(slot)-g.rowH/2+gap,defH:0,rowH:g.rowH-2*gap,
-    laneSlots:{[id]:0},...laneTiles.receiver,label:'',subscriber:id,terminalBadge:true,detail:'',inbox,rx:g.rx,...(shared?{rowTint:true}:{})});
+  const receiver=(id,slot)=>laneReceiver(id,id,{x:g.recvX,w:g.recvW,y:rowY(slot)},shared?{rowTint:true}:{});
   // Chwilowy napis zdarzenia: .subscribe() od pojawienia się odbiorcy (0,3 s przed subscribe) do dotarcia impulsu
   // do źródła (cold: HTTP; share: A do HTTP, B tylko do share, bo upstream już działa). Ręczne .unsubscribe()
   // trwa od wywołania do końca animacji anulowania. Pas nad pipeline'em jest pusty, więc napis niczego nie zasłania.
@@ -247,8 +262,7 @@ export function lanesGraph(scene) {
     ...(sub.unsubAt===undefined?[]:[callout('.unsubscribe()',sub.id,ev('inner-unsubscribe',`share-${sub.id}`,-.3),
       sub.cancelsUpstream?ev('disconnected',upstreamEdge('http',sub.session.index)):ev('disconnected',`share-${sub.id}`))])]):
     ['A','B'].map(id=>callout('.subscribe()',id,ev('subscribe',`map-${id}`,-.3),ev('connected',`http-map-${id}`)));
-  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,portRadius:g.portRadius,laneWire:g.laneWire,ball:g.ball,
-    textScale:g.textScale,labelScale:g.labelScale,
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),
     subscribers,
     nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,progressUntilNext:true,...upstreamTile('source')},
       {id:'map',x:g.mapX,w:g.mapW,label:'map',color:'op',transformBalls:true,...upstreamTile('operator')},
@@ -258,7 +272,7 @@ export function lanesGraph(scene) {
           ...Object.fromEntries(plan.sessions.map(session=>[`U${session.index}`,plan.subs.find(sub=>sub.id===session.initiator).slot]))},plan.subs.length)}]:[]),
       ...subIds.map((id,slot)=>receiver(id,slot))],
     edges:shared?sharedEdges:[...lane('A',1,5),...lane('B',3,7)],
-    trays:subIds.map((id,slot)=>({anchor:id,x:ballsX(g.recvX),y:rowY(slot),balls:true,max:g.maxBalls,gap:g.ballGap})),
+    trays:subIds.map((id,slot)=>laneTray(id,{x:g.recvX,w:g.recvW,y:rowY(slot)},g.maxBalls)),
     callouts,
   };
 }
@@ -268,7 +282,8 @@ export function lanesGraph(scene) {
 export function configureTimers(scene) {
   const ticks=[1,2,3].map((at,i)=>E(at,String(i),'source')),stop=3.5;
   const once=[E(1,'0','source')];
-  Object.assign(scene,{graph:timersGraph,playerLayout:'function',duration:4.5,unsubscribeAt:stop,
+  Object.assign(scene,{graph:timersGraph,playerLayout:'function',duration:4.5,unsubscribeAt:stop,ink:'#26323B',playerClass:'rx-flat-tiles',
+    timing:{subscribe:.8,travel:1,terminal:.8,gap:.5},
     title:'timer i interval: jedna wartość czy strumień?',code:'timer(1000) / interval(1000)',
     // Odbiorca timera dostaje ✓ complete dopiero po dotarciu sygnału (terminal krawędzi), nie z completeAt wiersza.
     rows:[R('timer(1000)',once,[],{completeAt:1}),R('Odbiorca timer',once),
@@ -286,61 +301,52 @@ export function configureTimers(scene) {
   });
 }
 
+// Wygląd torów: dwa niezależne rzędy źródło → odbiorca (A: timer, B: interval). Stan wykonania niesie wiersz:
+// timer kończy się complete, interval zostaje odsubskrybowany (szary wiersz, bez complete).
 export function timersGraph(scene) {
-  const frame=frameFor(scene),layout=frame.timers,tile={h:layout.tileH,ready:true,statusInside:true};
-  // 4:3 ma własne kolumny i wyższy box; 16:9 zachowuje dotychczasowe położenia.
-  const source=layout.source||{x:190,w:320},sink=layout.sink||{x:640,w:260},box=layout.box||{x:1015,w:370},boxH=layout.boxH||layout.tileH;
-  const nodes=[],panels=[],trays=[];
-  const stopped=t=>t>=scene.unsubscribeAt;
-  [['timer','timerSink','timer(1000)','po 1 s'],['interval','intervalSink','interval(1000)',t=>stopped(t)?'zatrzymany':'co 1 s']].forEach(([id,sinkId,label,detail],i)=>{
-    const y=layout.rows[i];
-    nodes.push({id,...tile,x:source.x,y,w:source.w,label,detail,ri:i*2,color:'source',terminalEdge:id+'-'+sinkId},
-      {id:sinkId,...tile,x:sink.x,y,w:sink.w,label:'Odbiorca',ri:i*2+1,color:'http',...(i?{detail:t=>stopped(t)?'unsubscribe':undefined}:{})});
-    // Box odbiorów na prawo od odbiorcy, w tym samym rzędzie; łącznik jest poziomy.
-    // 4:3: box pojawia się przy pierwszym odbiorze w tym rzędzie.
-    panels.push({x:box.x-box.w/2,y:y-boxH/2,w:box.w,h:boxH,from:{x:sink.x+sink.w/2,y},
-      ...(layout.showOnFirst?{showOn:{type:'deliver-next',edge:id+'-'+sinkId,value:'0'}}:{})});
-    // 4:3: jeden wyśrodkowany rząd (0, 1, 2 mieszczą się bez wielokropka przy skali 1,8).
-    trays.push({anchor:sinkId,x:box.x,y,w:box.w-24,...(layout.showOnFirst?{lines:1}:{})});
+  const tall=scene.format==='4:3',tops=tall?[108,336]:[42,250],nodes=[],trays=[],edges=[];
+  [['timer','timerSink','timer(1000)','A',0],['interval','intervalSink','interval(1000)','B',2]].forEach(([id,sinkId,label,lane,ri],i)=>{
+    const top=tops[i],receiver={x:910,w:400,y:laneRowY(top,0)},fill=laneSubscribers[lane].fill;
+    nodes.push({id,x:340,w:420,label,terminalEdge:id+'-'+sinkId,...laneTile('source',top,{[lane]:0},1)},
+      laneReceiver(sinkId,lane,receiver,{ready:false}));
+    trays.push(laneTray(sinkId,receiver,3));
+    edges.push({from:id,to:sinkId,subscriber:lane,logicalStart:0,events:scene.rows[ri].events.map(e=>({...e,color:fill})),
+      logicalEnd:i?{at:scene.unsubscribeAt,kind:'unsubscribe'}:{at:scene.rows[0].completeAt,kind:'complete'}});
   });
-  return {layout:'fixed',formatAware:true,width:1240,height:frame.height,nodes,panels,trays,
-    ...(layout.textScale?{textScale:layout.textScale,labelScale:layout.labelScale}:{}),
-    edges:[{from:'timer',to:'timerSink',events:scene.rows[0].events,logicalStart:0},
-      {from:'interval',to:'intervalSink',events:scene.rows[2].events,logicalStart:0,logicalEnd:{at:scene.unsubscribeAt,kind:'unsubscribe'}}]};
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B},nodes,trays,edges};
 }
 
 // Wariant HTTP: subskrypcja uruchamia request (praca tylko w kafelku HTTP), odpowiedź „dane” trafia do boxu pod odbiorcą,
 // potem complete. Odbiorca ma własny wiersz bez pracy, więc nie pokazuje paska ani „praca trwa”.
 export function configureHttp(scene) {
   const response=[E(7,'dane','http')];
-  Object.assign(scene,{graph:httpGraph,playerLayout:'function',duration:9.2,
+  // 9,9 s: complete dociera w 9,1 s, rozbłysk wiersza odbiorcy wygasa przed FINISHED.
+  Object.assign(scene,{graph:httpGraph,playerLayout:'function',duration:9.9,ink:'#26323B',playerClass:'rx-flat-tiles',
     title:'HTTP: od definicji do wykonania',code:"http.get('/api/data')",
     // .subscribe(render) dopisuje się z tym samym fade-in co odbiorca (born:1).
     codeFrames:[{at:1,code:"http.get('/api/data').subscribe(render)",fadeIn:.3}],
     rows:[R('HTTP',response,[B(2.1,7,'request')],{completeAt:7}),R('Odbiorca',response)],
     captions:[[0,'Definicja HTTP jest gotowa. Request jeszcze nie istnieje'],[1,'subscribe tworzy odbiorcę i łączy go ze źródłem'],[2.1,'Dopiero subskrypcja uruchamia request'],[7.8,'Odbiorca dostał dane. Za chwilę nadejdzie complete'],[9.2,'Complete kończy to wykonanie HTTP']],
     metrics:[],
-    playback:manual([{id:'request',event:{type:'connected',edge:'http-observer'},offset:.1,caption:'Subskrypcja dotarła do HTTP. Request ruszył'},
+    playback:manual([{id:'request',event:{type:'connected',edge:'http-observer'},offset:.35,caption:'Subskrypcja dotarła do HTTP. Request ruszył'},
       {id:'first',event:{type:'deliver-next',edge:'http-observer',value:'dane'},offset:.35,caption:'Odbiorca dostał dane; complete jeszcze nie dotarło'}]),
   });
 }
 
+// Wygląd torów: HTTP GET (definicja) → odbiorca A, który pojawia się razem z .subscribe(render). Request to postęp
+// w wierszu HTTP od zestawionej subskrypcji do odpowiedzi; „dane” zostają kulką w wierszu odbiorcy, potem complete.
 export function httpGraph(scene) {
-  const frame=frameFor(scene),layout=frame.http,tile={y:layout.tileY,h:layout.tileH,ready:true,statusInside:true};
-  const nodes=[
-    // Między wysłaniem odpowiedzi a sygnałem complete kafelek nie udaje jeszcze zakończenia.
-    {id:'http',x:layout.httpX??320,...tile,w:layout.httpW??320,label:'HTTP',ri:0,work:true,terminalEdge:'http-observer',detail:t=>t<2.1?'bez requestu':t>=7?'odpowiedź wysłana':undefined},
-    {id:'observer',x:layout.observerX??940,...tile,w:layout.observerW??280,label:'Odbiorca',ri:1,color:'http',ready:false,born:1},
-  ];
-  const observer=nodes[1];
-  // 4:3: box odbioru pojawia się, gdy „dane” dotrą do odbiorcy.
-  const box={x:observer.x-observer.w/2,y:layout.boxY,w:observer.w,h:layout.boxH??layout.tileH,from:{x:observer.x,y:observer.y+observer.h/2},
-    showOn:{type:'deliver-next',edge:'http-observer',value:'dane'}};
-  return {layout:'fixed',formatAware:true,width:1240,height:frame.height,nodes,panels:[box],
-    ...(layout.textScale?{textScale:layout.textScale,labelScale:layout.labelScale}:{}),
-    trays:[{anchor:'observer',x:observer.x,y:box.y+box.h/2,w:box.w-4,lines:1}],
-    edges:[{from:'http',to:'observer',events:scene.rows[0].events,logicalStart:1.3}],
-    schedule:{'http-observer':{start:1.3,connectDuration:.8,events:[{...scene.rows[0].events[0],arrival:7.8}],end:{at:8.3,logicalAt:7,kind:'complete',duration:.8}}}};
+  const top=scene.format==='4:3'?222:146,receiver={x:910,w:400,y:laneRowY(top,0)};
+  // Większa kulka mieści pełne „dane”.
+  const ball={r:34,font:26},fill=laneSubscribers.A.fill;
+  return {layout:'fixed',formatAware:true,width:1240,height:scene.format==='4:3'?612:460,...laneGraphLook(),ball,
+    subscribers:{A:laneSubscribers.A},
+    nodes:[{id:'http',x:340,w:420,label:'HTTP GET',workLanes:true,progressUntilNext:true,terminalEdge:'http-observer',...laneTile('source',top,{A:0},1)},
+      laneReceiver('observer','A',receiver,{ready:false,born:1})],
+    trays:[laneTray('observer',receiver,1,ball)],
+    edges:[{from:'http',to:'observer',subscriber:'A',events:scene.rows[0].events,logicalStart:1.3}],
+    schedule:{'http-observer':{start:1.3,connectDuration:.8,events:[{...scene.rows[0].events[0],color:fill,arrival:7.8}],end:{at:8.3,logicalAt:7,kind:'complete',duration:.8}}}};
 }
 
 // Wariant Subject: emisja może nastąpić także bez podłączonego odbiorcy.
@@ -435,11 +441,8 @@ function buildFlattenGraph(scene) {
 const horizontal = {panelW:520,sideW:220,sourceX:140,opX:620,observerX:1100,catchX:860};
 const httpWorkSlides=new Set(['08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap']);
 const frames = {
-  '16:9': {...horizontal,timers:{tileH:86,rows:[130,330]},http:{tileY:170,tileH:86,boxY:250},operator:{tileY:50,tileH:76,sourceX:140,opX:620,observerX:1100,sideW:200,mapW:240,boxY:148},height:460,tileY:50,tileH:76,panelY:148,panelBottom:440,columnH:210,historyTop:41,historyStep:60},
-  // 04 w 4:3: trzy duże kafelki i box odbioru pod odbiorcą; cała grupa (130 + 50 + 130) na środku ramki 612.
-  // 05 (timer/interval) w 4:3: dwa rzędy po 130 px wyśrodkowane w ramce 612, większy tekst jak w 04.
-  // 05-2 (HTTP) w 4:3: kafelki i box pod odbiorcą jak w 04, grupa wyśrodkowana w pionie i poziomie.
-  '4:3': {...horizontal,timers:{tileH:170,rows:[181,431],boxH:150,source:{x:210,w:360},sink:{x:630,w:280},box:{x:1040,w:340},showOnFirst:true,textScale:1.8,labelScale:2.2},http:{tileY:201,tileH:170,boxY:346,boxH:150,httpX:300,httpW:400,observerX:940,observerW:400,showOnFirst:true,textScale:1.8,labelScale:2.2},subject:{sourceX:300,sinkX:940,tileY:201,tileH:170,tileW:400,boxY:346,boxH:150,textScale:1.8,labelScale:2.2},operator:{tileY:201,tileH:170,sourceX:160,opX:590,observerX:1050,sideW:260,observerW:320,mapW:380,boxY:346,boxH:150,textScale:1.8,labelScale:2.2},height:612,tileY:60,tileH:96,panelY:172,panelBottom:592,columnH:300,historyTop:56,historyStep:84},
+  '16:9': {...horizontal,height:460,tileY:50,tileH:76,panelY:148,panelBottom:440,columnH:210,historyTop:41,historyStep:60},
+  '4:3': {...horizontal,height:612,tileY:60,tileH:96,panelY:172,panelBottom:592,columnH:300,historyTop:56,historyStep:84},
 };
 const frameFor = scene => frames[scene.format==='4:3'?'4:3':'16:9'];
 

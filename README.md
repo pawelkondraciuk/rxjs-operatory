@@ -187,15 +187,15 @@ Brak notatek w HTML.
 
 ### Operator to funkcja — `04-operator`
 
-**MAIN — po HTTP i timer/interval.** READY pokazuje kod `of(1, 2, 3)` oraz źródło i odbiorcę. Źródło emituje kolejno trzy osobne liczby: 1, 2, 3.
+**MAIN — po HTTP i timer/interval.** Wygląd torów jak w `04a-dwa-tory`: nagłówek kafelka to definicja, wiersz pod nim — wykonanie A. READY pokazuje kod `of(1, 2, 3)` i sam nagłówek `of(1, 2, 3)`. Źródło emituje kolejno trzy osobne liczby: 1, 2, 3.
 
-Pierwsze prawo odsłania jednocześnie `.pipe(map(x => x * 2))` w drugiej linii kodu oraz bloczek map. Oba pojawiają się łagodnym fade-in przez 0,3 s, bez przesuwania układu. Pipe składa definicję, nie uruchamia źródła. Następny etap pokazuje subskrypcję od odbiorcy ku źródłu. Nie ma dodatkowych opisów Subscriberów ani paneli wykonawców.
+Pierwsze prawo odsłania jednocześnie `.pipe(map(x => x * 2))` w drugiej linii kodu oraz nagłówek map. Oba pojawiają się łagodnym fade-in przez 0,3 s, bez przesuwania układu. Pipe składa definicję, nie uruchamia źródła. Następny etap: pojawia się odbiorca A (wiersz z inboxem), potem subskrypcja biegnie od niego ku źródłu, a pod nagłówkami map i of rosną wiersze A.
 
-Pierwsza wartość przechodzi ręcznie: 1 → map → 2. Jeden RxJS map podwaja każdą z trzech kolejnych emisji, bez zagnieżdżonego map. Wynik transformacji jest widoczny pod map tylko do wyjścia kapsułki. Box odbioru pojawia się po dotarciu 2. Następny krok włącza AUTO dla 2 → 4, 3 → 6 i complete; w boxie zostają trzy wyniki 2/4/6. Zielony terminal oznacza zakończenie tego wykonania, nie trwałe zamknięcie definicji Observable.
+Pierwsza wartość przechodzi ręcznie: kulka 1 wjeżdża do wiersza map, zatrzymuje się, zmienia w 2 i jedzie do odbiorcy. Jeden RxJS map podwaja każdą z trzech kolejnych emisji, bez zagnieżdżonego map. Następny krok włącza AUTO dla 2 → 4, 3 → 6 i complete (impuls na kablach); w wierszu odbiorcy zostają kulki 2/4/6. Zielone wiersze oznaczają zakończenie tego wykonania, nie trwałe zamknięcie definicji Observable — nagłówki pozostają pastelowe.
 
 **Speaker notes:** Najpierw źródło trzech osobnych wartości, potem składanie definicji przez pipe i uruchomienie przez subscribe. Operator dostaje Observable i zwraca Observable; map(project) tworzy funkcję przekazaną do pipe. Projekcja x => x * 2 przekształca pojedynczą liczbę. of, projekcja i odbiór są synchroniczne; postoje i przeloty dotyczą ilustracji.
 
-Kontroler `stages`: → zaczyna lub kończy etap, ← cofa checkpoint także w AUTO, Spacja pauzuje/wznawia, M zmienia tryb, R przywraca zatrzymany READY w wybranym trybie. Fade-in cofa się i resetuje razem z kodem i diagramem. Tempo ilustracji: etap pipe 0,65 s, subscribe 3,2 s, przelot 1,2 s, transformacja 1,4 s, zatrzymanie odbioru 0,5 s, terminal 1,2 s.
+Kontroler `stages`: → zaczyna lub kończy etap, ← cofa checkpoint także w AUTO, Spacja pauzuje/wznawia, M zmienia tryb, R przywraca zatrzymany READY w wybranym trybie. Fade-in cofa się i resetuje razem z kodem i diagramem. Tempo ilustracji: etap pipe 0,65 s, pojawienie odbiorcy 0,3 s, subscribe 3,2 s, przelot 1,2 s, transformacja 1,4 s, zatrzymanie odbioru 0,5 s, terminal 1,2 s, cisza 0,8 s przed FINISHED (rozbłysk wierszy wygasa).
 
 ### Tory wykonania: cold, share() i unsubscribe — `04a-dwa-tory`, `-2`, `-3` (slajdy testowe)
 
@@ -223,13 +223,13 @@ Warianty zachowują ID, lecz zajmują oddzielne miejsca narracji: **HTTP otwiera
 
 | ID | Kod i zachowanie |
 | --- | --- |
-| 05-zrodla-2 | `http.get('/api/data')`; pierwsze „dalej” dopisuje `.subscribe(render)` (fade-in razem z odbiorcą). READY ma tylko kafelek HTTP; subscribe odsłania odbiorcę. Postój request pokazuje pracę po podłączeniu, postój first odebrane dane przed complete. |
+| 05-zrodla-2 | `http.get('/api/data')`; pierwsze „dalej” dopisuje `.subscribe(render)` (fade-in razem z odbiorcą A). READY ma tylko nagłówek HTTP GET; subscribe odsłania odbiorcę i wiersz A. Postój request pokazuje pracę po podłączeniu, postój first odebrane dane przed complete. |
 | 05-zrodla | `timer(1000) / interval(1000)`. Oba emitują 0 po 1 s; timer kończy, interval emituje 0/1/2 i w 3,5 s kończy przez unsubscribe bez callbacku complete. |
 | 05-zrodla-3 | `const subject$ = new Subject()`. A bez odbiorców w 1 s; odbiorca 1 dołącza w 2,5 s i dostaje B w 4 s; odbiorca 2 dołącza w 5 s; C w 6,5 s dostają obaj. |
 
-HTTP ma pasek pracy tylko na źródle; odbiorca czeka, potem przechowuje dane w boxie pod kafelkiem. Diagram używa harmonogramu: pojawienie odbiorcy w 1 s, subscribe 1,3–2,1 s, odpowiedź 7–7,8 s, complete 8,3–9,1 s. Kod i widoczność cofają się razem. Pasek jest symulacją oczekiwania, nie procentem odpowiedzi sieciowej.
+Wszystkie trzy mają wygląd torów jak w `04a-dwa-tory` (nagłówek = definicja, wiersz = wykonanie, porty, kulki w wierszu odbiorcy, płaskie kafelki); Subject zostaje przy poprzednim układzie. HTTP ma postęp tylko w wierszu A pod HTTP GET (od zestawionej subskrypcji do odpowiedzi); odbiorca czeka, potem trzyma kulkę „dane” w swoim wierszu. Diagram używa harmonogramu: pojawienie odbiorcy w 1 s, subscribe 1,3–2,1 s, odpowiedź 7–7,8 s, complete 8,3–9,1 s, cisza do 9,9 s. Kod i widoczność cofają się razem. Postęp jest symulacją oczekiwania, nie procentem odpowiedzi sieciowej.
 
-Timer i interval pozostają w dwóch dużych rzędach z boxami po prawej. Postoje: pierwsze 0 → zakończenie timera → trzy wartości intervalu → unsubscribe. Wynik pozostaje nieruchomy.
+Timer i interval to dwa rzędy torów: `timer(1000)` → odbiorca A i `interval(1000)` → odbiorca B, kulki wartości w wierszach odbiorców. timer kończy się complete (zielone wiersze), interval po unsubscribe szarzeje bez complete. Postoje: pierwsze 0 → zakończenie timera → trzy wartości intervalu → unsubscribe. Wynik pozostaje nieruchomy.
 
 Subject ma pionowe rozgałęzienie do dwóch odbiorców. Log źródła kończy z A/B/C, odbiorca 1 z B/C, odbiorca 2 z C. Podpis logu ma własne miejsce nad wartościami i wyjaśnia, że diagram nie jest buforem Subject. Ręczne postoje: A bez odbiorców, podłączenie 1, odebrane B, podłączenie 2; dalej AUTO pokazuje C. Nie ma complete ani unsubscribe.
 
@@ -876,4 +876,4 @@ W `map + concatAll` górny pipeline ma cztery poziome kolumny: source$ → map �
 W MAIN 08–12 przy complete zielony staje się execution lane, a nagłówek definicji pozostaje pastelowy. Pozostałe migrowane sceny zmieniają tło całego kafelka przy własnym complete. Źródło może zakończyć się wcześniej; *Map pozostaje aktywne aż do zakończenia wymaganych inner i kolejki. Nieobsłużony error daje czerwony operator, a odsubskrybowane źródło zachowuje swój kolor.
 
 
-Płaski styl kafelków obejmuje 04a-dwa-tory (cold, share, share-unsub), 06a-cold-hot (cold i hot), 07-hot-cold (bez i z share) oraz slajdy 08–12 (map + concatAll, concatMap, mergeMap, switchMap i exhaustMap): klasa `rx-flat-tiles` w scene.playerClass (player przyjmuje kilka klas rozdzielonych spacją; 04a ma `rx-lanes rx-flat-tiles`, 06a i 07 dostają ją w configureScene) usuwa obrys i zaokrąglenie głównego prostokąta kafelka. Boksy historii (data-panel-box) w tych slajdach też są płaskie, z ciemniejszym tłem #ECE6DA zamiast ramki. Panel prac 08–12 jest rysowany płasko natywnie. Placeholder kolejki zachowuje przerywany obrys. Geometria, fonty, porty, progress, stany i animacje pozostają bez zmian; pozostałe slajdy nie otrzymują tej klasy.
+Płaski styl kafelków obejmuje 04-operator, 05-zrodla, 05-zrodla-2, 04a-dwa-tory (cold, share, share-unsub), 06a-cold-hot (cold i hot), 07-hot-cold (bez i z share) oraz slajdy 08–12 (map + concatAll, concatMap, mergeMap, switchMap i exhaustMap): klasa `rx-flat-tiles` w scene.playerClass (player przyjmuje kilka klas rozdzielonych spacją; 04a ma `rx-lanes rx-flat-tiles`, 06a i 07 dostają ją w configureScene) usuwa obrys i zaokrąglenie głównego prostokąta kafelka. Boksy historii (data-panel-box) w tych slajdach też są płaskie, z ciemniejszym tłem #ECE6DA zamiast ramki. Panel prac 08–12 jest rysowany płasko natywnie. Placeholder kolejki zachowuje przerywany obrys. Geometria, fonty, porty, progress, stany i animacje pozostają bez zmian; pozostałe slajdy nie otrzymują tej klasy.
