@@ -182,6 +182,8 @@ function activate(slide) {
   suspendedPlaying = false;
   if (activeSlide && activePlayer) stateFor(activeSlide).wasPlaying = activePlayer.isPlaying;
   if (activePlayer?.controller) activePlayer.controller.suspend('slide'); else activePlayer?.pause();
+  // Scena na żywo (interval) po wyjściu zatrzymuje wykonanie i wraca do READY; nie wznawia się po powrocie.
+  if (activePlayer?.live) activePlayer.controller.reset();
   activePlayer?.hideControls();
   activeSlide = slide;
   activePlayer = playerFor(slide);

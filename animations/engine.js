@@ -207,6 +207,13 @@ export function compileScene(scene) {
     const duration=r.end.duration||transitionDuration;
     if(r.end.kind==='unsubscribe') {
       const p=clamp((time-r.end.at)/duration);
+      // cancelPulse: szary pocisk „×” biegnie od odbiorcy do nadawcy; przebyta część kabla szarzeje za nim (grey),
+      // a po dotarciu kabel przygasa jak zwykle po unsubscribe. Bez flagi zachowanie dotychczasowe.
+      if(r.cancelPulse) {
+        const points=base.points,[x,y]=pointAt(points,1-p),settled=clamp((time-r.end.at-duration)/fadeDuration);
+        return {...base,phase:'unsubscribe',color:p>=1?laneIdle:color,offset:0,progress:1,opacity:1-(1-trail)*settled,done:p>=1,
+          ...(p<1?{grey:p,cancel:{x,y}}:{})};
+      }
       return {...base,phase:'unsubscribe',color:p>0?laneIdle:color,offset:0,progress:1,opacity:1-(1-trail)*p,done:p>=1};
     }
     const start=Math.max(r.end.at,...r.events.filter(e=>e.at<=r.end.at).map(e=>e.arrival)),p=clamp((time-start)/duration);
@@ -422,7 +429,9 @@ export function compileScene(scene) {
       // Historia next zachowuje powtórzenia. Deduplikacja jest jawną cechą
       // wizualizacji Set, nigdy domyślną semantyką strumienia.
       const valuesToShow=q.deduplicate?[...new Map(delivered.map(v=>[v.value,v])).values()]:delivered;
-      return {...q,values:valuesToShow.sort((a,b)=>a.arrival-b.arrival)};
+      const ordered=valuesToShow.sort((a,b)=>a.arrival-b.arrival);
+      // Kulki: tylko max widocznych i jedna wypadająca — snapshot nie rośnie z liczbą emisji.
+      return {...q,values:q.balls&&q.max?ordered.slice(-(q.max+1)):ordered};
     });
     const codeIndex=codeFrames.findLastIndex(frame=>frame.at<=time);
     const reveal=codeReveals.find(frame=>frame.index===codeIndex)||codeReveals.find(frame=>frame.index===codeIndex+1);

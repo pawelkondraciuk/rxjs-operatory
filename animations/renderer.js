@@ -266,6 +266,9 @@ export function renderScene(frame,options={}) {
     // Kabel toru (subscriber) zostaje po zakończeniu jako historia; ruch ograniczony pokazuje go od razu w pełni.
     const offset=e.subscriber?(reduced?0:e.offset):reduced?(e.phase==='subscribed'?0:-1):e.offset,width=e.width||6;
     svg+=`<path data-connection="${esc(e.id)}" data-phase="${e.phase}" d="${d}" fill="none" stroke="${e.color}" stroke-width="${width}" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${offset}"${e.opacity!==undefined&&e.opacity<1?` opacity="${+e.opacity.toFixed(3)}"`:''}/>`;
+    // Unsubscribe z cancelPulse: przebyta (prawa) część kabla szarzeje, szary pocisk „×” jedzie w lewo do nadawcy.
+    if(e.grey>0)svg+=`<path data-cancel-trail="${esc(e.id)}" d="${d}" fill="none" stroke="#808890" stroke-width="${width}" pathLength="1" stroke-dasharray="${e.grey.toFixed(4)} 2" stroke-dashoffset="${(-(1-e.grey)).toFixed(4)}"/>`;
+    if(e.cancel&&!reduced)svg+=`<g data-cancel="${esc(e.id)}"><circle cx="${e.cancel.x}" cy="${e.cancel.y}" r="${width*3.6}" fill="#808890" stroke="#fff" stroke-width="3"/>${text(e.cancel.x,e.cancel.y+1,'×',width*6,'style="fill:#fff;font-weight:700"')}</g>`;
     // Impuls complete/error: krótki odcinek w kolorze stanu biegnie od nadawcy do odbiorcy.
     if(e.pulse&&!reduced) {
       const len=.18,at=e.pulse.at*(1+len)-len;
@@ -375,11 +378,16 @@ export function renderScene(frame,options={}) {
   }
   for(const h of frame.histories) {
     if(frame.ball&&h.balls) {
-      // Kulki odebranych wartości od lewej, stały rozmiar; najwyżej h.max ostatnich (starsze wypadają), fade-in 0,3 s.
-      const size=h.ball||frame.ball,step=size.r*2+(h.gap??8);
-      h.values.slice(-(h.max||3)).forEach((value,i)=>{
-        const opacity=reduced||value.shownAt===undefined?1:clamp((frame.time-value.shownAt)/.3);
-        svg+=ball(h.x+i*step,h.y,value.value,value.color||'a',size,1,`data-token="received" opacity="${opacity}"`);
+      // Kulki odebranych wartości od lewej, stały rozmiar; najwyżej h.max ostatnich, fade-in 0,3 s. Gdy nowa kulka
+      // wchodzi do pełnej historii, wszystkie przesuwają się płynnie o jedno miejsce w lewo, a najstarsza wygasa.
+      const size=h.ball||frame.ball,step=size.r*2+(h.gap??8),max=h.max||3,shown=h.values.slice(-(max+1));
+      const overflow=shown.length>max,newest=shown.at(-1);
+      const shift=overflow&&!reduced&&newest.shownAt!==undefined?1-clamp((frame.time-newest.shownAt)/.3):0;
+      shown.forEach((value,i)=>{
+        const fade=reduced||value.shownAt===undefined?1:clamp((frame.time-value.shownAt)/.3);
+        if(overflow&&i===0&&shift<=0)return;
+        const opacity=overflow&&i===0?+shift.toFixed(3):fade;
+        svg+=ball(h.x+(i-(overflow?1:0)+shift)*step,h.y,value.value,value.color||'a',size,1,`data-token="received" opacity="${opacity}"`);
       });
       continue;
     }

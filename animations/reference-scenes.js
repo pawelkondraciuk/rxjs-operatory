@@ -282,49 +282,59 @@ export function lanesGraph(scene) {
   };
 }
 
-// Wariant timer/interval: timer(1000) emituje 0 i kończy się complete. interval(1000) emituje 0, 1, 2 i sam się nie kończy,
-// więc odbiorca ręcznie robi unsubscribe (3,5 s): kabel się odłącza, bez complete. Trzy wartości mieszczą się w boxie.
-export function configureTimers(scene) {
-  const ticks=[1,2,3].map((at,i)=>E(at,String(i),'source')),stop=3.5;
-  const once=[E(1,'0','source')];
-  Object.assign(scene,{graph:timersGraph,playerLayout:'function',duration:4.5,unsubscribeAt:stop,ink:'#26323B',playerClass:'rx-flat-tiles',
-    timing:{subscribe:.8,travel:1,terminal:.8,gap:.5},
-    title:'timer i interval: jedna wartość czy strumień?',code:'timer(1000) / interval(1000)',
-    // Odbiorca timera dostaje ✓ complete dopiero po dotarciu sygnału (terminal krawędzi), nie z completeAt wiersza.
-    rows:[R('timer(1000)',once,[],{completeAt:1}),R('Odbiorca timer',once),
-      R('interval(1000)',ticks),R('Odbiorca interval',ticks)],
-    captions:[[0,'Dwa źródła: timer(1000) i interval(1000)'],[1,'Po 1 s oba źródła emitują 0'],
-      [2,'interval emituje kolejną wartość. timer już się zakończył'],
-      [stop,'Odbiorca robi unsubscribe. interval przestaje emitować, bez complete']],
-    metrics:[],
-    playback:manual([
-      {id:'first',event:{type:'deliver-next',edge:'interval-intervalSink',value:'0'},offset:.35,caption:'Po 1 s oba źródła emitują 0'},
-      {id:'question',event:{type:'disconnected',edge:'timer-timerSink'},caption:'timer(1000) zakończył się po jednej wartości. Czy interval też się zakończy?'},
-      {id:'third',event:{type:'deliver-next',edge:'interval-intervalSink',value:'2'},offset:.35,caption:'interval wysłał 0, 1, 2 i działa dalej. Sam się nie zakończy'},
-      {id:'unsubscribed',event:{type:'disconnected',edge:'interval-intervalSink'},caption:'Odbiorca robi unsubscribe. interval przestaje emitować, bez complete'},
-    ]),
+// interval(1000): emisje bez końca, aż do ręcznego unsubscribe. Scena jest „na żywo”: model jest analityczny
+// (emisja co 1 s od zestawionej subskrypcji), a player kompiluje go dla przesuwanego okna czasu (scene.live).
+// Bez unsubscribe scena trwa do końca okna; .unsubscribe() wybiera chwilę rezygnacji i kończy scenę.
+const intervalTiming={subscribe:.3,connect:.8,period:1,travel:.8,cancel:.8,settle:.8,window:30,keep:5,demoClose:4.95};
+export function configureInterval(scene) {
+  const t=intervalTiming,start=t.subscribe+t.connect;
+  Object.assign(scene,{graph:intervalGraph,playerLayout:'function',ink:'#26323B',playerClass:'rx-flat-tiles',
+    title:'interval: strumień bez końca',code:'interval(1000)',
+    rows:[R('interval(1000)'),R('Odbiorca A')],
+    // window/keep: długość i zapas okna kompilacji (s); defaultClose: rezygnacja dla druku i „pokaż wynik”.
+    live:{start,window:t.window,keep:t.keep,margin:2,defaultClose:t.demoClose,variant:intervalVariant},
+    playback:{entry:'manual',finish:'hold',live:true,stops:[
+      {id:'live',time:start,caption:'interval emituje co sekundę: 0, 1, 2… Sam się nie kończy'}]},
   });
+  Object.assign(scene,intervalVariant(scene,{from:0,to:t.window,closedAt:null}));
 }
 
-// Wygląd torów: dwa niezależne rzędy źródło → odbiorca (A: timer, B: interval). Stan wykonania niesie wiersz:
-// timer kończy się complete, interval zostaje odsubskrybowany (szary wiersz, bez complete).
-export function timersGraph(scene) {
-  const tall=scene.format==='4:3',tops=tall?[108,336]:[42,250],nodes=[],trays=[],edges=[],callouts=[];
-  [['timer','timerSink','timer(1000)','A',0],['interval','intervalSink','interval(1000)','B',2]].forEach(([id,sinkId,label,lane,ri],i)=>{
-    const top=tops[i],receiver={x:910,w:400,y:laneRowY(top,0)},fill=laneSubscribers[lane].fill;
-    nodes.push({id,x:340,w:420,label,terminalEdge:id+'-'+sinkId,...laneTile('source',top,{[lane]:0},1)},
-      laneReceiver(sinkId,lane,receiver,{ready:false}));
-    trays.push(laneTray(sinkId,receiver,3));
-    // Dwa rzędy: napis stoi nad wierszem swojego odbiorcy, na wysokości nagłówka źródła.
-    const above={x:receiver.x,y:top+laneLook.defH/2},edge=id+'-'+sinkId;
-    callouts.push(subscribeCallout(lane,edge,edge,above),
-      // .unsubscribe() startuje dokładnie z rezygnacją (bez wyprzedzenia), żeby postój third nie zdradzał odpowiedzi.
-      ...(i?[laneCallout('.unsubscribe()',lane,laneEvent('inner-unsubscribe',edge),laneEvent('disconnected',edge),above)]:[]));
-    edges.push({from:id,to:sinkId,subscriber:lane,logicalStart:0,events:scene.rows[ri].events.map(e=>({...e,color:fill})),
-      logicalEnd:i?{at:scene.unsubscribeAt,kind:'unsubscribe'}:{at:scene.rows[0].completeAt,kind:'complete'}});
-  });
-  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),
-    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B},nodes,trays,edges,callouts};
+// Wariant sceny dla okna [from, to] i opcjonalnej chwili rezygnacji closedAt (czas ilustracji).
+// Wartość wysłana przed rezygnacją dociera do odbiorcy; dopiero potem rusza unsubscribe, a późniejsze emisje nie istnieją.
+function intervalVariant(scene,{from,to,closedAt}) {
+  const t=intervalTiming,start=scene.live.start,emitAt=k=>start+t.period*(k+1);
+  const closed=closedAt!==null&&closedAt!==undefined;
+  const last=closed?Math.ceil((closedAt-start)/t.period)-2:Infinity;
+  const unsubscribeAt=closed?Math.max(closedAt,last>=0?emitAt(last)+t.travel:closedAt):null;
+  const kFrom=Math.max(0,Math.floor((from-start)/t.period)-1),kTo=Math.min(last,Math.floor((to-start)/t.period));
+  const emitted=time=>Math.min(last+1,Math.max(0,Math.floor((time-start)/t.period)));
+  return {...scene,intervalPlan:{start,kFrom,kTo,unsubscribeAt},
+    duration:closed?unsubscribeAt+t.cancel+t.settle:to,
+    metrics:[{label:'emisje',value:emitted}],
+    captions:[[0,'interval(1000) to definicja. Bez subscribe nic nie emituje'],
+      [t.subscribe,'.subscribe() tworzy wykonanie A i łączy je z interval'],
+      ...(closed?[[unsubscribeAt,'.unsubscribe() A: rezygnacja biegnie od odbiorcy do interval'],
+        [unsubscribeAt+t.cancel,'interval przestał emitować. Bez complete — to rezygnacja odbiorcy, nie koniec strumienia']]:[])]};
+}
+
+export function intervalGraph(scene) {
+  const t=intervalTiming,{kFrom,kTo,unsubscribeAt}=scene.intervalPlan,start=scene.live.start;
+  const top=scene.format==='4:3'?222:146,receiver={x:910,w:400,y:laneRowY(top,0)},fill=laneSubscribers.A.fill;
+  const events=[];
+  for(let k=kFrom;k<=kTo;k++){const at=start+t.period*(k+1);events.push({...E(at,String(k),fill),logicalAt:at,arrival:at+t.travel});}
+  const edge='interval-observer',closed=unsubscribeAt!==null;
+  // .unsubscribe() zaczyna się przy odbiorcy (pod jego wierszem), nie w pasie nagłówków.
+  const below={x:receiver.x,y:receiver.y+laneLook.rowH/2+48};
+  return {layout:'fixed',formatAware:true,width:1240,height:scene.format==='4:3'?612:460,...laneGraphLook(),
+    subscribers:{A:laneSubscribers.A},
+    nodes:[{id:'interval',x:340,w:420,label:'interval(1000)',...laneTile('source',top,{A:0},1)},
+      laneReceiver('observer','A',receiver,{ready:false,born:0})],
+    trays:[laneTray('observer',receiver,3)],
+    callouts:[subscribeCallout('A',edge,edge,{y:top/2}),
+      ...(closed?[laneCallout('.unsubscribe()','A',laneEvent('inner-unsubscribe',edge),laneEvent('disconnected',edge),below)]:[])],
+    edges:[{id:edge,from:'interval',to:'observer',subscriber:'A',logicalStart:t.subscribe,cancelPulse:true,events:[]}],
+    schedule:{[edge]:{start:t.subscribe,connectDuration:t.connect,events,
+      ...(closed?{end:{at:unsubscribeAt,logicalAt:unsubscribeAt,kind:'unsubscribe',duration:t.cancel}}:{})}}};
 }
 
 // Wariant HTTP: subskrypcja uruchamia request (praca tylko w kafelku HTTP), odpowiedź „dane” trafia do boxu pod odbiorcą,

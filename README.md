@@ -37,7 +37,7 @@ MAIN ma **33 slajdy (22 animowane)**. EXTRAS zawiera **35 wariantów**. Całoś�
 
 Kolejność po otwarciu:
 
-1. HTTP (`05-zrodla-2`) → timer/interval (`05-zrodla`) → map, pipe i wykonanie (`04-operator`) → testowe slajdy torów wykonania: cold (`04a-dwa-tory`), share() za map (`-2`) i share z unsubscribe A (`-3`).
+1. HTTP (`05-zrodla-2`) → interval na żywo (`05-zrodla`) → map, pipe i wykonanie (`04-operator`) → testowe slajdy torów wykonania: cold (`04a-dwa-tory`), share() za map (`-2`) i share z unsubscribe A (`-3`).
 2. Dwa wykonania cold (`06a-cold-hot`) → dwa HTTP (`07-hot-cold`) → Subject (`05-zrodla-3`) → jedno aktywne HTTP z share (`07-hot-cold-2`) → późny odbiorca z share/shareReplay (`20-sharereplay`, `20-sharereplay-2`).
 3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap.
 4. catchError na zewnątrz/wewnątrz → distinctUntilChanged → wspólne porównanie debounceTime i auditTime (`16-czas-cztery`).
@@ -187,7 +187,7 @@ Brak notatek w HTML.
 
 ### Operator to funkcja — `04-operator`
 
-**MAIN — po HTTP i timer/interval.** Wygląd torów jak w `04a-dwa-tory`: nagłówek kafelka to definicja, wiersz pod nim — wykonanie A. READY pokazuje kod `of(1, 2, 3)` i sam nagłówek `of(1, 2, 3)`. Źródło emituje kolejno trzy osobne liczby: 1, 2, 3.
+**MAIN — po HTTP i interval.** Wygląd torów jak w `04a-dwa-tory`: nagłówek kafelka to definicja, wiersz pod nim — wykonanie A. READY pokazuje kod `of(1, 2, 3)` i sam nagłówek `of(1, 2, 3)`. Źródło emituje kolejno trzy osobne liczby: 1, 2, 3.
 
 Pierwsze prawo odsłania jednocześnie `.pipe(map(x => x * 2))` w drugiej linii kodu oraz nagłówek map. Oba pojawiają się łagodnym fade-in przez 0,3 s, bez przesuwania układu. Pipe składa definicję, nie uruchamia źródła. Następny etap: pojawia się odbiorca A (wiersz z inboxem) i chwilowy napis `.subscribe()` A nad pipeline'em, potem subskrypcja biegnie od niego ku źródłu, a pod nagłówkami map i of rosną wiersze A; napis znika, gdy subskrypcja dotrze do of.
 
@@ -219,17 +219,17 @@ Kontroler `stages`: → zaczyna lub kończy etap, ← cofa checkpoint także w A
 
 ### Źródła — rodzina `05-zrodla`
 
-Warianty zachowują ID, lecz zajmują oddzielne miejsca narracji: **HTTP otwiera część właściwą**, timer/interval są drugie, Subject pojawia się po dwóch cold HTTP.
+Warianty zachowują ID, lecz zajmują oddzielne miejsca narracji: **HTTP otwiera część właściwą**, interval jest drugi, Subject pojawia się po dwóch cold HTTP.
 
 | ID | Kod i zachowanie |
 | --- | --- |
 | 05-zrodla-2 | `http.get('/api/data')`; pierwsze „dalej” dopisuje `.subscribe(render)` (fade-in razem z odbiorcą A). READY ma tylko nagłówek HTTP GET; subscribe odsłania odbiorcę i wiersz A. Postój request pokazuje pracę po podłączeniu, postój first odebrane dane przed complete. |
-| 05-zrodla | `timer(1000) / interval(1000)`. Oba emitują 0 po 1 s; timer kończy, interval emituje 0/1/2 i w 3,5 s kończy przez unsubscribe bez callbacku complete. |
+| 05-zrodla | `interval(1000)` na żywo. Pierwsze „dalej” robi `.subscribe()`, potem emisje 0, 1, 2, 3… co sekundę bez końca; drugie „dalej” robi `.unsubscribe()` (bez complete); trzecie przechodzi dalej. |
 | 05-zrodla-3 | `const subject$ = new Subject()`. A bez odbiorców w 1 s; odbiorca A dołącza w 2,5 s i dostaje B w 4 s; odbiorca B dołącza w 5 s; C w 6,5 s dostają obaj. |
 
-Cała rodzina ma wygląd torów jak w `04a-dwa-tory` (nagłówek = definicja, wiersz = wykonanie, porty, kulki w wierszu odbiorcy, płaskie kafelki) i te same chwilowe napisy `.subscribe()` z badge'em toru, widoczne od pojawienia się odbiorcy do dotarcia subskrypcji do źródła. W timer/interval napis stoi nad wierszem swojego odbiorcy, a `.unsubscribe()` B pojawia się dopiero przy rezygnacji (po postoju trzech wartości). W Subject napisy A i B stoją nad kolumną odbiorców. HTTP ma postęp tylko w wierszu A pod HTTP GET (od zestawionej subskrypcji do odpowiedzi); odbiorca czeka, potem trzyma kulkę „dane” w swoim wierszu. Diagram używa harmonogramu: pojawienie odbiorcy w 1 s, subscribe 1,3–2,1 s, odpowiedź 7–7,8 s, complete 8,3–9,1 s, cisza do 9,9 s. Kod i widoczność cofają się razem. Postęp jest symulacją oczekiwania, nie procentem odpowiedzi sieciowej.
+Cała rodzina ma wygląd torów jak w `04a-dwa-tory` (nagłówek = definicja, wiersz = wykonanie, porty, kulki w wierszu odbiorcy, płaskie kafelki) i te same chwilowe napisy `.subscribe()` z badge'em toru, widoczne od pojawienia się odbiorcy do dotarcia subskrypcji do źródła. W interval `.unsubscribe()` A pojawia się pod wierszem odbiorcy, bo rezygnacja zaczyna się przy nim. W Subject napisy A i B stoją nad kolumną odbiorców. HTTP ma postęp tylko w wierszu A pod HTTP GET (od zestawionej subskrypcji do odpowiedzi); odbiorca czeka, potem trzyma kulkę „dane” w swoim wierszu. Diagram używa harmonogramu: pojawienie odbiorcy w 1 s, subscribe 1,3–2,1 s, odpowiedź 7–7,8 s, complete 8,3–9,1 s, cisza do 9,9 s. Kod i widoczność cofają się razem. Postęp jest symulacją oczekiwania, nie procentem odpowiedzi sieciowej.
 
-Timer i interval to dwa rzędy torów: `timer(1000)` → odbiorca A i `interval(1000)` → odbiorca B, kulki wartości w wierszach odbiorców. timer kończy się complete (zielone wiersze), interval po unsubscribe szarzeje bez complete. Postoje: pierwsze 0 → zakończenie timera → trzy wartości intervalu → unsubscribe. Wynik pozostaje nieruchomy.
+interval to jeden rząd: `interval(1000)` → odbiorca A. Slajd jest wyjątkiem od postojów: po `.subscribe()` emisje trwają tak długo, jak prelegent chce (licznik „emisje” rośnie bez ograniczeń, w wierszu odbiorcy zostają 3 ostatnie kulki, starsza płynnie wypada). Kolejne „dalej” wywołuje `.unsubscribe()` na istniejącym wykonaniu: wartość już wysłana dociera, potem szary pocisk „×” jedzie od odbiorcy w lewo do interval, przebyty kabel i wiersze szarzeją, emisje ustają; nie ma zielonego complete. AUTO ani pauza nie wywołują unsubscribe same. Lewo cofa etap (z anulowanego do emisji od zera, z emisji do READY); wyjście ze slajdu sprząta wykonanie, a powrót startuje od READY. Druk pokazuje anulowany kadr po wartościach 0, 1, 2.
 
 Subject to kafelek z wierszami A i B, które rosną, gdy odbiorcy subskrybują; odbiorcy A i B trzymają kulki w swoich wierszach. Nad nagłówkiem Subject stoi płaski log emisji „(bez bufora)”, który pojawia się z pierwszą emisją A. Log kończy z A/B/C, odbiorca A z B/C, odbiorca B z C; wartości mają własne kolory. Ręczne postoje: A bez odbiorców, podłączenie A, odebrane B, podłączenie B; dalej AUTO pokazuje C. Nie ma complete ani unsubscribe.
 

@@ -5,7 +5,12 @@ import { createStageController } from './stage-controller.js';
 
 // Jedyny zegar animacji. Semantyka i geometria nie zależą od RAF ani od DOM.
 export function createPlayer(root, scene, controls = {}) {
-const engine=compileScene(scene), playbackDuration=engine.duration;
+// scene.live (np. interval): wykonanie bez końca. Okno kompilacji [liveFrom, liveTo] przesuwa się z czasem,
+// więc liczba zdarzeń nie rośnie; close() wybiera chwilę unsubscribe i daje scenie skończoną długość.
+const live=scene.live||null;
+let liveClosed=null,liveFrom=0,liveTo=live?.window??0;
+const build=()=>compileScene(live?live.variant(scene,{from:liveFrom,to:liveTo,closedAt:liveClosed}):scene);
+let engine=build(), playbackDuration=engine.duration;
 root.classList?.toggle('rx-expanded',scene.playerLayout==='expanded');
 root.classList?.toggle('rx-function',scene.playerLayout==='function');
 // Scena może mieć własny kolor tekstu (np. tory wykonania: #26323B); reszta korzysta z domyślnego --ink.
@@ -49,7 +54,7 @@ function paint(){
  el.play.textContent=staged&&time>=playbackDuration?'Wynik':running?'Pauza':time>=playbackDuration?'Powtórz':time>0?'Kontynuuj':'Odtwórz';
  el.back.disabled=!staged&&time<=0; el.next.disabled=!staged&&!controls.step&&time>=playbackDuration;
  el.play.disabled=staged&&time>=playbackDuration;
- el.clock.textContent=Math.min(time,playbackDuration).toFixed(1).replace('.',',')+' / '+playbackDuration.toFixed(1).replace('.',',')+' s';
+ el.clock.textContent=Math.min(time,playbackDuration).toFixed(1).replace('.',',')+(live&&liveClosed===null?' s · bez końca':' / '+playbackDuration.toFixed(1).replace('.',',')+' s');
  el.slider.value=String(Math.min(time,playbackDuration));
  el.slider.setAttribute('aria-valuetext',Math.min(time,playbackDuration).toFixed(1)+' sekund');
  listeners.forEach(listener=>listener());
@@ -59,7 +64,18 @@ function pause(){
  if(animationFrame!==null)cancelAnimationFrame(animationFrame);
  animationFrame=null;paint();
 }
-function seek(target){pause();stopAt=null;time=clamp(target,0,playbackDuration);paint();}
+function rebuild(){engine=build();playbackDuration=engine.duration;el.slider.max=String(playbackDuration);}
+// Okno przesuwa się, zanim czas dojdzie do jego końca (margin), albo gdy cofamy się przed jego początek.
+function follow(target){
+ if(!live||liveClosed!==null||target>=liveFrom&&target<=liveTo-live.margin)return;
+ liveFrom=Math.max(0,target-live.keep);liveTo=Math.max(target,0)+live.window;rebuild();
+}
+function closeLive(){
+ if(!live||liveClosed!==null||time<live.start)return false;
+ liveClosed=time;rebuild();paint();return true;
+}
+function reopenLive(){if(!live)return;liveClosed=null;liveFrom=0;liveTo=live.window;rebuild();}
+function seek(target){pause();stopAt=null;follow(target);time=clamp(target,0,playbackDuration);paint();}
 // Szybkie „dalej” kończy rozpoczęty etap zamiast wybierać następny.
 function finishStep(){
  if(stopAt===null)return false;
@@ -86,7 +102,7 @@ function play(){
 }
 function toggle(){if(running)pause();else play();}
 function playContinuously(){stopAt=null;play();}
-function restart(){pause();stopAt=null;time=0;play();}
+function restart(){pause();stopAt=null;reopenLive();time=0;play();}
 function hideControls(){el.toolbar.hidden=true;if(root.contains(document.activeElement))document.activeElement.blur();}
 function toggleControls(){if(el.toolbar.hidden)el.toolbar.hidden=false;else hideControls();}
 function frame(now){
@@ -95,6 +111,7 @@ function frame(now){
  if(!root.isConnected){pause();return;}
  if(previous!==null)time+=Math.min((now-previous)/1000,.25);
  previous=now;
+ if(live&&liveClosed===null&&time>liveTo-live.margin)follow(time);
  if(stopAt!==null&&time>=stopAt){time=stopAt;stopAt=null;pause();controls.onStop?.(time);return;}
  if(time>=playbackDuration && (staged || scene.playback?.finish !== 'loop')){time=playbackDuration;pause();controls.onFinish?.();return;}
  if(time>=playbackDuration+2){time=0;}
@@ -116,7 +133,16 @@ root.addEventListener('keydown',event=>{
  if(event.target.matches('input')||(['Enter',' '].includes(event.key)&&event.target.matches('button')))event.stopPropagation();
 });
 paint();
-const api={subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener);},pause,play,playTo,playContinuously,toggle,step,finishStep,reset:restart,restart,seek,finish:()=>seek(playbackDuration),get isPlaying(){return running;},get time(){return Math.min(time,playbackDuration);},get duration(){return playbackDuration;},get snapshot(){return engine.snapshot(time);},get stops(){return engine.stops;},get state(){return running?'playing':time>=playbackDuration?'finished':time===0?'ready':'paused';},hideControls,toggleControls};
+const api={subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener);},pause,play,playTo,playContinuously,toggle,step,finishStep,reset:restart,restart,seek,finish:()=>{
+ // „Pokaż wynik” w trakcie emisji anuluje bieżące wykonanie; druk i READY — umowna chwila defaultClose.
+ if(live&&liveClosed===null){
+  if(time>=live.start)liveClosed=time;else{liveClosed=live.defaultClose;liveFrom=0;}
+  rebuild();
+ }
+ seek(playbackDuration);
+},get isPlaying(){return running;},get time(){return Math.min(time,playbackDuration);},get duration(){return playbackDuration;},get snapshot(){return engine.snapshot(time);},get stops(){return engine.stops;},get state(){return running?'playing':time>=playbackDuration?'finished':time===0?'ready':'paused';},hideControls,toggleControls};
+if(live)api.live={get start(){return live.start;},get state(){return liveClosed!==null?'closed':time>=live.start?'running':'idle';},
+ close:closeLive,reopen(){reopenLive();paint();}};
 if(staged){controller=createStageController(api,{mode:scene.playback.entry,...controls.stageOptions});api.controller=controller;}
 return api;
 }

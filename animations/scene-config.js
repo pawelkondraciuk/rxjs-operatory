@@ -1,4 +1,4 @@
-import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback, configureSubject, configureTimers, configureHttp, configureLanes } from './reference-scenes.js';
+import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback, configureSubject, configureInterval, configureHttp, configureLanes } from './reference-scenes.js';
 import { configureCatch } from './catch-scenes.js';
 
 // Końcowe ID po rozwinięciu wariantów; otwarcie pozostaje w kolejności HTML.
@@ -43,7 +43,7 @@ export function configureScene(scene) {
   }
   if(id==='13-limit')configureConcurrency(scene);
   if(id==='b04-catcherror')configureCatch(scene);
-  if(id==='05-zrodla'&&scene.sourceExample===0)configureTimers(scene);
+  if(id==='05-zrodla'&&scene.sourceExample===0)configureInterval(scene);
   if(id==='05-zrodla'&&scene.sourceExample===1)configureHttp(scene);
   if(id==='04a-dwa-tory')configureLanes(scene);
   if(id==='05-zrodla'&&scene.sourceExample===2)configureSubject(scene);
