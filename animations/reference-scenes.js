@@ -136,8 +136,9 @@ export function timersGraph(scene) {
 export function configureHttp(scene) {
   const response=[E(7,'dane','http')];
   Object.assign(scene,{graph:httpGraph,playerLayout:'function',duration:9.2,
-    title:'HTTP: od definicji do wykonania',code:"const data$ = http.get('/api/data')",
-    codeFrames:[{at:1,code:"const data$ = http.get('/api/data');\ndata$.subscribe(render)"}],
+    title:'HTTP: od definicji do wykonania',code:"http.get('/api/data')",
+    // .subscribe(render) dopisuje się z tym samym fade-in co odbiorca (born:1).
+    codeFrames:[{at:1,code:"http.get('/api/data').subscribe(render)",fadeIn:.3}],
     rows:[R('HTTP',response,[B(2.1,7,'request')],{completeAt:7}),R('Odbiorca',response)],
     captions:[[0,'Definicja HTTP jest gotowa. Request jeszcze nie istnieje'],[1,'subscribe tworzy odbiorcę i łączy go ze źródłem'],[2.1,'Dopiero subskrypcja uruchamia request'],[7.8,'Odbiorca dostał dane. Za chwilę nadejdzie complete'],[9.2,'Complete kończy to wykonanie HTTP']],
     metrics:[],

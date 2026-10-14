@@ -89,3 +89,60 @@ test('manual question stops do not reveal the replayed value or freeze fading ca
  const micro=compile(scenes.get('27-resolver-microtask')),stop=micro.stops.find(s=>s.id==='scheduled');
  for(const h of micro.snapshot(stop.time).histories)for(const v of h.values)assert.ok(stop.time-v.shownAt>=.3-1e-6,h.anchor);
 });
+
+test('model captions appear with their first visible effect, not while the value is still leaving the source',async()=>{
+ const {scenes,compile}=await deck();
+ const c=compile(scenes.get('14-distinct'));
+ const arrival=c.events.find(e=>e.type==='deliver-next'&&e.edge==='source-distinct'&&e.logicalAt===4).at;
+ assert.notEqual(c.snapshot(arrival-.05).caption,'Drugie A nie uruchamia HTTP w filtrowanym potoku.');
+ assert.equal(c.snapshot(arrival+.4).caption,'Drugie A nie uruchamia HTTP w filtrowanym potoku.');
+ const flat=compile(scenes.get('09-concatmap')),a=flat.events.find(e=>e.type==='deliver-next'&&e.edge==='source-op'&&e.value==='A').at;
+ assert.notEqual(flat.snapshot(a-.05).caption,'A uruchamia pierwszą pracę.');
+});
+
+test('subscription chains have no gaps: a receiver never waits for its upstream link to start later',async()=>{
+ const {scenes,compile}=await deck();
+ for(const scene of scenes.values()){
+  const records=[...compile(scene).plan.records.values()];
+  for(const r of records.filter(r=>!r.gateWork))for(const down of records.filter(d=>d.a.id===r.b.id)){
+   if(scene.id.startsWith('20-sharereplay')&&r.id==='http2-hub')continue; // share po resecie: nowe HTTP dla B
+   assert.ok(r.logicalStart<=down.logicalStart+1e-6,`${scene.id}: ${down.id} @${down.logicalStart}, ${r.id} @${r.logicalStart}`);
+  }
+ }
+});
+
+test('a time window opens only after its subscription is wired',async()=>{
+ const {scenes,compile}=await deck();
+ const c=compile(scenes.get('b03-buffertime')),wired=c.events.find(e=>e.type==='connected'&&e.edge==='buffer-http').at;
+ assert.notEqual(c.snapshot(0).nodes.find(n=>n.id==='buffer').workState,'active');
+ assert.notEqual(c.snapshot(wired-.05).nodes.find(n=>n.id==='buffer').status,'okno otwarte');
+ assert.ok(c.events.find(e=>e.type==='subscribe'&&e.edge==='http-sink').at<wired,'odbiorca subskrybuje pierwszy');
+});
+
+test('a shared value keeps the producer colour at every receiver',async()=>{
+ const {scenes,compile}=await deck();
+ for(const id of ['07-hot-cold-2','20-sharereplay','20-sharereplay-2','19-share','23-angular-alias','06a-cold-hot-2','18-async-2']){
+  const colours=new Map();
+  for(const r of compile(scenes.get(id)).plan.records.values())for(const e of r.events){
+   colours.set(e.value,colours.get(e.value)||new Set());colours.get(e.value).add(e.color);
+  }
+  for(const [value,set] of colours)assert.equal(set.size,1,`${id} ${value}: ${[...set]}`);
+ }
+});
+
+test('held scenes finish shortly after the last change; the first step of 07 starts immediately',async()=>{
+ const {scenes,compile}=await deck();
+ for(const scene of scenes.values()){
+  if(scene.playback?.finish!=='hold'||scene.kind==='cards'||scene.id.startsWith('22-refcount'))continue;
+  const c=compile(scene);
+  // Zmiana obrazu: zdarzenie, postój albo nowy podpis.
+  let caption=c.snapshot(0).caption,changed=0;
+  for(let t=0;t<=c.duration;t+=.1){const now=c.snapshot(t).caption;if(now!==caption){caption=now;changed=t;}}
+  const last=Math.max(changed,...c.events.map(e=>Math.max(e.at,e.until??0)),...c.stops.map(s=>s.time));
+  assert.ok(c.duration-last<=3,`${scene.id}: ${(c.duration-last).toFixed(1)} s bezruchu`);
+ }
+ for(const id of ['07-hot-cold','07-hot-cold-2']){
+  const c=compile(scenes.get(id));
+  assert.ok(c.snapshot(.3).nodes.some(n=>n.visible&&n.opacity>=.99),id);
+ }
+});

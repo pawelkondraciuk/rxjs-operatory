@@ -10,7 +10,8 @@ export function resolverScenes() {
   const enrichment=planEnrichment(),plan=planResolver();
   const problem=base('26-resolver-problem','100 elementów. Skąd wziąć ownerFullName?',
     "items.forEach(item => getOrEnqueue(item.ownerId))",[
-      R('HTTP', [E(1,'100 items')],[{start:.3,end:1,kind:'work'}],{completeAt:1}),
+      // GET startuje razem z subskrypcją, bez przerwy w łańcuchu.
+      R('HTTP', [E(1,'100 items')],[{start:0,end:1,kind:'work'}],{completeAt:1}),
     ],[[0,'GET /api/items dostarcza ownerId, ale bez ownerFullName.'],[1,'forEach pyta resolver. Cache hit daje wynik; miss trafia do pending.'],[3,'Wiele elementów może potrzebować tego samego ownerId.']],
     {layout:'fixed',width:1240,height:340,nodes:[node('items',130,170,'GET /api/items',{ri:0,work:true}),node('each',455,170,'getOrEnqueue'),
       node('cache',790,65,'cache hit: X'),node('pending',790,250,'pending: A, B, C'),node('store',1100,65,'store')],

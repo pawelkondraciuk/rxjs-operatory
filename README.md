@@ -227,7 +227,7 @@ Warianty zachowują ID, lecz zajmują oddzielne miejsca narracji: **HTTP otwiera
 
 | ID | Kod i zachowanie |
 | --- | --- |
-| 05-zrodla-2 | `const data$ = http.get('/api/data')`, potem `data$.subscribe(render)`. READY ma tylko HTTP; subscribe odsłania odbiorcę. Postój request pokazuje pracę po podłączeniu, postój first odebrane dane przed complete. |
+| 05-zrodla-2 | `http.get('/api/data')`; pierwsze „dalej” dopisuje `.subscribe(render)` (fade-in razem z odbiorcą). READY ma tylko kafelek HTTP; subscribe odsłania odbiorcę. Postój request pokazuje pracę po podłączeniu, postój first odebrane dane przed complete. |
 | 05-zrodla | `timer(1000) / interval(1000)`. Oba emitują 0 po 1 s; timer kończy, interval emituje 0/1/2 i w 3,5 s kończy przez unsubscribe bez callbacku complete. |
 | 05-zrodla-3 | `const subject$ = new Subject()`. A bez odbiorców w 1 s; odbiorca 1 dołącza w 2,5 s i dostaje B w 4 s; odbiorca 2 dołącza w 5 s; C w 6,5 s dostają obaj. |
 
@@ -249,7 +249,7 @@ Subject ma pionowe rozgałęzienie do dwóch odbiorców. Log źródła kończy z
 | --- | --- | --- |
 | 06-subskrypcja | Co uruchamia pracę? | `const data$ = http.get('/api/data')` |
 
-**Na bloczkach:** „subscribe()”, „HTTP”, „Odbiorca”. Request zaczyna się przy subskrypcji w 6 s; odpowiedź i complete w 12 s. Podpisy rozróżniają deklarację Observable od jego wykonania.
+**Na bloczkach:** „HTTP” (od początku z opisem „bez requestu”) i „Odbiorca”, który pojawia się dopiero przy subscribe w 6 s, jak na slajdzie HTTP z otwarcia części właściwej. Request zaczyna się przy subskrypcji w 6 s; odpowiedź i complete w 12 s. Podpisy rozróżniają deklarację Observable od jego wykonania.
 
 **Speaker notes:**
 
@@ -285,12 +285,12 @@ Subject ma pionowe rozgałęzienie do dwóch odbiorców. Log źródła kończy z
 
 **Na bloczkach i w animacji:**
 
-- Bez share: dwa rozsunięte tory `data$` → `data$.subscribe()`, bez górnego kafelka definicji; pod każdym odbiorcą osobny box odpowiedzi. Górny tor to A, dolny to B. A subskrybuje w 1 s i dostaje dane w 7 s; B w 3 s i dostaje je w 9 s. Licznik 2 requestów.
-- Z share: `data$` → `share()` → „Odbiorca A” i „Odbiorca B”. Źródło ma podpis zmiennej `data$`, a bloczek `share()` jest ukryty w READY i pojawia się fade-in przez 0,3 s po pierwszym prawie. B dołącza przed odpowiedzią; obaj dostają dane w 7 s. Licznik 1 requestu.
+- Bez share: dwa rozsunięte tory `data$` → `data$.subscribe()`, bez górnego kafelka definicji; pod każdym odbiorcą osobny box odpowiedzi. Górny tor to A, dolny to B. A subskrybuje od razu i dostaje dane w 6 s; B w 2 s i dostaje je w 8 s. Licznik 2 requestów.
+- Z share: `data$` → `share()` → „Odbiorca A” i „Odbiorca B”. Źródło ma podpis zmiennej `data$`, a bloczek `share()` jest ukryty w READY i pojawia się fade-in przez 0,3 s po pierwszym prawie. B dołącza w 2 s, przed odpowiedzią; obaj dostają te same dane (jeden kolor) w 6 s. Licznik 1 requestu.
 
 **Speaker notes:**
 
-> Porównaj warianty na kolejnych slajdach. A subskrybuje w 1 s, B w 3 s. Każdy request trwa 6 s od uruchomienia. Bez share każdy odbiorca uruchamia własne zimne wykonanie. Z share obaj korzystają z tej samej instancji data$ i nakładających się subskrypcji; B dołącza przed odpowiedzią w 7 s. Share rozsyła wynik przez wewnętrzny Subject. Zwykły share nie przechowuje wyniku dla spóźnionego odbiorcy i domyślnie resetuje po complete.
+> Porównaj warianty na kolejnych slajdach. A subskrybuje od razu, B po 2 s. Każdy request trwa 6 s od uruchomienia. Bez share każdy odbiorca uruchamia własne zimne wykonanie. Z share obaj korzystają z tej samej instancji data$ i nakładających się subskrypcji; B dołącza przed odpowiedzią w 6 s. Share rozsyła wynik przez wewnętrzny Subject. Zwykły share nie przechowuje wyniku dla spóźnionego odbiorcy i domyślnie resetuje po complete.
 
 ### A jeśli wartością jest Observable? — `08-map-strumienie`
 
@@ -430,7 +430,7 @@ Subject ma pionowe rozgałęzienie do dwóch odbiorców. Log źródła kończy z
 | --- | --- | --- |
 | 14-distinct | Czy ten sam identyfikator wymaga kolejnego HTTP? | `map(x => x.id) → distinctUntilChanged() → mergeMap(http)` |
 
-**Na bloczkach:** „id$” rozdziela się na „bez filtra” → „HTTP” i „distinctUntilChanged” → „HTTP”. Wejście A, A, B, B, A. Bez filtra 5 requestów, z filtrem 3; A po B przechodzi ponownie. Liczniki pokazują obie liczby żądań. Kolor kapsułki należy do wartości (A pomarańczowe, B zielone) w obu potokach.
+**Na bloczkach:** „id$” rozdziela się na „bez filtra” → „HTTP” i „distinctUntilChanged” → „HTTP”. Wejście A, A, B, B, A. Bez filtra 5 requestów, z filtrem 3; A po B przechodzi ponownie. Pytanie pada, gdy drugie A dolatuje do operatorów, zanim widać drugi request i liczniki. Liczniki pokazują obie liczby żądań. Kolor kapsułki należy do wartości (A pomarańczowe, B zielone) w obu potokach.
 
 **Speaker notes:**
 
@@ -467,7 +467,7 @@ Subject ma pionowe rozgałęzienie do dwóch odbiorców. Log źródła kończy z
 
 **Na bloczkach i w animacji:**
 
-- „zdarzenia$” → „debounceTime” → „Odbiorca”: wynik po 3,5 s ciszy; nowe wejście odnawia odliczanie.
+- „zdarzenia$” → „debounceTime” → „Odbiorca”: wynik po 3,5 s ciszy; nowe wejście odnawia odliczanie. Na postoju debounce przy źródle widać wychodzące H; podpis mówi, że znów zaczyna odliczanie.
 - „zdarzenia$” → „auditTime” → „Odbiorca”: pierwsze wejście otwiera okno 3,5 s, na końcu przechodzi ostatnia wartość.
 - „zdarzenia$” → „throttleTime” → „Odbiorca”: pierwsza wartość przechodzi, kolejne w oknie są pomijane; leading=true, trailing=false.
 - „zdarzenia$” → „sampleTime” → „Odbiorca”: odczyt co 3,5 s od subskrypcji; brak nowej wartości oznacza brak nowej emisji.
@@ -735,7 +735,7 @@ Modele są symulacją dydaktyczną, nie usługą produkcyjną. Testy sprawdzają
 | --- | --- | --- |
 | b03-buffertime | Potrzebuję wszystkich zdarzeń — w paczkach | `bufferTime(6000) → filter(xs => xs.length > 0) → HTTP` |
 
-**Na bloczkach:** „zdarzenia” → „bufferTime()” → „HTTP · paczka” → „Odbiorca”. A/B/C tworzą ABC, D/E tworzą DE, F osobną paczkę. Okna 6 s; 6 zdarzeń, 3 zbiorcze requesty. Kod nad diagramem zawiera też filtr pustych paczek.
+**Na bloczkach:** „zdarzenia” → „bufferTime()” → „HTTP · paczka” → „Odbiorca”. Odbiorca subskrybuje od początku (odbiorca → HTTP → bufferTime → zdarzenia), a okno bufferTime otwiera się dopiero po zestawieniu subskrypcji. A/B/C tworzą ABC, D/E tworzą DE, F osobną paczkę. Okna 6 s; 6 zdarzeń, 3 zbiorcze requesty. Kod nad diagramem zawiera też filtr pustych paczek.
 
 **Speaker notes:**
 

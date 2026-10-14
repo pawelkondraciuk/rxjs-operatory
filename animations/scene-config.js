@@ -21,6 +21,16 @@ export const extraIds = new Set(extraOrder);
 const stagedIds = new Set(['04-operator','05-zrodla','05-zrodla-2','05-zrodla-3','06a-cold-hot',
   '07-hot-cold','07-hot-cold-2','20-sharereplay','20-sharereplay-2']);
 
+// Sceny z finish:hold kończą się ok. 2 s po ostatnim zdarzeniu modelu, żeby AUTO nie stało długo
+// przed FINISHED (każde „dalej” w bezruchu tylko kończy animację). 22-refcount celowo pokazuje ciszę.
+const trimmedTails = new Set(['06-subskrypcja','07-hot-cold','12a-complete','13-limit','14-distinct','18-async','20-sharereplay']);
+function trimTail(scene) {
+  const times=[...scene.rows.flatMap(r=>[...r.events.map(e=>e.at),
+    ...r.spans.filter(p=>!['state','subscription'].includes(p.kind)).map(p=>p.end),...(r.completeAt===undefined?[]:[r.completeAt])]),
+    ...(scene.captions||[]).map(([at])=>at)];
+  scene.duration=Math.min(scene.duration,Math.max(...times)+2);
+}
+
 // Applies AFTER variants are resolved, so a variant never inherits stale stop times.
 export function configureScene(scene) {
   const id=scene.rendererId||scene.id;
@@ -37,6 +47,7 @@ export function configureScene(scene) {
   if(id==='05-zrodla'&&scene.sourceExample===1)configureHttp(scene);
   if(id==='05-zrodla'&&scene.sourceExample===2)configureSubject(scene);
   scene.group=extraIds.has(scene.id)?'bonus':'main';
+  if(trimmedTails.has(id))trimTail(scene);
   if(id==='07-hot-cold'||id==='20-sharereplay'||id==='06a-cold-hot'&&scene.comparisonMode!=='shared'){
     scene.playerLayout='expanded';
     scene.metrics=[{label:id==='06a-cold-hot'?'wykonania':'requesty',count:'started'}];
@@ -50,32 +61,36 @@ export function configureScene(scene) {
     scene.playback={entry:'manual',finish:'hold',afterLastManualStop:'start-auto',stops:[
       {id:'question',modelTime:3.9,caption:'Wejście nadal emituje. Który operator pokaże wynik przed ciszą?'},
       {id:'audit',event:{type:'deliver-next',edge:'op2-sink2',value:'D'},offset:.35,caption:'auditTime wyemitował D na końcu okna. debounceTime nadal czeka'},
-      {id:'debounce',event:{type:'deliver-next',edge:'op1-sink1',value:'G'},offset:.35,caption:'Po 3,5 s ciszy debounceTime wyemitował G'},
+      {id:'debounce',event:{type:'deliver-next',edge:'op1-sink1',value:'G'},offset:.35,caption:'Po 3,5 s ciszy debounceTime wyemitował G. Nowe H właśnie wychodzi ze źródła i znów zaczyna odliczanie'},
     ]};
     return scene;
   }
   const question={
-    '06-subskrypcja':6,'06a-cold-hot':6,'07-hot-cold':3,'18-async':1,
+    '06-subskrypcja':6,'06a-cold-hot':6,'07-hot-cold':2,'18-async':1,
     '20-sharereplay':10,'22-refcount':10,
     '14-distinct':5,'15-debounce-audit':5,
   }[id];
   const first={
-      '07-hot-cold':{id:'first',modelTime:1,caption:'Pierwszy odbiorca subskrybuje.'},
+      '07-hot-cold':{id:'first',modelTime:0,caption:'Pierwszy odbiorca subskrybuje.'},
       '06a-cold-hot':{id:'first',modelTime:0,caption:'A subskrybuje. B jeszcze nie słucha.'},
       '20-sharereplay':{id:'first',modelTime:6,caption:'Pierwsze HTTP wyemitowało odpowiedź i zakończyło się.'},
       '22-refcount':{id:'first',modelTime:2,caption:'Dwa widoki korzystają z aktywnego timera.'},
     }[id];
   if(question!==undefined)scene.playback={entry:'manual',finish:'hold',afterLastManualStop:'start-auto',stops:[
     ...(first?[first]:[]),
-    // 20: tuż przed wylotem wartości z bufora shareReplay, żeby pytanie nie pokazywało odpowiedzi.
-    {id:'question',...(id==='20-sharereplay'?{event:{type:'connected',edge:'hub-receiver1'},offset:-.001}:{modelTime:question}),caption:{
+    // Pytanie nie może pokazywać odpowiedzi. 20: tuż przed wylotem wartości z bufora shareReplay.
+    // 14: tuż przed dotarciem drugiego A do operatorów, zanim widać drugi request i liczniki.
+    {id:'question',...({
+      '20-sharereplay':{event:{type:'connected',edge:'hub-receiver1'},offset:-.001},
+      '14-distinct':{event:{type:'deliver-next',edge:'source-distinct',value:'A',logicalAt:4},offset:-.001},
+    }[id]||{modelTime:question}),caption:{
       '06-subskrypcja':'Dopiero subscribe uruchomiło HTTP. Deklaracja nie wykonała requestu.',
       '06a-cold-hot':'B dołączył. Czy dostanie własny timer, czy wspólne kolejne wartości?',
       '07-hot-cold':'Obaj odbiorcy już subskrybują. Ile wykonań HTTP?',
       '18-async':'A i B subskrybują ten sam user$. Ile requestów uruchomili?',
       '20-sharereplay':'B dołączył po complete. Nowe HTTP czy zachowany bufor?',
       '22-refcount':'Odbiorców: 0. Czy źródło nadal pracuje?',
-      '14-distinct':'Powtórzone ID: czy trzeba uruchomić nowe HTTP?',
+      '14-distinct':'Znowu A. Czy powtórzone ID uruchomi nowe HTTP w obu potokach?',
       '15-debounce-audit':'Throttle: A. Sample: C. Audit: D. Dlaczego debounce nadal czeka?',
     }[id]},
   ]};

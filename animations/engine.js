@@ -128,7 +128,17 @@ export function compileScene(scene) {
       throw new Error(`${scene.id}: fadeIn kodu wymaga dopisania tekstu i dodatniego czasu`);
     return [{index:i,at:frame.at,duration:frame.fadeIn,prefix,suffix:frame.code.slice(prefix.length)}];
   });
-  const captions=[...(scene.captions||[]).map(([at,caption])=>[plan.timeOf(at),caption]),
+  // Podpis chwili modelu pojawia się z jej pierwszym widocznym skutkiem: dotarciem wartości albo emisją operatora.
+  // Sam wylot ze źródła tego nie zmienia; partia bez wartości (subskrypcja, terminal) zachowuje swój początek.
+  const captionTime=at=>{
+    const batch=plan.batches.find(b=>b.at===at);
+    if(!batch)return plan.timeOf(at);
+    const operator=id=>records.some(r=>r.b.id===id&&!r.internal);
+    const effects=events.filter(e=>e.logicalAt===at&&e.at>=batch.start&&e.at<=batch.end&&
+      (e.type==='deliver-next'||['source-next','inner-next'].includes(e.type)&&operator(e.node))).map(e=>e.at);
+    return effects.length?Math.min(...effects):batch.start;
+  };
+  const captions=[...(scene.captions||[]).map(([at,caption])=>[captionTime(at),caption]),
     ...events.filter(e=>e.caption).map(e=>[e.at,e.caption]),...stops.filter(s=>s.caption).map(s=>[s.time,s.caption])].sort((a,b)=>a[0]-b[0]);
 
   // panel.showOn: panel (box) pojawia się przy pierwszym zdarzeniu pasującym do selektora, jak postój.
@@ -165,7 +175,10 @@ export function compileScene(scene) {
       const workEdge=outgoing.find(e=>e.gateWork||n.work);
       const lifecycle=workEdge?.end;
       const canceled=lifecycle?.kind==='unsubscribe'&&time>=lifecycle.at || (!workEdge&&span?.kind==='cancel'&&t>=span.end);
-      const started=workEdge?time>=workEdge.start+(workEdge.connectDuration||transitionDuration):span&&t>=span.start;
+      // Okno czasowe (timer) liczy się dopiero od zestawionej subskrypcji, nie od READY.
+      const touching=records.filter(e=>(e.a.id===n.id||e.b.id===n.id)&&!e.internal);
+      const connected=!touching.length||touching.some(e=>time>=e.start+(e.connectDuration||transitionDuration));
+      const started=workEdge?time>=workEdge.start+(workEdge.connectDuration||transitionDuration):span&&t>=span.start&&(!n.timer||connected);
       // Terminal w czasie ilustracji: nadawca pokazuje complete/error w chwili wysłania, odbiorca po dotarciu.
       // Czas modelu stoi podczas partii, więc bez tego stan wyprzedzałby ostatnią wartość albo spóźniał się za błędem.
       const terminalTime=kind=>{

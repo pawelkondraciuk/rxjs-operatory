@@ -25,25 +25,26 @@ add("06-subskrypcja","Co uruchamia pracę?","const data$ = http.get('/api/data')
  R("HTTP",[E(12,"dane","http")],[B(6,12,"request")],{completeAt:12}),
  R("odbiorca",[E(12,"dane","b")],[],{completeAt:12})
 ],[[0,"Budujemy Observable HTTP."],[1,"Samo utworzenie tego Observable nie wysyła żądania."],[6,"Subskrypcja uruchamia request."],[12,"Odpowiedź, a następnie complete."]],"Przykład dotyczy zimnego Observable z Angular HttpClient. Nie generalizuj leniwości na już uruchomiony Promise.");
+// A subskrybuje od razu (jak w 06a), B po 2 s; pierwszy krok nie zaczyna się od pustej sekundy.
 const shareWithoutRows=[
- R("HTTP #1",[E(7,"dane","a")],[B(1,7,"request A","a")],{completeAt:7}),
- R("HTTP #2",[E(9,"dane","b")],[B(3,9,"request B","b")],{completeAt:9}),
- R("odbiorca A",[E(7,"dane","a")],[B(1,7,"słucha","a","subscription")],{completeAt:7}),
- R("odbiorca B",[E(9,"dane","b")],[B(3,9,"słucha","b","subscription")],{completeAt:9})
+ R("HTTP #1",[E(6,"dane","a")],[B(0,6,"request A","a")],{completeAt:6}),
+ R("HTTP #2",[E(8,"dane","b")],[B(2,8,"request B","b")],{completeAt:8}),
+ R("odbiorca A",[E(6,"dane","a")],[B(0,6,"słucha","a","subscription")],{completeAt:6}),
+ R("odbiorca B",[E(8,"dane","b")],[B(2,8,"słucha","b","subscription")],{completeAt:8})
 ];
 const shareSharedRows=[
- R("wspólne HTTP",[E(7,"dane","http")],[B(1,7,"wspólny request","http")],{completeAt:7}),
+ R("wspólne HTTP",[E(6,"dane","http")],[B(0,6,"wspólny request","http")],{completeAt:6}),
  R("brak drugiego requestu"),
- R("odbiorca A",[E(7,"dane","a")],[B(1,7,"słucha","a","subscription")],{completeAt:7}),
- R("odbiorca B",[E(7,"dane","b")],[B(3,7,"słucha","b","subscription")],{completeAt:7})
+ R("odbiorca A",[E(6,"dane","http")],[B(0,6,"słucha","a","subscription")],{completeAt:6}),
+ R("odbiorca B",[E(6,"dane","http")],[B(2,6,"słucha","b","subscription")],{completeAt:6})
 ];
-const shareWithoutCaptions=[[0,"Ten sam Observable HTTP. Dwóch odbiorców."],[1,"A subskrybuje — rusza pierwszy request."],[3,"B subskrybuje — rusza drugi request."],[7,"A ma odpowiedź. Request B nadal trwa."],[9,"Dwie subskrypcje uruchomiły dwa requesty."]];
-const shareSharedCaptions=[[0,"Obaj odbiorcy używają tej samej instancji data$ z share()."],[1,"A subskrybuje — rusza wspólny request."],[3,"B dołącza do trwającego wykonania."],[7,"Jedna odpowiedź trafia do A i B."],[9,"Dwie subskrypcje współdzieliły jeden request."]];
-add("07-hot-cold","Dwie subskrypcje — bez share czy z share?","const data$ = http.get('/api/data')",21,shareWithoutRows,shareWithoutCaptions,"Porównaj warianty na kolejnych slajdach. A subskrybuje w 1 s, B w 3 s. Każdy request trwa 6 s od uruchomienia. Bez share każdy odbiorca uruchamia własne zimne wykonanie. Z share obaj korzystają z tej samej instancji data$ i nakładających się subskrypcji; B dołącza przed odpowiedzią w 7 s. Zwykły share nie przechowuje wyniku dla spóźnionego odbiorcy i domyślnie resetuje po complete.",{
- metrics:[{label:"uruchomione requesty",value:t=>(t>=1?1:0)+(t>=3?1:0)}],
+const shareWithoutCaptions=[[0,"Ten sam Observable HTTP. A subskrybuje — rusza pierwszy request."],[2,"B subskrybuje — rusza drugi request."],[6,"A ma odpowiedź. Request B nadal trwa."],[8,"Dwie subskrypcje uruchomiły dwa requesty."]];
+const shareSharedCaptions=[[0,"Ta sama instancja data$ z share(). A subskrybuje — rusza wspólny request."],[2,"B dołącza do trwającego wykonania."],[6,"Jedna odpowiedź trafia do A i B."],[8,"Dwie subskrypcje współdzieliły jeden request."]];
+add("07-hot-cold","Dwie subskrypcje — bez share czy z share?","const data$ = http.get('/api/data')",21,shareWithoutRows,shareWithoutCaptions,"Porównaj warianty na kolejnych slajdach. A subskrybuje od razu, B po 2 s. Każdy request trwa 6 s od uruchomienia. Bez share każdy odbiorca uruchamia własne zimne wykonanie. Z share obaj korzystają z tej samej instancji data$ i nakładających się subskrypcji; B dołącza przed odpowiedzią w 6 s. Zwykły share nie przechowuje wyniku dla spóźnionego odbiorcy i domyślnie resetuje po complete.",{
+ metrics:[{label:"uruchomione requesty",value:t=>1+(t>=2?1:0)}],
  variants:{
-  without:{rows:shareWithoutRows,captions:shareWithoutCaptions,code:"const data$ = http.get('/api/data')",metrics:[{label:"uruchomione requesty",value:t=>(t>=1?1:0)+(t>=3?1:0)}]},
-  shared:{rows:shareSharedRows,captions:shareSharedCaptions,code:"const data$ = http.get('/api/data').pipe(share())",metrics:[{label:"uruchomione requesty",value:t=>t>=1?1:0}]}
+  without:{rows:shareWithoutRows,captions:shareWithoutCaptions,code:"const data$ = http.get('/api/data')",metrics:[{label:"uruchomione requesty",value:t=>1+(t>=2?1:0)}]},
+  shared:{rows:shareSharedRows,captions:shareSharedCaptions,code:"const data$ = http.get('/api/data').pipe(share())",metrics:[{label:"uruchomione requesty",value:t=>1}]}
  }
 });
 add("08-map-strumienie","A jeśli wartością jest Observable?","map(id => request$(id)) → concatAll()",22,[
@@ -126,8 +127,8 @@ add("18-async","Jeden user$. Dwa requesty?","{{ user$ | async }} … {{ user$ | 
  R("async · B",[E(2,"sub B","b"),E(8,"dane","b")],[B(2,8,"HTTP #2","http")])
 ],[[0,"Dwie niezależne instancje async subskrybują ten sam zimny Observable HTTP."],[2,"Ten sam obiekt Observable może wykonać pracę dwa razy."],[9,"Dwie subskrypcje → dwa requesty."]],"Przykład Angular HttpClient bez współdzielenia. To nie są dwie referencje do wyniku jednego async, lecz dwie odrębne instancje pipe.",{metrics:[{label:"requesty",value:t=>(t>=1?1:0)+(t>=2?1:0)}]});
 add("19-share","share — wspólne wykonanie","http$.pipe(share())",18,[
- R("odbiorca A",[E(1,"sub A","a"),E(7,"dane","a")],[B(1,7,"słucha","a","subscription")],{completeAt:7}),
- R("odbiorca B",[E(3,"sub B","b"),E(7,"dane","b")],[B(3,7,"słucha","b","subscription")],{completeAt:7}),
+ R("odbiorca A",[E(1,"sub A","a"),E(7,"dane","http")],[B(1,7,"słucha","a","subscription")],{completeAt:7}),
+ R("odbiorca B",[E(3,"sub B","b"),E(7,"dane","http")],[B(3,7,"słucha","b","subscription")],{completeAt:7}),
  R("wspólne HTTP",[E(7,"dane","http")],[B(1,7,"jedno HTTP","http")],{completeAt:7})
 ],[[0,"Obaj odbiorcy używają tej samej instancji współdzielonego strumienia."],[3,"B dołącza przed odpowiedzią HTTP."],[7,"Jedna odpowiedź trafia do A i B."],[11,"share() domyślnie resetuje stan po complete."]],"A i B mają nakładające się subskrypcje. share() nie gwarantuje jednego wykonania na zawsze ani cache dla późniejszych odbiorców.",{metrics:[{label:"requesty",value:t=>t>=1?1:0}]});
 add("20-sharereplay","Co dostaje spóźniony odbiorca?","share() vs shareReplay({ bufferSize: 1, refCount: true })",22,[
@@ -152,9 +153,10 @@ add("22-refcount","Wszyscy wyszli. Co dalej?","shareReplay({ bufferSize: 1, refC
 ],[[0,"Źródło jest długotrwałe i nie kończy się samo."],[6,"A odchodzi. B nadal potrzebuje źródła."],[10,"Odchodzi ostatni odbiorca."],[12,"true odłącza źródło. false pozwala mu pracować dalej."],[21,"To inny przypadek niż zakończony request HTTP."]],"Model trwającego źródła z poprawnym teardown. Zera odbiorców nie należy utożsamiać z complete. Dalsze emisje wariantu false nie mają już odbiorców UI.");
 add("23-angular-alias","Jeden wynik w kilku miejscach widoku","@if (user$ | async; as user) { … user … user … }",18,[
  R("jeden async",[E(1,"sub","source"),E(6,"user","b")],[B(1,6,"HTTP")],{completeAt:6}),
- R("miejsce w UI · A",[E(6,"user","a")]),
+ // Ta sama wartość aliasu w każdym miejscu: jeden kolor, jak odpowiedź HTTP.
+ R("miejsce w UI · A",[E(6,"user","b")]),
  R("miejsce w UI · B",[E(6,"user","b")]),
- R("miejsce w UI · C",[E(6,"user","c")])
+ R("miejsce w UI · C",[E(6,"user","b")])
 ],[[0,"Jedna instancja async odbiera wynik."],[6,"Alias user jest używany w kilku miejscach szablonu."],[10,"Wspólny wynik w jednym widoku można udostępnić bez kolejnych subskrypcji."]],"To alternatywa dla wielu async w jednym zakresie szablonu. Dla niezależnych odbiorców nadal może być potrzebne współdzielenie. user jest w przykładzie obiektem.",{metrics:[{label:"subskrypcje HTTP",value:t=>t>=1?1:0}]});
 add("24-signals","A co z signals?","const user = toSignal(user$)",19,[
  R("toSignal",[E(1,"utwórz","source")]),

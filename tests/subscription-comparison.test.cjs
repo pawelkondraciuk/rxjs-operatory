@@ -23,12 +23,14 @@ test('one cold definition creates independent executions; request counters wait 
 test('overlapping shared HTTP uses one upstream execution and delivers to both receivers',async()=>{
  const {c}=await comparison('07-hot-cold','shared'),f=c.snapshot(c.duration);
  const birth=c.events.find(e=>e.type==='node-create'&&e.node==='hub').at;
+ // W READY hub jest niewidoczny (brak kafelka albo krycie 0 przed fade-in pierwszego etapu).
+ const shown=f=>{const n=f.nodes.find(n=>n.id==='hub');return n.visible&&n.opacity>0;};
  const ready=c.snapshot(0),fading=c.snapshot(birth+.15);
- assert.equal(ready.nodes.find(n=>n.id==='hub').visible,false);
+ assert.equal(shown(ready),false);
  assert.ok(Math.abs(fading.nodes.find(n=>n.id==='hub').opacity-.5)<1e-8);
  assert.equal(fading.executionCounts.started,0,'revealing share must not start the HTTP request');
  assert.equal(c.snapshot(c.stops[0].time).nodes.find(n=>n.id==='hub').opacity,1);
- assert.equal(c.snapshot(0).nodes.find(n=>n.id==='hub').visible,false,'rewind hides share again');
+ assert.equal(shown(c.snapshot(0)),false,'rewind hides share again');
  assert.equal(f.metrics[0].value,1);assert.equal(f.executionCounts.started,1);
  assert.deepEqual(received(f),[['dane'],['dane']]);
  const delivery=c.events.filter(e=>e.type==='deliver-next'&&e.node.startsWith('receiver'));

@@ -26,7 +26,9 @@ export function catalogGraph(s) {
    const x=j?825:275,start=coldhot?(j?6:0):j?(simultaneous?1:3):1;
    const sink=node("receiver"+j,x,510,"Odbiorca "+["A","B"][j],j?"b":"a",ri,{w:250,born:start});
    const target=shared?hub:jobs[j];
-   edge(target,sink,values(ri),{born:start});
+   // Wspólny producent: odbiorcy dostają tę samą wartość w kolorze producenta.
+   const colour=e=>values(0).find(v=>v.value===e.value)?.color??e.color;
+   edge(target,sink,shared?values(ri).map(e=>({...e,color:colour(e)})):values(ri),{born:start});
    const targetX=target.x+(j?target.w/2:-target.w/2);
    const side=j?1015:85;
    edge(sink,target,[{at:start,value:"sub",color:j?"b":"a"}],{dashed:true,born:start,label:"subscribe",points:[[x+(j?125:-125),510],[side,510],[side,target.y],[targetX,target.y]]});
@@ -39,13 +41,14 @@ export function catalogGraph(s) {
   [0,1].forEach(j=>{
    if(shared&&j)return;
    const n=node("map"+j,shared?550:j?825:275,240,"map(expensive)","op",j+1,{w:280,work:true});
-   maps.push(n);edge(source,n,values(0));
+   // Subskrypcja przez map(expensive) od razu; pasek kosztu dopiero przy emisjach.
+   maps.push(n);edge(source,n,values(0),{logicalStart:0});
   });
   const hub=shared?node("hub",550,385,"share()","op",null,{w:220}):null;
-  if(hub)edge(maps[0],hub,values(1));
+  if(hub)edge(maps[0],hub,values(1),{logicalStart:0});
   [3,4].forEach((ri,j)=>{
    const sink=node("receiver"+j,j?825:275,515,"Odbiorca "+["A","B"][j],j?"b":"a",ri,{w:240});
-   edge(shared?hub:maps[j],sink,values(ri));tray(ri,j?825:275,615,420,"");
+   edge(shared?hub:maps[j],sink,values(ri),{logicalStart:0});tray(ri,j?825:275,615,420,"");
   });
  }else if(s.diagram==="refcount"){
   const ref=s.comparisonMode==="shared";
@@ -132,17 +135,20 @@ export function catalogGraph(s) {
   edge(http,op,values(0));
   [1,2,3].forEach((ri,j)=>{
    const n=node("ui"+j,885,100+j*210,"UI · "+["A","B","C"][j],"http",ri);
-   edge(op,n,values(ri));
+   // async subskrybuje HTTP od razu przy subskrypcji widoku (1 s): cały łańcuch startuje razem.
+   edge(op,n,values(ri),{logicalStart:1});
   });
  }else if(caseId==="24-signals"){
   const http=node("http",160,265,"HTTP","source",1,{work:true});
   const op=node("signal",545,265,"toSignal","op",2,{w:260});
   const ui=node("ui",930,265,"user()","http",3,{w:170});
-  edge(http,op,values(1));edge(op,ui,values(3));
+  // toSignal subskrybuje przy utworzeniu (1 s); odczyty user() korzystają z tego samego połączenia.
+  edge(http,op,values(1));edge(op,ui,values(3),{logicalStart:1});
   tray(3,550,520,700,"Odczytana wartość");
  }else if(caseId==="06-subskrypcja"){
-  const http=node('http',200,200,'HTTP','source',1,{work:true,born:6});
-  const sink=node('sink',900,200,'Odbiorca','http',2,{ready:true});
+  // Definicja HTTP jest od początku (bez requestu); odbiorca pojawia się przy subscribe w 6 s, jak w 05-zrodla-2.
+  const http=node('http',200,200,'HTTP','source',1,{work:true,ready:true,detail:t=>t<6?'bez requestu':undefined});
+  const sink=node('sink',900,200,'Odbiorca','http',2,{born:6,ready:false});
   edge(http,sink,values(2),{born:6});tray(2,900,300,400);
  }else if(caseId==="05-zrodla"){
   const i=s.sourceExample??0,ri=i===2?3:i;
@@ -152,17 +158,19 @@ export function catalogGraph(s) {
  }else if((caseId==="21-share-miejsce"||s.diagram==="placement")){
   const source=node('source',100,250,'Subject','source',0);
   const hub=node('share',550,250,'share()','op');
+  // Odbiorcy subskrybują od razu; map(expensive) jest ogniwem tej samej subskrypcji, a nie czeka na pierwszy koszt.
+  const at0={logicalStart:0};
   if(s.mapAfterShare){
-   edge(source,hub,values(0));
+   edge(source,hub,values(0),at0);
    [2,3].forEach((ri,j)=>{
     const map=node('map'+j,800,100+j*230,'map(expensive)','op',ri,{work:true});
     const sink=node('sink'+j,1000,100+j*230,'Odbiorca '+['A','B'][j],'http');
-    edge(hub,map,values(0));edge(map,sink,values(ri));tray(ri,1000,210+j*230,260);
+    edge(hub,map,values(0),at0);edge(map,sink,values(ri),at0);tray(ri,1000,210+j*230,260);
    });
   }else{
    const map=node('map',300,250,'map(expensive)','op',1,{work:true});
-   edge(source,map,values(0));edge(map,hub,values(1));
-   [0,1].forEach(j=>{const sink=node('sink'+j,1000,100+j*230,'Odbiorca '+['A','B'][j],'http');edge(hub,sink,values(1));tray(1,1000,210+j*230,260);});
+   edge(source,map,values(0),at0);edge(map,hub,values(1),at0);
+   [0,1].forEach(j=>{const sink=node('sink'+j,1000,100+j*230,'Odbiorca '+['A','B'][j],'http');edge(hub,sink,values(1),at0);tray(1,1000,210+j*230,260);});
   }
  }else if(caseId==="b01-defer"){
   const token=node("token",550,65,"token","source",0,{detail:t=>t<9?"A":"B"});
@@ -185,7 +193,8 @@ export function catalogGraph(s) {
   const http=node('http',700,200,'HTTP · paczka','http',2,{work:true});
   const sink=node('sink',1000,200,'Odbiorca','http');
   edge(source,buffer,values(0));edge(buffer,http,values(1));
-  edge(http,sink,values(2),{gateWork:true});tray(2,1000,300,260);
+  // Odbiorca subskrybuje od początku: łańcuch odbiorca → HTTP → bufferTime → zdarzenia, prace HTTP dopiero przy paczkach.
+  edge(http,sink,values(2),{logicalStart:0});tray(2,1000,300,260);
  }else if(["b06-forkjoin","b07-zip","b08-merge"].includes(caseId)){
   const srcCount=s.rows.length-1;
   const outIndex=s.rows.length-1;
@@ -195,7 +204,9 @@ export function catalogGraph(s) {
    edge(n,op,values(i));
   }
   const sink=node("sink",550,475,"Odbiorca","http",null,{w:260});
-  edge(op,sink,values(outIndex));tray(outIndex,550,585,880);
+  // forkJoin subskrybuje wszystkie źródła od razu przy własnej subskrypcji (start żądań).
+  const firstWork=Math.min(...s.rows.slice(0,srcCount).flatMap(r=>r.spans.map(p=>p.start)),Infinity);
+  edge(op,sink,values(outIndex),Number.isFinite(firstWork)?{logicalStart:firstWork}:{});tray(outIndex,550,585,880);
  }else{
   // Independent examples retain their own producer; no invented dependency between rows.
   const columns=s.rows.length>4?3:2,spacing=1040/columns,rows=Math.ceil(s.rows.length/columns);
@@ -210,7 +221,8 @@ export function catalogGraph(s) {
  const definition=nodes.find(n=>n.id==='observable');
  if(definition)nodes.splice(nodes.indexOf(definition),1);
  // READY pokazuje uczestników potoku; wykonania zimnych źródeł pojawiają się przy subscribe.
- nodes.forEach(n=>{if(!n.work&&!n.inner)n.ready=true;});
+ // Jawne ready:false (np. odbiorca tworzony przez subscribe) ma pierwszeństwo.
+ nodes.forEach(n=>{if(!n.work&&!n.inner&&n.ready!==false)n.ready=true;});
  return {nodes, edges:edges.filter(e=>e.a!==definition&&e.b!==definition), trays, width:W, height:H};
 
 }
@@ -240,7 +252,7 @@ function executionComparison(scene) {
  };
  if(independent){
   for(const i of [0,1]){
-   const start=cold?(i?6:0):i?3:1;
+   const start=cold?(i?6:0):i?2:0;
    job('work'+i,270,rowY[i],440,i,start,cold?'timer$':'data$','work'+i+'-receiver'+i);
    const sink=tile('receiver'+i,960,rowY[i],440,cold?'timer$.subscribe()':'data$.subscribe()',i+2,{born:start,color:'http'});
    link('work'+i,sink.id,values(i+2),{logicalStart:start});history(sink,'work'+i+'-'+sink.id);
@@ -250,15 +262,19 @@ function executionComparison(scene) {
   const ids=late?['http1','http2']:['work0'];
   for(const [i,id] of ids.entries()){
    if(late&&shared&&i===1)continue;
-   const start=i?10:1;
+   const start=late?(i?10:1):0;
    job(id,175,late?rowY[i]:hub.y,330,i,start,late?'HTTP #'+(i+1):'data$',id+'-hub');
    link(id,hub.id,values(i),{logicalStart:start});
   }
+  // Hub przekazuje tę samą wartość: odbiorca dostaje kolor odpowiedzi, z której pochodzi (także z bufora),
+  // a nie własny. Różne kolory sugerowałyby dwie różne odpowiedzi.
+  const inputs=ids.flatMap((id,i)=>late&&shared&&i===1?[]:values(i));
+  const forwarded=events=>events.map(e=>({...e,color:inputs.filter(v=>v.value===e.value&&v.at<=e.at).at(-1)?.color??e.color}));
   for(const i of [0,1]){
-   const start=late?(i?10:1):(i?3:1);
+   const start=late?(i?10:1):(i?2:0);
    const sink=tile('receiver'+i,1040,rowY[i],360,'Odbiorca '+['A','B'][i],i+2,{born:start,color:'http'});
    // Późny odbiorca po resecie share subskrybuje nowe wykonanie.
-   link(hub.id,sink.id,values(i+2),{logicalStart:start});history(sink,hub.id+'-'+sink.id);
+   link(hub.id,sink.id,forwarded(values(i+2)),{logicalStart:start});history(sink,hub.id+'-'+sink.id);
   }
   if(late&&shared){
    const y=hub.y+hub.h/2+(large?60:25);

@@ -206,7 +206,7 @@ test('subscription travels receiver → share → source; values travel source �
 test('share fades in before subscription and a value never occupies consecutive connections simultaneously',async()=>{
   const {player}=await harness();
   const {api,elements}=player('07-hot-cold-2');
-  api.seek(1.15);
+  api.seek(.15);
   let svg=elements.get('.rx-stage').innerHTML;
   const opacity=Number(svg.match(/data-node="hub" opacity="([^"]+)"/)[1]);
   assert.ok(Math.abs(opacity-.5)<1e-8);

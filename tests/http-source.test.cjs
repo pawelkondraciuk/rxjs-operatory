@@ -12,7 +12,7 @@ const values=frame=>Array.from(frame.histories[0].values,v=>v.value);
 
 test('only the HTTP tile works; the receiver box gets the response, then both complete',async()=>{
  const {scene,c}=await http();
- assert.equal(scene.code,"const data$ = http.get('/api/data')");
+ assert.equal(scene.code,"http.get('/api/data')");
  const work=c.snapshot(c.stops[0].time);
  assert.deepEqual(Array.from(c.stops,s=>s.id),['request','first']);
  assert.equal(node(work,'http').status,'praca trwa');assert.ok(node(work,'http').showProgress);
