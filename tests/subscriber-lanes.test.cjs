@@ -1,7 +1,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules}=require('./v2-harness.cjs');
 
-async function lanes(format='4:3'){
+async function lanes(format='4:3',id='04a-dwa-tory'){
  class Slide{
   constructor(id){this.id=id;this.dataset={animation:id};this.heading={};this.player={setAttribute(){}};}
   querySelector(s){return s==='h2'?this.heading:this.player;}
@@ -10,7 +10,7 @@ async function lanes(format='4:3'){
  }
  const slides=[...fs.readFileSync('index.html','utf8').matchAll(/data-animation="([^"]+)"/g)].map(m=>new Slide(m[1]));
  const m=await modules(['catalog','presentation','engine','renderer'],{document:{querySelectorAll:()=>slides}});
- const c=m.engine.compileScene(m.presentation.prepareSlides(m.catalog.scenes,{format}).get('04a-dwa-tory'));
+ const c=m.engine.compileScene(m.presentation.prepareSlides(m.catalog.scenes,{format}).get(id));
  return {c,render:m.renderer.renderScene,at:id=>c.stops.find(s=>s.id===id).time};
 }
 const node=(frame,id)=>frame.nodes.find(n=>n.id===id);
@@ -76,4 +76,24 @@ test('code adds each subscribe when it happens, so B visibly joins later',async(
  const subscribeB=c.events.find(e=>e.type==='subscribe'&&e.edge==='map-B').at;
  assert.equal(c.snapshot(subscribeB+.3).code.split('\n')[1],'data$.subscribe(A); data$.subscribe(B)');
  assert.ok(c.snapshot(at('question')).codeReveal.opacity<1,'B dopisuje się dopiero przy swoim subscribe');
+});
+
+test('share() after map: one lane through HTTP and map, a hub fork to A and B, one response for both',async()=>{
+ const {c,at,render}=await lanes('4:3','04a-dwa-tory-2');
+ const second=c.snapshot(at('second'));
+ assert.deepEqual(lanesOf(second,'http'),['work:S:running'],'jeden request');
+ assert.deepEqual(lanesOf(second,'map'),['operator:S:running'],'jedno map');
+ assert.deepEqual(lanesOf(second,'share'),['operator:A:running','operator:B:running'],'dwa wejścia downstream');
+ assert.deepEqual(dots(second,'share'),['inS','outA','outB'],'jedno połączenie upstream');
+ assert.equal(second.metrics.find(m=>m.label==='requesty HTTP').value,1);
+ const question=c.snapshot(at('question'));
+ assert.deepEqual(lanesOf(question,'http'),['work:S:running'],'pytanie nie pokazuje drugiego requestu');
+ assert.equal(node(question,'B').visible,true);
+ const svg=render(second);
+ assert.match(svg,/data-hub-link="S-A"/);assert.match(svg,/data-hub-link="S-B"/);
+ const end=c.snapshot(c.duration);
+ assert.deepEqual(lanesOf(end,'A'),['receiver:A:completed']);assert.deepEqual(lanesOf(end,'B'),['receiver:B:completed']);
+ const received=Array.from(end.histories,h=>Array.from(h.values,v=>v.value+':'+v.color));
+ assert.deepEqual(received[0],received[1],'A i B dostają tę samą wartość w kolorze producenta');
+ assert.match(c.snapshot(0).code,/share\(\)\)$/);
 });

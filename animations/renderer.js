@@ -199,21 +199,29 @@ export function renderScene(frame,options={}) {
     if(n.showProgress)svg+=`<rect data-work-progress="${n.progress}" x="${n.x-n.w/2}" y="${n.y+n.h/2-9}" width="${n.w*n.progress}" height="9" fill="#132f42"/>`;
     if(n.transform)svg+=text(n.x,n.y+(n.transformOffset??n.h/2+52*k),n.transform,28*k,'data-transformation="true"');
     // Tory subskrybentów: stan wykonania jako mały element w kafelku definicji (pasek, chip, znaczek), gniazda na krawędziach.
+    // Hub (np. share): wspólne wejście bez własnego chipu; chipy wyjść są przesunięte, żeby zmieściło się rozwidlenie.
+    const hubInputs=(n.socketDots||[]).filter(d=>d.side==='in'&&!(n.laneStates||[]).some(l=>l.subscriber===d.subscriber));
+    const chipLeft=n.x-n.w/2+(hubInputs.length?50:22)*k;
     for(const lane of n.laneStates||[]) {
-      svg+=`<g data-lane="${esc(lane.subscriber)}" data-lane-role="${lane.role}" data-lane-state="${lane.state}"${lane.progress===undefined?'':` data-work-progress="${lane.progress}"`} opacity="${lane.opacity}"><title>${esc(lane.subscriber+' · '+lane.status)}</title>`;
+      svg+=`<g data-lane="${esc(lane.subscriber)}" data-lane-role="${lane.role}" data-lane-state="${lane.state}"${lane.progress===undefined?'':` data-work-progress="${lane.progress}"`} opacity="${lane.opacity}"><title>${esc((lane.label||lane.subscriber)+' · '+lane.status)}</title>`;
       if(lane.role==='work') {
-        const x0=n.x-n.w/2+48*k,x1=n.x+n.w/2-62*k,h=14*k,stopped=lane.state==='error'||lane.state==='cancelled';
-        svg+=text(n.x-n.w/2+24*k,lane.y,lane.subscriber,24*k,'style="font-weight:700;fill:#43525b"');
+        const x0=n.x-n.w/2+(lane.label?48:22)*k,x1=n.x+n.w/2-62*k,h=14*k,stopped=lane.state==='error'||lane.state==='cancelled';
+        if(lane.label)svg+=text(n.x-n.w/2+24*k,lane.y,lane.label,24*k,'style="font-weight:700;fill:#43525b"');
         svg+=`<rect x="${x0}" y="${lane.y-h/2}" width="${x1-x0}" height="${h}" rx="${h/2}" fill="#26343d" fill-opacity=".18"/>`;
         svg+=`<rect x="${x0}" y="${lane.y-h/2}" width="${(x1-x0)*lane.progress}" height="${h}" rx="${h/2}" fill="${stopped?'#b51e2e':lane.color}"/>`;
         svg+=laneIcon(n.x+n.w/2-34*k,lane.y,lane,k,frame.time);
       } else if(lane.role==='operator') {
-        const x0=n.x-n.w/2+22*k,x1=n.x+n.w/2-22*k,h=58*k;
+        const x0=chipLeft,x1=n.x+n.w/2-22*k,h=58*k;
         svg+=`<rect x="${x0}" y="${lane.y-h/2}" width="${x1-x0}" height="${h}" rx="${12*k}" fill="#fff" fill-opacity=".62"/>`;
         svg+=`<circle cx="${x0+20*k}" cy="${lane.y}" r="${7*k}" fill="${lane.color}"/><circle cx="${x1-20*k}" cy="${lane.y}" r="${7*k}" fill="${lane.color}"/>`;
-        svg+=laneIcon(n.x,lane.y,lane,k,frame.time);
+        svg+=laneIcon((x0+x1)/2,lane.y,lane,k,frame.time);
       } else svg+=laneIcon(n.x+n.w/2-30*k,n.y+n.h/2-30*k,lane,k,frame.time);
       svg+='</g>';
+    }
+    // Rozwidlenie huba: wspólne wejście → chip każdej subskrypcji wyjścia.
+    for(const input of hubInputs) for(const lane of (n.laneStates||[]).filter(l=>l.role==='operator')) {
+      const left=n.x-n.w/2,bend=(chipLeft-left)/2;
+      svg+=`<path data-hub-link="${esc(input.subscriber)}-${esc(lane.subscriber)}" d="M${left} ${input.y}C${left+bend} ${input.y} ${chipLeft-bend} ${lane.y} ${chipLeft} ${lane.y}" fill="none" stroke="${input.color}" stroke-width="${3*k}" opacity="${Math.min(input.opacity,lane.opacity)}"/>`;
     }
     for(const dot of n.socketDots||[])
       svg+=`<circle data-socket="${dot.side}" data-subscriber="${esc(dot.subscriber)}" cx="${dot.side==='out'?n.x+n.w/2:n.x-n.w/2}" cy="${dot.y}" r="${13*k}" fill="${dot.color}" stroke="#fff" stroke-width="3" opacity="${dot.opacity}"/>`;

@@ -200,7 +200,9 @@ export function compileScene(scene) {
     const ids=[...new Set(laneRecords.filter(r=>r.a.id===n.id||r.b.id===n.id).map(r=>r.subscriber))];
     return ids.flatMap(subscriber=>{
       const out=laneRecords.find(r=>r.a.id===n.id&&r.subscriber===subscriber),input=laneRecords.find(r=>r.b.id===n.id&&r.subscriber===subscriber);
-      const role=out&&n.workLanes?'work':out&&input?'operator':input&&!out?'receiver':null;
+      // Hub (np. share): wyjścia odbiorców to chipy subskrypcji, wspólne wejście pokazuje samo gniazdo.
+      const hub=laneRecords.some(r=>r.a.id===n.id);
+      const role=out&&n.workLanes?'work':out?'operator':hub?null:'receiver';
       if(!role)return [];
       const from=role==='receiver'?input.start:connectedAt(out);
       if(time<from)return [];
@@ -211,7 +213,7 @@ export function compileScene(scene) {
       } else if(out.end&&time>=out.end.at) {
         state=out.end.kind==='complete'?'completed':out.end.kind==='error'?'error':'cancelled';stoppedAt=out.end.at;
       }
-      const lane={role,subscriber,y:laneY(n,subscriber),color:subscriberColor(subscriber),fill:graph.subscribers?.[subscriber]?.fill,
+      const lane={role,subscriber,label:graph.subscribers?.[subscriber]?.label??subscriber,y:laneY(n,subscriber),color:subscriberColor(subscriber),fill:graph.subscribers?.[subscriber]?.fill,
         state,status:laneStatus[state==='running'&&role!=='work'?'waiting':state],opacity:clamp((time-from)/fadeDuration)};
       if(role==='work') {
         const to=out.workUntil!==undefined?plan.timeOf(out.workUntil):out.end?.at??plan.duration;
