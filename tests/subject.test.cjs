@@ -90,7 +90,9 @@ test('one User from HTTP reaches Subject, then splits into three identical next 
  const received=c.snapshot(at('received'));
  assert.equal(received.tokens.length,1);assert.equal(received.tokens[0].phase,'split-in');assert.equal(received.tokens[0].value,'{…}');
  const hub=node(received,'subject');assert.ok(received.tokens[0].x<=hub.x-hub.w/2+1e-6,'kulka na porcie wejściowym Subject');
- assert.equal(received.tokens[0].y,hub.laneStates.find(l=>l.subscriber==='B').y,'wejście upstreamu w środkowym wierszu');
+ assert.equal(received.tokens[0].y,hub.laneStates.find(l=>l.subscriber==='A').y,'wejście upstreamu na wysokości wiersza A');
+ const cable=received.edges.find(e=>e.id==='http-subject');
+ assert.ok(cable.points.every(p=>p[1]===cable.points[0][1]),'prosty kabel HTTP → Subject, bez załamania');
  assert.ok(received.histories.every(h=>!h.values.length));
  const split=c.snapshot(input.arrival+(outs[0].at-input.arrival)*.7);
  assert.equal(split.tokens.length,3);assert.ok(split.tokens.every(t=>t.phase==='split-out'&&t.color===input.color));
@@ -147,7 +149,7 @@ test('Subject keeps lane colours, horizontal receiver connections and the Cold f
     assert.equal(n.x,node(end,n.id).x);assert.equal(n.w,node(end,n.id).w);assert.equal(n.top,node(end,n.id).top);
     if(n.visible)assert.ok(n.y-n.h/2>=0&&n.y+n.h/2<=f.height);
    }
-   for(const e of f.edges.filter(e=>e.id!=='http-subject')){assert.equal(e.color,colors[e.subscriber]);assert.ok(e.points.every(p=>p[1]===e.points[0][1]),e.id+' poziomo');}
+   for(const e of f.edges){assert.equal(e.color,colors[e.subscriber]);assert.ok(e.points.every(p=>p[1]===e.points[0][1]),e.id+' poziomo');}
   }
   for(const [id] of fields){
    const lane=node(end,'subject').laneStates.find(l=>l.subscriber===id),field=node(end,id),coldField=node(coldEnd,id);

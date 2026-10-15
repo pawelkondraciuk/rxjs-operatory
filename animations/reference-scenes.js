@@ -577,12 +577,12 @@ export function subjectGraph(scene) {
   const preconnected={start:-2,connectDuration:.8};
   return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball:viewFieldBall,
     subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,C:laneSubscribers.C,U:subjectUpstream},
-    // HTTP GET pojawia się dopiero w etapie connect-http. Wejście upstreamu trafia w środkowy wiersz Subject;
-    // splitAt:0 — kulka rozdziela się na porcie wejściowym, nie w wierszu któregoś odbiorcy.
+    // HTTP GET pojawia się dopiero w etapie connect-http. Wejście upstreamu trafia w wiersz A Subject (prosty kabel
+    // z wiersza #1 HTTP); splitAt:0 — kulka rozdziela się na porcie wejściowym, nie stoi w wierszu A.
     nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,progressUntilNext:true,
       ...laneTile('source',top,{U:0},1),ready:false,born:at.born},
       {id:'subject',x:g.subjectX,w:g.subjectW,label:'Subject',splitBalls:true,splitAt:0,splitGuides:false,upstreamStripe:false,hubFan:false,
-        ...laneTile('operator',top,{U:1,...Object.fromEntries(coldFields.map(f=>[f.id,f.slot]))},coldFields.length)},
+        ...laneTile('operator',top,{U:0,...Object.fromEntries(coldFields.map(f=>[f.id,f.slot]))},coldFields.length)},
       ...fields.nodes],
     edges:[{id:'http-subject',from:'http',to:'subject',subscriber:'U',logicalStart:at.subscribe,fixedStart:true,logicalEnd:complete(at.complete)},
       ...coldFields.map(f=>({id:'subject-'+f.id,from:'subject',to:f.id,subscriber:f.id,logicalStart:-2,logicalEnd:complete(at.upstreamEnd)}))],
