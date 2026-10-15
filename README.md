@@ -25,7 +25,7 @@ Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przyw
 
 Porównania są osobnymi slajdami. Warianty z sufiksami -2/-3/-4 powstają podczas uruchamiania; pierwszy zachowuje ID bazowe. Poniżej podano kolejność MAIN, a dalszy spis opisuje rodziny tematycznie. Pozycje EXTRAS są oznaczone.
 
-Każda pozycja opisuje temat, ekran/bloczki i notatki prelegenta. Tabele wariantów podają rzeczywiste tytuły i kod nad diagramem. Speaker notes przy rodzinie dotyczą wszystkich jej wariantów, ponieważ sekcje są klonowane razem z notatkami. Notatki przytoczono z ujednoliconymi odstępami; powtarzaną instrukcję obsługi zwykłych animacji opisano wspólnie wyżej.
+Każda pozycja opisuje temat, ekran/bloczki i notatki prelegenta. Tabele wariantów podają rzeczywiste tytuły i kod nad diagramem. Speaker notes przy rodzinie dotyczą wszystkich jej wariantów, ponieważ sekcje są klonowane razem z notatkami. Wyjątkiem jest Subject (`05-zrodla-3`): ma własne notatki przypisane do checkpointów. Notatki przytoczono z ujednoliconymi odstępami; powtarzaną instrukcję obsługi zwykłych animacji opisano wspólnie wyżej.
 
 Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorze spowalniają ilustrację; nie dodają opóźnień do rzeczywistego synchronicznego RxJS. HTTP jest symulowane. Pasek pokazuje czas pracy, a nie pomiar postępu prawdziwego żądania.
 
@@ -37,8 +37,8 @@ MAIN ma **30 slajdów (19 animowanych)**. EXTRAS zawiera **35 wariantów**. Cał
 
 Kolejność po otwarciu:
 
-1. HTTP (`05-zrodla-2`) → interval na żywo (`05-zrodla`) → map, pipe i wykonanie (`04-operator`) → testowe slajdy torów wykonania: cold (`04a-dwa-tory`), share() za map (`-2`) i share z unsubscribe A (`-3`).
-2. Subject (`05-zrodla-3`) → późny odbiorca z share/shareReplay (`20-sharereplay`, `20-sharereplay-2`). Cold i współdzielenie HTTP pokazują wcześniej tory `04a`; powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
+1. HTTP (`05-zrodla-2`) → interval na żywo (`05-zrodla`) → map, pipe i wykonanie (`04-operator`) → cold (`04a-dwa-tory`) → ręczny multicast HTTP przez Subject (`05-zrodla-3`) → share() za map (`04a-dwa-tory-2`) → share z unsubscribe A (`04a-dwa-tory-3`).
+2. Następnie późny odbiorca z share/shareReplay (`20-sharereplay`, `20-sharereplay-2`). Cold i współdzielenie HTTP pokazują wcześniej tory `04a`; powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
 3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap.
 4. catchError na zewnątrz/wewnątrz → distinctUntilChanged → wspólne porównanie debounceTime i auditTime (`16-czas-cztery`).
 5. Cztery pytania podsumowania → „Pytania?” → rozmowa z salą albo dodatkowe przykłady.
@@ -219,21 +219,41 @@ Kontroler `stages`: → zaczyna lub kończy etap, ← cofa checkpoint także w A
 
 ### Źródła — rodzina `05-zrodla`
 
-Warianty zachowują ID, lecz zajmują oddzielne miejsca narracji: **HTTP otwiera część właściwą**, interval jest drugi, Subject pojawia się po torach wykonania 04a.
+Warianty zachowują ID, lecz zajmują oddzielne miejsca narracji: **HTTP otwiera część właściwą**, interval jest drugi, Subject stoi między Cold i share: **Cold → ręczny multicast przez Subject → automatyczny multicast przez share()**.
 
 | ID | Kod i zachowanie |
 | --- | --- |
 | 05-zrodla-2 | `http.get('/api/data')`; pierwsze „dalej” dopisuje `.subscribe(render)` (fade-in razem z odbiorcą A). READY ma tylko nagłówek HTTP GET; subscribe odsłania odbiorcę i wiersz A. Postój request pokazuje pracę po podłączeniu, postój first odebrane dane przed complete. |
 | 05-zrodla | `interval(1000)` na żywo. Pierwsze „dalej” robi `.subscribe()`, potem emisje 0, 1, 2, 3… co sekundę bez końca; drugie „dalej” robi `.unsubscribe()` (bez complete); trzecie przechodzi dalej. |
-| 05-zrodla-3 | `const subject$ = new Subject()`. A bez odbiorców w 1 s; odbiorca A dołącza w 2,5 s i dostaje B w 4 s; odbiorca B dołącza w 5 s; C w 6,5 s dostają obaj. |
+| 05-zrodla-3 | `const subject$ = new Subject<number>();`, subskrypcje A/B i osobne `http.get<number>(url).subscribe(subject$);`. Jedno HTTP rozsyła `42` i complete do obu odbiorców. |
 
 Cała rodzina ma wygląd torów jak w `04a-dwa-tory` (nagłówek = definicja, wiersz = wykonanie, porty, kulki w wierszu odbiorcy, płaskie kafelki) i te same chwilowe napisy `.subscribe()` z badge'em toru, widoczne od pojawienia się odbiorcy do dotarcia subskrypcji do źródła. W interval `.unsubscribe()` A pojawia się pod wierszem odbiorcy, bo rezygnacja zaczyna się przy nim. W Subject napisy A i B stoją nad kolumną odbiorców. HTTP ma postęp tylko w wierszu A pod HTTP GET (od zestawionej subskrypcji do odpowiedzi); odbiorca czeka, potem trzyma kulkę „dane” w swoim wierszu. Diagram używa harmonogramu: pojawienie odbiorcy w 1 s, subscribe 1,3–2,1 s, odpowiedź 7–7,8 s, complete 8,3–9,1 s, cisza do 9,9 s. Kod i widoczność cofają się razem. Postęp jest symulacją oczekiwania, nie procentem odpowiedzi sieciowej.
 
 interval to jeden rząd: `interval(1000)` → odbiorca A. Slajd jest wyjątkiem od postojów: po `.subscribe()` emisje trwają tak długo, jak prelegent chce (licznik „emisje” rośnie bez ograniczeń, w wierszu odbiorcy zostają 3 ostatnie kulki, starsza płynnie wypada). Kolejne „dalej” wywołuje `.unsubscribe()` na istniejącym wykonaniu: wartość już wysłana dociera, potem szary pocisk „×” jedzie od odbiorcy w lewo do interval, przebyty kabel i wiersze szarzeją, emisje ustają; nie ma zielonego complete. AUTO ani pauza nie wywołują unsubscribe same. Lewo cofa etap (z anulowanego do emisji od zera, z emisji do READY); wyjście ze slajdu sprząta wykonanie, a powrót startuje od READY. Druk pokazuje anulowany kadr po wartościach 0, 1, 2.
 
-Subject to kafelek z wierszami A i B, które rosną, gdy odbiorcy subskrybują; odbiorcy A i B trzymają kulki w swoich wierszach. Nad nagłówkiem Subject stoi płaski log emisji „(bez bufora)”, który pojawia się z pierwszą emisją A. Log kończy z A/B/C, odbiorca A z B/C, odbiorca B z C; wartości mają własne kolory. Ręczne postoje: A bez odbiorców, podłączenie A, odebrane B, podłączenie B; dalej AUTO pokazuje C. Nie ma complete ani unsubscribe.
+**Subject: ręczny multicast HTTP — 75–90 sekund.** Stały kod ma cztery linie: definicję `Subject<number>`, `subject$.subscribe(v => renderA(v));`, analogiczną subskrypcję B oraz `http.get<number>(url).subscribe(subject$);`. HTTP i Subject są wyróżnione kolorami, bieżąca linia dostaje obrys. Subject jest jednocześnie Observable dla A/B i Observerem HTTP, odbierającym next/error/complete.
 
-**Speaker notes:** Angular HttpClient jest przykładem cold źródła; nie generalizować tego na już uruchomiony Promise. Timer kończy automatycznie, interval przez rezygnację odbiorcy. Subject jest Observable i Observer, może przyjąć next bez odbiorców i nie odtwarza wcześniejszych wartości. To przykład hot źródła, nie definicja wszystkich źródeł hot.
+Diagram HTTP GET → Subject → A/B używa tych samych kafelków i portów co Cold/share. A i B podłączają się do Subject, a HTTP nadal nie działa. Dopiero osobne subscribe uruchamia jeden request. Jedna niebieska `42` dociera do Subject, rozdziela się na dwie identyczne kulki i równocześnie trafia do odbiorców. Następnie HTTP complete kończy Subject oraz obu odbiorców. Fioletowy tor A i pomarańczowy B zachowują kolory; upstream ma niezależny kolor zielonoturkusowy. Licznik requestów rośnie dopiero po zestawieniu subskrypcji HTTP. Nie ma logu/bufora ani ręcznego unsubscribe.
+
+Subject nie odtwarza historii. Odejście A i B nie anuluje automatycznie osobnej subskrypcji HTTP — trzeba nią zarządzać samodzielnie. Następny slajd pokazuje share(), który podłącza upstream przy pierwszej subskrypcji i zarządza jego odłączeniem.
+
+**Checkpointy i speaker notes:** notatki w standardowym oknie prelegenta zmieniają się wraz z osiągniętym checkpointem, również w AUTO, po cofnięciu, resecie i wejściu z hasha. Narracja poniżej jest zapisana w HTML; nie jest wyświetlana publiczności.
+
+| Nr | Checkpoint | Notatka prelegenta |
+| --- | --- | --- |
+| 0 | READY | Przed chwilą widzieliśmy, że dwie subskrypcje zimnego Observable uruchamiają dwa osobne requesty HTTP. A co, jeśli chcemy wykonać request tylko raz i przekazać jego wynik wielu odbiorcom? |
+| 1 | A podłączony | Do tego możemy wykorzystać Subject. To taki Observable, do którego sami możemy dostarczać wartości. Najpierw podłączamy pierwszego odbiorcę. |
+| 2 | B podłączony | Podłączamy drugiego. Mamy dwóch odbiorców, ale zwróćcie uwagę — żaden request jeszcze nie wystartował. |
+| 3 | Przed subskrypcją HTTP | Teraz robimy coś ciekawego. Subject może być nie tylko Observable, ale również Observerem. Możemy więc przekazać go bezpośrednio do subscribe naszego HTTP. |
+| 4 | HTTP pracuje | Dopiero ta subskrypcja uruchamia request. Jeden, niezależnie od tego, ilu odbiorców podłączyliśmy do Subjecta. |
+| 5 | Jedna 42 w Subject | HTTP zwraca jedną wartość. Subject ją odbiera i rozsyła do wszystkich aktualnych odbiorców. |
+| 6 | A i B mają 42 | Obaj dostają tę samą wartość. Jedna emisja źródła, dwa powiadomienia „next”. |
+| 7 | Complete obu odbiorców | HTTP się kończy, a Subject przekazuje również „complete” do obu odbiorców. |
+| 8 | FINISHED / przejście | Rozwiązaliśmy problem dwóch requestów. Ale jest jeden haczyk: to my ręcznie podłączyliśmy Subject do HTTP. Gdyby odbiorcy zrezygnowali, musielibyśmy sami zadbać o anulowanie tego requestu. A gdyby RxJS mógł zarządzać tym za nas? I tu pojawia się „share()”. |
+
+MANUAL zatrzymuje się w punktach 1–7; kolejny krok kończy animację w FINISHED. AUTO przechodzi płynnie przez całość. Ruch kulek tylko ilustruje synchroniczne rozsyłanie powiadomień; pauzy służą wyjaśnieniu. Pełny kod jest przykładem, nie jest wykonywany przez prezentację.
+
+**Speaker notes pozostałych źródeł:** Angular HttpClient jest przykładem cold źródła; nie generalizować tego na już uruchomiony Promise. Timer kończy automatycznie, interval przez rezygnację odbiorcy.
 
 ### Co uruchamia pracę? — `06-subskrypcja`
 

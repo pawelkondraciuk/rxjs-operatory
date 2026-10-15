@@ -3,7 +3,7 @@ import { configureCatch } from './catch-scenes.js';
 
 // Końcowe ID po rozwinięciu wariantów; otwarcie pozostaje w kolejności HTML.
 export const mainOrder = [
-  '05-zrodla-2','05-zrodla','04-operator','04a-dwa-tory','04a-dwa-tory-2','04a-dwa-tory-3','05-zrodla-3',
+  '05-zrodla-2','05-zrodla','04-operator','04a-dwa-tory','05-zrodla-3','04a-dwa-tory-2','04a-dwa-tory-3',
   '20-sharereplay','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap',
   'b04-catcherror','b04-catcherror-2','14-distinct','16-czas-cztery','25-podsumowanie','pytania',
 ];

@@ -277,7 +277,7 @@ export function compileScene(scene) {
       const slot=n.laneSlots[r.subscriber],growth=clamp((time-grow)/rowGrowth),eased=growth*growth*(3-2*growth);
       // Hub (np. share): lewy pasek wiersza ma kolor wspólnego upstreamu aktywnego w chwili dołączenia Subscribera.
       // Czas modelu: inicjator dołącza w tej samej chwili, w której share otwiera upstream (w ilustracji subscribe dociera do share wcześniej).
-      const upstream=n.splitBalls&&laneRecords.find(u=>u.b.id===n.id&&u.subscriber!==r.subscriber&&u.logicalStart<=r.logicalStart&&(!u.end||(u.end.logicalAt??u.end.at)>r.logicalStart));
+      const upstream=n.splitBalls&&n.upstreamStripe!==false&&laneRecords.find(u=>u.b.id===n.id&&u.subscriber!==r.subscriber&&u.logicalStart<=r.logicalStart&&(!u.end||(u.end.logicalAt??u.end.at)>r.logicalStart));
       if(eased>(rows.get(slot)?.growth??0))rows.set(slot,{slot,subscriber:r.subscriber,color:subscriberColor(r.subscriber),growth:eased,
         ...(upstream?{stripe:subscriberColor(upstream.subscriber)}:{}),...(n.rowTint?{tint:graph.subscribers?.[r.subscriber]?.tint}:{})});
     }
@@ -331,7 +331,7 @@ export function compileScene(scene) {
     // transformBalls: między dotarciem wartości do kafelka a wyjściem wyniku kulka wjeżdża do środka wiersza,
     // zatrzymuje się, zmienia wartość (krótki puls) i jedzie do portu wyjścia. Czas modelu stoi, to wyłącznie ilustracja.
     // splitBalls (hub, np. share): jedna kulka wspólnego upstreamu wjeżdża do punktu rozdzielenia, tam rozchodzi się
-    // na osobne powiadomienia next — po jednej kulce w kolorze każdego aktywnego Subscribera — do ich wierszy i wyjść.
+    // na osobne powiadomienia next — po jednej kulce z kolorem zdarzenia wyjścia — do wierszy i portów odbiorców.
     for(const n of nodes) if(n.splitBalls) for(const split of splitsOf(n)) {
       if(time<split.arrival||time>=split.departure)continue;
       const p=(time-split.arrival)/(split.departure-split.arrival),ease=u=>u*u*(3-2*u);
@@ -417,7 +417,7 @@ export function compileScene(scene) {
         disabled:evaluate(n.disabled,t),
         ...(laneRecords.length?{socketDots:socketsOf(n,time),laneStates:laneStatesOf(n,time),...growingTile(n,time),
           ...(n.subscriber?{laneColor:subscriberColor(n.subscriber),...(n.rowTint?{laneTint:graph.subscribers?.[n.subscriber]?.tint}:{})}:{}),
-          ...(n.splitBalls?{splitGuides:splitGuides(n,time)}:{})}:{})};
+          ...(n.splitBalls?{splitGuides:n.splitGuides===false?[]:splitGuides(n,time)}:{})}:{})};
     });
     const histories=trays.map(q=>{
       const values=records.filter(e=>e.b.id===q.anchor).flatMap(e=>e.events.filter(v=>v.arrival<=time));

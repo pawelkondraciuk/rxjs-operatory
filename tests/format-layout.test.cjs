@@ -21,7 +21,7 @@ test('4:3 diagrams fill the taller stage and keep every block inside the viewBox
   const c=compile(scene);
   for(const time of [0,...c.stops.map(s=>s.time),c.duration]){
    const f=c.snapshot(time);
-   assert.equal(f.height,scene.playerLayout?612:535,scene.id);
+   assert.equal(f.height,scene.id==='05-zrodla-3'?500:scene.playerLayout?612:535,scene.id);
    assert.ok(f.textScale>=1.15,scene.id);
    for(const n of f.nodes.filter(n=>n.visible)){
     assert.ok(n.x-n.w/2>=-1&&n.x+n.w/2<=f.width+1,scene.id+' '+n.id+' poziomo');

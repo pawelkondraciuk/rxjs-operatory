@@ -16,6 +16,7 @@ import { compileScene } from './animations/engine.js';
 import { installRevealStages } from './animations/reveal-stages.js';
 import { installAutoFinishGuard } from './animations/reveal-auto-finish.js';
 import { installSpeakerPreview } from './animations/speaker-preview.js';
+import { prepareCheckpointNotes, installCheckpointNotesReceiver } from './animations/checkpoint-notes.js';
 import { FORMATS, formatFromSearch, withFormat, toggledFormatUrl } from './animations/format.js';
 
 const params = new URLSearchParams(location.search);
@@ -92,6 +93,9 @@ for (const slide of steppedSlides) {
   button.addEventListener('click', toggleMode);
   slide.append(button);
 }
+// Szablony notatek są wybierane po rozwinięciu wariantów i utworzeniu markerów.
+for (const slide of document.querySelectorAll('[data-animation]')) prepareCheckpointNotes(slide, { printMode });
+
 function isStaged(slide = deck.getCurrentSlide()) { return sceneById.get(slide?.dataset.animation)?.playback?.controller === 'stages'; }
 function isStepped(slide = deck.getCurrentSlide()) { return slide?.classList.contains('rx-stepped'); }
 function fragmentTime(slide = deck.getCurrentSlide()) {
@@ -285,6 +289,7 @@ const stageReveal = installRevealStages(deck, {
   getManualTarget: slide => isStepped(slide) && stateFor(slide).mode === 'manual' ? fragmentTime(slide) : null,
   isEnabled: () => !printMode,
 });
+installCheckpointNotesReceiver(deck, stageReveal, { getPlayer: playerFor });
 
 // Po użyciu suwaka pilot nadal zmienia slajdy, zamiast przesuwać suwak.
 document.addEventListener('keydown', event => {

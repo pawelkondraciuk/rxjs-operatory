@@ -370,52 +370,62 @@ export function httpGraph(scene) {
     schedule:{'http-observer':{start:1.3,connectDuration:.8,events:[{...scene.rows[0].events[0],color:fill,arrival:7.8}],end:{at:8.3,logicalAt:7,kind:'complete',duration:.8}}}};
 }
 
-// Wariant Subject: emisja może nastąpić także bez podłączonego odbiorcy. Wygląd torów jak w 04a: kafelek Subject
-// dostaje wiersz A/B, gdy odbiorca subskrybuje; log emisji (bez bufora) stoi nad nagłówkiem definicji.
+// Ręczny multicast HTTP w stylu torów 04a: subskrypcje A/B dodają wiersze Subject,
+// ale nie tworzą ani nie zarządzają osobnym połączeniem z HTTP.
 export function configureSubject(scene) {
-  const at={a:1,subscribe:2.5,b:4,second:5,c:6.5},received=[E(at.b,'B','b'),E(at.c,'C','c')];
-  const emitted=[E(at.a,'A'),...received];
-  // Zachowujemy indeksy wierszy wariantu katalogowego; drugi odbiorca ma własną historię.
-  scene.rows=scene.rows.map((row,i)=>i===2?R('Subject — log emisji',emitted):i===3?R('Odbiorca A',received):row);
-  scene.rows.push(R('Odbiorca B',[emitted[2]]));
-  Object.assign(scene,{graph:subjectGraph,playerLayout:'expanded',metrics:[],subscribeAt:at.subscribe,secondSubscribeAt:at.second,duration:at.c+1,
-    ink:'#26323B',playerClass:'rx-flat-tiles',timing:{subscribe:.8,travel:1,terminal:.8,gap:.5},
-    title:'Subject: wartości dla obecnych odbiorców',code:'const subject$ = new Subject()',
-    captions:[[0,'Subject emituje do obecnych odbiorców. Log diagramu nie jest buforem'],
-      [at.a,'A bez odbiorców: nikt nie otrzymuje tej wartości'],
-      [at.subscribe,'Odbiorca A dołącza. Wcześniejsze A nie wraca'],
-      [at.b,'B trafia wyłącznie do odbiorcy A'],[at.second,'Odbiorca B dołącza. Nie dostaje wcześniejszych A ani B'],
-      [at.c,'C trafia do obu aktywnych odbiorców']],
+  const at={a:1,b:2,http:3,next:7,complete:8},value=E(at.next,'42','#087FAD');
+  const ev=(type,edge,offset=0)=>({type,edge,...(offset?{offset}:{})});
+  const active=(from,to)=>[{from,to}];
+  const subjectMark={id:'subject',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
+  const httpMark={id:'http',bg:'rgba(143,201,212,.4)',line:'#238F83'};
+  const manualStart=ev('manual-connect','http-subject');
+  const lines=[
+    [{text:'const subject$ = new Subject<number>();',mark:subjectMark}],
+    [{text:'subject$.subscribe(v => renderA(v));',mark:{id:'subscribe-a',bg:laneSubscribers.A.tint,line:laneSubscribers.A.color},
+      active:active(ev('subscribe','subject-A',-.3),ev('connected','subject-A'))}],
+    [{text:'subject$.subscribe(v => renderB(v));',mark:{id:'subscribe-b',bg:laneSubscribers.B.tint,line:laneSubscribers.B.color},
+      active:active(ev('subscribe','subject-B',-.3),ev('connected','subject-B'))}],
+    [{text:'http.get<number>(url)',mark:httpMark,active:active(manualStart,ev('source-next','http-subject'))},
+      {text:'.subscribe('},{text:'subject$',mark:{...subjectMark,id:'subject-observer'},active:active(manualStart,ev('connected','http-subject'))},{text:');'}],
+  ];
+  Object.assign(scene,{graph:subjectGraph,subjectTimes:at,playerLayout:'expanded',duration:10,
+    rows:[R('HTTP GET',[value],[B(at.http,at.next,'request')],{completeAt:at.complete}),
+      R('Odbiorca A',[value],[],{completeAt:at.complete}),R('Odbiorca B',[value],[],{completeAt:at.complete})],
+    metrics:[{label:'Requesty HTTP',count:'started'}],ink:'#26323B',playerClass:'rx-flat-tiles rx-subject-http',
+    timing:{subscribe:.8,travel:1,terminal:.8,gap:.5},
+    title:'Subject: ręczny multicast HTTP',code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
+    captions:[[0,'Subject: ręcznie łączymy jedno HTTP z wieloma odbiorcami']],
     playback:manual([
-      {id:'unobserved',event:{type:'source-next',node:'source',value:'A'},offset:.35,caption:'A bez subskrypcji: jedna emisja, zero odbiorów'},
-      {id:'subscribed',event:{type:'connected',edge:'source-sink'},offset:.35,caption:'Odbiorca A subskrybuje. A nie wraca'},
-      {id:'first',event:{type:'deliver-next',edge:'source-sink',value:'B'},offset:.35,caption:'B otrzymał tylko odbiorca A'},
-      {id:'second',event:{type:'connected',edge:'source-sink2'},offset:.35,caption:'Odbiorca B dołączył. Dostanie dopiero kolejne wartości'},
+      {id:'subscribed-a',event:ev('connected','subject-A'),offset:.35,caption:'A subskrybuje Subject. HTTP jeszcze nie działa'},
+      {id:'subscribed-b',event:ev('connected','subject-B'),offset:.35,caption:'Dwóch odbiorców Subjecta. Nadal zero requestów HTTP'},
+      {id:'connect-http',event:manualStart,caption:'Przekazujemy Subject jako Observer: http.get<number>(url).subscribe(subject$)'},
+      {id:'request',event:ev('connected','http-subject'),offset:.35,caption:'Osobna subskrypcja uruchomiła jeden request HTTP'},
+      {id:'received',event:ev('deliver-next','http-subject'),offset:.35,caption:'Subject odbiera jedną wartość 42 z HTTP'},
+      {id:'multicast',event:ev('deliver-next','subject-B'),offset:.35,caption:'Jedna emisja HTTP, dwa powiadomienia next. A i B otrzymali 42'},
+      {id:'complete',event:ev('disconnected','subject-B'),offset:.8,caption:'HTTP zakończone. Subject przekazał complete obu odbiorcom'},
     ]),
   });
 }
 
 export function subjectGraph(scene) {
-  const emitted=scene.rows[2].events,tall=scene.format==='4:3';
-  // Log nad kafelkiem, kafelek z dwoma zarezerwowanymi wierszami; całość wyśrodkowana w pionie.
-  const top=tall?250:167,log={x:130,y:tall?100:37,w:420,h:110};
-  const receivers=[['sink','A'],['sink2','B']].map(([id,lane],slot)=>({id,lane,at:{x:910,w:400,y:laneRowY(top,slot)}}));
-  const ballR=laneLook.ball.r;
-  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),
-    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B},
-    nodes:[{id:'source',x:340,w:420,label:'Subject',...laneTile('source',top,{A:0,B:1},2)},
-      ...receivers.map(r=>laneReceiver(r.id,r.lane,r.at,{ready:false}))],
-    // Log emisji pojawia się z pierwszą emisją; to zapis diagramu, nie bufor Subject.
-    panels:[{...log,label:'log emisji (bez bufora)',showOn:{type:'source-next',node:'source',value:'A'}}],
-    trays:[{anchor:'source',x:log.x+28+ballR,y:log.y+log.h-14-ballR,balls:true,max:3,gap:laneLook.ballGap,events:emitted,modelTime:true},
-      ...receivers.map(r=>laneTray(r.id,r.at,3))],
-    // A i B subskrybują w różnych chwilach, więc napis stoi w jednym miejscu: nad kolumną odbiorców, na wysokości logu.
-    callouts:[['A','source-sink'],['B','source-sink2']].map(([lane,edge])=>subscribeCallout(lane,edge,edge,{x:910,y:log.y+log.h/2})),
-    edges:[{id:'source-sink',from:'source',to:'sink',subscriber:'A',logicalStart:scene.subscribeAt,events:scene.rows[3].events},
-      {id:'source-sink2',from:'source',to:'sink2',subscriber:'B',logicalStart:scene.secondSubscribeAt,events:scene.rows[4].events}],
-    timeline:[{at:emitted[0].at,type:'source-next',node:'source',value:'A'},
-      {type:'subject-summary',event:{type:'deliver-next',edge:'source-sink2',value:'C'},offset:.35,
-        caption:'Log emisji: A, B, C. Odbiorca A: B, C. Odbiorca B: C. Subject nie odtwarza historii'}],
+  const tall=scene.format==='4:3',top=tall?110:72,at=scene.subjectTimes;
+  const receivers=['A','B'].map((id,slot)=>({id,at:{x:995,w:366,y:laneRowY(top,slot)}}));
+  const end={at:at.complete,kind:'complete'},value=scene.rows[0].events;
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?500:372,...laneGraphLook(),ball:{...laneLook.ball,textFill:'#fff'},
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,U:{color:'#238F83',fill:'#238F83',label:''}},
+    nodes:[{id:'http',x:217,w:310,label:'HTTP GET',workLanes:true,progressUntilNext:true,...laneTile('source',top,{U:0},1)},
+      {id:'subject',x:592,w:280,label:'Subject',splitBalls:true,splitAt:.5,splitGuides:false,upstreamStripe:false,hubFan:false,
+        ...laneTile('operator',top,{U:0,A:0,B:1},2)},
+      ...receivers.map(r=>laneReceiver(r.id,r.id,r.at,{ready:false}))],
+    edges:[{id:'http-subject',from:'http',to:'subject',subscriber:'U',logicalStart:at.http,fixedStart:true,logicalEnd:end,events:value},
+      ...receivers.map(r=>({id:'subject-'+r.id,from:'subject',to:r.id,subscriber:r.id,logicalStart:r.id==='A'?at.a:at.b,
+        logicalEnd:end,hold:1.2,events:value}))],
+    executions:[{id:'request',node:'http',edge:'http-subject',duration:at.next-at.http}],
+    trays:receivers.map(r=>laneTray(r.id,r.at,1)),
+    callouts:receivers.map(r=>subscribeCallout(r.id,'subject-'+r.id,'subject-'+r.id,{x:850,y:top/2})),
+    timeline:[{type:'manual-connect',edge:'http-subject',event:{type:'subscribe',edge:'http-subject'},offset:-.35},
+      {type:'subject-summary',event:{type:'disconnected',edge:'subject-B'},offset:1,
+        caption:'Subject nie buforuje. Upstream podłączamy i odłączamy ręcznie; share() zarządza nim za nas'}],
   };
 }
 

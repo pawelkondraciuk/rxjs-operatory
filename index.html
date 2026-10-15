@@ -452,6 +452,17 @@
                         <p><strong>Subject — po torach wykonania:</strong> A pojawia się bez odbiorców — trafia tylko do logu nad Subject. Odbiorca A dołącza (pod Subject rośnie wiersz A) i odbiera B. Dopiero potem dołącza odbiorca B, więc C dostają obaj. Historie odbiorców: B/C oraz C. Log emisji A/B/C należy do diagramu i nie jest buforem Subject. Nie ma odtworzenia A ani B dla późnego odbiorcy, complete ani unsubscribe.</p>
                         <p><strong>Sterowanie wprowadzeniem:</strong> Prawo uruchamia lub kończy etap, lewo cofa checkpoint także w AUTO. Spacja pauzuje/wznawia, M zmienia tryb, R przywraca zatrzymany początek, U pokazuje sterowanie.</p>
                     </aside>
+				<template data-checkpoint-notes="05-zrodla-3">
+                        <div data-checkpoint="ready"><p><strong>0 — Wprowadzenie</strong></p><p>Przed chwilą widzieliśmy, że dwie subskrypcje zimnego Observable uruchamiają dwa osobne requesty HTTP. A co, jeśli chcemy wykonać request tylko raz i przekazać jego wynik wielu odbiorcom?</p></div>
+                        <div data-checkpoint="subscribed-a"><p><strong>1 — A subskrybuje Subject</strong></p><p>Do tego możemy wykorzystać Subject. To taki Observable, do którego sami możemy dostarczać wartości. Najpierw podłączamy pierwszego odbiorcę.</p></div>
+                        <div data-checkpoint="subscribed-b"><p><strong>2 — B subskrybuje Subject</strong></p><p>Podłączamy drugiego. Mamy dwóch odbiorców, ale zwróćcie uwagę — żaden request jeszcze nie wystartował.</p></div>
+                        <div data-checkpoint="connect-http"><p><strong>3 — http.get(...).subscribe(subject$)</strong></p><p>Teraz robimy coś ciekawego. Subject może być nie tylko Observable, ale również Observerem. Możemy więc przekazać go bezpośrednio do subscribe naszego HTTP.</p></div>
+                        <div data-checkpoint="request"><p><strong>4 — Start HTTP</strong></p><p>Dopiero ta subskrypcja uruchamia request. Jeden, niezależnie od tego, ilu odbiorców podłączyliśmy do Subjecta.</p></div>
+                        <div data-checkpoint="received"><p><strong>5 — HTTP emituje 42</strong></p><p>HTTP zwraca jedną wartość. Subject ją odbiera i rozsyła do wszystkich aktualnych odbiorców.</p></div>
+                        <div data-checkpoint="multicast"><p><strong>6 — Multicast do A i B</strong></p><p>Obaj dostają tę samą wartość. Jedna emisja źródła, dwa powiadomienia „next”.</p></div>
+                        <div data-checkpoint="complete"><p><strong>7 — Complete</strong></p><p>HTTP się kończy, a Subject przekazuje również „complete” do obu odbiorców.</p></div>
+                        <div data-checkpoint="finished"><p><strong>8 — Przejście do share()</strong></p><p>Rozwiązaliśmy problem dwóch requestów. Ale jest jeden haczyk: to my ręcznie podłączyliśmy Subject do HTTP. Gdyby odbiorcy zrezygnowali, musielibyśmy sami zadbać o anulowanie tego requestu.</p><p>A gdyby RxJS mógł zarządzać tym za nas? I tu pojawia się „share()”.</p></div>
+                    </template>
 				</section>
 
 				<section id="06-subskrypcja" class="animation-slide" data-animation="06-subskrypcja">

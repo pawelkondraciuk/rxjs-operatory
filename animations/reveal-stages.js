@@ -1,6 +1,6 @@
 // Adapter do klawiatury i fragmentów Reveal, bez własnego handlera strzałek.
 export function installRevealStages(deck,{getController,getPlayer=()=>null,getManualTarget=()=>null,isEnabled=()=>true}={}) {
-  let controller,slide,unsubscribe,syncing=false,lastIndex;
+  let controller,slide,unsubscribe,syncing=false,lastIndex,restoring=0;
   const bindings=[
     [39,'→','Następny etap / koniec bieżącego',c=>c.next()],
     [34,'Page Down','Następny etap / koniec bieżącego',c=>c.next()],
@@ -11,7 +11,7 @@ export function installRevealStages(deck,{getController,getPlayer=()=>null,getMa
   ];
   function unbind(){bindings.forEach(([keyCode])=>deck.removeKeyBinding(keyCode));}
   function sync(force=false){
-    if(!controller||!slide||deck.getCurrentSlide()!==slide)return;
+    if(restoring||!controller||!slide||deck.getCurrentSlide()!==slide)return;
     const state=controller.state,count=slide.querySelectorAll('.rx-step').length;
     const index=state.state==='finished'?count-1:Math.min(count-1,state.checkpointIndex-1);
     if(!force&&index===lastIndex)return;
@@ -39,7 +39,7 @@ export function installRevealStages(deck,{getController,getPlayer=()=>null,getMa
     }));
   }
   function fragment(event,direction){
-    if(syncing||!controller||deck.isOverview()||deck.isPaused())return;
+    if(restoring||syncing||!controller||deck.isOverview()||deck.isPaused())return;
     const marker=event.fragment;
     if(!marker.closest('.rx-fragment-steps')||marker.closest('section')!==slide)return;
     if(direction>0)controller.next();else controller.previous();
@@ -49,7 +49,13 @@ export function installRevealStages(deck,{getController,getPlayer=()=>null,getMa
   deck.on('fragmentshown',shown);deck.on('fragmenthidden',hidden);
   const events=['slidechanged','overviewshown','overviewhidden','paused','resumed'];
   events.forEach(event=>deck.on(event,refresh));
-  return {refresh,sync,get syncing(){return syncing;},destroy(){
+  // Notes odtwarza stan fragmentu, nie komendę pilota. W trakcie przywracania
+  // nie uruchamiamy next/previous ani nie nadpisujemy docelowego fragmentu.
+  function restore(action){
+    restoring++;
+    try{action();}finally{restoring--;if(!restoring)sync(true);}
+  }
+  return {refresh,sync,restore,get syncing(){return syncing;},destroy(){
     unsubscribe?.();unbind();deck.off?.('fragmentshown',shown);deck.off?.('fragmenthidden',hidden);
     events.forEach(event=>deck.off?.(event,refresh));
   }};
