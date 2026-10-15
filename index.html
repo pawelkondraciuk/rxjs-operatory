@@ -587,6 +587,16 @@
 						<p>Porównaj położenie catchError: osobny operator za switchMap albo operator wewnątrz ramki każdego HTTP. http$ jest zimnym Observable, a każde kliknięcie tworzy jego nową subskrypcję. Ręczne postoje pokazują pracę A, błąd i wynik zastępczy []. W obu wariantach catchError subskrybuje of([]), które emituje i kończy się. Na zewnątrz kończy się cały wynik, a subskrypcja klik$ znika. Klik B nadal może wystąpić w źródle, lecz nie uruchamia HTTP B. Wewnątrz kończy się tylko inner A: kolejne kliknięcie uruchamia HTTP B z własnym catchError i przekazuje wynik B. Przerywana linia wskazuje zakres prac tworzonych przez switchMap; nie jest subskrypcją. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik: tutaj wynika to z wyboru of([]).</p>
 						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
+					<template data-checkpoint-notes="b04-catcherror-2">
+                        <div data-checkpoint="ready"><p><strong>0 — Definicja</strong></p><p>Zobaczmy, co się stanie, gdy HTTP zwróci błąd, ale catchError znajduje się wewnątrz switchMap.</p></div>
+                        <div data-checkpoint="subscribe"><p><strong>1 — Subscribe</strong></p><p>Subskrybujemy zewnętrzny strumień kliknięć.</p></div>
+                        <div data-checkpoint="click-a"><p><strong>2 — Klik A</strong></p><p>Pierwsze kliknięcie uruchamia wewnętrzny request HTTP.</p></div>
+                        <div data-checkpoint="request"><p><strong>3 — Request A</strong></p><p>Request trwa. Zwróćcie uwagę, gdzie umieściliśmy catchError.</p></div>
+                        <div data-checkpoint="error"><p><strong>4 — Error</strong></p><p>HTTP zwraca błąd. Ten błąd trafia do catchError wewnątrz konkretnego requestu.</p></div>
+                        <div data-checkpoint="fallback"><p><strong>5 — Fallback of([])</strong></p><p>CatchError nie naprawia HTTP. Subskrybuje zastępcze of([]), które emituje pustą tablicę. Inner kończy się poprawnie.</p></div>
+                        <div data-checkpoint="click-b"><p><strong>6 — Klik B</strong></p><p>Ale czy cały strumień kliknięć nadal działa? Sprawdźmy. Klikamy ponownie.</p></div>
+                        <div data-checkpoint="finished"><p><strong>7 — Sukces B</strong></p><p>I proszę — drugi request działa normalnie. Obsłużyliśmy błąd lokalnie, nie kończąc zewnętrznego Observable.</p></div>
+                    </template>
 				</section>
 <section id="22-refcount" class="animation-slide" data-animation="22-refcount">
 					<h2>Widok zniknął. Dlaczego timer nadal działa?</h2>

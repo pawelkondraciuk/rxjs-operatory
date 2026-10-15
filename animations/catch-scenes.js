@@ -85,3 +85,4 @@ function catchGraph(scene) {
     tokens:inside?[]:[{at:8,until:13,modelTime:true,value:'B',color:'b',x:clicksX,y:145,phase:'unobserved'}],
   };
 }
+

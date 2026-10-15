@@ -238,7 +238,8 @@ test('every variant has deterministic READY, question, FINISHED and fixed geomet
 
 test('catchError confines the error to its scope and only inner recovery accepts the next click',async()=>{
   const {scenes,engine:{compileScene}}=await harness();
-  for(const [id,inside] of [['b04-catcherror',false],['b04-catcherror-2',true]]) {
+  // catchError wewnątrz (-2) ma graf MAIN switchMap: tests/catch-inside.test.cjs.
+  for(const [id,inside] of [['b04-catcherror',false]]) {
     const engine=compileScene(scenes.get(id)),initial=engine.snapshot(0);
     const node=(frame,id)=>frame.nodes.find(n=>n.id===id);
     const history=frame=>frame.histories.find(h=>h.anchor==='observer').values.map(v=>v.value).join(',');

@@ -746,14 +746,16 @@ Modele są symulacją dydaktyczną, nie usługą produkcyjną. Testy sprawdzają
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
 | b04-catcherror | catchError na zewnątrz | `klik$.pipe(switchMap(() => http$), catchError(() => of([])))` |
-| b04-catcherror-2 | catchError wewnątrz | `klik$.pipe(switchMap(() => http$.pipe(catchError(() => of([])))))` |
+| b04-catcherror-2 | catchError wewnątrz | `klik$.pipe(switchMap(id =>`<br>`  http.get(url(id)).pipe(catchError(() => of([])))))` |
 
 **Na bloczkach i w animacji:**
 
 - Na zewnątrz: górny potok „klik$” → „switchMap” → „catchError” → „Odbiorca”. W ramce poniżej HTTP A; błąd dociera przez switchMap do zewnętrznego catchError. Odbiorca otrzymuje [] i complete. Klik B pozostaje przy odłączonym źródle, bez utworzenia HTTP B.
-- Wewnątrz: górny potok „klik$” → „switchMap” → „Odbiorca”. Ramka prac pokazuje osobno HTTP A → catchError → [] i późniejsze HTTP B → catchError → B. Complete dotyczy tylko inner; po wynikach [] i B odbiorca nadal subskrybuje kliknięcia.
+- Wewnątrz (wygląd MAIN switchMap): góra „klik$” → „switchMap” → kompaktowy odbiorca S1, jeden tor S1 przez cały czas aktywny (bez complete). Pod linią podziału PRACE WEWNĘTRZNE z dwoma kolumnami „HTTP GET” i „catchError”; wiersz na każdy inner (#1 · A, #2 · B) z portami i poziomym kablem do prawej krawędzi. Bez kafelka wyniku i bez kontenera.
+- Przebieg wewnątrz (czas modelu): subscribe S1 w 0,3 s, klik A w 1 s uruchamia HTTP A. W 4 s HTTP A kończy się błędem: czerwony impuls biegnie tylko do catchError, etap HTTP pokazuje „error”, do S1 nic nie dociera. catchError pokazuje chwilową pigułkę `of([])`, w 4,5 s emituje kulkę [] (przez switchMap do S1), w 5 s inner A kończy się complete (zielony etap catchError). Klik B w 6,5 s tworzy #2 · B i nowy HTTP, który w 9 s zwraca B → S1 i kończy inner B. S1 ma [] i B, nadal słucha kliknięć. Licznik requestów HTTP: 1, potem 2.
+- Postoje wewnątrz: subscribe, click-a, request, error, fallback, click-b, potem AUTO do sukcesu B. Notatki per checkpoint w `template[data-checkpoint-notes="b04-catcherror-2"]` (0–7, 60–90 s).
 - HTTP A pokazuje „× error” w chwili wysłania błędu; klik$ zostaje odłączony dopiero po dotarciu błędu do switchMap. Zewnętrzny catchError robi się zielony („✓ complete”) dopiero po wysłaniu complete za [].
-- Error jest oznaczony podpisem i czerwonym obramowaniem pracy. Ręczne postoje: HTTP A pracuje → błąd → [] i pytanie o klik B. Kolejny krok uruchamia AUTO do wyniku. Historia odbiorcy zmienia się po dotarciu wartości. Licznik pokazuje 1 lub 2 requesty.
+- Na zewnątrz: error jest oznaczony podpisem i czerwonym obramowaniem pracy. Ręczne postoje: HTTP A pracuje → błąd → [] i pytanie o klik B. Kolejny krok uruchamia AUTO do wyniku. Historia odbiorcy zmienia się po dotarciu wartości. Licznik pokazuje 1 lub 2 requesty.
 
 **Speaker notes:**
 

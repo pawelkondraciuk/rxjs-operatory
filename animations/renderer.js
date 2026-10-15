@@ -191,7 +191,13 @@ function innerWorkPanel(panel,frame,reduced=false) {
       }
       svg+=`<rect x="${sx}" y="${row.y}" width="${bar}" height="${h}" fill="${identity}"/>`;
       const label=status[stage.state]||(stage.hasProgress?'w trakcie':'oczekuje');
-      svg+=text(sx+stageW-18,cy,label,font,`style="text-anchor:end;fill:${stage.state==='completed'?'#26804E':stage.state==='errored'?'#C54848':'#26323B'}"`);
+      // Chwilowy fallback etapu obsługi błędu (np. of([]) w catchError): pigułka zamiast stanu, bez nowej kolumny.
+      if(stage.fallback) {
+        const fw=(String(stage.fallback.label).length*.6*font)+28,fx=sx+stageW-14-fw;
+        svg+=`<g data-inner-fallback="${esc(stage.fallback.label)}" opacity="${reduced?1:+stage.fallback.opacity.toFixed(3)}"><rect x="${fx}" y="${cy-font*.75}" width="${fw}" height="${font*1.5}" rx="${font*.75}" fill="#F3E6F8" stroke="#B384C6" stroke-width="2"/>`+
+          text(fx+fw/2,cy+1,stage.fallback.label,font,'style="font-family:Consolas,ui-monospace,monospace;font-weight:700;fill:#6B3D80"')+'</g>';
+      }
+      else svg+=text(sx+stageW-18,cy,label,font,`style="text-anchor:end;fill:${stage.state==='completed'?'#26804E':stage.state==='errored'?'#C54848':'#26323B'}"`);
       svg+='</g>';
     });
     svg+=idLabel+`<path d="M${tileLeft} ${row.y}H${tileRight}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/>`;

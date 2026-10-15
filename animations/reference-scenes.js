@@ -606,7 +606,7 @@ const frames = {
   '16:9': {...horizontal,height:460,tileY:50,tileH:76,panelY:148,panelBottom:440,columnH:210,historyTop:41,historyStep:60},
   '4:3': {...horizontal,height:612,tileY:60,tileH:96,panelY:172,panelBottom:592,columnH:300,historyTop:56,historyStep:84},
 };
-const frameFor = scene => frames[scene.format==='4:3'?'4:3':'16:9'];
+export const frameFor = scene => frames[scene.format==='4:3'?'4:3':'16:9'];
 
 export function flattenGraph(scene) {
   const graph = buildFlattenGraph(scene), frame = frameFor(scene);
@@ -686,7 +686,9 @@ export function flattenGraph(scene) {
 }
 
 // Główny tor S1 nad lokalnymi requestami. Prototypy i dodatki zachowują swoje modele.
-function configureHttpWorkPanel(graph,scene,frame) {
+// Opcjonalne columns/stages/edge pozwalają dodać kolejne etapy wiersza (np. HTTP GET → catchError); domyślnie jeden etap HTTP GET.
+export function configureHttpWorkPanel(graph,scene,frame,{columns=[{id:'source',label:'HTTP GET',fill:'#8FC9D4',runtime:'#E3F0F3'}],
+  stages=i=>[{column:'source',edge:'inner'+i+'-op',progress:true}],edge=i=>'inner'+i+'-op'}={}) {
   const large=scene.format==='4:3',top=large?28:10,defH=large?70:56,rowH=large?74:64;
   const all=scene.operatorName==='concatAll';
   const laneY=top+defH+rowH/2;
@@ -707,24 +709,24 @@ function configureHttpWorkPanel(graph,scene,frame) {
   for(const edge of graph.edges.filter(e=>!e.internal))edge.subscriber='S1';
   graph.trays=[{anchor:'observer',x:970,y:laneY,w:270,balls:true,max:4,gap:8,ball:{r:29.5,font:34.2,textFill:'#fff'}}];
   const works=scene.jobs.map((job,i)=>({id:'#'+(i+1),slot:i,value:job.value,color:['#6D4CD3','#B85D05','#087FAD','#B73770'][i%4],
-    node:'inner'+i,edge:'inner'+i+'-op',queuedNode:graph.nodes.some(n=>n.id==='queued'+i)?'queued'+i:undefined,
+    node:'inner'+i,edge:edge(i),queuedNode:graph.nodes.some(n=>n.id==='queued'+i)?'queued'+i:undefined,
     ...(all?{value:job.value+'$',queueObservable:true,queueLabel:'W KOLEJCE · Observable'}:{}),
     ...(job.ignored?{ignoredNode:'ignored'+i}:{}),
-    duration:job.dur??job.end-job.start,stages:[{column:'source',edge:'inner'+i+'-op',progress:true}]}));
+    duration:job.dur??job.end-job.start,stages:stages(i)}));
   // Kafelek prac stoi pod źródłem i operatorem (lewa krawędź źródła – prawa krawędź operatora), z nagłówkiem
   // i wierszami tej samej wysokości co u góry; porty i kabel wyniku jak w głównym torze.
   const source=graph.nodes.find(n=>n.id==='source'),op=graph.nodes.find(n=>n.id==='op');
   const panel=createInnerWorkPanel({works,height:frame.height,large,headerH:defH,rowH,
     tileLeft:source.x-source.w/2,tileRight:op.x+op.w/2,
-    columns:[{id:'source',label:'HTTP GET',fill:'#8FC9D4',runtime:'#E3F0F3'}]});
+    columns});
   Object.assign(panel,{ballText:'#fff',portRadius:11,wire:5,ball:graph.ball});
   graph.panels=[panel];
   for(const node of graph.nodes.filter(n=>n.workRow))Object.assign(node,{x:panel.x+panel.w/2,
     y:panel.rowsTop+node.slot*panel.rowHeight+panel.rowHeight/2,w:panel.w-32,h:panel.rowHeight});
   // Subscribe inner trwa tyle co jeden krok głównego toru (0,8 s), nie cały łańcuch.
-  for(const edge of graph.edges.filter(e=>e.from.startsWith('inner')))Object.assign(edge,{travel:1,connect:.8});
+  for(const edge of graph.edges.filter(e=>e.internal))Object.assign(edge,{travel:1,connect:.8});
   const byValue=new Map(scene.jobs.flatMap((job,i)=>[[job.value,works[i].color],[job.value+'$',works[i].color]]));
-  const emitted=new Map(graph.edges.filter(e=>e.from.startsWith('inner')).flatMap(e=>e.events.map(v=>
+  const emitted=new Map(graph.edges.filter(e=>e.internal).flatMap(e=>e.events.map(v=>
     [JSON.stringify([v.at,v.value]),byValue.get(v.execution)])));
   for(const edge of graph.edges)edge.events=edge.events.map(e=>({...e,
     color:byValue.get(e.execution)||emitted.get(JSON.stringify([e.at,e.value]))||byValue.get(e.value)||e.color}));
@@ -837,4 +839,77 @@ export function configureConcurrency(scene) {
   Object.assign(scene,{jobs,operatorName:'mergeMap · limit 3',outerCompleteAt:5,graph:flattenGraph});
   configureFlattenPlayback(scene);
   scene.metrics=[{label:'aktywne / 3',count:'active'},{label:'w kolejce',value:t=>jobs.filter(j=>j.at<=t&&t<j.start).length}];
+}
+
+// catchError wewnątrz (b04-catcherror-2) w wyglądzie MAIN switchMap: góra klik$ → switchMap → S1, dół PRACE WEWNĘTRZNE
+// z etapami HTTP GET → catchError w każdym wierszu. Błąd HTTP A kończy tylko etap HTTP (czerwony impuls do catchError);
+// catchError pokazuje chwilowe of([]), emituje [] i kończy inner A complete. Outer (klik$, switchMap, S1) nie kończy się,
+// więc klik B uruchamia nowy HTTP z poprawnym wynikiem. [] wychodzi 0,5 s, a complete 1 s modelu po błędzie (jak
+// next/complete w Subject), żeby błąd, fallback i zakończenie były osobno widoczne.
+const insideTimes={subscribe:.3,a:1,error:4,fallback:4.5,doneA:5,b:6.5,response:9};
+export function configureCatchInside(scene) {
+  const at=insideTimes;
+  const jobs=[{value:'A',at:at.a,start:at.a,end:at.doneA,dur:at.error-at.a},{value:'B',at:at.b,start:at.b,end:at.response,dur:at.response-at.b}];
+  const fallback=E(at.fallback,'[]'),response=E(at.response,'B','b');
+  const ev=(type,edge,extra={})=>({type,edge,...extra}),during=(from,to)=>({from,to});
+  const op={id:'switch',bg:'rgba(216,179,230,.45)',line:'#b384c6'},http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'};
+  // Kod w dwóch liniach (pełny przykład z wcięciami nie mieści się nad diagramem); fragmenty świecą, gdy pracują.
+  const lines=[[{text:'klik$.pipe('},{text:'switchMap',mark:op,active:jobs.map((job,i)=>during(ev('deliver-next','source-op',{value:job.value}),ev('inner-subscribe',`inner${i}-catch${i}`)))},{text:'(id =>'}],
+    [{text:'  '},{text:'http.get(url(id))',mark:http,active:[during(ev('inner-subscribe','inner0-catch0'),ev('stream-error','inner0-catch0')),
+      during(ev('inner-subscribe','inner1-catch1'),ev('inner-next','inner1-catch1'))]},
+      {text:'.pipe('},{text:'catchError(() => of([]))',mark:{...op,id:'catch'},active:[during(ev('disconnected','inner0-catch0'),ev('inner-next','catch0-op'))]},{text:')))'}]];
+  Object.assign(scene,{jobs,operatorName:'switchMap',catchTimes:at,graph:catchInsideGraph,duration:at.response+1.5,
+    title:'catchError wewnątrz',playerLayout:'expanded',playerClass:'rx-flat-tiles rx-catch-inside',
+    timing:{subscribe:1.6,travel:1,transform:1.4,terminal:.8,gap:.5},
+    code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
+    rows:[R('klik$',jobs.map(job=>E(job.at,job.value,job.value==='A'?'a':'b'))),
+      R('HTTP A',[],[{start:at.a,end:at.error,label:'HTTP A',kind:'error',color:'http'}]),
+      R('catchError A',[fallback],[],{completeAt:at.doneA}),
+      R('HTTP B',[response],[{start:at.b,end:at.response,label:'HTTP B',kind:'work',color:'http'}],{completeAt:at.response}),
+      R('catchError B',[response],[],{completeAt:at.response}),
+      R('wynik',[fallback,response])],
+    captions:[[0,'catchError wewnątrz switchMap: każdy HTTP ma własną obsługę błędu'],
+      [at.a,'Klik A: switchMap uruchamia pierwszy HTTP'],
+      [at.error,'HTTP A: error. Błąd trafia tylko do catchError tego requestu'],
+      [at.fallback,'catchError subskrybuje of([]): pusta tablica trafia do S1'],
+      [at.doneA,'Inner A kończy się complete. klik$ i S1 nadal działają'],
+      [at.b,'Klik B: switchMap uruchamia nowy HTTP'],
+      [at.response,'HTTP B zwraca wynik B. S1 nadal czeka na kolejne kliknięcia']],
+    metrics:[{label:'requesty HTTP',count:'started'},{label:'aktywne',count:'active'}],
+    playback:{entry:'manual',finish:'hold',afterLastManualStop:'start-auto',stops:[
+      {id:'subscribe',modelTime:at.subscribe,caption:'S1 subskrybuje klik$ przez switchMap. Czekamy na kliknięcia'},
+      {id:'click-a',event:ev('inner-subscribe','inner0-catch0'),offset:.05,caption:'Klik A: switchMap tworzy inner #1 i uruchamia HTTP'},
+      {id:'request',event:ev('inner-subscribe','inner0-catch0'),offset:1.5,caption:'HTTP A pracuje. catchError stoi wewnątrz tego requestu'},
+      {id:'error',event:ev('disconnected','inner0-catch0'),caption:'HTTP A: error dotarł do catchError. Do S1 nic nie poszło'},
+      {id:'fallback',event:ev('disconnected','catch0-op'),offset:.35,caption:'catchError: of([]) wyemitowało []. Inner A complete, outer działa dalej'},
+      {id:'click-b',event:ev('inner-subscribe','inner1-catch1'),offset:.05,caption:'Klik B: nowy inner #2 i nowy HTTP'},
+    ]},
+  });
+}
+
+function catchInsideGraph(scene) {
+  const frame=frameFor(scene),at=scene.catchTimes,[clicks,,catchA,httpB,catchB,result]=scene.rows;
+  const nodes=[{id:'source',label:'klik$',color:'source',ready:true},{id:'op',label:'switchMap',color:'op',ready:true},
+    {id:'observer',label:'',ready:true},
+    // Wiersz pracy: HTTP i catchError to dwa etapy tego samego inner; pozycje nadaje configureHttpWorkPanel.
+    ...scene.jobs.flatMap((job,i)=>['inner','catch'].map(kind=>({id:kind+i,label:kind==='inner'?'HTTP '+job.value:'catchError',
+      inner:true,workRow:true,panel:'jobs',slot:i,ready:false,born:job.start})))];
+  const tag=(events,job)=>events.map(e=>({...e,execution:job.value}));
+  const edges=[{from:'source',to:'op',events:clicks.events,logicalStart:at.subscribe},
+    {from:'op',to:'observer',events:result.events,logicalStart:at.subscribe},
+    // A: HTTP kończy się błędem tylko na odcinku HTTP → catchError; catchError emituje [] i kończy inner complete.
+    {id:'inner0-catch0',from:'inner0',to:'catch0',events:[],logicalStart:at.a,logicalEnd:{at:at.error,kind:'error'},gateWork:true,internal:true},
+    {id:'catch0-op',from:'catch0',to:'op',events:tag(catchA.events,scene.jobs[0]),logicalStart:at.a,logicalEnd:{at:at.doneA,kind:'complete'},gateWork:true,internal:true},
+    {id:'inner1-catch1',from:'inner1',to:'catch1',events:tag(httpB.events,scene.jobs[1]),logicalStart:at.b,logicalEnd:{at:at.response,kind:'complete'},gateWork:true,internal:true},
+    {id:'catch1-op',from:'catch1',to:'op',events:tag(catchB.events,scene.jobs[1]),logicalStart:at.b,logicalEnd:{at:at.response,kind:'complete'},gateWork:true,internal:true}];
+  const graph={layout:'fixed',formatAware:true,width:1240,height:frame.height,illustratedWork:true,nodes,edges,
+    executions:scene.jobs.map((job,i)=>({id:job.value,node:'inner'+i,edge:`inner${i}-catch${i}`,panel:'jobs',value:job.value,label:'HTTP '+job.value,duration:job.dur})),
+    timeline:[{type:'catch-summary',event:{type:'disconnected',edge:'catch1-op'},offset:.5,
+      caption:'Błąd A obsłużony lokalnie: drugie kliknięcie działa, outer nadal aktywny'}]};
+  configureHttpWorkPanel(graph,scene,frame,{
+    columns:[{id:'source',label:'HTTP GET',fill:'#8FC9D4',runtime:'#E3F0F3'},{id:'catch',label:'catchError',fill:'#D8B3E6',runtime:'#F1E7F6'}],
+    stages:i=>[{column:'source',edge:`inner${i}-catch${i}`,progress:true},
+      {column:'catch',edge:`catch${i}-op`,handles:{edge:`inner${i}-catch${i}`,label:'of([])'}}],
+    edge:i=>`catch${i}-op`});
+  return graph;
 }

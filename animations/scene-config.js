@@ -1,4 +1,4 @@
-import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback, configureSubject, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate } from './reference-scenes.js';
+import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback, configureSubject, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside } from './reference-scenes.js';
 import { configureCatch } from './catch-scenes.js';
 
 // Końcowe ID po rozwinięciu wariantów; otwarcie pozostaje w kolejności HTML.
@@ -41,7 +41,8 @@ export function configureScene(scene) {
     scene.graph=flattenGraph;configureFlattenPlayback(scene);
   }
   if(id==='13-limit')configureConcurrency(scene);
-  if(id==='b04-catcherror')configureCatch(scene);
+  // catchError wewnątrz (-2) w wyglądzie MAIN switchMap; na zewnątrz zostaje dotychczasowy graf.
+  if(id==='b04-catcherror')(scene.catchInside?configureCatchInside:configureCatch)(scene);
   if(id==='05-zrodla'&&scene.sourceExample===0)configureInterval(scene);
   if(id==='05-zrodla'&&scene.sourceExample===1)configureHttp(scene);
   if(id==='04a-dwa-tory')configureLanes(scene);

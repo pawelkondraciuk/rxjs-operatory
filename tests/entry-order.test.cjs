@@ -52,7 +52,7 @@ test('the error source shows the error before operators downstream, and the oute
  const http=c.snapshot(sent+.05).nodes.find(n=>n.id==='http-a');
  assert.equal(http.workState,'errored');assert.equal(http.showProgress,false);
  assert.notEqual(c.snapshot(sent+.05).nodes.find(n=>n.id==='switch').workState,'errored');
- for(const id of ['b04-catcherror','b04-catcherror-2']){
+ for(const id of ['b04-catcherror']){
   const model=compile(scenes.get(id)),error=model.events.find(e=>e.type==='stream-error'&&e.edge.startsWith('http-a-')).at;
   assert.notEqual(model.snapshot(error+.1).nodes.find(n=>n.id==='http-a').status,'praca trwa',id);
  }

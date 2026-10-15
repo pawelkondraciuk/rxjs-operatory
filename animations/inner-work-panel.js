@@ -50,7 +50,13 @@ export function innerWorkPanelSnapshot(panel, records, births, time) {
       const fraction = r?.end?.kind === 'unsubscribe' ? clamp((r.end.logicalAt-r.logicalStart)/work.duration) : 1;
       const progress = state === 'subscribing' || state === 'idle' ? 0 : clamp((time-start)/Math.max(.001,stop-start))*fraction;
       const since = r?.end ? r.end.at + (stage.receiver ? r.end.duration : 0) : undefined;
-      return {...stage,index:i,state,hasProgress:Boolean(stage.progress),progress,since};
+      // handles: etap obsługi błędu (np. catchError) pokazuje chwilowy fallback (label, np. of([])) od dotarcia błędu
+      // wskazanej krawędzi do własnego zakończenia; potem zwykły stan (complete).
+      const handled = stage.handles && record(stage.handles.edge)?.end;
+      const caughtAt = handled?.kind === 'error' ? handled.at + handled.duration : undefined;
+      const fallback = caughtAt !== undefined && time >= caughtAt && state === 'active' ?
+        {label:stage.handles.label, opacity:clamp((time-caughtAt)/.3)} : undefined;
+      return {...stage,index:i,state,hasProgress:Boolean(stage.progress),progress,since,...(fallback?{fallback}:{})};
     });
     const establishing=time<Math.max(connected(output),...work.stages.map(s=>connected(record(s.edge||work.edge))));
     const state=establishing?'subscribing':stateOf(output), reveal=clamp((time-(work.queueObservable?output.start:born))/.3);
