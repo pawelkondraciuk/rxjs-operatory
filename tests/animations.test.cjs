@@ -102,7 +102,7 @@ test('legend directions, terminal colors and final value delivery',async()=>{
 
 test('only receiver changes terminal color; refCount removes the correct subscriptions',async()=>{
   const {player}=await harness();
-  const complete=player('20-sharereplay');complete.api.finish();
+  const complete=player('20-sharereplay-2');complete.api.finish();
   let svg=complete.elements.get('.rx-stage').innerHTML;
   assert.match(svg,/data-node="receiver0"[^]*?fill="#087438"/);
   assert.match(svg,/data-node="http1"[^]*?fill="#ffc15c"/);
@@ -205,7 +205,7 @@ test('subscription travels receiver → share → source; values travel source �
 
 test('a shared value never occupies consecutive connections simultaneously',async()=>{
   const {player}=await harness();
-  const {api,elements}=player('20-sharereplay');
+  const {api,elements}=player('20-sharereplay-2');
   let svg;
   let sawInput=false,sawOutput=false;
   for(let t=0;t<api.duration;t+=.1){

@@ -282,6 +282,65 @@ export function lanesGraph(scene) {
   };
 }
 
+// share() i późny odbiorca (20-sharereplay): HTTP GET → share() → A/B w wyglądzie torów, kolumny jak cold.
+// A uruchamia HTTP #1, które emituje 42 i kończy się; share() resetuje się po complete (resetOnComplete: true).
+// B subskrybuje dopiero potem i uruchamia HTTP #2 — jedna definicja, dwa wykonania (tory #1 i #2 w kolorach inicjatorów).
+// complete jest 1 s modelu po odpowiedzi (jak w Subject), żeby odbiór i zakończenie były osobnymi postojami.
+const shareLateTimes={a:1,responseA:5,completeA:6,b:7,responseB:11,completeB:12};
+const shareLateValue='#087FAD';
+const shareLateRuns=at=>[{id:'A',slot:0,lane:'U1',upstream:'http-share',start:at.a,response:at.responseA,end:at.completeA},
+  {id:'B',slot:1,lane:'U2',upstream:'http-share-2',start:at.b,response:at.responseB,end:at.completeB}];
+export function configureShareLate(scene) {
+  const at=shareLateTimes,runs=shareLateRuns(at),value=t=>E(t,'42',shareLateValue);
+  const ev=(type,edge)=>({type,edge}),during=(from,to)=>({from,to});
+  const http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},share={id:'share',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
+  // HTTP świeci od wysłania odpowiedzi do jej dotarcia do share, share() — podczas przekazania wartości odbiorcy.
+  const lines=[[{text:'http$',mark:http,active:runs.map(r=>during(ev('source-next',r.upstream),ev('deliver-next',r.upstream)))},
+    {text:'.pipe('},{text:'share()',mark:share,active:runs.map(r=>during(ev('deliver-next',r.upstream),ev('source-next','share-'+r.id)))},{text:')'}]];
+  Object.assign(scene,{graph:shareLateGraph,shareLateTimes:at,playerLayout:'function',duration:at.completeB+2,ink:'#26323B',
+    playerClass:'rx-flat-tiles',code:'http$.pipe(share())',codeLines:lines,codeFrames:[],
+    timing:{subscribe:1.6,travel:1,transform:1.4,terminal:.8,gap:.5},
+    rows:[...runs.map((r,i)=>R(`HTTP #${i+1}`,[value(r.response)],[B(r.start,r.response,'request')],{completeAt:r.end})),
+      ...runs.map(r=>R(`Odbiorca ${r.id}`,[value(r.response)],[],{completeAt:r.end}))],
+    captions:[[0,'http$.pipe(share()): jedna definicja HTTP. Nic jeszcze nie działa'],
+      [at.a,'A subskrybuje. share() podpina się do HTTP i uruchamia wykonanie #1'],
+      [at.responseA,'HTTP #1 zwraca 42. share() przekazuje je do A'],
+      [at.b,'B subskrybuje po complete. share() nie pamięta 42 i startuje HTTP #2'],
+      [at.responseB,'HTTP #2 zwraca nowe 42. Ta sama definicja, nowy request']],
+    metrics:[{label:'Requesty HTTP',count:'started'}],
+    playback:manual([
+      {id:'subscribed-a',event:ev('connected','http-share'),offset:.35,caption:'A subskrybuje. share() uruchamia HTTP #1'},
+      {id:'received-a',event:ev('deliver-next','share-A'),offset:.35,caption:'HTTP #1 emituje 42. A otrzymuje wynik'},
+      {id:'complete-a',event:ev('disconnected','share-A'),offset:.8,caption:'HTTP #1 zakończone. share() przekazał complete i zresetował współdzielenie'},
+      {id:'subscribed-b',event:ev('connected','http-share-2'),offset:.35,caption:'B subskrybuje po complete. share() nie ma wyniku A, więc startuje HTTP #2'},
+      {id:'complete-b',event:ev('disconnected','share-B'),offset:.8,caption:'HTTP #2 zwróciło 42 dla B i zakończyło się'},
+    ]),
+  });
+}
+
+export function shareLateGraph(scene) {
+  const tall=scene.format==='4:3',top=tall?178:102,runs=shareLateRuns(scene.shareLateTimes);
+  const g={httpX:217,httpW:310,shareX:592,shareW:280,recvX:995,recvW:366},at=r=>({x:g.recvX,w:g.recvW,y:laneRowY(top,r.slot)});
+  const complete=end=>({at:end,kind:'complete'}),value=r=>[E(r.response,'42',shareLateValue)];
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball:{...laneLook.ball,textFill:'#fff'},
+    // U1/U2: wykonania HTTP w kolorach odbiorców, którzy je uruchomili; wiersz HTTP nosi numer wykonania.
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,U1:{...laneSubscribers.A,label:'#1'},U2:{...laneSubscribers.B,label:'#2'}},
+    nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,progressUntilNext:true,...laneTile('source',top,{U1:0,U2:1},2)},
+      {id:'share',x:g.shareX,w:g.shareW,label:'share()',color:'op',splitBalls:true,splitAt:.5,splitGuides:false,hubFan:false,rowTint:true,
+        ...laneTile('operator',top,{U1:0,A:0,U2:1,B:1},2)},
+      ...runs.map(r=>laneReceiver(r.id,r.id,at(r),{rowTint:true}))],
+    edges:runs.flatMap(r=>[
+      {id:r.upstream,from:'http',to:'share',subscriber:r.lane,logicalStart:r.start,logicalEnd:complete(r.end),events:value(r)},
+      {id:'share-'+r.id,from:'share',to:r.id,subscriber:r.id,logicalStart:r.start,logicalEnd:complete(r.end),hold:1.2,events:value(r)}]),
+    executions:runs.map((r,i)=>({id:`http-${i+1}`,node:'http',edge:r.upstream,duration:r.response-r.start})),
+    trays:runs.map(r=>laneTray(r.id,at(r),1)),
+    // .subscribe() nad kolumną odbiorców, do dotarcia impulsu do HTTP (każdy odbiorca uruchamia własne wykonanie).
+    callouts:runs.map(r=>subscribeCallout(r.id,'share-'+r.id,r.upstream,{x:g.recvX,y:top/2})),
+    timeline:[{type:'share-summary',event:{type:'disconnected',edge:'share-B'},offset:1,
+      caption:'Obaj dostali 42, ale były dwa requesty. share() nie przechowuje wyniku po complete'}],
+  };
+}
+
 // interval(1000): emisje bez końca, aż do ręcznego unsubscribe. Scena jest „na żywo”: model jest analityczny
 // (emisja co 1 s od zestawionej subskrypcji), a player kompiluje go dla przesuwanego okna czasu (scene.live).
 // Bez unsubscribe scena trwa do końca okna; .unsubscribe() wybiera chwilę rezygnacji i kończy scenę.

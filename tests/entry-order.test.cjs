@@ -81,7 +81,7 @@ test('the same value keeps its colour in both distinctUntilChanged branches',asy
 
 test('manual question stops do not reveal the replayed value or freeze fading capsules',async()=>{
  const {scenes,compile}=await deck();
- for(const id of ['20-sharereplay','20-sharereplay-2']){
+ for(const id of ['20-sharereplay-2']){
   const c=compile(scenes.get(id)),stop=c.stops.find(s=>s.id==='question'),f=c.snapshot(stop.time);
   assert.equal(f.tokens.length,0,id);
   assert.ok(f.edges.find(e=>e.id==='hub-receiver1').progress>.99,id);

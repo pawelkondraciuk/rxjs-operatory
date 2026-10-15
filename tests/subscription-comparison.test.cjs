@@ -8,8 +8,9 @@ async function comparison(id,mode='without',format='4:3'){
  return {scene,c:m.engine.compileScene(scene),render:m.renderer.renderScene};
 }
 const received=f=>Array.from(f.histories.filter(h=>h.anchor.startsWith('receiver')),h=>Array.from(h.values,e=>e.value));
-test('late share starts a second HTTP; shareReplay retains completed HTTP and replays to B',async()=>{
- for(const [mode,count] of [['without',2],['shared',1]]){
+// share (bez -2) ma wygląd torów: tests/share-late.test.cjs. Diagram „late” zostaje dla shareReplay.
+test('shareReplay retains completed HTTP and replays to B',async()=>{
+ for(const [mode,count] of [['shared',1]]){
   const {c}=await comparison('20-sharereplay',mode),f=c.snapshot(c.duration);
   const question=c.snapshot(c.stops.find(s=>s.id==='question').time);
   assert.deepEqual(received(question)[1],[],'B is connected; the answer is revealed only after the question');
@@ -30,7 +31,7 @@ test('late share starts a second HTTP; shareReplay retains completed HTTP and re
 });
 
 test('late comparison geometry, request counters and rewind remain correct in both formats',async()=>{
- for(const format of ['4:3','16:9'])for(const mode of ['without','shared']){
+ for(const format of ['4:3','16:9'])for(const mode of ['shared']){
   const {c,render}=await comparison('20-sharereplay',mode,format),f=c.snapshot(c.duration);
   const first=f.panels[0],next=f.nodes.find(n=>n.id==='receiver1');
   assert.ok(first.y+first.h<next.y-next.h/2,'history must not overlap the second receiver');

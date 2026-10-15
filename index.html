@@ -551,10 +551,19 @@
 					<h2>B przychodzi po odpowiedzi. Co dostanie?</h2>
 					<div class="rx-player" aria-label="B przychodzi po odpowiedzi. Co dostanie?"></div>
 					<aside class="notes">
-                        <p><strong>share:</strong> HTTP odpowiada i kończy się w 6 s. A znika w 8 s; B dołącza w 10 s. Czy nadal wystarczy jeden request? Domyślny share resetuje po complete, więc B uruchamia nowe HTTP.</p>
+                        <p><strong>share:</strong> Tory jak w cold/Subject: HTTP GET → share() → A/B. A uruchamia HTTP #1, które zwraca 42 i kończy się. Domyślny share resetuje po complete, więc późny B uruchamia HTTP #2 — ta sama definicja, drugie wykonanie, dwa requesty.</p>
                         <p><strong>shareReplay:</strong> Wewnętrzny ReplaySubject przechowuje ostatnią wartość. shareReplay({bufferSize:1,refCount:true}) zachowuje wynik poprawnie zakończonego źródła i odtwarza go dla B. RefCount true nie usuwa automatycznie zakończonego cache. To semantyka RxJS 7.8.2, nie pełna polityka cache ani TTL.</p>
                         <p><strong>Przejście:</strong> Wiemy już, kiedy wykonuje się praca i jak ją współdzielić. Teraz map zwróci Observable: kto będzie decydował, kiedy uruchomić jego pracę?</p>
                     </aside>
+				<template data-checkpoint-notes="20-sharereplay">
+                        <div data-checkpoint="ready"><p><strong>0 — Definicja</strong></p><p>Wiemy już, że share pozwala współdzielić jedno aktywne HTTP. Ale co stanie się, jeśli drugi odbiorca pojawi się dopiero po zakończeniu requestu?</p></div>
+                        <div data-checkpoint="subscribed-a"><p><strong>1 — A subskrybuje</strong></p><p>A subskrybuje jako pierwszy. Share uruchamia HTTP.</p></div>
+                        <div data-checkpoint="received-a"><p><strong>2 — HTTP #1 emituje 42</strong></p><p>HTTP zwraca 42, a A otrzymuje wynik.</p></div>
+                        <div data-checkpoint="complete-a"><p><strong>3 — HTTP #1 complete</strong></p><p>Request się zakończył. Share domyślnie resetuje swoje współdzielenie po complete.</p></div>
+                        <div data-checkpoint="subscribed-b"><p><strong>4 — Późny odbiorca B</strong></p><p>Teraz pojawia się B. Czy dostanie wynik, który przed chwilą otrzymał A? Nie. Share nie pamięta ostatniej wartości.</p></div>
+                        <div data-checkpoint="complete-b"><p><strong>5 — HTTP #2</strong></p><p>Zamiast tego powstaje drugie wykonanie HTTP. Ta sama definicja Observable, ale nowy request.</p></div>
+                        <div data-checkpoint="finished"><p><strong>6 — Stan końcowy</strong></p><p>Ostatecznie obaj dostali 42, ale wykonaliśmy dwa requesty. A gdybyśmy chcieli, żeby drugi odbiorca dostał poprzedni wynik bez kolejnego HTTP? Do tego przejdziemy na następnym slajdzie — shareReplay.</p></div>
+                    </template>
 				</section>
 
 
