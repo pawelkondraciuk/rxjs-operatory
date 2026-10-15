@@ -366,6 +366,16 @@ export function renderScene(frame,options={}) {
       const left=n.x-n.w/2,bend=(chipLeft-left)/2;
       svg+=`<path data-hub-link="${esc(input.subscriber)}-${esc(lane.subscriber)}" d="M${left} ${input.y}C${left+bend} ${input.y} ${chipLeft-bend} ${lane.y} ${chipLeft} ${lane.y}" fill="none" stroke="${input.color}" stroke-width="${3*k}" opacity="${Math.min(input.opacity,lane.opacity)}"/>`;
     }
+    // Kieszeń bufora (np. shareReplay): mały pod-kafelek z etykietą i slotem; pusty slot ma przerywany obrys.
+    if(n.bufferPocket) {
+      const b=n.bufferPocket,size=frame.ball||{r:29,font:35.5},x0=b.x-b.w/2;
+      svg+=`<g data-buffer="${esc(n.id)}" data-buffer-size="${b.values.length}"><rect x="${x0+1}" y="${b.y-b.h/2}" width="${b.w-2}" height="${b.h}" rx="${6*k}" fill="#F6F0F8" stroke="#B384C6" stroke-width="2"/>`;
+      svg+=text(x0+16*k,b.y,b.label,20*k,'style="text-anchor:start;fill:#65566C;font-weight:700"');
+      svg+=`<circle cx="${b.ball.x}" cy="${b.ball.y}" r="${size.r}" fill="none" stroke="#B384C6" stroke-width="2" stroke-dasharray="6 5"/>`;
+      // Zapisana kulka pojawia się dokładnie tam, gdzie dojechał token zapisu, więc bez fade-in.
+      for(const v of b.values)svg+=ball(b.ball.x,b.ball.y,v.value,v.color,size,1,'data-token="buffered"');
+      svg+='</g>';
+    }
     for(const dot of n.socketDots||[])
       svg+=`<circle data-socket="${dot.side}" data-subscriber="${esc(dot.subscriber)}" cx="${dot.side==='out'?n.x+n.w/2:n.x-n.w/2}" cy="${dot.y}" r="${dot.r??13*k}" fill="${dot.color}" stroke="#fff" stroke-width="3" opacity="${dot.opacity}"/>`;
     svg+='</g>';

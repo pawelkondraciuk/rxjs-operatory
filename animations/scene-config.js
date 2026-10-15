@@ -1,4 +1,4 @@
-import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback, configureSubject, configureInterval, configureHttp, configureLanes, configureShareLate } from './reference-scenes.js';
+import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback, configureSubject, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate } from './reference-scenes.js';
 import { configureCatch } from './catch-scenes.js';
 
 // Końcowe ID po rozwinięciu wariantów; otwarcie pozostaje w kolejności HTML.
@@ -52,8 +52,9 @@ export function configureScene(scene) {
     scene.playerLayout='expanded';
     scene.metrics=[{label:'requesty',count:'started'}];
   }
-  // Wariant share: wygląd torów (HTTP GET → share() → A/B); shareReplay (-2) zachowuje dotychczasowy diagram.
+  // Oba warianty 20 mają wygląd torów: share (HTTP GET → share() → A/B) i shareReplay z kieszenią bufora.
   if(scene.id==='20-sharereplay')configureShareLate(scene);
+  if(scene.id==='20-sharereplay-2')configureShareReplayLate(scene);
   // Zachowany hot w EXTRAS: płaskie kafelki jak w 04a i 08–12.
   if(id==='06a-cold-hot-2')scene.playerClass=[scene.playerClass,'rx-flat-tiles'].filter(Boolean).join(' ');
   if(scene.flattenLayout||scene.playback?.stops){

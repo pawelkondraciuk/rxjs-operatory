@@ -102,11 +102,7 @@ test('legend directions, terminal colors and final value delivery',async()=>{
 
 test('only receiver changes terminal color; refCount removes the correct subscriptions',async()=>{
   const {player}=await harness();
-  const complete=player('20-sharereplay-2');complete.api.finish();
-  let svg=complete.elements.get('.rx-stage').innerHTML;
-  assert.match(svg,/data-node="receiver0"[^]*?fill="#087438"/);
-  assert.match(svg,/data-node="http1"[^]*?fill="#ffc15c"/);
-  assert.doesNotMatch(svg,/data-connection=/);
+  let svg;
   for(const [id,alive] of [['22-refcount',true],['22-refcount-2',false]]){
     const p=player(id);p.api.finish();svg=p.elements.get('.rx-stage').innerHTML;
     assert.equal(svg.includes('data-connection="timer-hub"'),alive);
@@ -210,8 +206,8 @@ test('a shared value never occupies consecutive connections simultaneously',asyn
   let sawInput=false,sawOutput=false;
   for(let t=0;t<api.duration;t+=.1){
     api.seek(t);svg=elements.get('.rx-stage').innerHTML;
-    const input=svg.includes('data-value-on="http1-hub"');
-    const output=svg.includes('data-value-on="hub-receiver0"');
+    const input=svg.includes('data-value-on="http-replay"');
+    const output=svg.includes('data-value-on="replay-A"');
     assert.ok(!(input&&output),`simultaneous value at ${t}`);
     if(input)sawInput=true;
     if(output){assert.ok(sawInput);sawOutput=true;}

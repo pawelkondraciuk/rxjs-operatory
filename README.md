@@ -529,24 +529,25 @@ Podstawa wzmianki o cyklu życia: [Angular AsyncPipe](https://angular.dev/api/co
 
 ### share a shareReplay — `20-sharereplay`
 
-**Temat:** odbiorca dołączający po odpowiedzi i complete HTTP. share() współdzieli aktywne wykonanie, ale domyślnie (resetOnComplete: true) nie przechowuje wyniku po complete. Wariant share używa wyglądu torów z cold/Subject; shareReplay (-2) zachowuje dotychczasowy diagram: definicja tylko w kodzie, tory HTTP i odbiorców rozsunięte pionowo, share/shareReplay pośrodku, postój pytania przed odbiorem odpowiedzi B. Licznik requestów w obu wariantach opiera się na stanie wykonań; bufor odpowiedzi -2 jest pokazany dopiero po zakończeniu upstream.
+**Temat:** odbiorca dołączający po odpowiedzi i complete HTTP. share() współdzieli aktywne wykonanie, ale domyślnie (resetOnComplete: true) nie przechowuje wyniku po complete. Oba warianty używają wyglądu torów z cold/Subject. shareReplay({ bufferSize: 1, refCount: true }) ma dodatkowo małą kieszeń „bufor” pod kafelkiem operatora: późny odbiorca dostaje wartość z pamięci operatora, a nie z nowego requestu. Licznik requestów w obu wariantach opiera się na stanie wykonań.
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
 | 20-sharereplay | share: późny odbiorca uruchamia HTTP | `http$.pipe(share())` |
-| 20-sharereplay-2 | shareReplay: późny odbiorca dostaje wynik | `http$.pipe(shareReplay({bufferSize: 1, refCount: true}))` |
+| 20-sharereplay-2 | shareReplay: późny odbiorca dostaje wynik | `http$.pipe(`<br>`  shareReplay({ bufferSize: 1, refCount: true }))` |
 
 **Na bloczkach i w animacji:**
 
 - share (tory jak cold): trzy kolumny HTTP GET → share() → kompaktowi odbiorcy A/B z inboxami, bez legendy i dodatkowych paneli. Jeden nagłówek „HTTP GET”, dwa wiersze wykonań: #1 (fioletowy, uruchomiony przez A) i #2 (pomarańczowy, uruchomiony przez B); porty HTTP, share() i odbiorców leżą na wspólnym Y toru. Kod `http$.pipe(share())` bez trwałych subscribe; chwilowe „.subscribe()” z literą A/B nad kolumną odbiorców trwa do dotarcia impulsu do HTTP. Kulki 42 mają kolor wykonania i odbiorcy: z HTTP #1 do A fioletowa, z HTTP #2 do B pomarańczowa (jak share 04a i Subject).
 - Przebieg (czas modelu): A subskrybuje w 1 s, HTTP #1 emituje 42 w 5 s, complete w 6 s (zielony impuls, wiersze A w stanie completed, kable przygaszone). B pojawia się i subskrybuje dopiero w 7 s, uruchamia HTTP #2, które emituje nowe 42 w 11 s i kończy się w 12 s. B nie dostaje wyniku A. Licznik „Requesty HTTP”: 0 → 1 (po zestawieniu subskrypcji A) → 1 po complete → 2 (po zestawieniu subskrypcji B); next go nie zmienia.
 - Postoje share: subscribed-a, received-a, complete-a, subscribed-b, complete-b, potem AUTO do FINISHED z podpisem podsumowania. Notatki prelegenta per checkpoint w `template[data-checkpoint-notes="20-sharereplay"]` (0–6, 45–60 s), jak w Subject.
-- shareReplay: „HTTP #1” → „shareReplay(1)” → „Widok A”, „Widok B”. Panel „bufor ReplaySubject” pojawia się dopiero po dotarciu danych do operatora; B w 10 s dostaje zapamiętany wynik bez nowego HTTP. Licznik 1 requestu oraz jedna wartość w panelu bufora.
-- Postój pytania shareReplay wypada tuż przed wylotem wartości z bufora, więc kulka „dane” nie zdradza odpowiedzi. Napis „complete” przy HTTP i odbiorcach pojawia się dopiero przy faktycznym complete (wysłanym albo dostarczonym), nie razem z odpowiedzią.
+- shareReplay (tory jak share): HTTP GET → shareReplay(1) → odbiorcy A/B. Jeden nagłówek „HTTP GET” i tylko jedno wykonanie #1 (fioletowe, uruchomione przez A); B nie dostaje toru HTTP. Pod kafelkiem shareReplay(1) wisi kieszeń „bufor” z jednym slotem (przerywany okrąg, gdy pusty), która zjeżdża razem z rosnącymi wierszami.
+- Przebieg (czas modelu): A subskrybuje w 1 s i uruchamia HTTP #1; odpowiedź 42 w 5 s rozgałęzia się w wierszu A — jedna kulka jedzie do A, druga do kieszeni bufora (zapis równolegle z rozesłaniem). Complete w 6 s: tory A zakończone, bufor nadal zawiera 42 (refCount: true nie czyści wyniku zakończonego źródła). B subskrybuje w 7 s tylko do shareReplay(1); po zestawieniu subskrypcji kopia 42 wyjeżdża z kieszeni do portu B i trafia do odbiorcy B, potem complete. Kulki w kolorach odbiorców (A fioletowa, B pomarańczowa), w buforze wartość z wykonania #1. Licznik „Requesty HTTP”: 0 → 1 i zostaje 1.
+- Postoje shareReplay: subscribed-a, request (HTTP w trakcie, bufor pusty), stored (A i bufor mają 42), complete-a, subscribed-b (przed wyjęciem z bufora), replayed (B ma 42 i complete), potem AUTO do FINISHED z podpisem podsumowania. Notatki per checkpoint w `template[data-checkpoint-notes="20-sharereplay-2"]` (0–7, 45–60 s).
 
 **Speaker notes:**
 
-> share (notatki per checkpoint): A uruchamia HTTP #1, które zwraca 42 i kończy się; share resetuje się po complete, więc późny B uruchamia HTTP #2 — ta sama definicja, nowy request; ostatecznie obaj mają 42, ale były dwa requesty. Przejście do shareReplay. shareReplay (wspólne notatki sekcji): źródło HTTP kończy się odpowiedzią w 6 s, widok A znika w 8 s, B pojawia się w 10 s. shareReplay({bufferSize:1,refCount:true}) zachowuje wynik poprawnie zakończonego źródła i odtwarza go dla B. Mechanizm replay korzysta z ReplaySubject. RefCount true nie usuwa automatycznie tego zakończonego cache. Wersja RxJS 7.8.2.
+> share (notatki per checkpoint): A uruchamia HTTP #1, które zwraca 42 i kończy się; share resetuje się po complete, więc późny B uruchamia HTTP #2 — ta sama definicja, nowy request; ostatecznie obaj mają 42, ale były dwa requesty. Przejście do shareReplay. shareReplay (notatki per checkpoint): A uruchamia jedno HTTP; 42 trafia do A i jednocześnie do bufora; request się kończy, wartość zostaje; późny B dostaje ją od razu z bufora, bez nowego HTTP. Kluczowa różnica względem share(): jeden request, a późny odbiorca nadal dostaje wynik. shareReplay({bufferSize:1,refCount:true}) zachowuje wynik poprawnie zakończonego źródła (wewnętrzny ReplaySubject); refCount: true nie usuwa tego bufora. Wersja RxJS 7.8.2.
 
 ### Kosztowny map: bez share i z share — `21-share-miejsce`
 

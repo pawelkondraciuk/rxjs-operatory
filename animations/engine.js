@@ -297,6 +297,8 @@ export function compileScene(scene) {
     return laneRecords.filter(r=>r.b.id===n.id).flatMap(input=>input.events.map(e=>{
       const outputs=laneRecords.filter(r=>r.a.id===n.id).flatMap(out=>out.events.filter(v=>v.logicalAt===e.logicalAt&&v.at>=e.arrival)
         .map(v=>({value:v.value,color:v.color||'a',y:laneY(n,out.subscriber),at:v.at})));
+      // node.buffer: ta sama wartość trafia też do kieszeni bufora (zapis równolegle z rozesłaniem).
+      if(outputs.length&&n.buffer)outputs.push({value:e.value,color:e.color||'a',at:Math.min(...outputs.map(o=>o.at)),buffer:true});
       return outputs.length?{arrival:e.arrival,departure:Math.min(...outputs.map(o=>o.at)),value:e.value,color:e.color||'a',
         y:laneY(n,input.subscriber),left,right,x,outputs}:null;
     })).filter(Boolean);
@@ -308,6 +310,25 @@ export function compileScene(scene) {
       const p=(time-split.arrival)/(split.departure-split.arrival),opacity=Math.min(clamp(p/.15),clamp((1-p)/.15));
       return split.outputs.map(out=>({x1:split.x,y1:split.y,x2:split.right,y2:out.y,color:out.color,opacity}));
     });
+  }
+
+  // Kieszeń bufora (node.buffer, np. shareReplay): mały pod-kafelek tuż pod rosnącym kafelkiem operatora, zjeżdża razem
+  // z jego wierszami. Zawiera ostatnie size wartości wejścia, zapisane w chwili rozesłania (split); kulka zostaje po odtworzeniu.
+  function bufferOf(n,time) {
+    const b=n.buffer,r=graph.ball?.r??29,pad=b.pad??8,h=b.h??2*r+2*pad,gap=b.gap??6;
+    const bottom=n.top+n.defH+laneRowsOf(n,time).reduce((sum,row)=>sum+row.growth*n.rowH,0);
+    const y=bottom+gap+h/2,ball={x:n.x+n.w/2-pad-r-(b.inset??10),y};
+    const splits=splitsOf(n),inputs=laneRecords.filter(rec=>rec.b.id===n.id).flatMap(rec=>rec.events);
+    const stored=inputs.map(e=>({value:e.value,color:e.color||'a',shownAt:splits.find(sp=>sp.value===e.value&&sp.arrival===e.arrival)?.departure??e.arrival}))
+      .filter(v=>v.shownAt<=time).sort((a,b)=>a.shownAt-b.shownAt).slice(-(b.size||1));
+    return {x:n.x,y,w:n.w,h,label:b.label??'bufor',ball,values:stored};
+  }
+  // Odtworzenia z bufora: wartości wyjścia z replayHold bez odpowiadającego wejścia (logicalAt) — kulka wyjeżdża z kieszeni.
+  function replaysOf(n) {
+    const inputs=laneRecords.filter(rec=>rec.b.id===n.id).flatMap(rec=>rec.events);
+    return laneRecords.filter(rec=>rec.a.id===n.id&&rec.replayHold).flatMap(out=>out.events
+      .filter(v=>!inputs.some(e=>e.logicalAt===v.logicalAt))
+      .map(v=>({value:v.value,color:v.color||'a',start:v.at-Math.min(out.replayHold,n.buffer.move??.8),end:v.at,subscriber:out.subscriber})));
   }
 
   function snapshot(time) {
@@ -336,8 +357,18 @@ export function compileScene(scene) {
       if(time<split.arrival||time>=split.departure)continue;
       const p=(time-split.arrival)/(split.departure-split.arrival),ease=u=>u*u*(3-2*u);
       if(p<.4)tokens.push({x:split.left+(split.x-split.left)*ease(p/.4),y:split.y,value:split.value,color:split.color,phase:'split-in'});
-      else for(const out of split.outputs)tokens.push({x:split.x+(split.right-split.x)*ease((p-.4)/.6),y:split.y+(out.y-split.y)*ease((p-.4)/.6),
-        value:out.value,color:out.color,phase:'split-out',scale:1+.15*Math.max(0,1-Math.abs(p-.4)/.08)});
+      else for(const out of split.outputs) {
+        // Wyjście do bufora jedzie do kulki w kieszeni pod kafelkiem, pozostałe — do portów wyjść.
+        const target=out.buffer?bufferOf(n,time).ball:{x:split.right,y:out.y},u=ease((p-.4)/.6);
+        tokens.push({x:split.x+(target.x-split.x)*u,y:split.y+(target.y-split.y)*u,
+          value:out.value,color:out.color,phase:out.buffer?'buffer-in':'split-out',scale:1+.15*Math.max(0,1-Math.abs(p-.4)/.08)});
+      }
+    }
+    for(const n of nodes) if(n.buffer) for(const replay of replaysOf(n)) {
+      if(time<replay.start||time>=replay.end)continue;
+      const from=bufferOf(n,time).ball,u=(time-replay.start)/(replay.end-replay.start),e=u*u*(3-2*u);
+      tokens.push({x:from.x+(n.x+n.w/2-from.x)*e,y:from.y+(laneY(n,replay.subscriber)-from.y)*e,value:replay.value,color:replay.color,
+        phase:'replay',scale:1+.15*Math.max(0,1-u/.15)});
     }
     for(const n of nodes) if(n.transformBalls) for(const input of laneRecords.filter(r=>r.b.id===n.id)) {
       const output=laneRecords.find(r=>r.a.id===n.id&&r.subscriber===input.subscriber);
@@ -417,7 +448,8 @@ export function compileScene(scene) {
         disabled:evaluate(n.disabled,t),
         ...(laneRecords.length?{socketDots:socketsOf(n,time),laneStates:laneStatesOf(n,time),...growingTile(n,time),
           ...(n.subscriber?{laneColor:subscriberColor(n.subscriber),...(n.rowTint?{laneTint:graph.subscribers?.[n.subscriber]?.tint}:{})}:{}),
-          ...(n.splitBalls?{splitGuides:n.splitGuides===false?[]:splitGuides(n,time)}:{})}:{})};
+          ...(n.splitBalls?{splitGuides:n.splitGuides===false?[]:splitGuides(n,time)}:{}),
+          ...(n.buffer?{bufferPocket:bufferOf(n,time)}:{})}:{})};
     });
     const histories=trays.map(q=>{
       const values=records.filter(e=>e.b.id===q.anchor).flatMap(e=>e.events.filter(v=>v.arrival<=time));

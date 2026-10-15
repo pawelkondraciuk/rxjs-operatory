@@ -341,6 +341,66 @@ export function shareLateGraph(scene) {
   };
 }
 
+// shareReplay({ bufferSize: 1, refCount: true }) i późny odbiorca (20-sharereplay-2): HTTP GET → shareReplay(1) → A/B.
+// A uruchamia jedyne wykonanie HTTP (#1); 42 trafia do A i równolegle do kieszeni bufora pod operatorem. Po complete
+// bufor zostaje (refCount nie czyści wyniku zakończonego źródła). B subskrybuje później: bez toru HTTP, kulka wyjeżdża
+// z bufora (replayHold) do B, potem complete. Kolory kulek jak w share z późnym odbiorcą: wykonanie #1/A fioletowa, B pomarańczowa.
+const shareReplayTimes={a:1,response:5,complete:6,b:7};
+export function configureShareReplayLate(scene) {
+  const at=shareReplayTimes,ev=(type,edge)=>({type,edge}),during=(from,to)=>({from,to});
+  const a=E(at.response,'42',laneSubscribers.A.fill),b=E(at.b,'42',laneSubscribers.B.fill);
+  const http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},op={id:'share-replay',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
+  // Kod łamany przed shareReplay; HTTP świeci podczas odpowiedzi, shareReplay — przy rozesłaniu i zapisie oraz przy odtworzeniu dla B.
+  const lines=[[{text:'http$',mark:http,active:[during(ev('source-next','http-replay'),ev('deliver-next','http-replay'))]},{text:'.pipe('}],
+    [{text:'  '},{text:'shareReplay({ bufferSize: 1, refCount: true })',mark:op,
+      active:[during(ev('deliver-next','http-replay'),ev('source-next','replay-A')),during(ev('connected','replay-B'),ev('source-next','replay-B'))]},{text:')'}]];
+  Object.assign(scene,{graph:shareReplayLateGraph,shareReplayTimes:at,playerLayout:'function',duration:at.b+2,ink:'#26323B',
+    playerClass:'rx-flat-tiles',code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
+    timing:{subscribe:1.6,travel:1,transform:1.4,terminal:.8,gap:.5},
+    rows:[R('HTTP #1',[a],[B(at.a,at.response,'request')],{completeAt:at.complete}),
+      R('Odbiorca A',[a],[],{completeAt:at.complete}),R('Odbiorca B',[b],[],{completeAt:at.b})],
+    captions:[[0,'shareReplay(1): jedna definicja HTTP i pusty bufor. Nic jeszcze nie działa'],
+      [at.a,'A subskrybuje. shareReplay(1) uruchamia jedno wykonanie HTTP'],
+      [at.response,'HTTP zwraca 42. shareReplay(1) przekazuje je do A i zapisuje w buforze'],
+      [at.b,'B subskrybuje po complete. Bez nowego HTTP: 42 wychodzi z bufora']],
+    metrics:[{label:'Requesty HTTP',count:'started'}],
+    playback:manual([
+      {id:'subscribed-a',event:ev('connected','http-replay'),offset:.35,caption:'A subskrybuje. shareReplay(1) uruchamia jedno HTTP'},
+      {id:'request',event:ev('connected','http-replay'),offset:2,caption:'Request trwa. Bufor shareReplay(1) jest jeszcze pusty'},
+      {id:'stored',event:ev('deliver-next','replay-A'),offset:.35,caption:'HTTP zwraca 42: A dostaje wartość, a bufor ją zapamiętuje'},
+      {id:'complete-a',event:ev('disconnected','replay-A'),offset:.8,caption:'HTTP zakończone. Bufor nadal zawiera 42'},
+      {id:'subscribed-b',event:ev('connected','replay-B'),offset:.35,caption:'B subskrybuje po complete. Nie powstaje nowe HTTP'},
+      {id:'replayed',event:ev('disconnected','replay-B'),offset:.8,caption:'B dostał 42 prosto z bufora, a potem complete'},
+    ]),
+  });
+}
+
+export function shareReplayLateGraph(scene) {
+  const tall=scene.format==='4:3',top=tall?178:102,at=scene.shareReplayTimes;
+  // Operator szerszy niż w cold (330), żeby etykieta shareReplay(1) mieściła się w jednej linii; odbiorcy jak na innych slajdach.
+  const g={httpX:202,httpW:280,opX:577,opW:330,recvX:995,recvW:366};
+  const receivers=['A','B'].map((id,slot)=>({id,slot,pos:{x:g.recvX,w:g.recvW,y:laneRowY(top,slot)}}));
+  const complete=end=>({at:end,kind:'complete'});
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,U1:{...laneSubscribers.A,label:'#1'}},
+    nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,progressUntilNext:true,...laneTile('source',top,{U1:0},1)},
+      // buffer: kieszeń pod kafelkiem; splitAt .5 — kulka staje w wierszu A i rozgałęzia się do A i do bufora.
+      {id:'replay',x:g.opX,w:g.opW,label:'shareReplay(1)',color:'op',splitBalls:true,splitAt:.5,splitGuides:false,hubFan:false,rowTint:true,
+        buffer:{size:1,label:'bufor'},...laneTile('operator',top,{U1:0,A:0,B:1},2)},
+      ...receivers.map(r=>laneReceiver(r.id,r.id,r.pos,{rowTint:true}))],
+    edges:[{id:'http-replay',from:'http',to:'replay',subscriber:'U1',logicalStart:at.a,logicalEnd:complete(at.complete),events:scene.rows[0].events},
+      {id:'replay-A',from:'replay',to:'A',subscriber:'A',logicalStart:at.a,logicalEnd:complete(at.complete),hold:1.2,events:scene.rows[1].events},
+      // B: odtworzenie z bufora w chwili subskrypcji (replayHold — wyjęcie z kieszeni) i complete zakończonego źródła.
+      {id:'replay-B',from:'replay',to:'B',subscriber:'B',logicalStart:at.b,logicalEnd:complete(at.b),connect:.8,replayHold:1.2,events:scene.rows[2].events}],
+    executions:[{id:'http-1',node:'http',edge:'http-replay',duration:at.response-at.a}],
+    trays:receivers.map(r=>laneTray(r.id,r.pos,1)),
+    callouts:[subscribeCallout('A','replay-A','http-replay',{x:g.recvX,y:top/2}),
+      subscribeCallout('B','replay-B','replay-B',{x:g.recvX,y:top/2})],
+    timeline:[{type:'replay-summary',event:{type:'disconnected',edge:'replay-B'},offset:1,
+      caption:'Jeden request, dwóch odbiorców. Późny B dostał wynik z bufora shareReplay(1)'}],
+  };
+}
+
 // interval(1000): emisje bez końca, aż do ręcznego unsubscribe. Scena jest „na żywo”: model jest analityczny
 // (emisja co 1 s od zestawionej subskrypcji), a player kompiluje go dla przesuwanego okna czasu (scene.live).
 // Bez unsubscribe scena trwa do końca okna; .unsubscribe() wybiera chwilę rezygnacji i kończy scenę.

@@ -81,11 +81,6 @@ test('the same value keeps its colour in both distinctUntilChanged branches',asy
 
 test('manual question stops do not reveal the replayed value or freeze fading capsules',async()=>{
  const {scenes,compile}=await deck();
- for(const id of ['20-sharereplay-2']){
-  const c=compile(scenes.get(id)),stop=c.stops.find(s=>s.id==='question'),f=c.snapshot(stop.time);
-  assert.equal(f.tokens.length,0,id);
-  assert.ok(f.edges.find(e=>e.id==='hub-receiver1').progress>.99,id);
- }
  const micro=compile(scenes.get('27-resolver-microtask')),stop=micro.stops.find(s=>s.id==='scheduled');
  for(const h of micro.snapshot(stop.time).histories)for(const v of h.values)assert.ok(stop.time-v.shownAt>=.3-1e-6,h.anchor);
 });
@@ -122,8 +117,8 @@ test('a time window opens only after its subscription is wired',async()=>{
 
 test('a shared value keeps the producer colour at every receiver',async()=>{
  const {scenes,compile}=await deck();
- // 20-sharereplay (share) ma dwa osobne wykonania: kolor każdego sprawdza tests/share-late.test.cjs.
- for(const id of ['20-sharereplay-2','19-share','23-angular-alias','06a-cold-hot-2','18-async-2']){
+ // Para 20 (share/shareReplay) ma kulki w kolorach odbiorców: sprawdzają je tests/share-late i share-replay-late.
+ for(const id of ['19-share','23-angular-alias','06a-cold-hot-2','18-async-2']){
   const colours=new Map();
   for(const r of compile(scenes.get(id)).plan.records.values())for(const e of r.events){
    colours.set(e.value,colours.get(e.value)||new Set());colours.get(e.value).add(e.color);

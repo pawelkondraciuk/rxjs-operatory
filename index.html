@@ -552,7 +552,7 @@
 					<div class="rx-player" aria-label="B przychodzi po odpowiedzi. Co dostanie?"></div>
 					<aside class="notes">
                         <p><strong>share:</strong> Tory jak w cold/Subject: HTTP GET → share() → A/B. A uruchamia HTTP #1, które zwraca 42 i kończy się. Domyślny share resetuje po complete, więc późny B uruchamia HTTP #2 — ta sama definicja, drugie wykonanie, dwa requesty.</p>
-                        <p><strong>shareReplay:</strong> Wewnętrzny ReplaySubject przechowuje ostatnią wartość. shareReplay({bufferSize:1,refCount:true}) zachowuje wynik poprawnie zakończonego źródła i odtwarza go dla B. RefCount true nie usuwa automatycznie zakończonego cache. To semantyka RxJS 7.8.2, nie pełna polityka cache ani TTL.</p>
+                        <p><strong>shareReplay:</strong> Tory jak w share, z kieszenią „bufor” pod shareReplay(1). Jedno HTTP; 42 trafia do A i do bufora. Po complete bufor zostaje — refCount: true nie usuwa wyniku zakończonego źródła. Późny B dostaje 42 z bufora, bez nowego requestu. To semantyka RxJS 7.8.2, nie pełna polityka cache ani TTL.</p>
                         <p><strong>Przejście:</strong> Wiemy już, kiedy wykonuje się praca i jak ją współdzielić. Teraz map zwróci Observable: kto będzie decydował, kiedy uruchomić jego pracę?</p>
                     </aside>
 				<template data-checkpoint-notes="20-sharereplay">
@@ -563,6 +563,16 @@
                         <div data-checkpoint="subscribed-b"><p><strong>4 — Późny odbiorca B</strong></p><p>Teraz pojawia się B. Czy dostanie wynik, który przed chwilą otrzymał A? Nie. Share nie pamięta ostatniej wartości.</p></div>
                         <div data-checkpoint="complete-b"><p><strong>5 — HTTP #2</strong></p><p>Zamiast tego powstaje drugie wykonanie HTTP. Ta sama definicja Observable, ale nowy request.</p></div>
                         <div data-checkpoint="finished"><p><strong>6 — Stan końcowy</strong></p><p>Ostatecznie obaj dostali 42, ale wykonaliśmy dwa requesty. A gdybyśmy chcieli, żeby drugi odbiorca dostał poprzedni wynik bez kolejnego HTTP? Do tego przejdziemy na następnym slajdzie — shareReplay.</p></div>
+                    </template>
+				<template data-checkpoint-notes="20-sharereplay-2">
+                        <div data-checkpoint="ready"><p><strong>0 — Definicja, pusty bufor</strong></p><p>Przed chwilą widzieliśmy, że przy zwykłym share() późny odbiorca uruchamia nowy request. A co jeśli chcemy zachować ostatnią wartość?</p></div>
+                        <div data-checkpoint="subscribed-a"><p><strong>1 — A subskrybuje</strong></p><p>A subskrybuje jako pierwszy i uruchamia HTTP.</p></div>
+                        <div data-checkpoint="request"><p><strong>2 — HTTP pracuje</strong></p><p>Request trwa, ale zwróćcie uwagę, że shareReplay ma dodatkową odpowiedzialność — potrafi zapamiętać wynik.</p></div>
+                        <div data-checkpoint="stored"><p><strong>3 — 42 do A i do bufora</strong></p><p>HTTP zwraca 42. Ta wartość trafia do odbiorcy A, ale jednocześnie zostaje zapisana w buforze operatora.</p></div>
+                        <div data-checkpoint="complete-a"><p><strong>4 — Complete</strong></p><p>Request się kończy, ale zapamiętana wartość zostaje.</p></div>
+                        <div data-checkpoint="subscribed-b"><p><strong>5 — Późny odbiorca B</strong></p><p>Dopiero teraz pojawia się B. To jest późny odbiorca.</p></div>
+                        <div data-checkpoint="replayed"><p><strong>6 — 42 z bufora</strong></p><p>B dostaje wartość od razu z bufora. Nie uruchamiamy nowego HTTP.</p></div>
+                        <div data-checkpoint="finished"><p><strong>7 — Stan końcowy</strong></p><p>I to jest kluczowa różnica względem share(): jeden request, a późny odbiorca nadal dostaje wynik. Jeśli chcemy pamiętać ostatnie emisje, wtedy sięgamy po shareReplay().</p></div>
                     </template>
 				</section>
 
