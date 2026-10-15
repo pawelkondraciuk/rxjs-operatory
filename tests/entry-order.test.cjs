@@ -122,7 +122,8 @@ test('a time window opens only after its subscription is wired',async()=>{
 
 test('a shared value keeps the producer colour at every receiver',async()=>{
  const {scenes,compile}=await deck();
- for(const id of ['20-sharereplay','20-sharereplay-2','19-share','23-angular-alias','06a-cold-hot-2','18-async-2']){
+ // 20-sharereplay (share) ma dwa osobne wykonania: kolor każdego sprawdza tests/share-late.test.cjs.
+ for(const id of ['20-sharereplay-2','19-share','23-angular-alias','06a-cold-hot-2','18-async-2']){
   const colours=new Map();
   for(const r of compile(scenes.get(id)).plan.records.values())for(const e of r.events){
    colours.set(e.value,colours.get(e.value)||new Set());colours.get(e.value).add(e.color);

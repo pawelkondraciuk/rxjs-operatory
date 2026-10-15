@@ -286,12 +286,12 @@ export function lanesGraph(scene) {
 // A uruchamia HTTP #1, które emituje 42 i kończy się; share() resetuje się po complete (resetOnComplete: true).
 // B subskrybuje dopiero potem i uruchamia HTTP #2 — jedna definicja, dwa wykonania (tory #1 i #2 w kolorach inicjatorów).
 // complete jest 1 s modelu po odpowiedzi (jak w Subject), żeby odbiór i zakończenie były osobnymi postojami.
+// Kulka 42 ma kolor wykonania i odbiorcy (A fioletowa, B pomarańczowa), jak w share 04a i Subject.
 const shareLateTimes={a:1,responseA:5,completeA:6,b:7,responseB:11,completeB:12};
-const shareLateValue='#087FAD';
 const shareLateRuns=at=>[{id:'A',slot:0,lane:'U1',upstream:'http-share',start:at.a,response:at.responseA,end:at.completeA},
   {id:'B',slot:1,lane:'U2',upstream:'http-share-2',start:at.b,response:at.responseB,end:at.completeB}];
 export function configureShareLate(scene) {
-  const at=shareLateTimes,runs=shareLateRuns(at),value=t=>E(t,'42',shareLateValue);
+  const at=shareLateTimes,runs=shareLateRuns(at),value=r=>E(r.response,'42',laneSubscribers[r.id].fill);
   const ev=(type,edge)=>({type,edge}),during=(from,to)=>({from,to});
   const http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},share={id:'share',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
   // HTTP świeci od wysłania odpowiedzi do jej dotarcia do share, share() — podczas przekazania wartości odbiorcy.
@@ -300,8 +300,8 @@ export function configureShareLate(scene) {
   Object.assign(scene,{graph:shareLateGraph,shareLateTimes:at,playerLayout:'function',duration:at.completeB+2,ink:'#26323B',
     playerClass:'rx-flat-tiles',code:'http$.pipe(share())',codeLines:lines,codeFrames:[],
     timing:{subscribe:1.6,travel:1,transform:1.4,terminal:.8,gap:.5},
-    rows:[...runs.map((r,i)=>R(`HTTP #${i+1}`,[value(r.response)],[B(r.start,r.response,'request')],{completeAt:r.end})),
-      ...runs.map(r=>R(`Odbiorca ${r.id}`,[value(r.response)],[],{completeAt:r.end}))],
+    rows:[...runs.map((r,i)=>R(`HTTP #${i+1}`,[value(r)],[B(r.start,r.response,'request')],{completeAt:r.end})),
+      ...runs.map(r=>R(`Odbiorca ${r.id}`,[value(r)],[],{completeAt:r.end}))],
     captions:[[0,'http$.pipe(share()): jedna definicja HTTP. Nic jeszcze nie działa'],
       [at.a,'A subskrybuje. share() podpina się do HTTP i uruchamia wykonanie #1'],
       [at.responseA,'HTTP #1 zwraca 42. share() przekazuje je do A'],
@@ -321,8 +321,8 @@ export function configureShareLate(scene) {
 export function shareLateGraph(scene) {
   const tall=scene.format==='4:3',top=tall?178:102,runs=shareLateRuns(scene.shareLateTimes);
   const g={httpX:217,httpW:310,shareX:592,shareW:280,recvX:995,recvW:366},at=r=>({x:g.recvX,w:g.recvW,y:laneRowY(top,r.slot)});
-  const complete=end=>({at:end,kind:'complete'}),value=r=>[E(r.response,'42',shareLateValue)];
-  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball:{...laneLook.ball,textFill:'#fff'},
+  const complete=end=>({at:end,kind:'complete'}),value=r=>[E(r.response,'42',laneSubscribers[r.id].fill)];
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),
     // U1/U2: wykonania HTTP w kolorach odbiorców, którzy je uruchomili; wiersz HTTP nosi numer wykonania.
     subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,U1:{...laneSubscribers.A,label:'#1'},U2:{...laneSubscribers.B,label:'#2'}},
     nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,progressUntilNext:true,...laneTile('source',top,{U1:0,U2:1},2)},

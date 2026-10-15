@@ -24,8 +24,13 @@ test('late share: one HTTP definition, two executions in lanes #1 and #2',async(
  assert.equal(lane(end,'http','#1').color,'#7457D9');assert.equal(lane(end,'http','#2').color,'#D8840F');
  assert.deepEqual(balls(end,'A'),['42']);assert.deepEqual(balls(end,'B'),['42']);
  assert.equal(end.executionCounts.started,2);assert.equal(end.metrics[0].value,2);
- // Wspólny kolor next.
- assert.deepEqual([...new Set([...c.plan.records.values()].flatMap(r=>r.events.map(e=>e.color)))],['#087FAD']);
+ // Kolor kulki należy do wykonania i odbiorcy: #1 → A fioletowa, #2 → B pomarańczowa, na całej drodze.
+ const colours=edge=>Array.from(c.plan.records.get(edge).events,e=>e.color);
+ for(const [up,out,fill] of [['http-share','share-A','#cbbff2'],['http-share-2','share-B','#f3d09d']]){
+  assert.deepEqual(colours(up),[fill]);assert.deepEqual(colours(out),[fill]);
+ }
+ assert.deepEqual(Array.from(end.histories,h=>h.values[0].color),['#cbbff2','#f3d09d']);
+ assert.equal(end.ball.textFill,undefined);
 });
 
 test('late share: B subscribes only after HTTP #1 completed and starts HTTP #2',async()=>{
