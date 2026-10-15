@@ -431,25 +431,30 @@ export function httpGraph(scene) {
 
 // Ręczny multicast HTTP w stylu torów 04a: subskrypcje A/B dodają wiersze Subject,
 // ale nie tworzą ani nie zarządzają osobnym połączeniem z HTTP.
+// Tor U: wykonanie HTTP uruchomione przez subject$ (turkus); jasny progress jak tory A/B.
+const subjectUpstream={color:'#238F83',fill:'#b4e0d9',progress:'#abdbd3',label:'#1',ink:'#17695f',tint:'#e6f4f1'};
 export function configureSubject(scene) {
-  const at={a:1,b:2,http:3,next:7,complete:8},value=E(at.next,'42','#087FAD');
+  const at={a:1,b:2,http:3.75,next:7,complete:8},value=fill=>E(at.next,'42',fill);
   const ev=(type,edge,offset=0)=>({type,edge,...(offset?{offset}:{})});
   const active=(from,to)=>[{from,to}];
   const subjectMark={id:'subject',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
   const httpMark={id:'http',bg:'rgba(143,201,212,.4)',line:'#238F83'};
   const manualStart=ev('manual-connect','http-subject');
   const lines=[
-    [{text:'const subject$ = new Subject<number>();',mark:subjectMark}],
-    [{text:'subject$.subscribe(v => renderA(v));',mark:{id:'subscribe-a',bg:laneSubscribers.A.tint,line:laneSubscribers.A.color},
+    [{text:'const subject$ = '},{text:'new Subject<number>()',mark:subjectMark},{text:';'}],
+    // Linie subscribe bez stałego koloru (quiet): kolor toru tylko w czasie subskrypcji.
+    [{text:'subject$.subscribe(v => renderA(v));',mark:{id:'subscribe-a',bg:laneSubscribers.A.tint,line:laneSubscribers.A.color,quiet:true},
       active:active(ev('subscribe','subject-A',-.3),ev('connected','subject-A'))}],
-    [{text:'subject$.subscribe(v => renderB(v));',mark:{id:'subscribe-b',bg:laneSubscribers.B.tint,line:laneSubscribers.B.color},
+    [{text:'subject$.subscribe(v => renderB(v));',mark:{id:'subscribe-b',bg:laneSubscribers.B.tint,line:laneSubscribers.B.color,quiet:true},
       active:active(ev('subscribe','subject-B',-.3),ev('connected','subject-B'))}],
     [{text:'http.get<number>(url)',mark:httpMark,active:active(manualStart,ev('source-next','http-subject'))},
       {text:'.subscribe('},{text:'subject$',mark:{...subjectMark,id:'subject-observer'},active:active(manualStart,ev('connected','http-subject'))},{text:');'}],
   ];
   Object.assign(scene,{graph:subjectGraph,subjectTimes:at,playerLayout:'expanded',duration:10,
-    rows:[R('HTTP GET',[value],[B(at.http,at.next,'request')],{completeAt:at.complete}),
-      R('Odbiorca A',[value],[],{completeAt:at.complete}),R('Odbiorca B',[value],[],{completeAt:at.complete})],
+    // Kulka z HTTP ma kolor toru HTTP; Subject rozsyła osobne powiadomienia w kolorach odbiorców.
+    rows:[R('HTTP GET',[value(subjectUpstream.fill)],[B(at.http,at.next,'request')],{completeAt:at.complete}),
+      R('Odbiorca A',[value(laneSubscribers.A.fill)],[],{completeAt:at.complete}),
+      R('Odbiorca B',[value(laneSubscribers.B.fill)],[],{completeAt:at.complete})],
     metrics:[{label:'Requesty HTTP',count:'started'}],ink:'#26323B',playerClass:'rx-flat-tiles rx-subject-http',
     timing:{subscribe:.8,travel:1,terminal:.8,gap:.5},
     title:'Subject: ręczny multicast HTTP',code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
@@ -457,7 +462,7 @@ export function configureSubject(scene) {
     playback:manual([
       {id:'subscribed-a',event:ev('connected','subject-A'),offset:.35,caption:'A subskrybuje Subject. HTTP jeszcze nie działa'},
       {id:'subscribed-b',event:ev('connected','subject-B'),offset:.35,caption:'Dwóch odbiorców Subjecta. Nadal zero requestów HTTP'},
-      {id:'connect-http',event:manualStart,caption:'Przekazujemy Subject jako Observer: http.get<number>(url).subscribe(subject$)'},
+      {id:'connect-http',event:manualStart,offset:.75,caption:'Przekazujemy Subject jako Observer: http.get<number>(url).subscribe(subject$)'},
       {id:'request',event:ev('connected','http-subject'),offset:.35,caption:'Osobna subskrypcja uruchomiła jeden request HTTP'},
       {id:'received',event:ev('deliver-next','http-subject'),offset:.35,caption:'Subject odbiera jedną wartość 42 z HTTP'},
       {id:'multicast',event:ev('deliver-next','subject-B'),offset:.35,caption:'Jedna emisja HTTP, dwa powiadomienia next. A i B otrzymali 42'},
@@ -469,20 +474,25 @@ export function configureSubject(scene) {
 export function subjectGraph(scene) {
   const tall=scene.format==='4:3',top=tall?110:72,at=scene.subjectTimes;
   const receivers=['A','B'].map((id,slot)=>({id,at:{x:995,w:366,y:laneRowY(top,slot)}}));
-  const end={at:at.complete,kind:'complete'},value=scene.rows[0].events;
-  return {layout:'fixed',formatAware:true,width:1240,height:tall?500:372,...laneGraphLook(),ball:{...laneLook.ball,textFill:'#fff'},
-    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,U:{color:'#238F83',fill:'#238F83',label:''}},
+  const end={at:at.complete,kind:'complete'},value=row=>scene.rows[row].events;
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?500:372,...laneGraphLook(),
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,U:subjectUpstream},
+    // splitAt:0 — kulka z HTTP rozdziela się na porcie wejściowym, więc nie stoi w wierszu A (nie sugeruje, że A dostał ją pierwszy).
     nodes:[{id:'http',x:217,w:310,label:'HTTP GET',workLanes:true,progressUntilNext:true,...laneTile('source',top,{U:0},1)},
-      {id:'subject',x:592,w:280,label:'Subject',splitBalls:true,splitAt:.5,splitGuides:false,upstreamStripe:false,hubFan:false,
+      {id:'subject',x:592,w:280,label:'Subject',splitBalls:true,splitAt:0,splitGuides:false,upstreamStripe:false,hubFan:false,
         ...laneTile('operator',top,{U:0,A:0,B:1},2)},
       ...receivers.map(r=>laneReceiver(r.id,r.id,r.at,{ready:false}))],
-    edges:[{id:'http-subject',from:'http',to:'subject',subscriber:'U',logicalStart:at.http,fixedStart:true,logicalEnd:end,events:value},
+    edges:[{id:'http-subject',from:'http',to:'subject',subscriber:'U',logicalStart:at.http,fixedStart:true,logicalEnd:end,events:value(0)},
       ...receivers.map(r=>({id:'subject-'+r.id,from:'subject',to:r.id,subscriber:r.id,logicalStart:r.id==='A'?at.a:at.b,
-        logicalEnd:end,hold:1.2,events:value}))],
+        logicalEnd:end,hold:1.2,events:value(r.id==='A'?1:2)}))],
     executions:[{id:'request',node:'http',edge:'http-subject',duration:at.next-at.http}],
     trays:receivers.map(r=>laneTray(r.id,r.at,1)),
-    callouts:receivers.map(r=>subscribeCallout(r.id,'subject-'+r.id,'subject-'+r.id,{x:850,y:top/2})),
-    timeline:[{type:'manual-connect',edge:'http-subject',event:{type:'subscribe',edge:'http-subject'},offset:-.35},
+    // .subscribe(subject$) z identyfikatorem wykonania #1: od ręcznego podłączenia do zestawienia subskrypcji HTTP.
+    callouts:[...receivers.map(r=>subscribeCallout(r.id,'subject-'+r.id,'subject-'+r.id,{x:850,y:top/2})),
+      {...laneCallout('.subscribe(subject$)','U',{type:'manual-connect',edge:'http-subject'},{type:'connected',edge:'http-subject'},{x:420,y:top/2}),label:'#1'}],
+    // Krok przed connect-http (~1,15 s): pauza 0,4 s po subscribed-b, manual-connect 1 s przed subscribe upstreamu,
+    // postój +0,75 pokazuje ustabilizowany napis; kabel rusza 0,25 s później.
+    timeline:[{type:'manual-connect',edge:'http-subject',event:{type:'subscribe',edge:'http-subject'},offset:-1},
       {type:'subject-summary',event:{type:'disconnected',edge:'subject-B'},offset:1,
         caption:'Subject nie buforuje. Upstream podłączamy i odłączamy ręcznie; share() zarządza nim za nas'}],
   };

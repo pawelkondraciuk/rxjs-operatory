@@ -49,11 +49,13 @@ test('one HTTP value splits inside Subject into identical simultaneous notificat
  assert.equal(a.at,b.at);assert.equal(a.arrival,b.arrival);
  const received=c.snapshot(at('received'));
  assert.equal(received.tokens.length,1);assert.equal(received.tokens[0].phase,'split-in');
- assert.equal(received.tokens[0].value,'42');assert.equal(received.tokens[0].color,'#087FAD');
+ assert.equal(received.tokens[0].value,'42');assert.equal(received.tokens[0].color,'#b4e0d9');
+ const hub=node(received,'subject');assert.ok(received.tokens[0].x<=hub.x-hub.w/2+hub.w*hub.splitAt+1e-6,'kulka rozdziela się przy lewej krawędzi Subject');
  assert.ok(received.histories.every(h=>!h.values.length));
  const split=c.snapshot(input.arrival+(a.at-input.arrival)*.7);
  assert.equal(split.tokens.length,2);
- assert.ok(split.tokens.every(t=>t.phase==='split-out'&&t.value==='42'&&t.color==='#087FAD'));
+ assert.ok(split.tokens.every(t=>t.phase==='split-out'&&t.value==='42'));
+ assert.deepEqual(Array.from(split.tokens,t=>t.color).sort(),['#cbbff2','#f3d09d']);
  assert.notEqual(split.tokens[0].y,split.tokens[1].y);
  const flying=c.snapshot((a.at+a.arrival)/2);
  assert.equal(flying.tokens.length,2);
@@ -64,8 +66,9 @@ test('one HTTP value splits inside Subject into identical simultaneous notificat
   assert.deepEqual(values(c.snapshot(a.arrival),id),['42']);
  }
  for(const f of [received,split,flying,c.snapshot(c.duration)]){
-  assert.equal(f.ball.textFill,'#fff');
-  assert.ok(f.histories.every(h=>h.values.every(v=>v.color==='#087FAD')));
+  assert.equal(f.ball.textFill,undefined);
+  // Kolor kulki należy do odbiorcy: A fioletowa, B pomarańczowa.
+  assert.ok(f.histories.every(h=>h.values.every(v=>v.color===({A:'#cbbff2',B:'#f3d09d'})[h.anchor])));
   assert.doesNotMatch(m.renderer.renderScene(f),/data-split-guide|data-hub-link|NaN|Infinity/);
  }
 });

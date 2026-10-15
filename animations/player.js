@@ -44,7 +44,8 @@ function paint(){
  const mark=segment=>{
   const opacity=reducedMotion&&segment.opacity>0?1:segment.opacity,text=codeHtml(segment.text);
   if(!segment.mark)return opacity<1?`<span style="opacity:${opacity}" aria-hidden="${opacity===0}">${text}</span>`:text;
-  return `<span class="rx-code-mark${segment.active?' rx-code-active':''}" data-mark="${esc(segment.mark.id||'')}" style="--mark-bg:${segment.mark.bg};--mark-line:${segment.mark.line};opacity:${opacity}" aria-hidden="${opacity===0}">${text}</span>`;
+  // mark.quiet: fragment bez stałego wyróżnienia — kolor pojawia się tylko w czasie active.
+  return `<span class="rx-code-mark${segment.mark.quiet?' rx-code-quiet':''}${segment.active?' rx-code-active':''}" data-mark="${esc(segment.mark.id||'')}" style="--mark-bg:${segment.mark.bg};--mark-line:${segment.mark.line};opacity:${opacity}" aria-hidden="${opacity===0}">${text}</span>`;
  };
  if(snapshot.codeView)el.code.innerHTML=snapshot.codeView.map(line=>line.map(mark).join('')).join('\n');
  else el.code.innerHTML=reveal?codeHtml(reveal.prefix)+`<span data-code-reveal="true" style="opacity:${reducedMotion&&reveal.opacity>0?1:reveal.opacity}" aria-hidden="${reveal.opacity===0}">${codeHtml(reveal.suffix)}</span>`:codeHtml(snapshot.code);

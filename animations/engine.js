@@ -446,7 +446,7 @@ export function compileScene(scene) {
         const opacity=Math.min(clamp((time-callout.from)/.25),1-clamp((time-callout.to)/.3));
         if(time<callout.from||opacity<=0)return [];
         const subscriber=graph.subscribers?.[callout.subscriber]||{};
-        return [{text:callout.text,label:callout.subscriber,x:callout.x??width/2,y:callout.y,size:callout.size,opacity,
+        return [{text:callout.text,label:callout.label??callout.subscriber,x:callout.x??width/2,y:callout.y,size:callout.size,opacity,
           color:subscriber.color||colors.a,ink:subscriber.ink||subscriber.color||'#26323B',fill:subscriber.tint||'#fff'}];
       })}:{}),
       ...executionState,
