@@ -17,111 +17,121 @@ const node=(frame,id)=>frame.nodes.find(n=>n.id===id);
 const dots=(frame,id)=>Array.from(node(frame,id).socketDots,d=>d.side+d.subscriber).sort();
 const lanesOf=(frame,id)=>Array.from(node(frame,id).laneStates,l=>`${l.role}:${l.subscriber}:${l.state}`);
 
-test('cold: one definition, a lane per subscriber through HTTP, map and receiver',async()=>{
- const {c,at}=await lanes();
+const fieldOf=(svg,id)=>svg.slice(svg.indexOf(`data-field="${id}"`),svg.indexOf('</g>',svg.indexOf(`data-field="${id}"`)));
+
+test('cold: one user$ definition, three view fields subscribe and start three simultaneous HTTP requests',async()=>{
+ const {c,at,render}=await lanes();
  const ready=c.snapshot(0);
  assert.deepEqual(dots(ready,'http'),[]);assert.equal(node(ready,'http').laneStates.length,0);
- assert.equal(node(ready,'A').visible,false);
- const subscribing=c.events.find(e=>e.type==='subscribe'&&e.edge==='map-A').at+.4;
- assert.deepEqual(dots(c.snapshot(subscribing),'map'),[],'gniazdo map dopiero po dotarciu subscribe');
- assert.deepEqual(lanesOf(c.snapshot(subscribing),'A'),['receiver:A:running']);
+ assert.deepEqual(Array.from(ready.nodes,n=>n.id),['http','A','B','C'],'bez map ani osobnych Observable pól');
+ for(const id of ['A','B','C'])assert.equal(node(ready,id).visible,true,id+': pole widoku istnieje od READY');
+ const svg0=render(ready);
+ for(const [id,label] of [['A','user.firstName'],['B','user.lastName'],['C','user.city']]){
+  assert.match(fieldOf(svg0,id),new RegExp(`data-field-state="empty"[\\s\\S]*>${label.replace('.','\\.')}</text>`),id+': etykieta pola');
+  assert.match(fieldOf(svg0,id),/data-field-slot="empty"/,id+': puste miejsce na wartość');
+ }
+ assert.equal(ready.metrics.find(m=>m.label==='Requesty HTTP').value,0);
+ const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge);
+ // A, B i C subskrybują po kolei (B 0,4 s po A, C 0,2 s po B); każde subscribe uruchamia osobne HTTP.
+ assert.deepEqual(['A','B','C'].map(id=>ev('subscribe','http-'+id).logicalAt),[1,1.4,1.6]);
+ // Postój first: A zestawione i widoczne w HTTP, B jeszcze nie subskrybuje.
  const first=c.snapshot(at('first'));
- assert.deepEqual(dots(first,'map'),['inA','outA']);
- assert.deepEqual(dots(first,'http'),['outA']);
+ assert.ok(at('first')<ev('subscribe','http-B').at,'postój przed subscribe B');
  assert.deepEqual(lanesOf(first,'http'),['work:A:running']);
- assert.deepEqual(lanesOf(first,'map'),['operator:A:running'],'map ma własną subskrypcję toru A');
- const second=c.snapshot(at('second'));
- assert.deepEqual(lanesOf(second,'http'),['work:A:running','work:B:running'],'cold: dwa requesty');
- assert.deepEqual(lanesOf(second,'map'),['operator:A:running','operator:B:running']);
- const [a,b]=node(second,'http').laneStates;
- assert.ok(a.progress>b.progress,'osobne wykonania mają osobny postęp');
- assert.notEqual(a.y,b.y);
+ assert.equal(node(first,'http').laneStates[0].opacity,1,'wiersz A w pełni widoczny');
+ assert.equal((first.callouts||[]).length,0,'bez napisów A ani B na postoju');
+ assert.equal(first.metrics.find(m=>m.label==='Requesty HTTP').value,1);
+ assert.ok(ev('subscribe','http-B').at>ev('connected','http-A').at&&ev('subscribe','http-C').at>ev('connected','http-B').at);
+ const requests=c.snapshot(at('requests'));
+ assert.deepEqual(lanesOf(requests,'http'),['work:A:running','work:B:running','work:C:running'],'trzy requesty jednocześnie');
+ assert.deepEqual(dots(requests,'http'),['outA','outB','outC']);
+ const [a,b,cc]=node(requests,'http').laneStates;
+ assert.ok(a.progress>b.progress&&b.progress>cc.progress&&cc.progress>0,'osobne wykonania mają osobny postęp');
+ assert.equal(requests.metrics.find(m=>m.label==='Requesty HTTP').value,3);
+ const firstConnected=ev('connected','http-A').at;
+ assert.equal(c.snapshot(firstConnected+.05).metrics.find(m=>m.label==='Requesty HTTP').value,1,'licznik rośnie po zestawieniu subskrypcji');
+ assert.ok(at('requests')<ev('source-next','http-A').at,'postój przed pierwszą odpowiedzią');
 });
 
-test('lanes finish independently and the receiver definition keeps its colour',async()=>{
+test('every HTTP execution emits the whole User object once; each field shows only its own property',async()=>{
  const {c,at,render}=await lanes();
- const done=c.snapshot(at('done'));
- assert.deepEqual(lanesOf(done,'http'),['work:A:completed','work:B:running']);
- assert.deepEqual(lanesOf(done,'map'),['operator:A:completed','operator:B:running']);
- assert.deepEqual(lanesOf(done,'A'),['receiver:A:completed']);assert.deepEqual(lanesOf(done,'B'),['receiver:B:running']);
- assert.equal(node(done,'http').laneStates[0].progress,1);assert.ok(node(done,'http').laneStates[1].progress<1);
- assert.ok(dots(done,'map').includes('inB')&&dots(done,'map').includes('outB'));
- const receiverA=node(done,'A');
- assert.equal(receiverA.notification,'complete');assert.equal(receiverA.fill,node(c.snapshot(at('first')),'A').fill,'kafelek odbiorcy nie zmienia koloru');
- assert.equal(receiverA.status,'');
- const end=c.snapshot(c.duration);
- for(const id of ['http','map','A','B'])assert.ok(node(end,id).socketDots.every(d=>Math.abs(d.opacity-.35)<1e-9),id+': gniazda zakończonego toru są przygaszone');
- const edge=(f,id)=>f.edges.find(e=>e.id===id);
- assert.ok(edge(done,'map-A').visible&&edge(done,'map-A').opacity<=.35,'kabel A zostaje jako przygaszona historia');
- assert.equal(edge(done,'map-A').color,'#7457D9','w kolorze toru, nie zielony');
- assert.ok(edge(done,'map-B').opacity===1&&edge(done,'map-B').phase==='subscribed','kabel B aktywny');
- assert.ok(end.edges.every(e=>e.visible&&e.opacity<=.35&&!e.pulse),'po końcu obie historie przygaszone, bez impulsów');
- const sent=c.events.find(e=>e.type==='stream-complete'&&e.edge==='http-map-A').at;
- const pulse=edge(c.snapshot(sent+.3),'http-map-A').pulse;
- assert.equal(pulse.color,'#26804E','complete przebiega zielonym impulsem');assert.ok(pulse.at>0&&pulse.at<1);
- assert.equal(node(c.snapshot(sent+.3),'map').laneStates[0].state,'running','map zmienia stan dopiero po dotarciu complete');
- assert.ok(['http','map','A','B'].every(id=>node(end,id).laneStates.every(l=>l.state==='completed')));
- assert.deepEqual(Array.from(end.histories,h=>Array.from(h.values,v=>v.value)),[['42'],['42']]);
- const svg=render(done);
- assert.match(svg,/data-lane="B" data-lane-role="work" data-lane-state="running"/);
- assert.match(svg,/data-lane="A" data-lane-role="operator" data-lane-state="completed"/);
- assert.match(svg,/<title>A · ✓ complete<\/title>/,'stan toru ma tekst');
- const mapDone=svg.slice(svg.indexOf('data-node="map"'),svg.indexOf('data-node="A"'));
- assert.deepEqual([...mapDone.matchAll(/data-row-state="(\w+)"/g)].map(m=>m[1]),['completed','running'],'zielony tylko wiersz A');
- assert.match(mapDone,/data-row-state="completed"[^>]*><rect[^>]+fill="#DDF1E1"/);
- assert.doesNotMatch(svg,/data-row-flash/,'postój nie łapie rozbłysku');
- const doneAt=c.events.find(e=>e.type==='stream-complete'&&e.edge==='map-A').at;
- assert.match(render(c.snapshot(doneAt+.2)),/data-row-flash="completed"/,'complete podkreśla krótki rozbłysk');
- const receiverDone=svg.slice(svg.indexOf('data-node="A"'),svg.indexOf('data-node="B"'));
- assert.match(receiverDone,/data-row-state="completed"/);
- assert.equal(node(done,'map').fill,node(c.snapshot(0),'map').fill,'nagłówek definicji map bez zmian');
- assert.match(svg,/data-socket="out" data-subscriber="B"/);
- assert.match(svg,/data-connection="map-A" data-phase="complete"[^>]*opacity="0.35"/,"kabel A jako przygaszona historia");
- const second=render(c.snapshot(at('second')));
- assert.doesNotMatch(second,/data-lane-icon=/,'stan wiersza niesie tło, bez ikon');
- assert.doesNotMatch(second,/data-row-state="running"[^>]*><rect[^>]+fill="#DDF1E1"/);
- const mapRows=second.slice(second.indexOf('data-node="map"'),second.indexOf('data-node="A"'));
- assert.deepEqual([...mapRows.matchAll(/data-row-state="(\w+)"/g)].map(m=>m[1]),['running','running']);
- assert.match(second,/<title>A · podłączony, czeka na next<\/title>/);
- assert.equal(render(c.snapshot(at('second'))),render(c.snapshot(at('second'))),'deterministyczna klatka');
+ for(const r of c.plan.records.values())assert.deepEqual(Array.from(r.events,e=>e.value),['{…}'],r.id+': cały obiekt, jedno next');
+ assert.equal(c.events.filter(e=>e.type==='source-next').length,3,'trzy odpowiedzi, po jednej na wykonanie');
+ const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at;
+ const fly=(ev('source-next','http-B')+ev('deliver-next','http-B'))/2;
+ assert.deepEqual(Array.from(c.snapshot(fly).tokens,t=>t.value+':'+t.edge),['{…}:http-B'],'kulka niesie symbol obiektu');
+ assert.match(fieldOf(render(c.snapshot(fly)),'B'),/data-field-state="empty"/,'pole puste, dopóki obiekt nie dotrze');
+ const received=c.snapshot(at('received')),svg=render(received);
+ for(const [id,value] of [['A','Paweł'],['B','Kondraciuk'],['C','Białystok']]){
+  const field=fieldOf(svg,id);
+  assert.match(field,new RegExp(`data-field-value="${value}" opacity="1.000"`),id+': '+value);
+  assert.doesNotMatch(field,/>\{…\}</,'pole nie pokazuje całego obiektu');
+ }
+ assert.deepEqual(Array.from(received.histories,h=>Array.from(h.values,v=>v.value+':'+v.color)),
+  [['{…}:#cbbff2'],['{…}:#f3d09d'],['{…}:#bcd6f5']],'odbiorca dostał obiekt w kolorze swojego wykonania');
+ assert.deepEqual(lanesOf(received,'http'),['work:A:running','work:B:running','work:C:running'],'complete przychodzi osobno, po odbiorze');
+ assert.ok(node(received,'http').laneStates.every(l=>l.progress===1),'postęp HTTP kończy się z odpowiedzią');
+ assert.equal(render(received),render(c.snapshot(at('received'))),'deterministyczna klatka');
+ const arrival=ev('deliver-next','http-A');
+ assert.match(fieldOf(render(c.snapshot(arrival+.15)),'A'),/data-field-value="Paweł" opacity="0.500"/,'wartość wchodzi fade-in 0,3 s');
 });
 
-test('code shows only the pipeline definition, coloured like its blocks',async()=>{
+test('each execution completes on its own: green pulse, completed rows, dimmed cables, counter ends at 3',async()=>{
+ const {c,render}=await lanes();
+ const edge=(f,id)=>f.edges.find(e=>e.id===id),end=c.snapshot(c.duration);
+ const sent=c.events.find(e=>e.type==='stream-complete'&&e.edge==='http-A').at;
+ assert.equal(edge(c.snapshot(sent+.3),'http-A').pulse.color,'#26804E','complete przebiega zielonym impulsem');
+ assert.equal(node(c.snapshot(sent+.3),'B').laneStates[0].state,'running','B kończy się osobno');
+ assert.match(render(c.snapshot(sent+.2)),/data-row-flash="completed"/,'complete podkreśla krótki rozbłysk');
+ assert.deepEqual(lanesOf(end,'http'),['work:A:completed','work:B:completed','work:C:completed']);
+ for(const id of ['A','B','C']){
+  assert.deepEqual(lanesOf(end,id),[`receiver:${id}:completed`]);
+  assert.equal(node(end,id).fill,node(c.snapshot(0),id).fill,'kafelek pola nie zmienia koloru');
+  assert.ok(edge(end,'http-'+id).opacity<=.35&&!edge(end,'http-'+id).pulse,'kabel zostaje jako przygaszona historia');
+ }
+ assert.equal(node(end,'http').fill,node(c.snapshot(0),'http').fill,'nagłówek definicji bez zmian');
+ assert.ok(['http','A','B','C'].every(id=>node(end,id).socketDots.every(d=>Math.abs(d.opacity-.35)<1e-9)),'gniazda przygaszone');
+ assert.equal(end.metrics.find(m=>m.label==='Requesty HTTP').value,3,'licznik kończy na 3');
+ assert.equal(end.caption,'Trzy pola wyglądają poprawnie, ale backend dostał trzy identyczne requesty');
+ const svg=render(end);
+ for(const [id,value] of [['A','Paweł'],['B','Kondraciuk'],['C','Białystok']])assert.match(fieldOf(svg,id),new RegExp(`data-field-value="${value}"`));
+ assert.match(svg,/<title>A · ✓ complete<\/title>/,'stan toru ma tekst');
+ assert.match(svg,/data-connection="http-A" data-phase="complete"[^>]*opacity="0.35"/);
+});
+
+test('code shows only the user$ definition, without subscribe or field operators',async()=>{
  const {c,at}=await lanes();
  const view=t=>Array.from(c.snapshot(t).codeView,line=>Array.from(line,part=>({...part})));
- for(const t of [0,at('first'),at('second'),c.duration]){
-  const v=view(t);
-  assert.equal(v.map(line=>line.map(p=>p.text).join('')).join('\n'),'http.get<number>(url).pipe(map(x => x * 2))','bez linii subscribe');
- }
- const marks=Object.fromEntries(view(0).flat().filter(p=>p.mark).map(p=>[p.mark.id,p]));
- assert.deepEqual(Object.keys(marks).sort(),['http','map']);
- const arrival=c.events.find(e=>e.type==='deliver-next'&&e.edge==='http-map-A').at,departure=c.events.find(e=>e.type==='source-next'&&e.edge==='map-A').at;
- assert.ok(view((arrival+departure)/2).flat().find(p=>p.mark?.id==='map').active,'map świeci podczas przekształcenia');
- assert.deepEqual(Array.from(c.snapshot(0).metrics,m=>m.label),['Pipeline','Requesty HTTP']);
+ for(const t of [0,at('requests'),at('received'),c.duration])
+  assert.equal(view(t).map(line=>line.map(p=>p.text).join('')).join('\n'),"const user$ = http.get<User>('/api/users/42');");
+ assert.deepEqual(view(0).flat().filter(p=>p.mark).map(p=>p.mark.id),['http']);
+ assert.doesNotMatch(c.snapshot(0).code,/map|pluck|subscribe/);
+ const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at;
+ const http=t=>view(t).flat().find(p=>p.mark?.id==='http').active;
+ assert.equal(http(at('requests')),false);
+ assert.equal(http((ev('source-next','http-C')+ev('deliver-next','http-C'))/2),true,'http.get świeci, gdy odpowiedź wylatuje');
+ assert.deepEqual(Array.from(c.snapshot(0).metrics,m=>m.label),['Observable','Requesty HTTP']);
+ assert.equal(c.snapshot(0).metrics[0].value,1);
 });
 
-test('cold: a transient .subscribe() overlay per lane, from the receiver appearing until the impulse reaches HTTP',async()=>{
+test('cold: a transient .subscribe() overlay per field, from the receiver subscribing until the impulse reaches HTTP',async()=>{
  const {c,at,render}=await lanes();
  const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at;
  const shown=t=>Array.from(c.snapshot(t).callouts||[],x=>x.text+' '+x.label);
  assert.deepEqual(shown(0),[],'same definicje: brak napisu');
- for(const id of ['A','B']){
-  const start=ev('subscribe','map-'+id),arrived=ev('connected','http-map-'+id);
+ for(const id of ['A','B','C']){
+  const start=ev('subscribe','http-'+id),arrived=ev('connected','http-'+id);
   assert.deepEqual(shown((start+arrived)/2),['.subscribe() '+id],'napis podczas impulsu '+id);
-  assert.ok(arrived-start+.3>=1.5,'napis widoczny wystarczająco długo');
-  assert.deepEqual(shown(arrived+.31),[],'znika po dotarciu impulsu do HTTP, nie czeka na request');
-  assert.equal(c.snapshot(arrived+.31).nodes.find(n=>n.id==='http').laneStates.find(l=>l.subscriber===id).state,'running');
+  assert.ok(arrived-start>=1.2-1e-9,'napis widoczny przez cały impuls subskrypcji');
+  assert.ok(!shown(arrived+.31).includes('.subscribe() '+id),'znika po dotarciu impulsu do HTTP, nie czeka na request');
  }
- assert.deepEqual(shown(at('first')),[]);assert.deepEqual(shown(at('second')),[]);
- assert.deepEqual(shown(at('question')),['.subscribe() B']);
- const callout=c.snapshot(at('question')).callouts[0];
- assert.equal(callout.color,'#D8840F');
+ for(const id of ['first','requests','received'])assert.deepEqual(shown(at(id)),[]);
  for(let t=0;t<=c.duration;t+=.05)assert.ok(!shown(t).some(x=>x.startsWith('.unsubscribe')),'complete nie pokazuje unsubscribe');
- const svg=render(c.snapshot(at('question')));
- assert.match(svg,/data-callout="\.subscribe\(\)" data-callout-lane="B"/);
- const map=c.snapshot(at('question')).nodes.find(n=>n.id==='map');
- assert.ok(callout.y+45*.78<map.y-map.h/2,'napis nad pipeline\'em, niczego nie zasłania');
- assert.equal(render(c.snapshot(at('question'))),render(c.snapshot(at('question'))),'deterministycznie');
+ const mid=(ev('subscribe','http-C')+ev('connected','http-C'))/2,callout=c.snapshot(mid).callouts[0];
+ assert.equal(callout.color,'#2F7ED8');
+ assert.match(render(c.snapshot(mid)),/data-callout="\.subscribe\(\)" data-callout-lane="C"/);
+ const http=c.snapshot(mid).nodes.find(n=>n.id==='http');
+ assert.ok(callout.y+45*.78<http.y-http.h/2,'napis nad diagramem, niczego nie zasłania');
 });
 
 test('callouts also support a manual .unsubscribe() during the cancel animation (mechanism check on a copy of the share scene)',async()=>{
@@ -172,18 +182,17 @@ test('tiles grow: a fixed definition part, then one execution row per subscripti
  const tile=(t,id)=>node(c.snapshot(t),id),http0=tile(0,'http');
  assert.equal(http0.h,http0.defH,'READY: sama definicja');assert.equal(http0.laneRows.length,0);
  const top=http0.y-http0.h/2;
- for(const id of ['first','second','done']){
+ for(const id of ['requests','received']){
   const http=tile(at(id),'http');
   assert.ok(Math.abs(http.y-http.h/2-top)<1e-9,'góra kafelka stoi');
  }
- assert.equal(tile(at('first'),'http').laneRows.length,1);assert.equal(tile(at('first'),'map').h,http0.defH+http0.rowH);
- assert.deepEqual(Array.from(tile(at('second'),'map').laneRows,r=>r.subscriber),['A','B']);
- assert.equal(tile(c.duration,'http').h,http0.defH+2*http0.rowH,'wiersze zostają po zakończeniu');
- const mapSubscribe=c.events.find(e=>e.type==='subscribe'&&e.edge==='map-A').at,mapConnected=c.events.find(e=>e.type==='connected'&&e.edge==='map-A').at;
- assert.equal(tile(mapSubscribe+.1,'map').laneRows.length,0,'kafelek nie rośnie przed pojawieniem się wykonania');
- const growing=tile(mapConnected-.1,'map');
+ assert.deepEqual(Array.from(tile(at('requests'),'http').laneRows,r=>r.subscriber),['A','B','C']);
+ assert.equal(tile(c.duration,'http').h,http0.defH+3*http0.rowH,'wiersze zostają po zakończeniu');
+ const subscribe=c.events.find(e=>e.type==='subscribe'&&e.edge==='http-A').at,connected=c.events.find(e=>e.type==='connected'&&e.edge==='http-A').at;
+ assert.equal(tile(subscribe+.1,'http').laneRows.length,0,'kafelek nie rośnie przed pojawieniem się wykonania');
+ const growing=tile(connected-.1,'http');
  assert.ok(growing.laneRows.length===1&&growing.laneRows[0].growth<1&&growing.laneStates.length===0,'wiersz rozszerza kafelek tuż przed dotarciem subscribe');
- assert.equal(tile(mapConnected,'map').laneRows[0].growth,1);
+ assert.equal(tile(connected,'http').laneRows[0].growth,1);
  const share=await lanes('4:3','04a-dwa-tory-2');
  const end=share.c.snapshot(share.c.duration);
  assert.equal(node(end,'http').laneRows.length,1,'share: jeden wiersz w HTTP');
@@ -193,21 +202,21 @@ test('tiles grow: a fixed definition part, then one execution row per subscripti
 
 test('producer progress is the row background moving forward, then the row turns complete',async()=>{
  const {c,at,render}=await lanes();
- const fill=(t,id)=>{const svg=render(c.snapshot(t)),part=svg.slice(svg.indexOf('data-node="http"'),svg.indexOf('data-node="map"'));
+ const fill=(t,id)=>{const svg=render(c.snapshot(t)),part=svg.slice(svg.indexOf('data-node="http"'),svg.indexOf('data-node="A"'));
   return part.match(new RegExp(`data-lane="${id}"[^>]*>(?:<title>[^<]*</title>)<rect data-work-fill="([^"]+)" x="[^"]+" y="[^"]+" width="([^"]+)"`));};
- const early=fill(at('first'),'A'),later=fill(at('question'),'A');
+ const connected=c.events.find(e=>e.type==='connected'&&e.edge==='http-A').at;
+ const early=fill(connected+.5,'A'),later=fill(at('requests'),'A');
  assert.ok(early&&later,'pasek jest tłem wiersza');
  assert.ok(Number(later[2])>Number(early[2]),'tło przesuwa się do przodu');
- assert.equal(fill(at('done'),'A'),null,'po complete wiersz przejmuje zieleń');
- assert.ok(fill(at('done'),'B'),'tor B nadal pokazuje postęp');
- // Wymiary pod projektor: przy 1024×768 (≈0,787 px na jednostkę) nagłówek ~52 px, wiersz ~54 px, pipeline 85–90% szerokości.
+ const completeA=c.events.find(e=>e.type==='stream-complete'&&e.edge==='http-A').at;
+ assert.equal(fill(completeA+.05,'A'),null,'po complete wiersz przejmuje zieleń');
+ assert.ok(fill(completeA+.05,'C'),'C nadal czeka na swoje complete');
+ // Wymiary pod projektor: przy 1024×768 (≈0,787 px na jednostkę) nagłówek ~62 px, wiersz ~70 px, pipeline ~90% szerokości.
  const end=c.snapshot(c.duration),http=node(end,'http'),receiver=node(end,'A'),px=v=>v*.787;
- assert.ok(Math.abs(px(http.defH)-62)<2&&Math.abs(px(http.rowH)-70)<2,'nagłówek +20%, wiersz +30%');
- assert.ok(Math.abs(px(end.ball.r*2)-46)<2,'kulka 46 px');
+ assert.ok(Math.abs(px(http.defH)-62)<2&&Math.abs(px(http.rowH)-70)<2,'nagłówek i wiersz jak w pozostałych torach');
+ assert.ok(Math.abs(px(end.ball.r*2)-53.5)<2,'kulka mieści symbol obiektu');
  const span=(receiver.x+receiver.w/2-(http.x-http.w/2))/end.width;
  assert.ok(span>=.88&&span<=.92,'pipeline zajmuje ~90% szerokości: '+span);
- const map=node(end,'map');
- assert.ok(Math.abs((map.x-map.w/2)-(http.x+http.w/2)-((receiver.x-receiver.w/2)-(map.x+map.w/2)))<1e-9,'równe odstępy');
 });
 
 test('share(): A unsubscribes while B stays — A greys (stripe too), B keeps the purple upstream, the result splits only to B',async()=>{
@@ -264,28 +273,29 @@ test('share scenarios: C joins the running upstream; the last unsubscribe cancel
  assert.deepEqual(Array.from(end.histories,h=>h.values.length),[0,0,1]);
 });
 
-test('cold: compact receivers on the lanes, value balls, transform inside map and HTTP wait ending with the response',async()=>{
+test('cold: compact field receivers on the lanes in both formats; map transform stays in the share variant',async()=>{
  for(const format of ['4:3','16:9']){
   const {c,at,render}=await lanes(format);
-  const end=c.snapshot(c.duration),map=node(end,'map');
-  for(const id of ['A','B']){
-   const r=node(end,id),slot=id==='A'?0:1,laneY=map.top+map.defH+(slot+.5)*map.rowH;
-   assert.equal(r.y,laneY,format+' '+id+': odbiorca na wysokości toru');
-   assert.ok(r.h<=map.rowH&&r.defH===0,'odbiorca bez nagłówka, wysokości wiersza');
-   const e=end.edges.find(e=>e.id==='map-'+id);
-   assert.ok(e.points.every(p=>p[1]===laneY),'połączenie poziome');
-  }
-  const svg=render(c.snapshot(at('done')));
+  const end=c.snapshot(c.duration),http=node(end,'http');
+  ['A','B','C'].forEach((id,slot)=>{
+   const r=node(end,id),laneY=http.top+http.defH+(slot+.5)*http.rowH;
+   assert.equal(r.y,laneY,format+' '+id+': pole na wysokości toru');
+   assert.ok(r.h<=http.rowH&&r.defH===0,'pole bez nagłówka, wysokości wiersza');
+   assert.ok(end.edges.find(e=>e.id==='http-'+id).points.every(p=>p[1]===laneY),'połączenie poziome');
+  });
+  assert.ok(end.nodes.every(n=>n.y+n.h/2<=end.height),format+': mieści się w ramce');
+  const svg=render(c.snapshot(at('received')));
   assert.match(svg,/data-icon="inbox"/);
-  assert.match(svg,/<circle cx="[^"]+" cy="[^"]+" r="[^"]+"[^>]*\/><text[^>]*>42<\/text>/,'wartość jako kulka');
-  const arrival=c.events.find(e=>e.type==='deliver-next'&&e.edge==='http-map-A').at,departure=c.events.find(e=>e.type==='source-next'&&e.edge==='map-A').at;
-  assert.ok(departure-arrival>=1,'kulka zatrzymuje się w map');
-  const ballAt=t=>c.snapshot(t).tokens.find(t=>t.phase==='transform');
-  assert.equal(ballAt(arrival+(departure-arrival)*.4).value,'21');assert.equal(ballAt(arrival+(departure-arrival)*.6).value,'42');
-  assert.equal(ballAt(arrival+(departure-arrival)*.5).x,map.x,'zatrzymanie na środku map');
-  const sent=c.events.find(e=>e.type==='source-next'&&e.edge==='http-map-A').at;
+  assert.doesNotMatch(svg,/data-token="received"/,'pole pokazuje właściwość, nie kulkę');
+  const sent=c.events.find(e=>e.type==='source-next'&&e.edge==='http-A').at;
   assert.equal(node(c.snapshot(sent),'http').laneStates[0].progress,1,'postęp HTTP kończy się z odpowiedzią');
  }
+ const {c}=await lanes('4:3','04a-dwa-tory-2'),map=node(c.snapshot(c.duration),'map');
+ const arrival=c.events.find(e=>e.type==='deliver-next'&&e.edge==='http-map').at,departure=c.events.find(e=>e.type==='source-next'&&e.edge==='map-share').at;
+ assert.ok(departure-arrival>=1,'kulka zatrzymuje się w map');
+ const ballAt=t=>c.snapshot(t).tokens.find(t=>t.phase==='transform');
+ assert.equal(ballAt(arrival+(departure-arrival)*.4).value,'21');assert.equal(ballAt(arrival+(departure-arrival)*.6).value,'42');
+ assert.equal(ballAt(arrival+(departure-arrival)*.5).x,map.x,'zatrzymanie na środku map');
 });
 
 test('receiver history keeps at most three latest balls at a constant size',async()=>{
@@ -324,4 +334,17 @@ test('share slides use the cold look: pipeline code, transient subscribe/unsubsc
  assert.deepEqual(Array.from(c.snapshot(at('question')).callouts,x=>x.text+' '+x.label),['.unsubscribe() A']);
  assert.equal((c.snapshot(at('cancelled')).callouts||[]).length,0,'po animacji anulowania napis znika');
  assert.equal((c.snapshot(ev('stream-complete','share-B')+.1).callouts||[]).length,0,'complete bez napisu');
+});
+
+test('cold has checkpoint notes for READY, each manual stop and the handoff to the Subject question',async()=>{
+ const {c}=await lanes();
+ const html=fs.readFileSync('index.html','utf8');
+ const source=html.match(/<template data-checkpoint-notes="04a-dwa-tory">([\s\S]*?)<\/template>/)[1];
+ const notes=Object.fromEntries([...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)].map(([,id,text])=>[id,text]));
+ assert.deepEqual(Object.keys(notes),['ready',...Array.from(c.stops,s=>s.id),'finished']);
+ assert.match(notes.ready,/trzy niezależne komponenty potrzebują danych tego samego użytkownika/);
+ assert.match(notes.first,/Każdy z nich subskrybuje ten sam Observable\. Pierwszy uruchamia HTTP\./);
+ assert.match(notes.requests,/Drugi też uruchamia HTTP, a trzeci robi dokładnie to samo/);
+ assert.match(notes.received,/Każdy request zwraca cały obiekt użytkownika/);
+ assert.match(notes.finished,/backend dostał trzy identyczne requesty[\s\S]*wykonując HTTP tylko raz\?/);
 });

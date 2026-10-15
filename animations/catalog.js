@@ -14,7 +14,7 @@ const count=(events,t)=>events.filter(e=>e.at<=t&&e.kind!=="complete"&&e.kind!==
 const cards=(id,title,items,captions,notes,duration=16,extra={})=>add(id,title,"",duration,[],captions,notes,{kind:"cards",items:items.map((label,i)=>({label,at:1+i*2.3,color:["source","op","http","b"][i%4]})),...extra});
 cards("01-tytul","RxJS — operatory, które znasz, ale bałeś się zagadać",["Kiedy?","Ile naraz?","Co pominąć?","Co współdzielić?"],[[0,""],[3,"Znane nazwy. Konkretne decyzje o pracy."],[12,"Jedno zdarzenie może uruchomić znacznie więcej, niż myślisz."]],"Otwarcie. Zapowiedz decyzje o pracy, kolejności i współdzieleniu. Tytuł można pozostawić jako statyczny slajd.",14);
 add("04-operator","Operator to funkcja","",1,[],[],"");
-add("04a-dwa-tory","Cold: jedna definicja, dwa wykonania","",1,[],[],"");
+add("04a-dwa-tory","Cold: jedna definicja, trzy wykonania","",1,[],[],"");
 add("05-zrodla","Skąd płyną wartości?","timer · HTTP · Subject",20,[
  R("timer",[E(2,"0","source"),E(6,"1","source"),E(10,"2","source"),E(14,"3","source")]),
  R("HTTP",[E(7,"dane","http")],[B(1,7,"request")],{completeAt:7}),

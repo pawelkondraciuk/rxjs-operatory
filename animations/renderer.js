@@ -393,6 +393,19 @@ export function renderScene(frame,options={}) {
     svg+=token(point?.[0]??t.x,point?.[1]??t.y,t.value,t.color,`data-value-on="${esc(t.edge||'source')}" data-token="${esc(t.phase)}"`,150*k,Boolean(panels.length),k);
   }
   for(const h of frame.histories) {
+    if(h.field) {
+      // Pole widoku (opt-in): etykieta właściwości i miejsce na wartość. Odebrana wartość to cały obiekt —
+      // pole pokazuje tylko swoją właściwość (field.value), fade-in 0,3 s od dotarcia; wcześniej przerywany slot.
+      const k=frame.textScale||1,latest=h.values.at(-1),valueY=h.y+14*k,slotH=22*k,owner=frame.nodes.find(n=>n.id===h.anchor);
+      if(owner&&!owner.visible)continue;
+      const shown=!latest?0:reduced||latest.shownAt===undefined?1:clamp((frame.time-latest.shownAt)/.3);
+      svg+=`<g data-field="${esc(h.anchor)}" data-field-state="${latest?'value':'empty'}" opacity="${owner?.opacity??1}"><title>${esc(h.field.label+' · '+(latest?h.field.value:'brak wartości'))}</title>`;
+      svg+=text(h.x,h.y-16*k,h.field.label,16*k,'style="text-anchor:start;font-family:Consolas,ui-monospace,monospace;fill:#55636c"');
+      if(shown<1)svg+=`<rect data-field-slot="empty" x="${h.x}" y="${valueY-slotH/2}" width="${Math.min(h.w,150*k)}" height="${slotH}" rx="${5*k}" fill="none" stroke="#8b979e" stroke-width="2" stroke-dasharray="6 5" opacity="${(1-shown).toFixed(3)}"/>`;
+      if(shown>0)svg+=text(h.x,valueY,h.field.value,22*k,`data-field-value="${esc(h.field.value)}" opacity="${shown.toFixed(3)}" style="text-anchor:start;font-weight:700;fill:#26323B"`);
+      svg+='</g>';
+      continue;
+    }
     if(frame.ball&&h.balls) {
       // Kulki odebranych wartości od lewej, stały rozmiar; najwyżej h.max ostatnich, fade-in 0,3 s. Gdy nowa kulka
       // wchodzi do pełnej historii, wszystkie przesuwają się płynnie o jedno miejsce w lewo, a najstarsza wygasa.
