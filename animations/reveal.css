@@ -97,11 +97,6 @@
 }
 .rx-player.rx-flat-tiles [data-panel-box] { fill: #ECE6DA; }
 
-/* Tylko ręczny multicast HTTP: cztery pełne linie kodu, stała rezerwa miejsca. */
-.rx-player.rx-subject-http { grid-template-rows:228px 512px 110px; }
-.rx-player.rx-subject-http .rx-code { font-size:40px; line-height:1.25; }
 /* catchError wewnątrz: dwie linie kodu (druga ~52 znaki) muszą się zmieścić bez łamania. */
 .rx-player.rx-catch-inside .rx-code { font-size:36px; }
 [data-ratio="16-9"] .rx-player.rx-catch-inside .rx-code { font-size:24px; }
-[data-ratio="16-9"] .rx-player.rx-subject-http { grid-template-rows:156px 384px 72px; }
-[data-ratio="16-9"] .rx-player.rx-subject-http .rx-code { font-size:28px; }

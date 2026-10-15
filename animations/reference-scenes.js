@@ -174,6 +174,16 @@ function laneCodeLines(plan) {
 const coldUser={firstName:'Paweł',lastName:'Kondraciuk',city:'Białystok'},coldUserSymbol='{…}';
 const coldFields=[{id:'A',key:'firstName',start:1},{id:'B',key:'lastName',start:1.4},{id:'C',key:'city',start:1.6}]
   .map((f,slot)=>({...f,slot,edge:`http-${f.id}`,label:`user.${f.key}`,value:coldUser[f.key],response:f.start+3,complete:f.start+4}));
+// Pola widoku A/B/C wspólne dla Cold i Subject: ta sama kolumna (x/w 960/436), wiersze na torach, etykieta właściwości
+// i miejsce na wartość (tray.field). Kulka obiektu ma ten sam rozmiar na obu slajdach.
+const viewFieldBall={r:34,font:26};
+function viewFields(top,extra={}) {
+  const g={x:960,w:436},pos=f=>({x:g.x,w:g.w,y:laneRowY(top,f.slot)}),k=laneLook.textScale,inbox=laneInbox();
+  const fieldLeft=g.x-g.w/2+inbox.left+laneLook.icon+8*k+22*k+16;
+  return {left:g.x-g.w/2,
+    nodes:coldFields.map(f=>laneReceiver(f.id,f.id,pos(f),{ready:true,...extra})),
+    trays:coldFields.map(f=>({anchor:f.id,x:fieldLeft,y:pos(f).y,w:g.x+g.w/2-14-fieldLeft,field:{label:f.label,value:f.value}}))};
+}
 function configureColdFields(scene) {
   const ev=(type,edge)=>({type,edge}),during=(from,to)=>({from,to}),user=f=>E(f.response,coldUserSymbol,laneSubscribers[f.id].fill);
   const http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},last=coldFields.at(-1);
@@ -205,22 +215,19 @@ function configureColdFields(scene) {
 // z trzema wierszami wykonań i trzy kompaktowe pola widoku. Pole: pasek toru, inbox, litera, etykieta właściwości
 // (monospace) i miejsce na wartość — puste do dotarcia User, potem wybrana właściwość (tray.field).
 export function coldFieldsGraph(scene) {
-  const tall=scene.format==='4:3',top=tall?178:102,g={httpX:272,httpW:420,recvX:960,recvW:436};
-  const pos=f=>({x:g.recvX,w:g.recvW,y:laneRowY(top,f.slot)}),k=laneLook.textScale,inbox=laneInbox();
-  const fieldLeft=g.recvX-g.recvW/2+inbox.left+laneLook.icon+8*k+22*k+16;
+  const tall=scene.format==='4:3',top=tall?178:102,g={httpX:272,httpW:420,recvX:960},fields=viewFields(top);
   return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),
     // Kulka jak „dane” w HTTP 05-zrodla-2 (r 34/font 26); symbol obiektu „{…}” z marginesem od brzegu.
-    ball:{r:34,font:26},
+    ball:viewFieldBall,
     subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,C:laneSubscribers.C},
     nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,progressUntilNext:true,
       ...laneTile('source',top,Object.fromEntries(coldFields.map(f=>[f.id,f.slot])),coldFields.length)},
       // Pola widoku istnieją od READY (puste); litera i inbox wykonania pojawiają się z subscribe.
-      ...coldFields.map(f=>laneReceiver(f.id,f.id,pos(f),{ready:true}))],
+      ...fields.nodes],
     edges:coldFields.map(f=>({id:f.edge,from:'http',to:f.id,subscriber:f.id,logicalStart:f.start,
       logicalEnd:{at:f.complete,kind:'complete'},events:[E(f.response,coldUserSymbol,laneSubscribers[f.id].fill)]})),
     executions:coldFields.map((f,i)=>({id:`http-${i+1}`,node:'http',edge:f.edge,duration:f.response-f.start})),
-    trays:coldFields.map(f=>({anchor:f.id,x:fieldLeft,y:pos(f).y,w:g.recvX+g.recvW/2-14-fieldLeft,
-      field:{label:f.label,value:f.value}})),
+    trays:fields.trays,
     // .subscribe() nad kolumną pól, od subscribe do dotarcia impulsu do HTTP. Pola są widoczne od READY, więc
     // bez wyprzedzenia 0,3 s — napis B nie pojawia się jeszcze na postoju first.
     callouts:coldFields.map(f=>laneCallout('.subscribe()',f.id,laneEvent('subscribe',f.edge),laneEvent('connected',f.edge),{x:g.recvX,y:top/2})),
@@ -527,72 +534,70 @@ export function httpGraph(scene) {
     schedule:{'http-observer':{start:1.3,connectDuration:.8,events:[{...scene.rows[0].events[0],color:fill,arrival:7.8}],end:{at:8.3,logicalAt:7,kind:'complete',duration:.8}}}};
 }
 
-// Ręczny multicast HTTP w stylu torów 04a: subskrypcje A/B dodają wiersze Subject,
-// ale nie tworzą ani nie zarządzają osobnym połączeniem z HTTP.
-// Tor U: wykonanie HTTP uruchomione przez subject$ (turkus); jasny progress jak tory A/B.
+// Subject (05-zrodla-3): kontynuacja Cold — te same pola widoku A/B/C, ale jeden HTTP zasila je przez Subject.
+// READY: A/B/C są już subskrybentami Subject (subskrypcje zestawione przed t = 0, bez powtarzania animacji).
+// Osobne http.get(...).subscribe(subject$) (tor U, #1) uruchamia jedyny request; subskrypcje A/B/C nim nie zarządzają.
+// Jedno next z HTTP → trzy powiadomienia Subject w tym samym kolorze emisji; jedno complete kończy Subject i odbiorców.
+// Jawny harmonogram ilustracji (schedule) zamiast planFlow: tylko on pozwala zacząć od już zestawionych subskrypcji.
 const subjectUpstream={color:'#238F83',fill:'#b4e0d9',progress:'#abdbd3',label:'#1',ink:'#17695f',tint:'#e6f4f1'};
+const subjectTimes={born:.2,connect:.5,subscribe:1,link:.8,next:6,travel:1,hold:1.2,complete:10.2,terminal:.8,duration:14};
 export function configureSubject(scene) {
-  const at={a:1,b:2,http:3.75,next:7,complete:8},value=fill=>E(at.next,'42',fill);
-  const ev=(type,edge,offset=0)=>({type,edge,...(offset?{offset}:{})});
-  const active=(from,to)=>[{from,to}];
+  const at=subjectTimes,ev=(type,edge,offset=0)=>({type,edge,...(offset?{offset}:{})});
+  const connected=at.subscribe+at.link,arrival=at.next+at.travel,split=arrival+at.hold,delivered=split+at.travel;
+  const upstreamEnd=at.complete+at.terminal,downstreamEnd=upstreamEnd+at.terminal;
   const subjectMark={id:'subject',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
-  const httpMark={id:'http',bg:'rgba(143,201,212,.4)',line:'#238F83'};
-  const manualStart=ev('manual-connect','http-subject');
-  const lines=[
-    [{text:'const subject$ = '},{text:'new Subject<number>()',mark:subjectMark},{text:';'}],
-    // Linie subscribe bez stałego koloru (quiet): kolor toru tylko w czasie subskrypcji.
-    [{text:'subject$.subscribe(v => renderA(v));',mark:{id:'subscribe-a',bg:laneSubscribers.A.tint,line:laneSubscribers.A.color,quiet:true},
-      active:active(ev('subscribe','subject-A',-.3),ev('connected','subject-A'))}],
-    [{text:'subject$.subscribe(v => renderB(v));',mark:{id:'subscribe-b',bg:laneSubscribers.B.tint,line:laneSubscribers.B.color,quiet:true},
-      active:active(ev('subscribe','subject-B',-.3),ev('connected','subject-B'))}],
-    [{text:'http.get<number>(url)',mark:httpMark,active:active(manualStart,ev('source-next','http-subject'))},
-      {text:'.subscribe('},{text:'subject$',mark:{...subjectMark,id:'subject-observer'},active:active(manualStart,ev('connected','http-subject'))},{text:');'}],
-  ];
-  Object.assign(scene,{graph:subjectGraph,subjectTimes:at,playerLayout:'expanded',duration:10,
-    // Kulka z HTTP ma kolor toru HTTP; Subject rozsyła osobne powiadomienia w kolorach odbiorców.
-    rows:[R('HTTP GET',[value(subjectUpstream.fill)],[B(at.http,at.next,'request')],{completeAt:at.complete}),
-      R('Odbiorca A',[value(laneSubscribers.A.fill)],[],{completeAt:at.complete}),
-      R('Odbiorca B',[value(laneSubscribers.B.fill)],[],{completeAt:at.complete})],
-    metrics:[{label:'Requesty HTTP',count:'started'}],ink:'#26323B',playerClass:'rx-flat-tiles rx-subject-http',
-    timing:{subscribe:.8,travel:1,terminal:.8,gap:.5},
-    title:'Subject: ręczny multicast HTTP',code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
-    captions:[[0,'Subject: ręcznie łączymy jedno HTTP z wieloma odbiorcami']],
+  // Stały kod: wyłącznie definicja Subject. Fragment świeci, gdy Subject rozsyła next i complete.
+  const lines=[[{text:'const subject$ = '},{text:'new Subject<User>()',mark:subjectMark,
+    active:[{from:ev('deliver-next','http-subject'),to:ev('source-next','subject-A')},{from:ev('disconnected','http-subject'),to:ev('disconnected','subject-A')}]},{text:';'}]];
+  const value=E(at.next,coldUserSymbol,subjectUpstream.fill);
+  Object.assign(scene,{graph:subjectGraph,subjectTimes:{...at,connected,arrival,split,delivered,upstreamEnd,downstreamEnd},
+    playerLayout:'function',duration:at.duration,ink:'#26323B',playerClass:'rx-lanes rx-flat-tiles',
+    title:'Subject: ręczny multicast HTTP',code:lines[0].map(part=>part.text).join(''),codeLines:lines,codeFrames:[],
+    rows:[R('HTTP GET',[value],[B(at.subscribe,at.next,'request')],{completeAt:at.complete}),
+      ...coldFields.map(f=>R(`Pole ${f.label}`,[{...value,at:split}],[],{completeAt:upstreamEnd}))],
+    metrics:[{label:'Odbiorcy',value:()=>coldFields.length},{label:'Requesty HTTP',count:'started'}],
+    captions:[[0,'Ci sami trzej odbiorcy subskrybują Subject. HTTP jeszcze nie jest podłączony']],
     playback:manual([
-      {id:'subscribed-a',event:ev('connected','subject-A'),offset:.35,caption:'A subskrybuje Subject. HTTP jeszcze nie działa'},
-      {id:'subscribed-b',event:ev('connected','subject-B'),offset:.35,caption:'Dwóch odbiorców Subjecta. Nadal zero requestów HTTP'},
-      {id:'connect-http',event:manualStart,offset:.75,caption:'Przekazujemy Subject jako Observer: http.get<number>(url).subscribe(subject$)'},
-      {id:'request',event:ev('connected','http-subject'),offset:.35,caption:'Osobna subskrypcja uruchomiła jeden request HTTP'},
-      {id:'received',event:ev('deliver-next','http-subject'),offset:.35,caption:'Subject odbiera jedną wartość 42 z HTTP'},
-      {id:'multicast',event:ev('deliver-next','subject-B'),offset:.35,caption:'Jedna emisja HTTP, dwa powiadomienia next. A i B otrzymali 42'},
-      {id:'complete',event:ev('disconnected','subject-B'),offset:.8,caption:'HTTP zakończone. Subject przekazał complete obu odbiorcom'},
+      {id:'connect-http',event:ev('connected','http-subject'),offset:.35,caption:'Subject jest Observerem: http.get(...).subscribe(subject$) podłącza HTTP'},
+      {id:'request',event:ev('connected','http-subject'),offset:2,caption:'Jeden request HTTP. A, B i C nadal czekają na wartość'},
+      {id:'received',event:ev('deliver-next','http-subject'),offset:.35,caption:'HTTP emituje jeden obiekt User do Subjecta'},
+      {id:'multicast',event:ev('deliver-next','subject-C'),offset:.35,caption:'Subject rozsyła tę samą wartość do A, B i C. Każde pole pokazuje swoją właściwość'},
+      {id:'complete',event:ev('disconnected','subject-C'),offset:.8,caption:'HTTP zakończone. Subject przekazał complete wszystkim odbiorcom'},
     ]),
   });
 }
 
 export function subjectGraph(scene) {
-  const tall=scene.format==='4:3',top=tall?110:72,at=scene.subjectTimes;
-  const receivers=['A','B'].map((id,slot)=>({id,at:{x:995,w:366,y:laneRowY(top,slot)}}));
-  const end={at:at.complete,kind:'complete'},value=row=>scene.rows[row].events;
-  return {layout:'fixed',formatAware:true,width:1240,height:tall?500:372,...laneGraphLook(),
-    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,U:subjectUpstream},
-    // splitAt:0 — kulka z HTTP rozdziela się na porcie wejściowym, więc nie stoi w wierszu A (nie sugeruje, że A dostał ją pierwszy).
-    nodes:[{id:'http',x:217,w:310,label:'HTTP GET',workLanes:true,progressUntilNext:true,...laneTile('source',top,{U:0},1)},
-      {id:'subject',x:592,w:280,label:'Subject',splitBalls:true,splitAt:0,splitGuides:false,upstreamStripe:false,hubFan:false,
-        ...laneTile('operator',top,{U:0,A:0,B:1},2)},
-      ...receivers.map(r=>laneReceiver(r.id,r.id,r.at,{ready:false}))],
-    edges:[{id:'http-subject',from:'http',to:'subject',subscriber:'U',logicalStart:at.http,fixedStart:true,logicalEnd:end,events:value(0)},
-      ...receivers.map(r=>({id:'subject-'+r.id,from:'subject',to:r.id,subscriber:r.id,logicalStart:r.id==='A'?at.a:at.b,
-        logicalEnd:end,hold:1.2,events:value(r.id==='A'?1:2)}))],
-    executions:[{id:'request',node:'http',edge:'http-subject',duration:at.next-at.http}],
-    trays:receivers.map(r=>laneTray(r.id,r.at,1)),
-    // .subscribe(subject$) z identyfikatorem wykonania #1: od ręcznego podłączenia do zestawienia subskrypcji HTTP.
-    callouts:[...receivers.map(r=>subscribeCallout(r.id,'subject-'+r.id,'subject-'+r.id,{x:850,y:top/2})),
-      {...laneCallout('.subscribe(subject$)','U',{type:'manual-connect',edge:'http-subject'},{type:'connected',edge:'http-subject'},{x:420,y:top/2}),label:'#1'}],
-    // Krok przed connect-http (~1,15 s): pauza 0,4 s po subscribed-b, manual-connect 1 s przed subscribe upstreamu,
-    // postój +0,75 pokazuje ustabilizowany napis; kabel rusza 0,25 s później.
-    timeline:[{type:'manual-connect',edge:'http-subject',event:{type:'subscribe',edge:'http-subject'},offset:-1},
-      {type:'subject-summary',event:{type:'disconnected',edge:'subject-B'},offset:1,
-        caption:'Subject nie buforuje. Upstream podłączamy i odłączamy ręcznie; share() zarządza nim za nas'}],
+  const tall=scene.format==='4:3',top=tall?178:102,at=scene.subjectTimes,fields=viewFields(top);
+  // Dwie kolumny przed polami (te same co na Cold): HTTP GET i Subject, równe odstępy 110 (mieszczą kulkę obiektu w locie).
+  const g={httpX:177,httpW:230,subjectX:517,subjectW:230};
+  const complete=(end,logicalAt=end)=>({at:end,logicalAt,kind:'complete',duration:at.terminal});
+  const value={value:coldUserSymbol,color:subjectUpstream.fill};
+  // Subskrypcje A/B/C zestawione przed READY: start −2, połączenie 0,8 s — w t = 0 wiersze i porty są w pełni widoczne.
+  const preconnected={start:-2,connectDuration:.8};
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball:viewFieldBall,
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,C:laneSubscribers.C,U:subjectUpstream},
+    // HTTP GET pojawia się dopiero w etapie connect-http. Wejście upstreamu trafia w środkowy wiersz Subject;
+    // splitAt:0 — kulka rozdziela się na porcie wejściowym, nie w wierszu któregoś odbiorcy.
+    nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,progressUntilNext:true,
+      ...laneTile('source',top,{U:0},1),ready:false,born:at.born},
+      {id:'subject',x:g.subjectX,w:g.subjectW,label:'Subject',splitBalls:true,splitAt:0,splitGuides:false,upstreamStripe:false,hubFan:false,
+        ...laneTile('operator',top,{U:1,...Object.fromEntries(coldFields.map(f=>[f.id,f.slot]))},coldFields.length)},
+      ...fields.nodes],
+    edges:[{id:'http-subject',from:'http',to:'subject',subscriber:'U',logicalStart:at.subscribe,fixedStart:true,logicalEnd:complete(at.complete)},
+      ...coldFields.map(f=>({id:'subject-'+f.id,from:'subject',to:f.id,subscriber:f.id,logicalStart:-2,logicalEnd:complete(at.upstreamEnd)}))],
+    schedule:{'http-subject':{start:at.subscribe,connectDuration:at.link,events:[{...value,at:at.next,arrival:at.arrival}],end:complete(at.complete)},
+      ...Object.fromEntries(coldFields.map(f=>['subject-'+f.id,{...preconnected,
+        events:[{...value,at:at.split,arrival:at.delivered,logicalAt:at.next}],end:complete(at.upstreamEnd)}]))},
+    executions:[{id:'request',node:'http',edge:'http-subject',duration:at.next-at.subscribe}],
+    trays:fields.trays,
+    // Migawka prawdziwej składni nad diagramem, z identyfikatorem wykonania #1: od ręcznego podłączenia do chwili
+    // po zestawieniu subskrypcji HTTP (zostaje na postoju connect-http, znika w drodze do request).
+    callouts:[{...laneCallout("http.get<User>('/api/users/42').subscribe(subject$)",'U',{type:'manual-connect',edge:'http-subject'},
+      {type:'connected',edge:'http-subject',offset:.6},{x:620,y:top/2}),size:34,label:'#1'}],
+    timeline:[{type:'manual-connect',edge:'http-subject',event:{type:'subscribe',edge:'http-subject'},offset:at.connect-at.subscribe},
+      {type:'subject-summary',event:{type:'disconnected',edge:'subject-C'},offset:1.1,
+        caption:'Ten sam widok co na Cold, ale jeden request zamiast trzech. Upstream podłączyliśmy ręcznie'}],
   };
 }
 
