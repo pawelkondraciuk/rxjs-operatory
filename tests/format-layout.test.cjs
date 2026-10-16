@@ -42,7 +42,7 @@ test('16:9 keeps the previous geometry and SVG of every variant',async()=>{
    assert.equal(render(wide.snapshot(time)),render(legacy.snapshot(time)),scene.id+' @'+time);
   // Slajdy torów (04a-dwa-tory(-2,-3), 04-operator, cała rodzina 05-zrodla i para share/shareReplay 20-sharereplay(-2)) mają w obu formatach wspólne,
   // powiększone wymiary pod projektor (graph.textScale).
-  if(!/^(04a-dwa-tory|04-operator$|05-zrodla(-[234])?$|20-sharereplay(-2)?$)/.test(scene.id))assert.equal(wide.snapshot(0).textScale,1);
+  if(!/^(04a-dwa-tory|04-operator$|05-zrodla(-[2345])?$|20-sharereplay(-2)?$)/.test(scene.id))assert.equal(wide.snapshot(0).textScale,1);
  }
 });
 

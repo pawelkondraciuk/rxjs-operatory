@@ -17,7 +17,7 @@ Sceny MAIN z pytaniami zaczynają od nieruchomego READY. Prawo / Page Down uruch
 
 W oknie prelegenta (`S`) podgląd następnego slajdu domyślnie pokazuje dużą nazwę, np. **switchMap**, i krótki podtytuł. Wskazuje kolejny slajd, także podczas ręcznych postojów bieżącej animacji. Przełącznik **Podgląd: Tytuł / Slajd** w prawym dolnym rogu tego pola przywraca standardowy podgląd. Wybór jest zapamiętywany w przeglądarce. Notatki pozostają w standardowym polu Notes. Opcjonalne `data-speaker-title` na sekcji ustawia własny podpis wyłącznie dla prelegenta.
 
-Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 66 slajdów daje 82 strony PDF.
+Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 67 slajdów daje 83 strony PDF.
 
 Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przywraca ekran panoramiczny 1280×720. `W` przeładowuje stronę w drugim formacie, zostając na tym samym slajdzie i fragmencie; animacja wraca do stanu tego fragmentu. Linki do EXTRAS i powrót do pytań zachowują wybrany format. Druk działa w obu: `?print-pdf` (4:3) lub `?print-pdf&ratio=16:9`. W 4:3 slajdy wykorzystują pełną wysokość: większe zdjęcia i kody QR, wyższe diagramy, większy tekst i kapsułki w animacjach (×1,15), etykiety kafelków do ×1,3 oraz większy tytuł (64 px; za długi zmniejsza się, by został w jednej linii), kod (42 px, długi łańcuch przechodzi do nowej linii przed .pipe/.subscribe) i podpis.
 
@@ -25,7 +25,7 @@ Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przyw
 
 Porównania są osobnymi slajdami. Warianty z sufiksami -2/-3/-4 powstają podczas uruchamiania; pierwszy zachowuje ID bazowe. Poniżej podano kolejność MAIN, a dalszy spis opisuje rodziny tematycznie. Pozycje EXTRAS są oznaczone.
 
-Każda pozycja opisuje temat, ekran/bloczki i notatki prelegenta. Tabele wariantów podają rzeczywiste tytuły i kod nad diagramem. Speaker notes przy rodzinie dotyczą wszystkich jej wariantów, ponieważ sekcje są klonowane razem z notatkami. Wyjątkiem są oba slajdy Subject (`05-zrodla-3`, `05-zrodla-4`): mają własne notatki przypisane do checkpointów. Notatki przytoczono z ujednoliconymi odstępami; powtarzaną instrukcję obsługi zwykłych animacji opisano wspólnie wyżej.
+Każda pozycja opisuje temat, ekran/bloczki i notatki prelegenta. Tabele wariantów podają rzeczywiste tytuły i kod nad diagramem. Speaker notes przy rodzinie dotyczą wszystkich jej wariantów, ponieważ sekcje są klonowane razem z notatkami. Wyjątkiem są trzy slajdy Subject (`05-zrodla-5`, `05-zrodla-3`, `05-zrodla-4`): mają własne notatki przypisane do checkpointów. Notatki przytoczono z ujednoliconymi odstępami; powtarzaną instrukcję obsługi zwykłych animacji opisano wspólnie wyżej.
 
 Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorze spowalniają ilustrację; nie dodają opóźnień do rzeczywistego synchronicznego RxJS. HTTP jest symulowane. Pasek pokazuje czas pracy, a nie pomiar postępu prawdziwego żądania.
 
@@ -33,11 +33,11 @@ Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorz
 
 Pełne otwarcie pozostaje bez zmian: społeczność, historia meet.js, fotografie, autor, tytuł i pytania o operatory. Budżet **30–35 minut dotyczy tylko części właściwej**; otwarcie, pytania i dogrywka są dodatkowo.
 
-MAIN ma **31 slajdów (20 animowanych)**. EXTRAS zawiera **35 wariantów**. Całość obejmuje 48 bazowych slajdów HTML, 66 po rozwinięciu, 55 animowanych. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
+MAIN ma **32 slajdy (21 animowanych)**. EXTRAS zawiera **35 wariantów**. Całość obejmuje 48 bazowych slajdów HTML, 67 po rozwinięciu, 56 animowanych. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
 
 Kolejność po otwarciu:
 
-1. HTTP (`05-zrodla-2`) → interval na żywo (`05-zrodla`) → map, pipe i wykonanie (`04-operator`) → cold (`04a-dwa-tory`) → ręczny multicast HTTP przez Subject (`05-zrodla-3`) → Subject + interval: kto odłączy źródło? (`05-zrodla-4`) → share() za map (`04a-dwa-tory-2`) → share z unsubscribe A (`04a-dwa-tory-3`).
+1. HTTP (`05-zrodla-2`) → interval na żywo (`05-zrodla`) → map, pipe i wykonanie (`04-operator`) → cold (`04a-dwa-tory`) → Subject — ręczna emisja (`05-zrodla-5`) → ręczny multicast HTTP przez Subject (`05-zrodla-3`) → Subject + interval: kto odłączy źródło? (`05-zrodla-4`) → share() za map (`04a-dwa-tory-2`) → share z unsubscribe A (`04a-dwa-tory-3`).
 2. Następnie późny odbiorca z share/shareReplay (`20-sharereplay`, `20-sharereplay-2`). Cold i współdzielenie HTTP pokazują wcześniej tory `04a`; powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
 3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap.
 4. catchError na zewnątrz/wewnątrz → distinctUntilChanged → wspólne porównanie debounceTime i auditTime (`16-czas-cztery`).
@@ -219,12 +219,13 @@ Kontroler `stages`: → zaczyna lub kończy etap, ← cofa checkpoint także w A
 
 ### Źródła — rodzina `05-zrodla`
 
-Warianty zachowują ID, lecz zajmują oddzielne miejsca narracji: **HTTP otwiera część właściwą**, interval jest drugi, oba Subjecty stoją między Cold i share: **Cold → ręczny multicast przez Subject → ręczne połączenie, którego nikt nie odłącza → automatyczny multicast przez share()**.
+Warianty zachowują ID, lecz zajmują oddzielne miejsca narracji: **HTTP otwiera część właściwą**, interval jest drugi, trzy Subjecty stoją między Cold i share: **Cold → ręczna emisja subject$.next(user) → ręczny multicast HTTP przez Subject → ręczne połączenie, którego nikt nie odłącza → automatyczny multicast przez share()**.
 
 | ID | Kod i zachowanie |
 | --- | --- |
 | 05-zrodla-2 | `http.get('/api/data')`; pierwsze „dalej” dopisuje `.subscribe(render)` (fade-in razem z odbiorcą A). READY ma tylko nagłówek HTTP GET; subscribe odsłania odbiorcę i wiersz A. Postój request pokazuje pracę po podłączeniu, postój first odebrane dane przed complete. |
 | 05-zrodla | `interval(1000)` na żywo. Pierwsze „dalej” robi `.subscribe()`, potem emisje 0, 1, 2, 3… co sekundę bez końca; drugie „dalej” robi `.unsubscribe()` (bez complete); trzecie przechodzi dalej. |
+| 05-zrodla-5 | Stale tylko `const subject$ = new Subject<User>();`. A/B/C (pola widoku z Cold) kolejno subskrybują pusty Subject; jedna migawka `subject$.next(user)` — kulka User w Subject rozdziela się na trzy identyczne powiadomienia; pola pokazują Paweł / Kondraciuk / Białystok. Bez complete. |
 | 05-zrodla-3 | Stale tylko `const subject$ = new Subject<User>();`. A/B/C (pola widoku z Cold) subskrybują Subject od READY; migawka `http.get<User>('/api/users/42').subscribe(subject$)` podłącza jedno HTTP, które przez Subject rozsyła obiekt User i complete do trzech pól. |
 | 05-zrodla-4 | `const subject$ = new Subject<number>();` i `const connection = interval(1000).subscribe(subject$);`. Start już działający: interval → Subject → A/B/C; kolejne „dalej” to `subA/subB/subC.unsubscribe()`, a interval emituje dalej do Subjecta bez odbiorców. |
 
@@ -232,7 +233,20 @@ Cała rodzina ma wygląd torów jak w `04a-dwa-tory` (nagłówek = definicja, wi
 
 interval to jeden rząd: `interval(1000)` → odbiorca A. Slajd jest wyjątkiem od postojów: po `.subscribe()` emisje trwają tak długo, jak prelegent chce (licznik „emisje” rośnie bez ograniczeń, w wierszu odbiorcy zostają 3 ostatnie kulki, starsza płynnie wypada). Kolejne „dalej” wywołuje `.unsubscribe()` na istniejącym wykonaniu: wartość już wysłana dociera, potem szary pocisk „×” jedzie od odbiorcy w lewo do interval, przebyty kabel i wiersze szarzeją, emisje ustają; nie ma zielonego complete. AUTO ani pauza nie wywołują unsubscribe same. Lewo cofa etap (z anulowanego do emisji od zera, z emisji do READY); wyjście ze slajdu sprząta wykonanie, a powrót startuje od READY. Druk pokazuje anulowany kadr po wartościach 0, 1, 2.
 
-**Subject: ręczny multicast HTTP — 60–75 sekund.** Bezpośrednia kontynuacja Cold: te same pola widoku A/B/C (`user.firstName` → Paweł, `user.lastName` → Kondraciuk, `user.city` → Białystok; ten sam wygląd, rozmiar, kolory i kulka `{…}`), ale jeden request zasila je przez Subject. Stały kod to tylko `const subject$ = new Subject<User>();` (fragment `new Subject<User>()` świeci, gdy Subject rozsyła next i complete). Subject jest Observable dla A/B/C i Observerem dla HTTP.
+**Subject — ręczna emisja (`05-zrodla-5`) — 45–60 sekund.** Wprowadzenie Subjecta przed podłączeniem HTTP, bezpośrednio po Cold. Kod przez cały slajd: `const subject$ = new Subject<User>();` (fragment `new Subject<User>()` świeci od ręcznego next do wyjścia powiadomień). Obiekt `user` = `{ firstName: 'Paweł', lastName: 'Kondraciuk', city: 'Białystok' }` jest tylko w danych demonstracji (ten sam co na Cold), nie w kodzie slajdu. Diagram Subject → A/B/C w wyglądzie Subject + HTTP: Subject x/w 177/230 stoi w miejscu kolumny HTTP GET z następnego slajdu (tam przesuwa się na środek, 517/230), pola widoku jak na Cold i Subject + HTTP (960/436, `user.firstName`, `user.lastName`, `user.city`), top 178/102, viewBox 1240×612/460, płaskie kafelki, liczniki rx-lanes. Bez HTTP GET, legendy i nowych kontenerów.
+
+READY: pusty kafelek Subject (sam nagłówek) i trzy puste pola; liczniki Odbiorcy 0 i Wywołania next 0. Pierwsze „dalej”: A, B i C kolejno subskrybują Subject (napis `.subscribe()` z literą toru nad kolumną pól, kabel rośnie od pola do Subjecta w 1 s, w Subject powstają wiersze A/B/C); inboxy puste. Drugie: migawka `subject$.next(user)` (w jednej linii, bez badge'a toru, w miejscu migawki `http.get…subscribe(subject$)` z następnego slajdu) i jedna kulka `{…}` (fade-in) w środku Subject; Wywołania next 1. Trzecie: kulka rozdziela się na trzy identyczne powiadomienia next (kolor emisji User jak na następnym slajdzie), które jednocześnie jadą istniejącymi połączeniami — postój w połowie drogi. Czwarte: kulki docierają, pola pokazują Paweł / Kondraciuk / Białystok. Piąte: FINISHED z podpisem „Jedna emisja, trzech odbiorców. Subject nadal działa — bez complete”. Brak complete i unsubscribe: wiersze zostają aktywne, wyniki widoczne. Harmonogram (czas ilustracji = czas modelu): subscribe A/B/C 0,6/1,9/3,2 s (zestawienie 1 s), next 5 s, rozdzielenie 5,8–6,4 s, przelot 1,4 s, dotarcie 7,8 s, koniec 9,6 s.
+
+| Nr | Checkpoint | Notatka prelegenta |
+| --- | --- | --- |
+| 0 | READY | Do tej pory poznaliśmy Observable, które same dostarczały nam wartości. Ale co, jeśli chcemy samodzielnie decydować, kiedy pojawi się nowa wartość? Możemy wykorzystać Subject. |
+| 1 | subscribed | Mamy trzy miejsca w interfejsie. Jedno pokazuje imię, drugie nazwisko, a trzecie miasto. Wszystkie subskrybują ten sam Subject. |
+| 2 | next | Teraz ręcznie wywołujemy next i przekazujemy obiekt użytkownika. Zwróćcie uwagę, robimy to tylko raz. |
+| 3 | multicast | Subject rozsyła tę samą wartość wszystkim aktualnym odbiorcom. Każdy otrzymuje cały obiekt User. |
+| 4 | received | Ale każdy odbiorca może zrobić z nim coś innego. W naszym przypadku jeden pokazuje imię, drugi nazwisko, trzeci miasto. |
+| 5 | FINISHED / stan końcowy | Czyli mamy jeden obiekt, jedną emisję i trzech odbiorców. Tylko w prawdziwej aplikacji raczej nie będziemy ręcznie wywoływać next za każdym razem. Co jeśli chcielibyśmy pobrać ten obiekt z HTTP? |
+
+**Subject: ręczny multicast HTTP — 60–75 sekund.** Kontynuacja ręcznej emisji (i odpowiedź na problem z Cold): te same pola widoku A/B/C (`user.firstName` → Paweł, `user.lastName` → Kondraciuk, `user.city` → Białystok; ten sam wygląd, rozmiar, kolory i kulka `{…}`), ale jeden request zasila je przez Subject. Stały kod to tylko `const subject$ = new Subject<User>();` (fragment `new Subject<User>()` świeci, gdy Subject rozsyła next i complete). Subject jest Observable dla A/B/C i Observerem dla HTTP.
 
 Diagram HTTP GET → Subject → A/B/C (HTTP x/w 177/230, Subject 517/230, pola jak na Cold 960/436, odstępy 110), wygląd i wymiary torów jak na Cold (top 178/102, viewBox 1240×612/460, liczniki rx-lanes). READY: A, B i C są już subskrybentami Subject — trzy aktywne wiersze A/B/C, porty i poziome kable (subskrypcje zestawione przed t = 0, bez animacji), puste pola, brak HTTP GET, Requesty HTTP 0, Odbiorcy 3. Pierwsze „dalej”: pojawia się nagłówek HTTP GET i duża migawka prawdziwej składni `http.get<User>('/api/users/42').subscribe(subject$)` z badge'em `#1`; impuls subskrypcji biegnie od Subjecta w lewo do HTTP, powstaje jeden wiersz `#1` (turkus `#238F83`, niezależny od A/B/C) i startuje request. Subskrypcje A/B/C nie uruchamiają HTTP. Wejście upstreamu trafia w wiersz A Subject (prosty, poziomy kabel z wiersza `#1` HTTP); wszystkie połączenia są poziome. HTTP emituje jeden obiekt (kulka `{…}`), który zatrzymuje się na porcie Subject i rozdziela na trzy jednoczesne powiadomienia next w tym samym kolorze emisji; pola pokazują swoje właściwości. Jedno complete HTTP dociera zielonym impulsem do Subject, który przekazuje complete A/B/C; pola zachowują wartości, licznik requestów kończy na 1. Bez logu/bufora, replay, unsubscribe, map i share.
 
@@ -242,8 +256,8 @@ Subject nie odtwarza historii. Odejście odbiorców nie anuluje automatycznie os
 
 | Nr | Checkpoint | Notatka prelegenta |
 | --- | --- | --- |
-| 0 | READY | Przed chwilą mieliśmy trzy komponenty, trzy subskrypcje i trzy identyczne requesty HTTP. Spróbujmy rozwiązać ten problem inaczej. Tutaj mamy Subject, do którego są już podłączeni ci sami trzej odbiorcy. |
-| 1 | connect-http | Subject potrafi sam emitować wartości przez next(), ale nie musimy robić tego ręcznie. Jest również Observerem, więc możemy przekazać go bezpośrednio do subscribe innego Observable. |
+| 0 | READY | Zamiast ręcznie wywoływać next, pobierzmy ten obiekt z HTTP. Pamiętacie Cold: trzy komponenty, trzy subskrypcje i trzy identyczne requesty. Tutaj mamy ten sam Subject, do którego są już podłączeni ci sami trzej odbiorcy. |
+| 1 | connect-http | Widzieliśmy, że Subject potrafi sam emitować wartości przez next(), ale nie musimy robić tego ręcznie. Jest również Observerem, więc możemy przekazać go bezpośrednio do subscribe innego Observable. |
 | 2 | request | Dopiero teraz rusza HTTP. Zwróćcie uwagę: jeden request, niezależnie od liczby odbiorców Subjecta. |
 | 3 | received | Backend zwraca jeden obiekt użytkownika. HTTP emituje go do Subjecta. |
 | 4 | multicast | Subject rozsyła tę samą wartość wszystkim trzem odbiorcom. Każdy dostaje cały obiekt, ale wyświetla tylko potrzebne pole. |

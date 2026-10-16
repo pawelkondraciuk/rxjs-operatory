@@ -469,13 +469,15 @@ export function renderScene(frame,options={}) {
   // Chwilowy napis zdarzenia nad diagramem (warstwa na wierzchu, niczego nie przesuwa): monospace w kolorze toru,
   // delikatne tło i badge z identyfikatorem toru. Przy ograniczonym ruchu bez przejść.
   for(const c of frame.callouts||[]) {
-    const size=c.size||45,charW=size*.6,textW=Array.from(c.text).length*charW,badge=size*1.15,gap=size*.32,pad=size*.45;
+    // Pusty label (np. ręczne subject$.next(user) — to nie jest wykonanie toru) pomija badge.
+    const size=c.size||45,charW=size*.6,textW=Array.from(c.text).length*charW,badge=c.label===''?0:size*1.15,gap=badge?size*.32:0,pad=size*.45;
     const w=pad+textW+gap+badge+pad,h=size*1.55,x0=c.x-w/2,opacity=reduced?1:c.opacity;
     svg+=`<g data-callout="${esc(c.text)}" data-callout-lane="${esc(c.label)}" opacity="${+opacity.toFixed(3)}" role="note">`;
     svg+=`<rect x="${x0}" y="${c.y-h/2}" width="${w}" height="${h}" rx="${h/2}" fill="${c.fill}" stroke="${c.color}" stroke-opacity=".55" stroke-width="2"/>`;
     svg+=text(x0+pad,c.y+1,c.text,size,`style="text-anchor:start;font-family:Consolas,ui-monospace,monospace;font-weight:700;fill:${c.ink}"`);
-    svg+=`<rect x="${x0+pad+textW+gap}" y="${c.y-badge/2}" width="${badge}" height="${badge}" rx="${badge*.22}" fill="${c.color}"/>`;
-    svg+=text(x0+pad+textW+gap+badge/2,c.y+1,c.label,size*.82,'style="font-weight:700;fill:#fff"')+'</g>';
+    if(badge)svg+=`<rect x="${x0+pad+textW+gap}" y="${c.y-badge/2}" width="${badge}" height="${badge}" rx="${badge*.22}" fill="${c.color}"/>`+
+      text(x0+pad+textW+gap+badge/2,c.y+1,c.label,size*.82,'style="font-weight:700;fill:#fff"');
+    svg+='</g>';
   }
   if(frame.queue&&!panels.length)svg+=text(frame.width/2,frame.height-20,frame.queue,22*k,'data-queue="true"');
   // Dwa rzędy kart dzielą wysokość diagramu; przy 340 daje to dotychczasowy krok 155 i karty 130.

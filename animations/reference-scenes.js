@@ -601,6 +601,64 @@ export function subjectGraph(scene) {
   };
 }
 
+// Subject — ręczna emisja (05-zrodla-5): wprowadzenie przed Subject + HTTP, ten sam wygląd i pola widoku A/B/C.
+// Subject stoi w miejscu kolumny HTTP z następnego slajdu (x/w 177/230; tam przesuwa się na środek, a po lewej
+// pojawia się HTTP GET). READY: pusty kafelek Subject i puste pola. A, B i C kolejno subskrybują Subject (impulsy
+// od pól w lewo, trzy wiersze wykonań), potem jedno subject$.next(user): kulka User pojawia się w Subject (node.emits)
+// i rozdziela na trzy identyczne powiadomienia next, które jednocześnie jadą do pól. Bez complete — Subject zostaje
+// aktywny, a odbiorcy zasubskrybowani. Jawny harmonogram (schedule): czas ilustracji = czas modelu.
+const subjectManualTimes={subscribe:[.6,1.9,3.2],link:1,next:5,hold:1.4,travel:1.4,summary:.65,duration:9.6};
+export function configureSubjectManual(scene) {
+  const at=subjectManualTimes,ev=(type,edge,offset=0)=>({type,edge,...(offset?{offset}:{})});
+  const split=at.next+at.hold,delivered=split+at.travel;
+  const subjectMark={id:'subject',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
+  // Stały kod: wyłącznie definicja Subject; świeci od ręcznego next do wyjścia powiadomień. subject$.next(user)
+  // to chwilowa migawka nad diagramem (graph.callouts), w jednej linii i bez rozwijania obiektu user.
+  const lines=[[{text:'const subject$ = '},{text:'new Subject<User>()',mark:subjectMark,
+    active:[{from:{type:'manual-next'},to:ev('source-next','subject-A')}]},{text:';'}]];
+  const value=E(split,coldUserSymbol,subjectUpstream.fill);
+  Object.assign(scene,{graph:subjectManualGraph,subjectManualTimes:{...at,split,delivered},
+    playerLayout:'function',duration:at.duration,ink:'#26323B',playerClass:'rx-lanes rx-flat-tiles',
+    title:'Subject — ręczna emisja',code:lines[0].map(part=>part.text).join(''),codeLines:lines,codeFrames:[],
+    rows:[R('Subject',[{...value,at:at.next}]),...coldFields.map(f=>R(`Pole ${f.label}`,[value]))],
+    // Odbiorcy rosną z zestawionymi subskrypcjami; wywołania next — jedno, od chwili subject$.next(user).
+    metrics:[{label:'Odbiorcy',value:t=>at.subscribe.filter(start=>t>=start+at.link).length},
+      {label:'Wywołania next',value:t=>t>=at.next?1:0}],
+    captions:[[0,'new Subject<User>(): Subject jeszcze nie ma odbiorców i niczego nie emituje']],
+    playback:manual([
+      {id:'subscribed',event:ev('connected','subject-C'),offset:.35,caption:'A, B i C subskrybują ten sam Subject. Pola czekają na wartość'},
+      {id:'next',event:{type:'manual-next'},offset:.6,caption:'subject$.next(user): jedna ręczna emisja obiektu User'},
+      {id:'multicast',event:ev('source-next','subject-A'),offset:at.travel/2,caption:'Subject rozsyła tę samą wartość do A, B i C jednocześnie'},
+      {id:'received',event:ev('deliver-next','subject-C'),offset:.35,caption:'Każdy dostał cały obiekt User i pokazuje tylko swoje pole'},
+    ]),
+  });
+}
+
+export function subjectManualGraph(scene) {
+  const tall=scene.format==='4:3',top=tall?178:102,at=scene.subjectManualTimes,fields=viewFields(top);
+  const g={subjectX:177,subjectW:230};
+  const value={value:coldUserSymbol,color:subjectUpstream.fill};
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball:viewFieldBall,
+    // U: kolory emisji obiektu User (jak #1 na slajdzie HTTP) dla kulek i migawki next; bez własnego toru.
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,C:laneSubscribers.C,U:subjectUpstream},
+    nodes:[{id:'subject',x:g.subjectX,w:g.subjectW,label:'Subject',splitBalls:true,splitGuides:false,upstreamStripe:false,hubFan:false,
+        emits:[{...value,at:at.next}],
+        ...laneTile('operator',top,Object.fromEntries(coldFields.map(f=>[f.id,f.slot])),coldFields.length)},
+      ...fields.nodes],
+    edges:coldFields.map((f,i)=>({id:'subject-'+f.id,from:'subject',to:f.id,subscriber:f.id,logicalStart:at.subscribe[i]})),
+    // Trzy powiadomienia jednej emisji: wspólne logicalAt (next), ten sam kolor i wspólny wylot z portów Subject.
+    schedule:Object.fromEntries(coldFields.map((f,i)=>['subject-'+f.id,{start:at.subscribe[i],connectDuration:at.link,
+      events:[{...value,at:at.split,arrival:at.delivered,logicalAt:at.next}]}])),
+    trays:fields.trays,
+    callouts:[...coldFields.map(f=>laneCallout('.subscribe()',f.id,laneEvent('subscribe','subject-'+f.id),laneEvent('connected','subject-'+f.id),{x:960,y:top/2})),
+      // Migawka ręcznej emisji w miejscu migawki http.get(...).subscribe(subject$) z następnego slajdu; bez badge'a toru.
+      {...laneCallout('subject$.next(user)','U',{type:'manual-next'},laneEvent('deliver-next','subject-C'),{x:620,y:top/2}),label:''}],
+    timeline:[{type:'manual-next',at:at.next},
+      {type:'subject-manual-summary',event:{type:'deliver-next',edge:'subject-C'},offset:at.summary,
+        caption:'Jedna emisja, trzech odbiorców. Subject nadal działa — bez complete'}],
+  };
+}
+
 // Subject i interval (05-zrodla-4): kto odłączy źródło? interval(1000) → Subject → A/B/C, wygląd jak Subject + HTTP.
 // READY: wszystkie subskrypcje zestawione przed t = 0 — także connection (tor #1: interval → Subject) — i interval
 // od razu emituje. Scena na żywo z akcjami (scene.live.actions): kolejne „dalej” wywołują subA/subB/subC.unsubscribe()

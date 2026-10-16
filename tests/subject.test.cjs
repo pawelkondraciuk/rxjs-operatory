@@ -181,7 +181,7 @@ test('Subject checkpoint notes follow the stops and end with the question about 
  const source=html.match(/<template data-checkpoint-notes="05-zrodla-3">([\s\S]*?)<\/template>/)[1];
  const notes=Object.fromEntries([...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)].map(([,id,text])=>[id,text]));
  assert.deepEqual(Object.keys(notes),['ready',...Array.from(c.stops,s=>s.id),'finished']);
- assert.match(notes.ready,/trzy identyczne requesty HTTP[\s\S]*ci sami trzej odbiorcy/);
+ assert.match(notes.ready,/Zamiast ręcznie wywoływać next, pobierzmy ten obiekt z HTTP[\s\S]*trzy identyczne requesty[\s\S]*ci sami trzej odbiorcy/);
  assert.match(notes['connect-http'],/Jest również Observerem/);
  assert.match(notes.request,/jeden request, niezależnie od liczby odbiorców Subjecta/);
  assert.match(notes.received,/HTTP emituje go do Subjecta/);

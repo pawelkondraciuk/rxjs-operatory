@@ -14,7 +14,7 @@ const laneY=(n,id)=>{
   if(n.laneSlots&&id in n.laneSlots)return n.top+n.defH+(n.laneSlots[id]+.5)*n.rowH;
   const i=(n.laneIds||[]).indexOf(id);return i<0?n.y:n.y+(n.laneTop||0)+i*(n.laneStep||0);
 };
-const rowGrowth=.35,dropDuration=.5;
+const rowGrowth=.35,dropDuration=.5,emitMove=.6;
 const workSpans=row=>(row.spans||[]).filter(p=>!['queue','state','window','subscription'].includes(p.kind));
 
 // Kompilacja wykonuje się raz. Cały graf (także niewidoczne inner) rezerwuje miejsca.
@@ -301,7 +301,19 @@ export function compileScene(scene) {
       if(outputs.length&&n.buffer)outputs.push({value:e.value,color:e.color||'a',at:Math.min(...outputs.map(o=>o.at)),buffer:true});
       return outputs.length?{arrival:e.arrival,departure:Math.min(...outputs.map(o=>o.at)),value:e.value,color:e.color||'a',
         y:laneY(n,input.subscriber),left,right,x,outputs}:null;
-    })).filter(Boolean);
+    })).concat(emitsOf(n,left,right)).filter(Boolean);
+  }
+  // node.emits (opt-in, np. subject$.next(user)): wartość bez kabla wejścia pojawia się (fade-in) w środku wierszy kafelka
+  // w chwili at i stamtąd rozdziela się na wyjścia z tym samym logicalAt — jedna emisja, kilka powiadomień next.
+  function emitsOf(n,left,right) {
+    const slots=Object.values(n.laneSlots||{}),y=n.top+n.defH+(slots.length?Math.max(...slots)+1:1)*n.rowH/2;
+    return (n.emits||[]).map(e=>{
+      const logicalAt=e.logicalAt??e.at;
+      const outputs=laneRecords.filter(r=>r.a.id===n.id).flatMap(out=>out.events.filter(v=>v.logicalAt===logicalAt&&v.at>=e.at)
+        .map(v=>({value:v.value,color:v.color||'a',y:laneY(n,out.subscriber),at:v.at})));
+      return outputs.length?{arrival:e.at,departure:Math.min(...outputs.map(o=>o.at)),value:e.value,color:e.color||'a',
+        y,left,right,x:n.x,outputs,emitted:true}:null;
+    });
   }
   // Subtelne przerywane ścieżki rozdzielenia — widoczne tylko w trakcie rozdzielania, nie na stałe.
   function splitGuides(n,time) {
@@ -356,6 +368,17 @@ export function compileScene(scene) {
     for(const n of nodes) if(n.splitBalls) for(const split of splitsOf(n)) {
       if(time<split.arrival||time>=split.departure)continue;
       const p=(time-split.arrival)/(split.departure-split.arrival),ease=u=>u*u*(3-2*u);
+      if(split.emitted) {
+        // Emisja w kafelku: kulka wchodzi fade-in i czeka w środku; ostatnie emitMove s przed wyjściem rozchodzi się do portów.
+        const move=Math.min(emitMove,split.departure-split.arrival),start=split.departure-move;
+        if(time<start)tokens.push({x:split.x,y:split.y,value:split.value,color:split.color,phase:'emit',opacity:clamp((time-split.arrival)/fadeDuration)});
+        else for(const out of split.outputs) {
+          const u=ease((time-start)/move);
+          tokens.push({x:split.x+(split.right-split.x)*u,y:split.y+(out.y-split.y)*u,value:out.value,color:out.color,phase:'split-out',
+            scale:1+.15*Math.max(0,1-(time-start)/move/.15)});
+        }
+        continue;
+      }
       if(p<.4)tokens.push({x:split.left+(split.x-split.left)*ease(p/.4),y:split.y,value:split.value,color:split.color,phase:'split-in'});
       else for(const out of split.outputs) {
         // Wyjście do bufora jedzie do kulki w kieszeni pod kafelkiem, pozostałe — do portów wyjść.
