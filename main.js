@@ -187,7 +187,8 @@ function activate(slide) {
   if (activeSlide && activePlayer) stateFor(activeSlide).wasPlaying = activePlayer.isPlaying;
   if (activePlayer?.controller) activePlayer.controller.suspend('slide'); else activePlayer?.pause();
   // Scena na żywo (interval) po wyjściu zatrzymuje wykonanie i wraca do READY; nie wznawia się po powrocie.
-  if (activePlayer?.live) activePlayer.controller.reset();
+  // Ponowna aktywacja tego samego slajdu (np. przy inicjalizacji Reveal) nie jest wyjściem.
+  if (activePlayer?.live && activeSlide !== slide) activePlayer.controller.reset();
   activePlayer?.hideControls();
   activeSlide = slide;
   activePlayer = playerFor(slide);
@@ -199,14 +200,14 @@ function activate(slide) {
     const requestedSlide = requestedId === slide.id || deck.getSlides()[Number(requestedId)] === slide;
     if (!state.visited && requestedSlide && Number.isInteger(requestedFragment) && requestedFragment >= 0) {
       const marker = slide.querySelectorAll('.rx-step')[requestedFragment];
-      if (marker?.dataset.handoff === 'true') activePlayer.controller.finish();
-      else if (marker) activePlayer.controller.seek(Number(marker.dataset.time));
+      if (marker) activePlayer.controller.seekCheckpoint(Number(marker.dataset.time), marker.dataset.handoff === 'true');
     }
     const blocked = deck.isOverview() || deck.isPaused() || document.hidden;
     if (blocked) activePlayer.controller.suspend('environment');
     else {
       activePlayer.controller.resume('environment'); activePlayer.controller.resume('slide');
       if (!state.visited && state.mode === 'auto' && activePlayer.state !== 'finished') activePlayer.controller.next();
+      autoplayLive();
     }
   }
   else if (isStepped(slide) && state.mode === 'manual') {
@@ -223,11 +224,15 @@ function activate(slide) {
   autoFinish.sync(slide);
 }
 
+// Scena na żywo z autoplay (Subject + interval) startuje już działająca: emisje ruszają przy wejściu na slajd.
+function autoplayLive() {
+  if (activePlayer?.live?.autoplay && !activePlayer.isPlaying && activePlayer.state !== 'finished') activePlayer.controller.toggle();
+}
 let suspendedPlaying = false;
 function suspend() { if (activePlayer?.controller) { activePlayer.controller.suspend('environment'); return; } suspendedPlaying ||= Boolean(activePlayer?.isPlaying); activePlayer?.pause(); }
 function resume() {
   if (!printMode && !deck.isOverview() && !deck.isPaused() && !document.hidden) {
-    if (activePlayer?.controller) { activePlayer.controller.resume('environment'); return; }
+    if (activePlayer?.controller) { activePlayer.controller.resume('environment'); if (activePlayer.state === 'ready') autoplayLive(); return; }
     if (suspendedPlaying) {
       if (isStepped() && stateFor().mode === 'manual') activePlayer?.playTo(fragmentTime());
       else if (activePlayer?.state !== 'finished') activePlayer?.play();

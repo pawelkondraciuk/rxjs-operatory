@@ -14,7 +14,7 @@ const laneY=(n,id)=>{
   if(n.laneSlots&&id in n.laneSlots)return n.top+n.defH+(n.laneSlots[id]+.5)*n.rowH;
   const i=(n.laneIds||[]).indexOf(id);return i<0?n.y:n.y+(n.laneTop||0)+i*(n.laneStep||0);
 };
-const rowGrowth=.35;
+const rowGrowth=.35,dropDuration=.5;
 const workSpans=row=>(row.spans||[]).filter(p=>!['queue','state','window','subscription'].includes(p.kind));
 
 // Kompilacja wykonuje się raz. Cały graf (także niewidoczne inner) rezerwuje miejsca.
@@ -363,6 +363,13 @@ export function compileScene(scene) {
         tokens.push({x:split.x+(target.x-split.x)*u,y:split.y+(target.y-split.y)*u,
           value:out.value,color:out.color,phase:out.buffer?'buffer-in':'split-out',scale:1+.15*Math.max(0,1-Math.abs(p-.4)/.08)});
       }
+    }
+    // dropBalls (hub, np. Subject bez odbiorców): wartość, której nikt nie odbiera, kurczy się i gaśnie na porcie wejścia.
+    for(const n of nodes) if(n.dropBalls) for(const input of laneRecords.filter(r=>r.b.id===n.id)) for(const e of input.events) {
+      if(time<e.arrival||time>=e.arrival+dropDuration)continue;
+      if(laneRecords.some(out=>out.a.id===n.id&&out.events.some(v=>v.logicalAt===e.logicalAt&&v.at>=e.arrival)))continue;
+      const p=(time-e.arrival)/dropDuration;
+      tokens.push({x:n.x-n.w/2,y:laneY(n,input.subscriber),value:e.value,color:e.color||'a',phase:'drop',opacity:1-p,scale:1-.4*p});
     }
     for(const n of nodes) if(n.buffer) for(const replay of replaysOf(n)) {
       if(time<replay.start||time>=replay.end)continue;

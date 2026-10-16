@@ -1,9 +1,9 @@
-import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback, configureSubject, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside } from './reference-scenes.js';
+import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback, configureSubject, configureSubjectInterval, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside } from './reference-scenes.js';
 import { configureCatch } from './catch-scenes.js';
 
 // Końcowe ID po rozwinięciu wariantów; otwarcie pozostaje w kolejności HTML.
 export const mainOrder = [
-  '05-zrodla-2','05-zrodla','04-operator','04a-dwa-tory','05-zrodla-3','04a-dwa-tory-2','04a-dwa-tory-3',
+  '05-zrodla-2','05-zrodla','04-operator','04a-dwa-tory','05-zrodla-3','05-zrodla-4','04a-dwa-tory-2','04a-dwa-tory-3',
   '20-sharereplay','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap',
   'b04-catcherror','b04-catcherror-2','14-distinct','16-czas-cztery','25-podsumowanie','pytania',
 ];
@@ -18,7 +18,7 @@ export const extraOrder = [
   '23-angular-alias','24-signals','26-resolver-problem','27-resolver-microtask','28-resolver-batch',
 ];
 export const extraIds = new Set(extraOrder);
-const stagedIds = new Set(['04-operator','05-zrodla','05-zrodla-2','05-zrodla-3','20-sharereplay','20-sharereplay-2']);
+const stagedIds = new Set(['04-operator','05-zrodla','05-zrodla-2','05-zrodla-3','05-zrodla-4','20-sharereplay','20-sharereplay-2']);
 
 // Sceny z finish:hold kończą się ok. 2 s po ostatnim zdarzeniu modelu, żeby AUTO nie stało długo
 // przed FINISHED (każde „dalej” w bezruchu tylko kończy animację). 22-refcount celowo pokazuje ciszę.
@@ -47,6 +47,8 @@ export function configureScene(scene) {
   if(id==='05-zrodla'&&scene.sourceExample===1)configureHttp(scene);
   if(id==='04a-dwa-tory')configureLanes(scene);
   if(id==='05-zrodla'&&scene.sourceExample===2)configureSubject(scene);
+  // Subject + interval: odbiorcy odchodzą, connection z interval zostaje (scena na żywo z akcjami).
+  if(id==='05-zrodla'&&scene.sourceExample===3)configureSubjectInterval(scene);
   scene.group=extraIds.has(scene.id)?'bonus':'main';
   if(trimmedTails.has(id))trimTail(scene);
   if(id==='20-sharereplay'){

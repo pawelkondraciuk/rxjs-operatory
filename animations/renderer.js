@@ -389,8 +389,10 @@ export function renderScene(frame,options={}) {
   for(const panel of panels)svg+=executionPanel(frame,panel,reduced);
   for(const t of frame.tokens) {
     const edge=reduced&&frame.edges.find(e=>e.id===t.edge),point=edge?.points?.at(-1);
-    if(frame.ball){svg+=ball(point?.[0]??t.x,point?.[1]??t.y,t.value,t.color,frame.ball,reduced?1:t.scale||1,`data-value-on="${esc(t.edge||'source')}" data-token="${esc(t.phase)}"`);continue;}
-    svg+=token(point?.[0]??t.x,point?.[1]??t.y,t.value,t.color,`data-value-on="${esc(t.edge||'source')}" data-token="${esc(t.phase)}"`,150*k,Boolean(panels.length),k);
+    // Opcjonalne krycie tokenu (np. wartość gasnąca w Subject bez odbiorców).
+    const attrs=`data-value-on="${esc(t.edge||'source')}" data-token="${esc(t.phase)}"${t.opacity===undefined?'':` opacity="${+t.opacity.toFixed(3)}"`}`;
+    if(frame.ball){svg+=ball(point?.[0]??t.x,point?.[1]??t.y,t.value,t.color,frame.ball,reduced?1:t.scale||1,attrs);continue;}
+    svg+=token(point?.[0]??t.x,point?.[1]??t.y,t.value,t.color,attrs,150*k,Boolean(panels.length),k);
   }
   for(const h of frame.histories) {
     if(h.field) {

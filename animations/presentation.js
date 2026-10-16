@@ -20,11 +20,11 @@ export function prepareSlides(scenes, { format = '4:3' } = {}) {
         comparisonMode: mode, title: titles[original.id][i],
       }));
     } else if (original.id === '05-zrodla') {
-      // Warianty 0 (interval na żywo) i 1 (HTTP) ustawiają configureInterval/configureHttp w configureScene.
-      variants = [0,1,2].map(i => ({ ...original, sourceExample:i, duration:i===1?11:20,
-        title:['interval: strumień bez końca','HTTP: odpowiedź i complete','Subject: odbierasz od chwili subskrypcji'][i],
-        code:['interval(1000)','http.get(\'/api/data\')','subject$.subscribe(observer)'][i],
-        captions:[[],[],[[0,'Subject może emitować bez odbiorcy.'],[4,'A bez subskrypcji.'],[8,'Odbiorca subskrybuje.'],[12,'Dostaje B.'],[16,'Dostaje C. Trzy emisje, dwa odbiory.']]][i],
+      // Warianty 0 (interval na żywo), 1 (HTTP), 2 (Subject + HTTP) i 3 (Subject + interval) konfiguruje configureScene.
+      variants = [0,1,2,3].map(i => ({ ...original, sourceExample:i, duration:i===1?11:20,
+        title:['interval: strumień bez końca','HTTP: odpowiedź i complete','Subject: odbierasz od chwili subskrypcji','Subject — kto odłączy źródło?'][i],
+        code:['interval(1000)','http.get(\'/api/data\')','subject$.subscribe(observer)',''][i],
+        captions:[[],[],[[0,'Subject może emitować bez odbiorcy.'],[4,'A bez subskrypcji.'],[8,'Odbiorca subskrybuje.'],[12,'Dostaje B.'],[16,'Dostaje C. Trzy emisje, dwa odbiory.']],[]][i],
       }));
     } else if (original.id === '21a-share-pozycja') {
       variants = [false,true].map(after => ({ ...original, mapAfterShare:after,

@@ -17,7 +17,7 @@ Sceny MAIN z pytaniami zaczynają od nieruchomego READY. Prawo / Page Down uruch
 
 W oknie prelegenta (`S`) podgląd następnego slajdu domyślnie pokazuje dużą nazwę, np. **switchMap**, i krótki podtytuł. Wskazuje kolejny slajd, także podczas ręcznych postojów bieżącej animacji. Przełącznik **Podgląd: Tytuł / Slajd** w prawym dolnym rogu tego pola przywraca standardowy podgląd. Wybór jest zapamiętywany w przeglądarce. Notatki pozostają w standardowym polu Notes. Opcjonalne `data-speaker-title` na sekcji ustawia własny podpis wyłącznie dla prelegenta.
 
-Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 65 slajdów daje 81 stron PDF.
+Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 66 slajdów daje 82 strony PDF.
 
 Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przywraca ekran panoramiczny 1280×720. `W` przeładowuje stronę w drugim formacie, zostając na tym samym slajdzie i fragmencie; animacja wraca do stanu tego fragmentu. Linki do EXTRAS i powrót do pytań zachowują wybrany format. Druk działa w obu: `?print-pdf` (4:3) lub `?print-pdf&ratio=16:9`. W 4:3 slajdy wykorzystują pełną wysokość: większe zdjęcia i kody QR, wyższe diagramy, większy tekst i kapsułki w animacjach (×1,15), etykiety kafelków do ×1,3 oraz większy tytuł (64 px; za długi zmniejsza się, by został w jednej linii), kod (42 px, długi łańcuch przechodzi do nowej linii przed .pipe/.subscribe) i podpis.
 
@@ -25,7 +25,7 @@ Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przyw
 
 Porównania są osobnymi slajdami. Warianty z sufiksami -2/-3/-4 powstają podczas uruchamiania; pierwszy zachowuje ID bazowe. Poniżej podano kolejność MAIN, a dalszy spis opisuje rodziny tematycznie. Pozycje EXTRAS są oznaczone.
 
-Każda pozycja opisuje temat, ekran/bloczki i notatki prelegenta. Tabele wariantów podają rzeczywiste tytuły i kod nad diagramem. Speaker notes przy rodzinie dotyczą wszystkich jej wariantów, ponieważ sekcje są klonowane razem z notatkami. Wyjątkiem jest Subject (`05-zrodla-3`): ma własne notatki przypisane do checkpointów. Notatki przytoczono z ujednoliconymi odstępami; powtarzaną instrukcję obsługi zwykłych animacji opisano wspólnie wyżej.
+Każda pozycja opisuje temat, ekran/bloczki i notatki prelegenta. Tabele wariantów podają rzeczywiste tytuły i kod nad diagramem. Speaker notes przy rodzinie dotyczą wszystkich jej wariantów, ponieważ sekcje są klonowane razem z notatkami. Wyjątkiem są oba slajdy Subject (`05-zrodla-3`, `05-zrodla-4`): mają własne notatki przypisane do checkpointów. Notatki przytoczono z ujednoliconymi odstępami; powtarzaną instrukcję obsługi zwykłych animacji opisano wspólnie wyżej.
 
 Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorze spowalniają ilustrację; nie dodają opóźnień do rzeczywistego synchronicznego RxJS. HTTP jest symulowane. Pasek pokazuje czas pracy, a nie pomiar postępu prawdziwego żądania.
 
@@ -33,11 +33,11 @@ Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorz
 
 Pełne otwarcie pozostaje bez zmian: społeczność, historia meet.js, fotografie, autor, tytuł i pytania o operatory. Budżet **30–35 minut dotyczy tylko części właściwej**; otwarcie, pytania i dogrywka są dodatkowo.
 
-MAIN ma **30 slajdów (19 animowanych)**. EXTRAS zawiera **35 wariantów**. Całość obejmuje 48 bazowych slajdów HTML, 65 po rozwinięciu, 54 animowane. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
+MAIN ma **31 slajdów (20 animowanych)**. EXTRAS zawiera **35 wariantów**. Całość obejmuje 48 bazowych slajdów HTML, 66 po rozwinięciu, 55 animowanych. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
 
 Kolejność po otwarciu:
 
-1. HTTP (`05-zrodla-2`) → interval na żywo (`05-zrodla`) → map, pipe i wykonanie (`04-operator`) → cold (`04a-dwa-tory`) → ręczny multicast HTTP przez Subject (`05-zrodla-3`) → share() za map (`04a-dwa-tory-2`) → share z unsubscribe A (`04a-dwa-tory-3`).
+1. HTTP (`05-zrodla-2`) → interval na żywo (`05-zrodla`) → map, pipe i wykonanie (`04-operator`) → cold (`04a-dwa-tory`) → ręczny multicast HTTP przez Subject (`05-zrodla-3`) → Subject + interval: kto odłączy źródło? (`05-zrodla-4`) → share() za map (`04a-dwa-tory-2`) → share z unsubscribe A (`04a-dwa-tory-3`).
 2. Następnie późny odbiorca z share/shareReplay (`20-sharereplay`, `20-sharereplay-2`). Cold i współdzielenie HTTP pokazują wcześniej tory `04a`; powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
 3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap.
 4. catchError na zewnątrz/wewnątrz → distinctUntilChanged → wspólne porównanie debounceTime i auditTime (`16-czas-cztery`).
@@ -219,13 +219,14 @@ Kontroler `stages`: → zaczyna lub kończy etap, ← cofa checkpoint także w A
 
 ### Źródła — rodzina `05-zrodla`
 
-Warianty zachowują ID, lecz zajmują oddzielne miejsca narracji: **HTTP otwiera część właściwą**, interval jest drugi, Subject stoi między Cold i share: **Cold → ręczny multicast przez Subject → automatyczny multicast przez share()**.
+Warianty zachowują ID, lecz zajmują oddzielne miejsca narracji: **HTTP otwiera część właściwą**, interval jest drugi, oba Subjecty stoją między Cold i share: **Cold → ręczny multicast przez Subject → ręczne połączenie, którego nikt nie odłącza → automatyczny multicast przez share()**.
 
 | ID | Kod i zachowanie |
 | --- | --- |
 | 05-zrodla-2 | `http.get('/api/data')`; pierwsze „dalej” dopisuje `.subscribe(render)` (fade-in razem z odbiorcą A). READY ma tylko nagłówek HTTP GET; subscribe odsłania odbiorcę i wiersz A. Postój request pokazuje pracę po podłączeniu, postój first odebrane dane przed complete. |
 | 05-zrodla | `interval(1000)` na żywo. Pierwsze „dalej” robi `.subscribe()`, potem emisje 0, 1, 2, 3… co sekundę bez końca; drugie „dalej” robi `.unsubscribe()` (bez complete); trzecie przechodzi dalej. |
 | 05-zrodla-3 | Stale tylko `const subject$ = new Subject<User>();`. A/B/C (pola widoku z Cold) subskrybują Subject od READY; migawka `http.get<User>('/api/users/42').subscribe(subject$)` podłącza jedno HTTP, które przez Subject rozsyła obiekt User i complete do trzech pól. |
+| 05-zrodla-4 | `const subject$ = new Subject<number>();` i `const connection = interval(1000).subscribe(subject$);`. Start już działający: interval → Subject → A/B/C; kolejne „dalej” to `subA/subB/subC.unsubscribe()`, a interval emituje dalej do Subjecta bez odbiorców. |
 
 Cała rodzina ma wygląd torów jak w `04a-dwa-tory` (nagłówek = definicja, wiersz = wykonanie, porty, kulki w wierszu odbiorcy, płaskie kafelki) i te same chwilowe napisy `.subscribe()` z badge'em toru, widoczne od pojawienia się odbiorcy do dotarcia subskrypcji do źródła. W interval `.unsubscribe()` A pojawia się pod wierszem odbiorcy, bo rezygnacja zaczyna się przy nim. W Subject jedyny napis to migawka `http.get<User>('/api/users/42').subscribe(subject$)` z badge'em `#1`, wyśrodkowana nad diagramem. HTTP ma postęp tylko w wierszu A pod HTTP GET (od zestawionej subskrypcji do odpowiedzi); odbiorca czeka, potem trzyma kulkę „dane” w swoim wierszu. Diagram używa harmonogramu: pojawienie odbiorcy w 1 s, subscribe 1,3–2,1 s, odpowiedź 7–7,8 s, complete 8,3–9,1 s, cisza do 9,9 s. Kod i widoczność cofają się razem. Postęp jest symulacją oczekiwania, nie procentem odpowiedzi sieciowej.
 
@@ -250,6 +251,19 @@ Subject nie odtwarza historii. Odejście odbiorców nie anuluje automatycznie os
 | 6 | FINISHED / podsumowanie | Osiągnęliśmy dokładnie ten sam efekt w widoku, ale zamiast trzech requestów mamy jeden. Tylko że tym razem ręcznie podłączyliśmy źródło do Subjecta. Kto będzie pilnował tego połączenia, kiedy odbiorcy się odłączą? |
 
 MANUAL zatrzymuje się w punktach 1–5; kolejny krok kończy animację w FINISHED. AUTO przechodzi płynnie przez całość. Ruch kulek tylko ilustruje synchroniczne rozsyłanie powiadomień; pauzy służą wyjaśnieniu. Pełny kod jest przykładem, nie jest wykonywany przez prezentację.
+
+**Subject — kto odłączy źródło? (`05-zrodla-4`) — 45–60 sekund.** Kontynuacja Subject + HTTP z interval zamiast HTTP. Kod przez cały slajd: `const subject$ = new Subject<number>();` oraz `const connection = interval(1000).subscribe(subject$);` (bez kodu subskrypcji A/B/C). Diagram interval(1000) → Subject → A/B/C w wyglądzie torów Subject + HTTP (te same wysokości nagłówka 79 i wierszy 89, top 178/102, viewBox 1240×612/460): interval x/w 212/310 z jednym wierszem `#1` (turkus `#238F83`), Subject 592/230 z wierszami A/B/C, kompaktowi odbiorcy 1000/366 wyrównani z wierszami Subject (A fioletowy, B pomarańczowy, C niebieski); wszystkie kable poziome, wejście `#1` trafia w wiersz A. Odbiorca pokazuje ostatnią odebraną liczbę (kulka r 34, font 30, kolor emisji `#1`).
+
+Slajd startuje już działający: wszystkie subskrypcje są zestawione przed t = 0, a emisje 0, 1, 2… ruszają przy wejściu (co 1 s, przelot 0,8 s, rozesłanie w Subject 0,4 s). Scena jest na żywo jak interval: postoje nie zatrzymują emisji. Kolejne „dalej”: `subA.unsubscribe()`, `subB.unsubscribe()`, `subC.unsubscribe()` — migawka w miejscu nagłówka kolumny odbiorców z literą i kolorem toru; wartość, która dotarła już do Subjecta, jeszcze dociera, potem szary impuls × biegnie od odbiorcy w lewo i kończy się na Subject; szarzeją tylko wiersz odbiorcy, jego kabel i wiersz w Subject. Tor `#1` zachowuje kolor i nigdy nie dostaje impulsu. Czwarte „dalej” (etap 4) niczego nie wywołuje: wyróżnia w kodzie `interval(1000).subscribe(subject$)`; wartości nadal dochodzą do Subjecta i tam gasną (kurczą się na porcie wejścia), licznik „Emisje interval” rośnie, „Odbiorcy Subject” = 0, A/B/C zachowują ostatnie liczby. Bez complete i bez `connection.unsubscribe()` w animacji. Piąte „dalej” przechodzi do share(). „Dalej” w trakcie animacji unsubscribe tylko ją kończy; lewo cofa ostatnią akcję (odbiorca znów odbiera), z etapu 0 — poprzedni slajd. AUTO i Spacja nie wywołują unsubscribe. Wyjście ze slajdu technicznie sprząta wykonanie; powrót zaczyna od stanu początkowego. Druk i „pokaż wynik” dają nieruchomy kadr etapu 4.
+
+| Nr | Checkpoint | Notatka prelegenta |
+| --- | --- | --- |
+| 0 | READY (emisje trwają) | Przed chwilą pokazaliśmy, że możemy podłączyć HTTP do Subjecta. Teraz zamiast HTTP wykorzystamy dobrze już znany interval. Mamy trzech odbiorców i jedno wspólne źródło. |
+| 1 | unsub-a | Pierwszy odbiorca rezygnuje. Jego subskrypcja się kończy, ale pozostali nadal dostają wartości. |
+| 2 | unsub-b | Drugi też się odłącza. Interval nadal działa, bo mamy jeszcze trzeciego odbiorcę. Na razie wszystko wygląda rozsądnie. |
+| 3 | unsub-c | Teraz odłączamy ostatniego. I jak myślicie, co powinno się wydarzyć ze źródłem? |
+| 4 | source | Nic. Interval nadal emituje kolejne wartości. Tylko nie ma już komu ich przekazywać. Dlaczego? Bo subskrypcja interval została utworzona osobno, przez interval.subscribe(subject$). Nie jest powiązana z liczbą odbiorców Subjecta. Żeby zatrzymać źródło, musielibyśmy sami wywołać connection.unsubscribe(). Przejście: Czyli Subject rozwiązuje problem rozsyłania wartości, ale nie zarządza automatycznie połączeniem ze źródłem. A gdyby RxJS robił to za nas? |
+| — | FINISHED (druk) | Podsumowanie: trzech odbiorców zrezygnowało, ale interval nadal pracuje; połączenie trzeba zakończyć samemu. |
 
 **Speaker notes pozostałych źródeł:** Angular HttpClient jest przykładem cold źródła; nie generalizować tego na już uruchomiony Promise. Timer kończy automatycznie, interval przez rezygnację odbiorcy.
 

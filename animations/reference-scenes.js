@@ -601,6 +601,99 @@ export function subjectGraph(scene) {
   };
 }
 
+// Subject i interval (05-zrodla-4): kto odłączy źródło? interval(1000) → Subject → A/B/C, wygląd jak Subject + HTTP.
+// READY: wszystkie subskrypcje zestawione przed t = 0 — także connection (tor #1: interval → Subject) — i interval
+// od razu emituje. Scena na żywo z akcjami (scene.live.actions): kolejne „dalej” wywołują subA/subB/subC.unsubscribe()
+// (odłącza się wyłącznie Subject → X; szary impuls × kończy się na Subject), a ostatnia akcja (source) niczego nie
+// wywołuje — wyróżnia w kodzie connection. Wartości bez odbiorców docierają do Subject i tam gasną (dropBalls).
+// Bez complete i bez connection.unsubscribe(): interval pracuje, dopóki prowadzący nie zmieni slajdu.
+const subjectIntervalTiming={first:.5,period:1,travel:.8,hold:.4,cancel:.8,calloutHold:.4,window:30,keep:5,margin:2,
+  actions:['A','B','C','source'],defaults:[3,6,9,12],settle:2.8,actionGap:1.5,defaultClose:14.9};
+const subjectIntervalReceivers=[{id:'A',slot:0},{id:'B',slot:1},{id:'C',slot:2}];
+export function configureSubjectInterval(scene) {
+  const t=subjectIntervalTiming;
+  // Postoje to stabilne kadry akcji na umownej osi (defaults): znaczniki Reveal, notatki, hash i podgląd Notes.
+  // Na żywo kontroler liczy etap z liczby wykonanych akcji, nie z czasu.
+  const settled=t.defaults.map((at,i)=>at+(t.actions[i]==='source'?.5:t.settle));
+  Object.assign(scene,{graph:subjectIntervalGraph,playerLayout:'function',ink:'#26323B',playerClass:'rx-lanes rx-flat-tiles rx-two-lines',
+    title:'Subject — kto odłączy źródło?',
+    rows:[R('interval(1000)'),...subjectIntervalReceivers.map(r=>R('Odbiorca '+r.id))],
+    live:{start:0,window:t.window,keep:t.keep,margin:t.margin,defaultClose:t.defaultClose,actions:t.actions,defaults:t.defaults,
+      actionGap:t.actionGap,settle:t.settle,autoplay:true,variant:subjectIntervalVariant},
+    playback:{entry:'manual',finish:'hold',live:true,stops:['unsub-a','unsub-b','unsub-c','source'].map((id,i)=>({id,time:settled[i]}))},
+  });
+  Object.assign(scene,subjectIntervalVariant(scene,{from:0,to:t.window,closedAt:null,actions:[]}));
+}
+
+// Wariant dla okna [from, to], wykonanych akcji (czasy ilustracji, w kolejności live.actions) i opcjonalnego
+// zamrożenia closedAt (druk, „pokaż wynik”: skończona scena bez nowych emisji, źródło nadal bez complete).
+// Odbiorca dostaje wartości, które dotarły do Subject przed jego unsubscribe; potem rusza impuls ×.
+function subjectIntervalVariant(scene,{from,to,closedAt,actions=[]}) {
+  const t=subjectIntervalTiming,closed=closedAt!==null&&closedAt!==undefined,end=closed?closedAt:to;
+  const emitAt=k=>t.first+t.period*k,arrival=k=>emitAt(k)+t.travel,split=k=>arrival(k)+t.hold,delivered=k=>split(k)+t.travel;
+  const kFrom=Math.max(0,Math.floor((from-t.first)/t.period)-3),kTo=Math.floor((end-t.first)/t.period);
+  const receivers=subjectIntervalReceivers.map((r,i)=>{
+    const at=actions[i];
+    if(at===undefined)return {...r,kMax:kTo,unsubscribeAt:null};
+    const kMax=Math.min(kTo,Math.ceil((at-t.first-t.travel)/t.period)-1);
+    const unsubscribeAt=Math.max(at,kMax>=0?delivered(kMax):at);
+    return {...r,kMax,calledAt:at,unsubscribeAt,doneAt:unsubscribeAt+t.cancel+t.calloutHold};
+  });
+  const sourceAt=actions[t.actions.indexOf('source')];
+  const emitted=time=>Math.max(0,Math.min(kTo+1,Math.floor((time-t.first)/t.period)+1));
+  const subjectMark={id:'subject',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
+  // connection bez stałego wyróżnienia; świeci od ostatniego etapu (źródło pracuje bez odbiorców).
+  const connectionMark={id:'connection',bg:'rgba(35,143,131,.16)',line:subjectUpstream.color,quiet:true};
+  const lines=[[{text:'const subject$ = '},{text:'new Subject<number>()',mark:subjectMark},{text:';'}],
+    [{text:'const connection = '},{text:'interval(1000).subscribe(subject$)',mark:connectionMark,
+      active:sourceAt===undefined?[]:[{from:{type:'connection-focus'},to:{type:'connection-focus-end'}}]},{text:';'}]];
+  const unsubscribed=receivers.filter(r=>r.unsubscribeAt!==null);
+  return {...scene,subjectIntervalPlan:{kFrom,kTo,receivers,sourceAt,end},
+    duration:closed?closedAt:to,liveBusyUntil:t.actions.map((id,i)=>receivers.find(r=>r.id===id)?.doneAt??actions[i]),
+    code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
+    metrics:[{label:'Emisje interval',value:emitted},
+      {label:'Odbiorcy Subject',value:time=>receivers.length-unsubscribed.filter(r=>time>=r.unsubscribeAt).length}],
+    captions:[[0,'interval emituje co sekundę. Subject rozsyła każdą wartość do A, B i C'],
+      ...unsubscribed.map(r=>[r.calledAt,{A:'A się odłącza. B i C nadal odbierają',B:'B się odłącza. Odbiera już tylko C',
+        C:'Odłącza się ostatni odbiorca. Co stanie się z interval?'}[r.id]]),
+      ...(sourceAt===undefined?[]:[[sourceAt,'interval nadal emituje do Subject. connection pozostaje aktywne']])]};
+}
+
+export function subjectIntervalGraph(scene) {
+  const tall=scene.format==='4:3',top=tall?178:102,t=subjectIntervalTiming,{kFrom,kTo,receivers,sourceAt,end}=scene.subjectIntervalPlan;
+  // Kolumny: interval(1000) mieści etykietę w jednej linii, Subject jak na slajdzie HTTP, kompaktowi odbiorcy; odstępy 110.
+  const g={sourceX:212,sourceW:310,subjectX:592,subjectW:230,recvX:1000,recvW:366};
+  const pos=r=>({x:g.recvX,w:g.recvW,y:laneRowY(top,r.slot)});
+  // Kulka liczby mieści trzy cyfry; wartości mają kolor emisji (fill toru #1) jak w Subject + HTTP.
+  const ball={r:34,font:30},fill=subjectUpstream.fill,emitAt=k=>t.first+t.period*k;
+  const value=(k,at,arrival)=>({value:String(k),color:fill,at,arrival,logicalAt:emitAt(k)});
+  const range=(a,b)=>Array.from({length:Math.max(0,b-a+1)},(_,i)=>a+i);
+  const preconnected={start:-2,connectDuration:.8};
+  // Ostatnia kulka odbiorcy stoi w wolnej części wiersza; poprzednia odjeżdża w lewo, nie zasłaniając litery.
+  const trayX=g.recvX+g.recvW/2-143;
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball,
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,C:laneSubscribers.C,U:subjectUpstream},
+    nodes:[{id:'interval',x:g.sourceX,w:g.sourceW,label:'interval(1000)',...laneTile('source',top,{U:0},1)},
+      {id:'subject',x:g.subjectX,w:g.subjectW,label:'Subject',splitBalls:true,splitAt:0,splitGuides:false,upstreamStripe:false,hubFan:false,
+        dropBalls:true,...laneTile('operator',top,{U:0,...Object.fromEntries(receivers.map(r=>[r.id,r.slot]))},receivers.length)},
+      ...receivers.map(r=>laneReceiver(r.id,r.id,pos(r),{ready:true}))],
+    edges:[{id:'interval-subject',from:'interval',to:'subject',subscriber:'U',logicalStart:-2},
+      ...receivers.map(r=>({id:'subject-'+r.id,from:'subject',to:r.id,subscriber:r.id,logicalStart:-2,cancelPulse:true}))],
+    schedule:{'interval-subject':{...preconnected,events:range(kFrom,kTo).map(k=>value(k,emitAt(k),emitAt(k)+t.travel))},
+      ...Object.fromEntries(receivers.map(r=>['subject-'+r.id,{...preconnected,
+        // Także ostatnie wartości sprzed okna: odłączony odbiorca zachowuje ostatnią odebraną liczbę.
+        events:range(Math.max(0,Math.min(kFrom,r.kMax-1)),r.kMax).map(k=>{const split=emitAt(k)+t.travel+t.hold;return value(k,split,split+t.travel);}),
+        ...(r.unsubscribeAt===null?{}:{end:{at:r.unsubscribeAt,logicalAt:r.unsubscribeAt,kind:'unsubscribe',duration:t.cancel}})}]))},
+    trays:receivers.map(r=>({...laneTray(r.id,pos(r),1,ball),x:trayX})),
+    // subX.unsubscribe() w miejscu nagłówka kolumny odbiorców (odbiorcy nie mają nagłówka), z literą i kolorem toru:
+    // od wywołania do chwili po dotarciu impulsu × do Subject.
+    callouts:receivers.filter(r=>r.unsubscribeAt!==null).map(r=>({...laneCallout(`sub${r.id}.unsubscribe()`,r.id,
+      {type:'unsubscribe-call',edge:'subject-'+r.id},laneEvent('disconnected','subject-'+r.id,t.calloutHold),{x:g.recvX,y:top+laneLook.defH/2}),size:34})),
+    timeline:[...receivers.filter(r=>r.unsubscribeAt!==null).map(r=>({type:'unsubscribe-call',edge:'subject-'+r.id,at:r.calledAt})),
+      ...(sourceAt===undefined?[]:[{type:'connection-focus',at:sourceAt},{type:'connection-focus-end',at:end+1}])],
+  };
+}
+
 function buildFlattenGraph(scene) {
   const all=scene.operatorName==='concatAll',sourceY=50,operatorX=all?780:720;
   const nodes=[

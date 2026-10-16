@@ -97,6 +97,6 @@
 }
 .rx-player.rx-flat-tiles [data-panel-box] { fill: #ECE6DA; }
 
-/* catchError wewnątrz: dwie linie kodu (druga ~52 znaki) muszą się zmieścić bez łamania. */
-.rx-player.rx-catch-inside .rx-code { font-size:36px; }
-[data-ratio="16-9"] .rx-player.rx-catch-inside .rx-code { font-size:24px; }
+/* catchError wewnątrz i Subject + interval: dwie linie kodu (druga ~52–54 znaki) muszą się zmieścić bez łamania. */
+.rx-player:is(.rx-catch-inside, .rx-two-lines) .rx-code { font-size:36px; }
+[data-ratio="16-9"] .rx-player:is(.rx-catch-inside, .rx-two-lines) .rx-code { font-size:24px; }

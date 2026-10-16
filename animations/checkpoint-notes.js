@@ -47,7 +47,10 @@ export function installCheckpointNotesReceiver(deck,stages,{getPlayer,view=windo
     stages.restore(()=>{
       deck.setState(state);
       const player=getPlayer(slide),marker=slide.querySelectorAll('.rx-step')[state.indexf];
-      if(player?.controller)player.controller.seek(marker?.dataset.handoff==='true'?player.duration:Number(marker?.dataset.time||0));
+      const handoff=marker?.dataset.handoff==='true',time=Number(marker?.dataset.time||0);
+      // seekCheckpoint odtwarza też etap sceny na żywo z akcjami (Subject + interval).
+      if(player?.controller?.seekCheckpoint)player.controller.seekCheckpoint(time,handoff);
+      else if(player?.controller)player.controller.seek(handoff?player.duration:time);
     });
   },true);
 }

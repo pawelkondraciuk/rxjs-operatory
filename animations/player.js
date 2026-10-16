@@ -7,9 +7,10 @@ import { createStageController } from './stage-controller.js';
 export function createPlayer(root, scene, controls = {}) {
 // scene.live (np. interval): wykonanie bez końca. Okno kompilacji [liveFrom, liveTo] przesuwa się z czasem,
 // więc liczba zdarzeń nie rośnie; close() wybiera chwilę unsubscribe i daje scenie skończoną długość.
+// live.actions (opt-in, np. kolejne unsubscribe odbiorców Subject): akcje w chwilach wywołania; źródło działa dalej.
 const live=scene.live||null;
-let liveClosed=null,liveFrom=0,liveTo=live?.window??0;
-const build=()=>compileScene(live?live.variant(scene,{from:liveFrom,to:liveTo,closedAt:liveClosed}):scene);
+let liveClosed=null,liveFrom=0,liveTo=live?.window??0,liveActs=[],current=scene;
+const build=()=>{current=live?live.variant(scene,{from:liveFrom,to:liveTo,closedAt:liveClosed,actions:liveActs}):scene;return compileScene(current);};
 let engine=build(), playbackDuration=engine.duration;
 root.classList?.toggle('rx-expanded',scene.playerLayout==='expanded');
 root.classList?.toggle('rx-function',scene.playerLayout==='function');
@@ -75,7 +76,15 @@ function closeLive(){
  if(!live||liveClosed!==null||time<live.start)return false;
  liveClosed=time;rebuild();paint();return true;
 }
-function reopenLive(){if(!live)return;liveClosed=null;liveFrom=0;liveTo=live.window;rebuild();}
+function reopenLive(){if(!live)return;liveClosed=null;liveActs=[];liveFrom=0;liveTo=live.window;rebuild();}
+// Sekwencja akcji: „pokaż wynik” wykonuje pozostałe akcje co actionGap i zamraża kadr po settle;
+// z READY (druk) — umowne chwile live.defaults i defaultClose.
+function finishActions(){
+ if(time<=0){liveActs=[...live.defaults];liveClosed=live.defaultClose;liveFrom=0;return;}
+ const remaining=live.actions.length-liveActs.length;
+ liveActs=[...liveActs,...Array.from({length:remaining},(_,i)=>time+i*live.actionGap)];
+ liveClosed=remaining?liveActs.at(-1)+live.settle:time;
+}
 function seek(target){pause();stopAt=null;follow(target);time=clamp(target,0,playbackDuration);paint();}
 // Szybkie „dalej” kończy rozpoczęty etap zamiast wybierać następny.
 function finishStep(){
@@ -137,13 +146,24 @@ paint();
 const api={subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener);},pause,play,playTo,playContinuously,toggle,step,finishStep,reset:restart,restart,seek,finish:()=>{
  // „Pokaż wynik” w trakcie emisji anuluje bieżące wykonanie; druk i READY — umowna chwila defaultClose.
  if(live&&liveClosed===null){
-  if(time>=live.start)liveClosed=time;else{liveClosed=live.defaultClose;liveFrom=0;}
+  if(live.actions)finishActions();
+  else if(time>=live.start)liveClosed=time;else{liveClosed=live.defaultClose;liveFrom=0;}
   rebuild();
  }
  seek(playbackDuration);
 },get isPlaying(){return running;},get time(){return Math.min(time,playbackDuration);},get duration(){return playbackDuration;},get snapshot(){return engine.snapshot(time);},get stops(){return engine.stops;},get state(){return running?'playing':time>=playbackDuration?'finished':time===0?'ready':'paused';},hideControls,toggleControls};
 if(live)api.live={get start(){return live.start;},get state(){return liveClosed!==null?'closed':time>=live.start?'running':'idle';},
  close:closeLive,reopen(){reopenLive();paint();}};
+// stage: liczba wykonanych akcji; busy: animacja ostatniej akcji jeszcze trwa (liveBusyUntil z wariantu).
+if(live?.actions)Object.defineProperties(api.live,Object.getOwnPropertyDescriptors({actions:live.actions,autoplay:Boolean(live.autoplay),
+ get stage(){return liveActs.length;},
+ get busyUntil(){return liveActs.length?current.liveBusyUntil?.[liveActs.length-1]??-Infinity:-Infinity;},
+ get busy(){return liveClosed===null&&time<api.live.busyUntil;},
+ act(){if(liveClosed!==null||liveActs.length>=live.actions.length)return false;liveActs=[...liveActs,Math.max(time,live.start)];rebuild();paint();return true;},
+ // Cofnięcie akcji: kadr z chwili jej wywołania, już bez niej.
+ undo(){if(!liveActs.length)return false;const at=liveActs.at(-1);liveActs=liveActs.slice(0,-1);rebuild();seek(at);return true;},
+ // Stabilny kadr etapu (hash, podgląd Notes): akcje z umownej osi live.defaults do chwili target.
+ restore(target){liveClosed=null;liveActs=live.defaults.filter(at=>at<=target+1e-7);liveFrom=Math.max(0,target-live.keep);liveTo=Math.max(target,0)+live.window;rebuild();seek(target);}}));
 if(staged){controller=createStageController(api,{mode:scene.playback.entry,...controls.stageOptions});api.controller=controller;}
 return api;
 }
