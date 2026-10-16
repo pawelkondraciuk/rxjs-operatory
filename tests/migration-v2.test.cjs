@@ -19,10 +19,12 @@ test('HTTP slides share the accepted panel and retain native Reveal playback',as
   const real=scenes.get(id),prototype={...prototypes.find(s=>s.id==='prototype-'+mode),format:real.format},c=compile(real),p=compile(prototype);
   assert.equal(c.snapshot(0).panels[0].frameless,true);
   assert.equal(p.snapshot(0).innerWorkPanels,undefined); // Prototypy pozostają przy poprzednich modelach.
-  const expected={concatMap:['A','B','C','D'],mergeMap:['A','B','D','C'],switchMap:['D'],exhaustMap:['A','D']}[mode];
+  // Porównanie 09–12: te same A/B/C; pełna subskrypcja tylko w concatMap, odpowiedź na osobnym ręcznym postoju.
+  const expected={concatMap:['A','B','C'],mergeMap:['B','A','C'],switchMap:['B','C'],exhaustMap:['A','C']}[mode];
   assert.deepEqual(history(c.snapshot(c.duration),'observer'),expected);
   assert.equal(real.playback.controller,undefined);assert.equal(real.playback.entry,'manual');
-  assert.deepEqual(Array.from(c.stops,s=>s.id),['subscribe','first','active','question']);
+  assert.deepEqual(Array.from(c.stops,s=>s.id),{concatMap:['subscribe','first','active','question','answer'],
+    switchMap:['question','answer','started']}[mode]||['question','answer']);
  }
  for(const id of ids){
   const scene=scenes.get(id),c=compile(scene);
@@ -32,28 +34,27 @@ test('HTTP slides share the accepted panel and retain native Reveal playback',as
   assert.equal(c.snapshot(c.duration).nodes.find(n=>n.id==='observer').notification,'complete');
  }
 });
-test('real concatMap queue is visible at the question, while concatAll queues existing unsubscribed Observables',async()=>{
+test('real concatMap queue is visible at the answer, while concatAll queues existing unsubscribed Observables',async()=>{
  const {scenes,compile,render}=await family(),c=compile(scenes.get('09-concatmap'));
  const q=c.snapshot(c.stops.at(-1).time),queued=q.nodes.find(n=>n.id==='queued1');
  assert.equal(queued.label,'B (wartość)');assert.equal(queued.opacity,1);assert.equal(q.executionCounts.started,1);
  assert.equal(q.executions.some(e=>e.id==='B'),false);
- const done=render(c.snapshot(c.duration));assert.equal((done.match(/data-inner-state="completed"/g)||[]).length,4);
+ const done=render(c.snapshot(c.duration));assert.equal((done.match(/data-inner-state="completed"/g)||[]).length,3);
  assert.match(done,/PRACE WEWNĘTRZNE/);assert.doesNotMatch(done,/data-queue=|EMISJE|ODBIÓR/);
  const all=compile(scenes.get('08-map-strumienie')),f=all.snapshot(all.stops.at(-1).time),svg=render(f);
  assert.equal(f.executionCounts.started,1);assert.match(svg,/W KOLEJCE · Observable/);
  assert.deepEqual(Array.from(f.innerWorkPanels[0].rows.filter(r=>r.state==='queued'),r=>r.value),['B$','C$']);
  assert.equal(f.executions.some(e=>e.id==='B'),false);
 });
-test('real mergeMap demonstrates chronological reception and C/D overlap',async()=>{
+test('real mergeMap demonstrates chronological reception: B overlaps A and returns first',async()=>{
  const {scenes,compile}=await family(),c=compile(scenes.get('10-mergemap')),f=c.snapshot(c.duration);
- assert.deepEqual(history(f,'observer'),['A','B','D','C']);
- const sub=c.events.find(e=>e.type==='inner-subscribe'&&e.execution==='D');
- const overlap=c.snapshot(sub.at+.01).executions;assert.equal(overlap.find(e=>e.id==='C').state,'running');assert.equal(overlap.find(e=>e.id==='D').state,'running');
+ assert.deepEqual(history(f,'observer'),['B','A','C']);
+ const sub=c.events.find(e=>e.type==='inner-subscribe'&&e.execution==='B');
+ const overlap=c.snapshot(sub.at+.01).executions;assert.equal(overlap.find(e=>e.id==='A').state,'running');assert.equal(overlap.find(e=>e.id==='B').state,'running');
  const terminal=e=>c.events.find(x=>x.type==='stream-complete'&&x.execution===e).at;
- const delivery=c.events.find(e=>e.type==='deliver-next'&&e.node==='observer'&&e.value==='D');
- assert.equal(c.events.find(e=>e.type==='reception-order').at,delivery.at);
- assert.match(c.snapshot(delivery.at).caption,/D dotarło przed C/);
- assert.ok(terminal('D')<terminal('C'));assert.equal(f.histories.find(h=>h.anchor==='observer').max,4);
+ const delivery=c.events.find(e=>e.type==='deliver-next'&&e.node==='observer'&&e.value==='B');
+ assert.match(c.snapshot(delivery.at).caption,/B wróciło przed A/);
+ assert.ok(terminal('B')<terminal('A'));assert.equal(f.histories.find(h=>h.anchor==='observer').max,4);
 });
 test('complete outer waits for remaining work; concurrency limit never exceeds three subscriptions',async()=>{
  const {scenes,compile}=await family();

@@ -876,6 +876,8 @@ export function flattenGraph(scene) {
   ];
   graph.timeline = [...(graph.timeline||[]),...(scene.timeline||[])];
   if (httpWorkSlides.has(scene.id)) configureHttpWorkPanel(graph,scene,frame);
+  // Główny tor S1 zestawiony przed READY: scena nie powtarza animacji subskrypcji (porównanie 10–12).
+  if (scene.preconnected) for (const edge of graph.edges.filter(e=>!e.internal)) edge.preconnected=true;
   return graph;
 }
 
@@ -906,6 +908,8 @@ export function configureHttpWorkPanel(graph,scene,frame,{columns=[{id:'source',
     node:'inner'+i,edge:edge(i),queuedNode:graph.nodes.some(n=>n.id==='queued'+i)?'queued'+i:undefined,
     ...(all?{value:job.value+'$',queueObservable:true,queueLabel:'W KOLEJCE · Observable'}:{}),
     ...(job.ignored?{ignoredNode:'ignored'+i}:{}),
+    // Wejście z decide: wiersz pokazuje „?” od dotarcia do operatora aż do reakcji.
+    ...(scene.rows[0].events.some(e=>e.value===job.value&&e.decide)?{input:{edge:all?'projection-op':'source-op',value:job.value}}:{}),
     duration:job.dur??job.end-job.start,stages:stages(i)}));
   // Kafelek prac stoi pod źródłem i operatorem (lewa krawędź źródła – prawa krawędź operatora), z nagłówkiem
   // i wierszami tej samej wysokości co u góry; porty i kabel wyniku jak w głównym torze.
@@ -913,7 +917,9 @@ export function configureHttpWorkPanel(graph,scene,frame,{columns=[{id:'source',
   const panel=createInnerWorkPanel({works,height:frame.height,large,headerH:defH,rowH,
     tileLeft:source.x-source.w/2,tileRight:op.x+op.w/2,
     columns});
-  Object.assign(panel,{ballText:'#fff',portRadius:11,wire:5,ball:graph.ball});
+  Object.assign(panel,{ballText:'#fff',portRadius:11,wire:5,ball:graph.ball,
+    // Porównanie 09–12: teardown anulowanego inner jako szary impuls × (switchMap).
+    ...(comparisonSlides.has(scene.id)?{cancelPulse:true,pace:true}:{})});
   graph.panels=[panel];
   for(const node of graph.nodes.filter(n=>n.workRow))Object.assign(node,{x:panel.x+panel.w/2,
     y:panel.rowsTop+node.slot*panel.rowHeight+panel.rowHeight/2,w:panel.w-32,h:panel.rowHeight});
@@ -947,10 +953,18 @@ function overlapTail(scene) {
     {type:'reception-order',event:{type:'deliver-next',edge:'op-observer',value:'D1'},caption:'D1 dotarło przed C2: mergeMap nie zachowuje kolejności wejść.'}];
 }
 
+// MAIN 09–12 porównują jeden problem: A uruchamia długi HTTP, B przychodzi w połowie jego pracy, C dopiero po
+// zakończeniu A. Dane, kolory i tempo są identyczne; zmienia się tylko operator. B po dotarciu do operatora czeka
+// (decide, czas ilustracji) na pytanie, zanim operator pokaże reakcję.
+const comparisonSlides=new Set(['09-concatmap','10-mergemap','11-switchmap','12-exhaustmap']);
+const comparison={input:[{at:.6,value:'A',dur:3},{at:2.1,value:'B',dur:1.2},{at:5.2,value:'C',dur:1.2}],sourceComplete:5.6,decide:.6};
+
 export function configureFlatten(scene,mode) {
-  const all=mode==='concatAll',httpWork=httpWorkSlides.has(scene.id),concatHttp=scene.id==='09-concatmap'&&mode==='concatMap';
+  const all=mode==='concatAll',httpWork=httpWorkSlides.has(scene.id),compare=comparisonSlides.has(scene.id)&&!all;
+  const concatHttp=scene.id==='09-concatmap'&&mode==='concatMap'&&!compare;
   // Wspólne wejście i potencjalny czas pracy dla czterech strategii.
-  const input=(all?[1,1.2,1.4]:[1,1.45,1.9,2.7]).map((at,i)=>({at,value:'ABCD'[i],dur:1.2,color:['a','b','c','a'][i]}));
+  const input=compare?comparison.input.map((v,i)=>({...v,color:['a','b','c'][i]})):
+    (all?[1,1.2,1.4]:[1,1.45,1.9,2.7]).map((at,i)=>({at,value:'ABCD'[i],dur:1.2,color:['a','b','c','a'][i]}));
   let end=0;
   const jobs=input.map((v,i)=>{
     if(mode==='exhaustMap'&&v.at<end)return {...v,ignored:true};
@@ -958,7 +972,8 @@ export function configureFlatten(scene,mode) {
     end=mode==='switchMap'&&input[i+1]?Math.min(natural,input[i+1].at):natural;
     return {...v,start,end,cancelled:end<natural};
   });
-  const result=[],rows=[R('wejście',input.map(v=>E(v.at,v.value,v.color)),[],{completeAt:3})];
+  const result=[],rows=[R('wejście',input.map(v=>({...E(v.at,v.value,v.color),...(compare&&v.value==='B'?{decide:comparison.decide}:{})})),[],
+    {completeAt:compare?comparison.sourceComplete:3})];
   if(all)rows.push(R('map',input.map(v=>E(v.at,v.value+'$',v.color)),[],{completeAt:3}));
   for(const job of jobs) {
     const ev=httpWork?(job.ignored||job.cancelled?[]:[E(job.end,job.value,job.color)]):job.ignored?[]:(mode==='switchMap'?[1.1]:[.65,1.05]).filter(offset=>job.start+offset<job.end).map((offset,i)=>E(job.start+offset,job.value+(mode==='switchMap'?'':i+1),job.color));
@@ -991,8 +1006,46 @@ export function configureFlatten(scene,mode) {
   }
   if(httpWork&&all)scene.captions[1][1]='map tworzy A$; samo utworzenie Observable nie uruchamia HTTP.';
   if(httpWork&&!concatHttp)scene.playback.stops.find(s=>s.id==='active').caption='Pierwszy HTTP jest aktywny; każda odpowiedź oznacza jedną wartość i complete.';
-  if(mode==='mergeMap')overlapTail(scene);
+  if(compare)configureComparison(scene,mode);
+  else if(mode==='mergeMap')overlapTail(scene);
   configureFlattenPlayback(scene);
+}
+
+// Podpisy i postoje porównania. concatMap pokazuje pełną subskrypcję S1; pozostałe trzy zaczynają od zestawionego S1
+// (preconnected) i jednym „dalej” dochodzą do tego samego pytania. Odpowiedź zawsze wymaga kolejnego „dalej”.
+function configureComparison(scene,mode) {
+  const first=mode==='concatMap',question='A wciąż pracuje. Przychodzi B. Co teraz?';
+  const ev=(type,extra)=>({type,...extra}),arrivedB=ev('deliver-next',{edge:'source-op',value:'B'});
+  const answer={
+    concatMap:{id:'answer',event:arrivedB,offset:comparison.decide+.4,caption:'concatMap: B czeka W KOLEJCE. Projekcja B nie została wywołana'},
+    mergeMap:{id:'answer',event:ev('inner-subscribe',{node:'inner1'}),offset:.05,caption:'mergeMap: projekcja B i drugi HTTP równolegle z A'},
+    switchMap:{id:'answer',event:ev('disconnected',{edge:'inner0-op'}),offset:.35,caption:'switchMap: unsubscribe inner A — anulowane, bez complete. S1 działa dalej'},
+    exhaustMap:{id:'answer',event:arrivedB,offset:comparison.decide+.4,caption:'exhaustMap: B pominięte. Bez projekcji, bez HTTP, bez kolejki'},
+  }[mode];
+  Object.assign(scene,{preconnected:!first,code:`source$.pipe(${mode}(id => http.get(url(id))))`,
+    captions:[[0,first?'Projekcja zwraca Observable; concatMap decyduje, kiedy go zasubskrybować.':`Ten sam problem, inny operator: S1 już subskrybuje source$ przez ${mode}.`],
+      [comparison.input[0].at,'A: projekcja tworzy inner, HTTP A startuje.'],
+      [comparison.input[1].at,question],
+      [comparison.input[2].at,{concatMap:'C przychodzi, gdy nic nie czeka: od razu nowy HTTP.',mergeMap:'C uruchamia kolejny HTTP.',
+        switchMap:'C uruchamia nowy HTTP; nic nie trzeba anulować.',exhaustMap:'A skończone: exhaustMap przyjmuje C i uruchamia nowy HTTP.'}[mode]],
+      [scene.rows.at(-1).completeAt,'source$ i wszystkie inner zakończone. Wynik: complete.']],
+    playback:manual([
+      ...(first?[
+        {id:'subscribe',modelTime:.3,caption:'.subscribe(): S1 subskrybuje concatMap, a concatMap — source$.'},
+        {id:'first',event:ev('deliver-next',{edge:'source-op',value:'A'}),caption:'A dotarło do concatMap. Projekcja: id => http.get(url(A))'},
+        {id:'active',event:ev('inner-subscribe',{node:'inner0'}),offset:.05,caption:'concatMap subskrybuje inner A: HTTP A startuje.'}]:[]),
+      {id:'question',event:arrivedB,offset:.35,caption:question},
+      answer,
+      ...(mode==='switchMap'?[{id:'started',event:ev('inner-subscribe',{node:'inner1'}),offset:.05,caption:'Projekcja B: nowy inner i nowy HTTP. Wynik B trafi do S1'}]:[]),
+    ]),
+  });
+  const after={concatMap:'A complete: dopiero teraz projekcja B i HTTP B.',mergeMap:'B wróciło przed A: wyniki w kolejności odpowiedzi.',
+    switchMap:'Wynik B trafia do S1. Anulowane A nie wysłało complete.',exhaustMap:'A kończy się normalnie. B nie wraca — exhaustMap nie ma kolejki.'}[mode];
+  const selector={concatMap:ev('inner-subscribe',{node:'inner1'}),mergeMap:ev('deliver-next',{edge:'op-observer',value:'B'}),
+    switchMap:ev('deliver-next',{edge:'op-observer',value:'B'}),exhaustMap:ev('deliver-next',{edge:'op-observer',value:'A'})}[mode];
+  // Podpis odpowiedzi pojawia się razem z reakcją operatora (koniec decide), nie dopiero na postoju.
+  scene.timeline=[{type:'operator-decision',event:arrivedB,offset:comparison.decide,caption:answer.caption},
+    {type:'comparison-after',event:selector,caption:after}];
 }
 
 export function configureFlattenPlayback(scene) {

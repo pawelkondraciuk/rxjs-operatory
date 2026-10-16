@@ -513,25 +513,53 @@
 				<section id="09-concatmap" class="animation-slide" data-animation="09-concatmap">
 					<h2>concatMap — Po kolei</h2>
 					<div class="rx-player" aria-label="concatMap — Po kolei"></div>
-					<aside class="notes"><ul><li><strong>Pytanie:</strong> B przychodzi podczas A$ — czy powstało już B$? Nie.</li><li><strong>Kolejka:</strong> W górnym pipeline jest jeden główny Subscriber S1; źródło nie trzyma wyemitowanych wartości. Każdy HTTP daje jedną odpowiedź; w odbiorcy mieszczą się wszystkie cztery odpowiedzi A/B/C/D w stałym rozmiarze. url(id) wybiera endpoint requestu. Dół pokazuje prace #1–#4. B/C/D mają placeholder W KOLEJCE: bez projekcji, inner, portów i subskrypcji.</li><li><strong>Moment:</strong> Complete A$ → project(B) tworzy inner w miejscu placeholdera → subskrypcja B$ → progress w tle. Nie przesuwamy pozostałych wierszy.</li><li><strong>Wniosek:</strong> Jedna praca naraz; kolejność zachowana, kolejka zwiększa opóźnienie.</li></ul></aside>
+					<aside class="notes"><ul><li><strong>Porównanie:</strong> concatMap otwiera serię czterech slajdów z tym samym problemem: A pracuje długo, B przychodzi w połowie, C po zakończeniu A. Tylko tutaj pokazujemy całą subskrypcję S1.</li><li><strong>Pytanie:</strong> A pracuje, przychodzi B — czekamy czy drugi request? Czekamy: B W KOLEJCE, bez projekcji, inner i HTTP.</li><li><strong>Wniosek:</strong> Jedna praca naraz; kolejność zachowana, kolejka zwiększa opóźnienie.</li></ul></aside>
+					<template data-checkpoint-notes="09-concatmap">
+                        <div data-checkpoint="ready"><p><strong>0 — Start</strong></p><p>Teraz dochodzimy do operatorów, które dla każdej wartości mogą uruchomić osobną pracę. Funkcja projekcji zwraca Observable, a operator decyduje, kiedy go zasubskrybować.</p><p>Na górze jest jeden pipeline: source$ → concatMap → S1. Na dole, w PRACACH WEWNĘTRZNYCH, każda wartość wejściowa dostaje własny wiersz: #1 · A, #2 · B, #3 · C.</p></div>
+                        <div data-checkpoint="subscribe"><p><strong>1 — subscribe()</strong></p><p>Wywołujemy subscribe: S1 subskrybuje concatMap, a concatMap — source$. To jedna główna subskrypcja; nie powstaje nowa dla każdej wartości.</p></div>
+                        <div data-checkpoint="first"><p><strong>2 — A dociera</strong></p><p>Źródło emituje A. concatMap nic nie czeka, więc wywołuje projekcję: id => http.get(url(A)). Projekcja tylko tworzy Observable — request jeszcze nie ruszył.</p></div>
+                        <div data-checkpoint="active"><p><strong>3 — HTTP A</strong></p><p>Dopiero subskrypcja inner Observable uruchamia HTTP A. Wiersz #1 · A pokazuje postęp.</p></div>
+                        <div data-checkpoint="question"><p><strong>4 — A pracuje, przychodzi B</strong></p><p>A już wykonuje HTTP. Przychodzi B. Co teraz? Uruchomimy drugi request czy poczekamy?</p><p>Nie podpowiadaj: wiersz #2 · B ma tylko znak zapytania.</p></div>
+                        <div data-checkpoint="answer"><p><strong>5 — Odpowiedź: kolejka</strong></p><p>concatMap kolejkowuje B. Dopóki A się nie skończy, nie wywołujemy nawet projekcji dla B.</p><p>W KOLEJCE to wartość B, nie Observable: brak portów, progressu i HTTP. Dalej odtwarza się samo.</p></div>
+                        <div data-checkpoint="finished"><p><strong>6 — Wynik</strong></p><p>A complete → dopiero teraz projekcja B, inner B i HTTP B w tym samym wierszu. C przychodzi, gdy nic nie czeka, i od razu startuje.</p><p>Wyniki A, B, C w kolejności wejść. Koszt: B czekało na całe A.</p></div>
+                    </template>
 				</section>
 
 				<section id="10-mergemap" class="animation-slide" data-animation="10-mergemap">
 					<h2>mergeMap — Równocześnie</h2>
 					<div class="rx-player" aria-label="mergeMap — Równocześnie"></div>
-					<aside class="notes"><ul><li><strong>Pytanie:</strong> A$ trwa, przychodzi B — czeka czy startuje? Startuje.</li><li><strong>Równolegle:</strong> Każde wejście uruchamia własny HTTP i subskrypcję, z niezależnym postępem w tle wiersza. Jeden request daje jedną odpowiedź. Górny S1 jest wspólną subskrypcją wyniku, a #1–#4 to osobne prace wewnętrzne.</li><li><strong>Kolejność:</strong> C$ trwa dłużej, D$ kończy wcześniej: D dociera przed C. Odbiorca mieści A/B/D/C w kolorach prac i ze stałym rozmiarem kulek.</li><li><strong>Wniosek:</strong> Odbiór według dotarcia; kolejność wejść nie gwarantuje kolejności wyników.</li></ul></aside>
+					<aside class="notes"><ul><li><strong>Porównanie:</strong> Te same A/B/C i ten sam HTTP co w concatMap; S1 jest już zestawione.</li><li><strong>Pytanie:</strong> Czy musimy czekać na A? Nie — drugi inner i drugi HTTP równolegle.</li><li><strong>Wniosek:</strong> B wraca przed A; wyniki w kolejności odpowiedzi, nie wejść.</li></ul></aside>
+					<template data-checkpoint-notes="10-mergemap">
+                        <div data-checkpoint="ready"><p><strong>0 — Wprowadzenie</strong></p><p>Zostawiamy identyczną sytuację. A pracuje i pojawia się B. Ale tym razem mamy mergeMap.</p><p>S1 już subskrybuje — nie powtarzamy tej animacji. Dalej: A startuje i dochodzi do połowy.</p></div>
+                        <div data-checkpoint="question"><p><strong>1 — A pracuje, przychodzi B</strong></p><p>Czy naprawdę musimy czekać na zakończenie A?</p></div>
+                        <div data-checkpoint="answer"><p><strong>2 — Odpowiedź: równolegle</strong></p><p>Nie. mergeMap uruchamia oba wewnętrzne Observable równolegle. Wyniki mogą wracać w dowolnej kolejności.</p><p>Dwa aktywne wiersze: #1 · A i #2 · B, każdy z własnym HTTP i postępem. Dalej odtwarza się samo.</p></div>
+                        <div data-checkpoint="finished"><p><strong>3 — Wynik</strong></p><p>B wróciło przed A, bo krótszy request skończył się wcześniej. S1 dostaje wyniki w kolejności nadejścia: B, A, C.</p></div>
+                    </template>
 				</section>
 
 				<section id="11-switchmap" class="animation-slide" data-animation="11-switchmap">
 					<h2>switchMap — Najnowsza subskrypcja</h2>
 					<div class="rx-player" aria-label="switchMap — Najnowsza subskrypcja"></div>
-					<aside class="notes"><ul><li><strong>Pytanie:</strong> B przychodzi podczas HTTP A — co stanie się z A$?</li><li><strong>Moment:</strong> Unsubscribe A$ → dopiero start B$; postęp A zatrzymany, wiersz szary i opisany jako anulowane. Brak impulsu complete; odsubskrybowany request nie emituje odpowiedzi.</li><li><strong>Wynik:</strong> B/C/D zastępują poprzednika; tylko D dostarcza odpowiedź.</li><li><strong>Pułapka:</strong> ABORT klienta ≠ cofnięcie operacji serwera; unsubscribe ≠ complete.</li></ul></aside>
+					<aside class="notes"><ul><li><strong>Porównanie:</strong> Te same A/B/C co w concatMap i mergeMap; S1 jest już zestawione.</li><li><strong>Pytanie:</strong> Co z A? Anulowane: unsubscribe inner A (szary impuls ×), bez complete.</li><li><strong>Pułapka:</strong> ABORT klienta ≠ cofnięcie operacji serwera; unsubscribe ≠ complete. S1 nadal działa.</li></ul></aside>
+					<template data-checkpoint-notes="11-switchmap">
+                        <div data-checkpoint="ready"><p><strong>0 — Wprowadzenie</strong></p><p>A już pracuje. Teraz przychodzi B.</p><p>S1 już subskrybuje — dalej: A startuje i dochodzi do połowy.</p></div>
+                        <div data-checkpoint="question"><p><strong>1 — A pracuje, przychodzi B</strong></p><p>Co stanie się z A? Dokończy pracę czy zostanie anulowane?</p></div>
+                        <div data-checkpoint="answer"><p><strong>2 — Odpowiedź: anulowanie A</strong></p><p>switchMap odsubskrybowuje poprzednie wewnętrzne Observable i przełącza się na nowe. Główna subskrypcja S1 nadal działa.</p><p>Szary × to teardown inner A: request po stronie klienta przerwany, brak complete i brak odpowiedzi A.</p></div>
+                        <div data-checkpoint="started"><p><strong>3 — Nowy inner B</strong></p><p>Dopiero teraz projekcja B: nowy inner i nowy HTTP. Dalej odtwarza się samo.</p></div>
+                        <div data-checkpoint="finished"><p><strong>4 — Wynik</strong></p><p>S1 dostaje B i C. Anulowane A nie wraca. Pamiętaj: unsubscribe nie cofa operacji na serwerze.</p></div>
+                    </template>
 				</section>
 
 				<section id="12-exhaustmap" class="animation-slide" data-animation="12-exhaustmap">
 					<h2>exhaustMap — Jestem zajęty</h2>
 					<div class="rx-player" aria-label="exhaustMap — Jestem zajęty"></div>
-					<aside class="notes"><ul><li><strong>Pytanie:</strong> A$ trwa, przychodzi B — czy powstanie B$? Nie.</li><li><strong>Pominięcie:</strong> B i C zachowują identyfikatory i stały napis „pominięte”, bez projekcji, inner, portów, progressu i kolejki.</li><li><strong>Moment:</strong> Po complete A$ dopiero nowe D uruchamia D$.</li><li><strong>Wniosek:</strong> Trwająca praca ma pierwszeństwo; wynik A, D — po jednej odpowiedzi HTTP.</li></ul></aside>
+					<aside class="notes"><ul><li><strong>Porównanie:</strong> Te same A/B/C; po kolejkowaniu, równoległości i anulowaniu — ignorowanie.</li><li><strong>Pytanie:</strong> A co, jeśli nie chcemy przyjmować kolejnej pracy? B POMINIĘTE: bez projekcji, requestu i kolejki.</li><li><strong>Wniosek:</strong> Po zakończeniu A exhaustMap przyjmuje C.</li></ul></aside>
+					<template data-checkpoint-notes="12-exhaustmap">
+                        <div data-checkpoint="ready"><p><strong>0 — Wprowadzenie</strong></p><p>A pracuje. Przychodzi B. Poznaliśmy już kolejkowanie, równoległość i anulowanie.</p><p>S1 już subskrybuje — dalej: A startuje i dochodzi do połowy.</p></div>
+                        <div data-checkpoint="question"><p><strong>1 — A pracuje, przychodzi B</strong></p><p>A co, jeśli nie chcemy teraz przyjmować żadnej kolejnej pracy?</p></div>
+                        <div data-checkpoint="answer"><p><strong>2 — Odpowiedź: pominięte</strong></p><p>exhaustMap ignoruje B. Nie uruchamia projekcji, nie tworzy requestu i nie zapisuje B na później. Dopiero po zakończeniu A może przyjąć następną wartość.</p><p>Dalej odtwarza się samo.</p></div>
+                        <div data-checkpoint="finished"><p><strong>3 — Wynik</strong></p><p>A kończy się normalnie, B nie wraca. C przychodzi po zakończeniu A i uruchamia nowy HTTP. S1 dostaje A i C.</p></div>
+                    </template>
 				</section>
 
 

@@ -18,12 +18,19 @@ export function createInnerWorkPanel({works,columns,height,large=false,id='jobs'
 export function innerWorkPanelSnapshot(panel, records, births, time) {
   const record = id => records.find(r => r.id === id);
   const connected = r => r ? r.start + r.connectDuration : Infinity;
+  // panel.cancelPulse (opt-in): unsubscribe biegnie szarym impulsem × od operatora do pracy; praca jest anulowana po jego dotarciu.
+  const pulsed = r => panel.cancelPulse && r?.end?.kind === 'unsubscribe';
   const stateOf = (r, receiver = false) => {
     if (!r || time < r.start) return 'idle';
     if (time < connected(r)) return 'subscribing';
-    if (!r.end || time < r.end.at + (receiver ? r.end.duration : 0)) return 'active';
+    if (!r.end || time < r.end.at + (receiver || pulsed(r) ? r.end.duration : 0)) return 'active';
     return r.end.kind === 'unsubscribe' ? 'cancelled' : r.end.kind === 'error' ? 'errored' : 'completed';
   };
+  // Pierwsza decyzja operatora (work.input z decide) w trakcie pracy: chwila ilustracji i ułamek czasu modelu.
+  const pivotOf = (r, work, start, stop) => panel.works.filter(w => w.input).map(w => {
+    const e = record(w.input.edge)?.events.find(v => String(v.value) === String(w.input.value));
+    return e && {at:e.arrival + (e.decide || 0), fraction:(e.logicalAt - r.logicalStart)/work.duration};
+  }).filter(p => p && p.at > start && p.at < stop && p.fraction > 0 && p.fraction < 1).sort((a,b) => a.at-b.at)[0] || null;
   const rows = panel.works.flatMap(work => {
     const output = record(work.edge), born = births.get(work.node) ?? Infinity;
     const queuedAt = work.queuedNode ? births.get(work.queuedNode) : undefined;
@@ -31,14 +38,27 @@ export function innerWorkPanelSnapshot(panel, records, births, time) {
     const y = panel.rowsTop + work.slot * panel.rowHeight;
     const color = work.color || '#7457D9';
     const base = {id:work.id, slot:work.slot, value:work.value, color, y, h:panel.rowHeight};
+    // work.input (opt-in): wejście dotarło do operatora, ale jego los nie jest jeszcze rozstrzygnięty (decide we flow).
+    // Od dotarcia widać tylko identyfikator i „?”; kolejka, pominięcie albo nowy inner pojawiają się po decyzji.
+    const arrived = work.input ? record(work.input.edge)?.events.find(e => String(e.value) === String(work.input.value)) : undefined;
+    const pendingAt = arrived?.arrival, decidedAt = arrived ? arrived.arrival + (arrived.decide || 0) : undefined;
+    const pending = pendingAt === undefined ? null : {opacity:clamp((time-pendingAt)/.3), decided:clamp((time-decidedAt)/.3)};
+    const settledAt = at => decidedAt === undefined ? at : Math.max(at, decidedAt);
     if(ignoredAt!==undefined) {
-      const opacity=clamp((time-ignoredAt)/.3);
+      if (pending && time >= pendingAt && time < decidedAt) return [{...base,state:'pending',opacity:pending.opacity,question:1}];
+      const shownAt=settledAt(ignoredAt),opacity=clamp((time-shownAt)/.3);
+      if (pending && time >= pendingAt) return [{...base,state:'ignored',opacity:1,reveal:opacity,from:'pending'}];
       return time>=ignoredAt&&opacity>0?[{...base,state:'ignored',opacity}]:[];
     }
-    const waitingAt=work.queueObservable?born:queuedAt;
+    const waitingAt=work.queueObservable?born:queuedAt===undefined?undefined:settledAt(queuedAt);
     if (time < born || work.queueObservable&&time<output.start) {
-      return waitingAt !== undefined && time >= waitingAt ? [{...base,state:'queued',queueLabel:work.queueLabel,
-        existingObservable:Boolean(work.queueObservable),opacity:clamp((time-waitingAt)/.3)}] : [];
+      if (waitingAt !== undefined && time >= waitingAt) {
+        const fade=clamp((time-waitingAt)/.3);
+        return [{...base,state:'queued',queueLabel:work.queueLabel,existingObservable:Boolean(work.queueObservable),
+          ...(pending?{opacity:1,reveal:fade,from:'pending'}:{opacity:fade})}];
+      }
+      // Przed decyzją (i np. podczas anulowania poprzednika w switchMap) wiersz ma tylko identyfikator; „?” gaśnie po decyzji.
+      return pending && time >= pendingAt ? [{...base,state:'pending',opacity:pending.opacity,question:1-pending.decided}] : [];
     }
     if (!output) return [];
     const stages = work.stages.map((stage, i) => {
@@ -46,10 +66,19 @@ export function innerWorkPanelSnapshot(panel, records, births, time) {
       const state = stateOf(r, stage.receiver);
       // Postęp kończy się z odpowiedzią (pierwszy next), jak w kafelku HTTP GET toru; complete przychodzi po niej.
       // Przy anulowaniu zachowujemy potencjalny czas pracy, więc pasek nigdy nie udaje complete.
-      const stop = r?.events[0]?.at ?? r?.end?.at ?? start + work.duration;
+      const stop = r?.events[0]?.at ?? (r?.end ? r.end.at + (pulsed(r) ? r.end.duration : 0) : start + work.duration);
       const fraction = r?.end?.kind === 'unsubscribe' ? clamp((r.end.logicalAt-r.logicalStart)/work.duration) : 1;
-      const progress = state === 'subscribing' || state === 'idle' ? 0 : clamp((time-start)/Math.max(.001,stop-start))*fraction;
-      const since = r?.end ? r.end.at + (stage.receiver ? r.end.duration : 0) : undefined;
+      let progress = state === 'subscribing' || state === 'idle' ? 0 : clamp((time-start)/Math.max(.001,stop-start))*fraction;
+      // panel.pace (opt-in): do decyzji operatora o innym wejściu pasek rośnie stałym tempem i w chwili decyzji pokazuje
+      // ułamek modelu (np. połowę), niezależnie od tego, co operator zrobi potem. Dalej dochodzi do odpowiedzi
+      // albo — przy anulowaniu — rośnie tym samym tempem do dotarcia impulsu ×.
+      const pivot = panel.pace && r && stage.progress ? pivotOf(r, work, start, stop) : null;
+      if (pivot && progress > 0) {
+        const rate = pivot.fraction/(pivot.at-start), t = Math.min(time, stop);
+        progress = t < pivot.at ? (t-start)*rate : r.events.length ?
+          pivot.fraction+(1-pivot.fraction)*clamp((t-pivot.at)/Math.max(.001,stop-pivot.at)) : Math.min(1, pivot.fraction+(t-pivot.at)*rate);
+      }
+      const since = r?.end ? r.end.at + (stage.receiver || pulsed(r) ? r.end.duration : 0) : undefined;
       // handles: etap obsługi błędu (np. catchError) pokazuje chwilowy fallback (label, np. of([])) od dotarcia błędu
       // wskazanej krawędzi do własnego zakończenia; potem zwykły stan (complete).
       const handled = stage.handles && record(stage.handles.edge)?.end;
@@ -65,9 +94,11 @@ export function innerWorkPanelSnapshot(panel, records, births, time) {
       const r = record(stage.edge || work.edge), terminal = r.end;
       const p = terminal ? clamp((time-terminal.at)/terminal.duration) : 0;
       const cancelled = terminal?.kind === 'unsubscribe' && time >= terminal.at;
+      // Impuls × jedzie od prawej granicy (operator) do etapu; przebyta część kabla szarzeje za nim.
+      const cancel = cancelled && pulsed(r) && p < 1 ? {at:p} : null;
       return {index:i, visible:time>=r.start, subscribe:clamp((time-r.start)/r.connectDuration),
         opacity:terminal && time>=terminal.at+terminal.duration ? .35 : 1,
-        color:cancelled?'#808890':color,
+        color:cancelled&&!cancel?'#808890':color,cancel,
         pulse:terminal&&!cancelled&&time>=terminal.at&&p<1?{at:p,color:terminal.kind==='error'?'#C54848':'#26804E'}:null};
     });
     const tokens = work.stages.flatMap((stage,i) => {
@@ -75,7 +106,10 @@ export function innerWorkPanelSnapshot(panel, records, births, time) {
       return r.events.filter(e=>time>=e.at&&time<e.arrival).map(e=>({stage:i,value:e.value,color,
         progress:clamp((time-e.at)/(e.arrival-e.at))}));
     });
-    return [{...base,state,queueLabel:work.queueLabel,opacity:waitingAt===undefined?reveal:1,reveal:waitingAt===undefined?1:reveal,stages,wires,tokens}];
+    // Wiersz widoczny wcześniej (kolejka albo nierozstrzygnięte wejście) płynnie odsłania wykonanie w tym samym slocie.
+    const shown=waitingAt!==undefined||pending!==null;
+    return [{...base,state,queueLabel:work.queueLabel,opacity:shown?1:reveal,reveal:shown?reveal:1,
+      ...(shown?{from:waitingAt!==undefined&&born>=waitingAt?'queued':'pending',question:pending?1-pending.decided:0}:{}),stages,wires,tokens}];
   });
   return {...panel, rows};
 }

@@ -330,6 +330,16 @@ Slajd startuje już działający: wszystkie subskrypcje są zestawione przed t =
 - **concatAll:** Subskrybuje po kolei: A$ → B$ → C$.
 - **Różnica:** concatAll kolejkuje Observable; concatMap wartości przed projekcją.
 
+### Wspólny problem 09–12: A pracuje, przychodzi B
+
+Cztery slajdy pokazują identyczną sytuację i zmieniają wyłącznie operator. Kod: `source$.pipe(<operator>(id => http.get(url(id))))`. Te same wejścia, kolory i tempo: A w 0,6 s uruchamia długi HTTP (3 s), B przychodzi w 2,1 s (A w połowie, HTTP B 1,2 s), C w 5,2 s — po zakończeniu A (HTTP C 1,2 s); source$ kończy się w 5,6 s. Kolory prac: A indygo #6D4CD3, B pomarańcz #B85D05, C niebieski #087FAD.
+
+Góra bez zmian: source$ → operator → kompaktowy Odbiorca, jeden główny tor S1 (nie powstaje nowa subskrypcja główna dla wartości). Dół: PRACE WEWNĘTRZNE w stylu catchError wewnątrz — wiersz na wartość wejściową (#1 · A, #2 · B, #3 · C), wspólny nagłówek HTTP GET, porty i poziomy kabel do prawej granicy, progress w tle, complete zielone, anulowanie szare, error czerwony. Wiersz identyfikuje wartość i jej ewentualną pracę, nie Subscribera.
+
+**Wspólny postój `question`:** S1 aktywne, HTTP A pracuje (pasek ok. 46% — identyczny na czterech slajdach), kulka B czeka na porcie wejścia operatora, a wiersz #2 · B ma tylko identyfikator i znak „?”: bez W KOLEJCE, POMINIĘTE, projekcji, HTTP, portów i progressu. Następne „dalej” (osobny ręczny postój `answer`) dopiero uruchamia reakcję operatora; AUTO włącza się po odpowiedzi.
+
+**Subskrypcja główna:** tylko concatMap pokazuje pełną sekwencję (subscribe → A → projekcja → inner HTTP). mergeMap, switchMap i exhaustMap zaczynają w READY od zestawionego S1; jedno „dalej” prowadzi przez emisję A, start HTTP A i dotarcie B wprost do pytania.
+
 ### concatMap — `09-concatmap`
 
 **Temat:** obsługa pracy po kolei.
@@ -338,14 +348,15 @@ Slajd startuje już działający: wszystkie subskrypcje są zestawione przed t =
 | --- | --- | --- |
 | 09-concatmap | concatMap — Po kolei | `source$.pipe(concatMap(id => http.get(url(id))))` |
 
-**Na bloczkach:** source$ → concatMap → kompaktowy Odbiorca, jeden główny tor S1 w kolorze fioletowym. Źródło i operator mają stały pastelowy nagłówek oraz dynamiczny execution lane. Porty i połączenia są poziome; Wiersz źródła zawiera tylko S1, bez historii emisji. Odbiorca mieści cztery kulki stałego rozmiaru, powiększone o 18%, z białymi literami — po jednej odpowiedzi na request. Kolory prac i odpowiedzi: A indygo #6D4CD3, B pomarańcz #B85D05, C niebieski #087FAD, D malinowy #B73770. Porty, paski i linie zachowują tę paletę; progress jest delikatnym odcieniem pracy, a complete pozostaje jasnozielone. Poniżej poziomego separatora jest kafelek HTTP GET (PRACE WEWNĘTRZNE obok nagłówka), bez otaczającej ramki: stałe, przylegające wiersze #1 · A, #2 · B, #3 · C, #4 · D. Aktywna praca ma postęp w tle, porty i lokalne wyjście do prawej granicy. Oczekująca wartość ma placeholder W KOLEJCE bez inner, subskrypcji i progressu. Po complete poprzednika placeholder zmienia się w utworzoną pracę w tym samym slocie, potem startuje subskrypcja i progress. Nagłówek dolnej kolumny to HTTP GET. url(id) wybiera endpoint; każdy inner emituje jedną odpowiedź i complete. Wspólne wejście A, B, C, D; praca trwa 1,2 s od subskrypcji. Wynik A, B, C, D — jedna wartość na request.
+**Na bloczkach:** postoje subscribe, first (A dociera, projekcja), active (inner A subskrybowany, HTTP A startuje), question, answer. Odpowiedź: #2 · B przechodzi w W KOLEJCE (przerywany placeholder) — wartość bez projekcji, inner i HTTP. Po complete A placeholder płynnie zmienia się w pracę B w tym samym slocie: projekcja, subskrypcja, progress. C przychodzi, gdy nic nie czeka, i od razu startuje. Wynik A, B, C.
 
-**Speaker notes:**
+**Speaker notes (per checkpoint, szablon `data-checkpoint-notes`):**
 
-- **Pytanie:** B przychodzi podczas A$ — czy powstało już B$? Nie.
-- **Kolejka:** B/C/D czekają jako wartości; jeszcze bez projekcji i HTTP.
-- **Moment:** Complete A$ → projekcja B → subskrypcja B$.
-- **Wniosek:** Jedna praca naraz; kolejność zachowana, kolejka zwiększa opóźnienie.
+- **Start:** Operatory, które dla każdej wartości mogą uruchomić osobną pracę. Projekcja zwraca Observable, operator decyduje, kiedy go zasubskrybować.
+- **subscribe / A / HTTP A:** jedna główna subskrypcja S1; projekcja tylko tworzy Observable, request rusza dopiero z subskrypcją inner.
+- **A pracuje, przychodzi B:** Uruchomimy drugi request czy poczekamy?
+- **Odpowiedź:** concatMap kolejkowuje B. Dopóki A się nie skończy, nie wywołujemy nawet projekcji dla B.
+- **Wynik:** Kolejność zachowana, kolejka zwiększa opóźnienie.
 
 ### mergeMap — `10-mergemap`
 
@@ -355,14 +366,13 @@ Slajd startuje już działający: wszystkie subskrypcje są zestawione przed t =
 | --- | --- | --- |
 | 10-mergemap | mergeMap — Równocześnie | `source$.pipe(mergeMap(id => http.get(url(id))))` |
 
-**Na bloczkach:** source$ → mergeMap → kompaktowy Odbiorca, jeden główny tor S1. Szeroki panel HTTP GET ma przylegające wiersze #1–#4, osobne porty, kolory i postęp w tle. Każde wejście A/B/C/D natychmiast tworzy i subskrybuje HTTP, bez kolejki. Każdy request emituje jedną odpowiedź i complete. C pracuje 1,9 s, a D 0,9 s: nakładają się, lecz późniejszy D kończy przed C. Odbiorca mieści wszystkie cztery odpowiedzi A, B, D, C w kolejności dotarcia.
+**Na bloczkach:** READY z zestawionym S1, postoje question i answer. Odpowiedź: projekcja B i drugi aktywny wiersz HTTP równolegle z A (dwa wiersze „w trakcie”, licznik aktywne 2). Krótszy HTTP B kończy przed A: odbiorca dostaje B, A, C w kolejności nadejścia.
 
 **Speaker notes:**
 
-- **Pytanie:** A$ trwa, przychodzi B — czeka czy startuje? Startuje.
-- **Równolegle:** Każde wejście uruchamia inner; domyślnie bez limitu współbieżności.
-- **Kolejność:** C$ trwa dłużej, D$ kończy wcześniej: odpowiedź D dociera przed C.
-- **Wniosek:** Odbiór według dotarcia; kolejność wejść nie gwarantuje kolejności wyników.
+- **Wprowadzenie:** Identyczna sytuacja: A pracuje i pojawia się B, ale tym razem mamy mergeMap.
+- **Pytanie:** Czy naprawdę musimy czekać na zakończenie A?
+- **Odpowiedź:** Nie. mergeMap uruchamia oba wewnętrzne Observable równolegle. Wyniki mogą wracać w dowolnej kolejności.
 
 ### switchMap — `11-switchmap`
 
@@ -370,15 +380,15 @@ Slajd startuje już działający: wszystkie subskrypcje są zestawione przed t =
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
-| 11-switchmap | switchMap — Najnowsza subskrypcja | `id$.pipe(switchMap(id => http.get(url(id))))` |
+| 11-switchmap | switchMap — Najnowsza subskrypcja | `source$.pipe(switchMap(id => http.get(url(id))))` |
 
-**Na bloczkach:** id$ → switchMap → kompaktowy Odbiorca, jeden tor S1. Panel HTTP GET ma stałe, przylegające wiersze #1–#4. Postój przy B następuje, gdy HTTP A nadal pracuje. Dalej: unsubscribe A, szary wiersz „anulowane”, zatrzymany postęp i przygaszony kabel bez impulsu complete, następnie start B. Kolejne wejścia anulują B i C; tylko D dostarcza jedną odpowiedź i complete. Nagłówki definicji się nie zmieniają.
+**Na bloczkach:** READY z zestawionym S1, postoje question, answer, started. Odpowiedź: szary impuls × jedzie od prawej granicy (operator) po kablu inner A do HTTP GET — teardown wewnętrznej subskrypcji A; po jego dotarciu wiersz #1 · A jest „anulowane” (szary, zatrzymany pasek, bez impulsu complete i bez odpowiedzi). Górny tor S1 pozostaje aktywny. Potem projekcja B, nowy inner i HTTP B (postój started); wynik B, potem C.
 
 **Speaker notes:**
 
-- **Pytanie:** B przychodzi podczas HTTP A — co stanie się z A$?
-- **Moment:** Unsubscribe A$ → dopiero start B$; pasek A zatrzymany.
-- **Wynik:** B/C/D zastępują poprzednika; tylko D dostarcza odpowiedź.
+- **Wprowadzenie:** A już pracuje. Teraz przychodzi B.
+- **Pytanie:** Co stanie się z A? Dokończy pracę czy zostanie anulowane?
+- **Odpowiedź:** switchMap odsubskrybowuje poprzednie wewnętrzne Observable i przełącza się na nowe. Główna subskrypcja S1 nadal działa.
 - **Pułapka:** ABORT klienta ≠ cofnięcie operacji serwera; unsubscribe ≠ complete.
 
 ### exhaustMap — `12-exhaustmap`
@@ -389,14 +399,13 @@ Slajd startuje już działający: wszystkie subskrypcje są zestawione przed t =
 | --- | --- | --- |
 | 12-exhaustmap | exhaustMap — Jestem zajęty | `source$.pipe(exhaustMap(id => http.get(url(id))))` |
 
-**Na bloczkach:** source$ → exhaustMap → kompaktowy Odbiorca, tor S1 oraz panel HTTP GET. B i C podczas A zachowują identyfikatory i stałe oznaczenie „pominięte”, bez utworzonego HTTP, portów, kolejki i subskrypcji. Wiersze mają stałe sloty; D startuje po complete A. Każdy uruchomiony HTTP daje jedną odpowiedź; wynik A, D. Zakończone wiersze są jasnozielone z przygaszonymi połączeniami.
+**Na bloczkach:** READY z zestawionym S1, postoje question i answer. Odpowiedź: #2 · B — POMINIĘTE, bez projekcji, inner, HTTP, portów i kolejki; B nie wraca później. A kończy się normalnie; C przychodzi po zakończeniu A i uruchamia nowy HTTP. Wynik A, C.
 
 **Speaker notes:**
 
-- **Pytanie:** A$ trwa, przychodzi B — czy powstanie B$? Nie.
-- **Pominięcie:** B i C bez projekcji, inner i kolejki.
-- **Moment:** Po complete A$ dopiero nowe D uruchamia D$.
-- **Wniosek:** Trwająca praca ma pierwszeństwo; wynik A, D — po jednej odpowiedzi na request.
+- **Wprowadzenie:** A pracuje. Przychodzi B. Poznaliśmy już kolejkowanie, równoległość i anulowanie.
+- **Pytanie:** A co, jeśli nie chcemy teraz przyjmować żadnej kolejnej pracy?
+- **Odpowiedź:** exhaustMap ignoruje B. Nie uruchamia projekcji, nie tworzy requestu i nie zapisuje B na później. Dopiero po zakończeniu A może przyjąć następną wartość.
 
 ### source$: complete — `12a-complete`
 
@@ -891,7 +900,7 @@ Podgląd developerski: /work/animation-review.html (lokalna konfiguracja Vite ma
 
 Slajdy MAIN 08–12 korzystają ze wspólnego adaptera `configureHttpWorkPanel` na bazie `flattenGraph`. Góra pokazuje jeden S1 z execution lanes, pastelowymi nagłówkami i kolorowymi poziomymi połączeniami. Źródło nie trzyma historii emisji; do czterech odpowiedzi HTTP mieści się w kompaktowym odbiorcy. Kulki mają białe litery i pełną paletę A indygo #6D4CD3 / B pomarańcz #B85D05 / C niebieski #087FAD / D malinowy #B73770. Tę samą paletę mają porty, paski i linie prac; progress jest łagodniejszy, complete jasnozielone.
 
-Dół zajmuje ponad 90% szerokości diagramu: poziomy separator, kafelek HTTP GET pod źródłem i operatorem (nagłówek tej samej wysokości co u góry, wiersze prac jak tory: pasek koloru, #1 · A, postęp w tle, stan tekstem) oraz napis PRACE WEWNĘTRZNE obok nagłówka, nad kablami wyników. Postęp HTTP kończy się z odpowiedzią. Nie ma zaokrąglonego kontenera ani przewodów między poziomami. Wynik wychodzi do prawej granicy panelu, a dopiero potem z górnego operatora do odbiorcy. Każdy zakończony request daje jedną odpowiedź; anulowany nie daje complete. concatAll kolejkuje już utworzone Observable (#2 · B$, W KOLEJCE · Observable); concatMap kolejkuje wartości przed projekcją. mergeMap uruchamia równoległe wiersze i zachowuje odpowiedź D przed C. switchMap szarzy anulowane prace bez terminalnego impulsu. exhaustMap zachowuje wiersze pominiętych wejść z identyfikatorami i napisem „pominięte”, bez inner i kolejki.
+Dół zajmuje ponad 90% szerokości diagramu: poziomy separator, kafelek HTTP GET pod źródłem i operatorem (nagłówek tej samej wysokości co u góry, wiersze prac jak tory: pasek koloru, #1 · A, postęp w tle, stan tekstem) oraz napis PRACE WEWNĘTRZNE obok nagłówka, nad kablami wyników. Postęp HTTP kończy się z odpowiedzią. Nie ma zaokrąglonego kontenera ani przewodów między poziomami. Wynik wychodzi do prawej granicy panelu, a dopiero potem z górnego operatora do odbiorcy. Każdy zakończony request daje jedną odpowiedź; anulowany nie daje complete. concatAll kolejkuje już utworzone Observable (#2 · B$, W KOLEJCE · Observable); concatMap kolejkuje wartości przed projekcją. W 09–12 wiersz B przed decyzją operatora ma tylko „?”. mergeMap uruchamia równoległe wiersze (B wraca przed A). switchMap anuluje inner A szarym impulsem × bez terminalnego impulsu complete. exhaustMap zachowuje wiersz pominiętego wejścia z identyfikatorem i napisem POMINIĘTE, bez inner i kolejki.
 
 Dodatki 12a/13-limit i prototypy QA zachowują poprzednie modele oraz geometrię. Cold/share i catchError również pozostają bez zmian; dodatkowa obsługa catchError w nowym panelu jest odłożona.
 

@@ -43,6 +43,15 @@ export function planFlow(nodes, links, modelDuration, timingOverrides) {
       function connect(e) {
         if (finished.has(e)) return finished.get(e);
         pending.delete(e);
+        // edge.preconnected: subskrypcja zestawiona przed READY (scena nie powtarza jej animacji); nie zajmuje czasu ilustracji.
+        if (e.preconnected) {
+          const record=records.get(e.id);
+          record.connectDuration=e.connect??connectDuration;
+          record.start=-1-record.connectDuration;
+          for (const id of [e.a.id,e.b.id]) if (!births.has(id)) births.set(id,record.start);
+          finished.set(e,phase);
+          return phase;
+        }
         const downstream = outgoing(e.b.id).filter(next=>pending.has(next)||finished.has(next));
         const ready = Math.max(phase,...downstream.map(connect));
         const fade = Math.max(reveal(e.b.id,ready),reveal(e.a.id,ready));
@@ -85,6 +94,8 @@ export function planFlow(nodes, links, modelDuration, timingOverrides) {
       return arrival;
     }
     phase=Math.max(phase,...values.map(e=>emit(e)));
+    // Wartość z decide: po dotarciu czeka (czas ilustracji), zanim operator pokaże reakcję — miejsce na pytanie.
+    phase=Math.max(phase,...values.flatMap(e=>records.get(e.id).events.filter(v=>v.logicalAt===at&&v.decide).map(v=>v.arrival+v.decide)));
     // Czytelny checkpoint: nowa wartość już dotarła, stara praca jeszcze trwa.
     // To wyłącznie handoff ilustracji, bez przesuwania czasu modelu.
     if(values.length&&ending.length)phase+=handoffDuration;

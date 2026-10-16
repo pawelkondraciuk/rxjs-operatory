@@ -158,6 +158,12 @@ function innerWorkPanel(panel,frame,reduced=false) {
     return `<rect data-inner-placeholder="${row.state}" x="${px}" y="${row.y+6}" width="${pw}" height="${rowHeight-13}" fill="#EEEBE9"${dashed?' stroke="#BEB4BF" stroke-width="2" stroke-dasharray="8 6"':''}/>`+
       text(px+pw/2,row.y+rowHeight/2,label,font,'style="fill:#746B76;font-weight:600"');
   };
+  // Wejście czeka na decyzję operatora: pusty slot bez przerywanego obrysu, tylko „?” (bez portów, progressu i HTTP).
+  const undecided=(row,question)=>{
+    const px=tileLeft+identifierW,pw=tileRight-px-10;
+    return `<g data-inner-placeholder="pending"><rect x="${px}" y="${row.y+6}" width="${pw}" height="${rowHeight-13}" fill="#EEEBE9"/>`+
+      (question>0?text(px+pw/2,row.y+rowHeight/2,'?',font*1.25,`style="fill:#746B76;font-weight:700" opacity="${+question.toFixed(3)}"`):'')+'</g>';
+  };
   let svg=`<g data-inner-work-panel="${esc(panel.id)}">`;
   panel.columns.forEach((column,i)=>{
     const labelSize=clamp((stageW-24)/(Math.max(1,column.label.length)*.55),26*k,26*(frame.labelScale||k));
@@ -170,14 +176,21 @@ function innerWorkPanel(panel,frame,reduced=false) {
     svg+=`<g data-inner-work="${esc(row.id)}" data-inner-state="${row.state}" data-row-slot="${row.slot}" opacity="${reduced?1:row.opacity}">`;
     svg+=`<title>${esc(row.id+' · '+row.value+' · '+row.state)}</title>`;
     svg+=`<rect x="${tileLeft}" y="${row.y}" width="${tileRight-tileLeft}" height="${h}" fill="#F4F1EE"/>`;
+    if(row.state==='pending') {
+      svg+=`<rect x="${tileLeft}" y="${row.y}" width="${bar}" height="${h}" fill="${identity}"/>`+idLabel+undecided(row,reduced?Math.round(row.question):row.question);
+      svg+=`<path d="M${tileLeft} ${row.y}H${tileRight}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/></g>`;continue;
+    }
     if(row.state==='queued'||row.state==='ignored') {
-      const queued=row.state==='queued';
+      const queued=row.state==='queued',reveal=reduced||row.reveal===undefined?1:row.reveal;
       svg+=`<rect x="${tileLeft}" y="${row.y}" width="${bar}" height="${h}" fill="${identity}"${queued?'':' opacity=".45"'}/>`+idLabel;
-      svg+=waiting(row,queued?row.queueLabel||'W KOLEJCE':'pominięte',queued);
+      // Po decyzji „?” ustępuje stanowi wejścia (kolejka albo pominięcie) w tym samym slocie.
+      if(reveal<1)svg+=`<g opacity="${(1-reveal).toFixed(3)}">${undecided(row,1)}</g>`;
+      const placeholder=waiting(row,queued?row.queueLabel||'W KOLEJCE':'POMINIĘTE',queued);
+      svg+=reveal<1?`<g opacity="${+reveal.toFixed(3)}">${placeholder}</g>`:placeholder;
       svg+=`<path d="M${tileLeft} ${row.y}H${tileRight}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/></g>`;continue;
     }
     // Wpis kolejki ustępuje płynnie miejscu wykonania w tym samym slocie.
-    if(row.reveal<1&&!reduced)svg+=`<g opacity="${1-row.reveal}">${waiting({...row,state:'queued'},row.queueLabel||'W KOLEJCE',true)}</g>`;
+    if(row.reveal<1&&!reduced)svg+=`<g opacity="${1-row.reveal}">${row.from==='pending'?undecided(row,row.question||0):waiting({...row,state:'queued'},row.queueLabel||'W KOLEJCE',true)}</g>`;
     svg+=`<g opacity="${reduced?1:row.reveal}">`;
     row.stages.forEach((stage,i)=>{
       const column=panel.columns[i],sx=stageX(i),fill=fills[stage.state]||column.runtime;
@@ -205,8 +218,17 @@ function innerWorkPanel(panel,frame,reduced=false) {
       if(!wire.visible)continue;
       const sx=stageX(wire.index)+stageW,ex=wire.index<count-1?stageX(wire.index+1):right;
       svg+=`<path data-inner-wire="${esc(row.id)}-${wire.index}" d="M${sx} ${cy}H${ex}" fill="none" stroke="${wire.color}" stroke-width="${wireW}" opacity="${wire.opacity}" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${reduced?0:-(1-wire.subscribe)}"/>`;
+      if(wire.cancel) {
+        // Teardown inner: szara przebyta część kabla od prawej granicy i pocisk „×” jadący w lewo do etapu.
+        const cx=ex-(ex-sx)*wire.cancel.at;
+        svg+=`<path data-inner-cancel-trail="${esc(row.id)}-${wire.index}" d="M${ex} ${cy}H${cx}" fill="none" stroke="#808890" stroke-width="${wireW}"/>`;
+      }
       if(wire.pulse&&!reduced)svg+=`<path data-inner-pulse="${esc(row.id)}-${wire.index}" d="M${sx} ${cy}H${ex}" fill="none" stroke="${wire.pulse.color}" stroke-width="${wireW*2}" stroke-linecap="round" pathLength="1" stroke-dasharray=".18 2" stroke-dashoffset="${(.18-wire.pulse.at*1.18).toFixed(4)}"/>`;
-      for(const port of [sx,ex])svg+=`<circle data-inner-port="true" cx="${port}" cy="${cy}" r="${portR}" fill="${wire.color}" stroke="#fff" stroke-width="3" opacity="${wire.opacity*wire.subscribe}"/>`;
+      for(const port of [sx,ex])svg+=`<circle data-inner-port="true" cx="${port}" cy="${cy}" r="${portR}" fill="${wire.cancel&&port===ex?'#808890':wire.color}" stroke="#fff" stroke-width="3" opacity="${wire.opacity*wire.subscribe}"/>`;
+      if(wire.cancel&&!reduced) {
+        const cx=ex-(ex-sx)*wire.cancel.at;
+        svg+=`<g data-inner-cancel="${esc(row.id)}-${wire.index}"><circle cx="${cx}" cy="${cy}" r="${wireW*3.6}" fill="#808890" stroke="#fff" stroke-width="3"/>${text(cx,cy+1,'×',wireW*6,'style="fill:#fff;font-weight:700"')}</g>`;
+      }
     }
     for(const t of row.tokens) {
       const sx=stageX(t.stage)+stageW,ex=t.stage<count-1?stageX(t.stage+1):right;

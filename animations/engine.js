@@ -360,6 +360,11 @@ export function compileScene(scene) {
       const [x,y]=pointAt(points,(time-e.at)/(e.arrival-e.at));
       tokens.push({x,y,value:e.value,color:e.color||'a',edge:r.id,phase:e.phase||'travel'});
     }
+    // Wartość z decide (flow.js) czeka na porcie wejścia odbiorcy, aż operator pokaże reakcję; potem gaśnie.
+    for(const r of records) for(const e of r.events) if(!r.internal&&e.decide&&time>=e.arrival&&time<e.arrival+e.decide+fadeDuration) {
+      const [x,y]=pointAt(r.points||geometry(r.a,r.b),1);
+      tokens.push({x,y,value:e.value,color:e.color||'a',edge:r.id,phase:'decide',opacity:1-clamp((time-e.arrival-e.decide)/fadeDuration)});
+    }
     for(const e of sourceTokens) if(time>=e.at&&time<e.until)tokens.push({...e});
     // transformBalls: między dotarciem wartości do kafelka a wyjściem wyniku kulka wjeżdża do środka wiersza,
     // zatrzymuje się, zmienia wartość (krótki puls) i jedzie do portu wyjścia. Czas modelu stoi, to wyłącznie ilustracja.
