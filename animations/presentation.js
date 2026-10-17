@@ -35,9 +35,9 @@ export function prepareSlides(scenes, { format = '4:3' } = {}) {
         metrics:[original.metrics[after?1:0]],
       }));
     } else if (original.id === '04a-dwa-tory') {
-      // Tory wykonania: cold (trzy pola widoku, trzy requesty user$), share() za map (jeden tor do share, dwa wyjścia) i share z unsubscribe A.
+      // Tory wykonania: cold (trzy pola widoku, trzy requesty user$), share() (HTTP GET → share() → A/B, jeden request) i share z unsubscribe A.
       variants = ['cold', 'share', 'share-unsub'].map(mode => ({ ...original, lanesMode: mode,
-        title: { cold: 'Cold: jedna definicja, trzy wykonania', share: 'share() za map: jedno HTTP, dwa wyjścia',
+        title: { cold: 'Cold: jedna definicja, trzy wykonania', share: 'share(): jedno HTTP, dwóch odbiorców',
           'share-unsub': 'share(): A rezygnuje, B zostaje' }[mode] }));
     } else if (original.id === 'b04-catcherror') {
       variants = [false,true].map(inside => ({ ...original, catchInside:inside }));

@@ -27,7 +27,7 @@ test('Subject checkpoint notes use native Reveal fragment notes and keep READY s
 });
 test('checkpoint notes leave other variants untouched and print uses the final explanation',async()=>{
  const {['checkpoint-notes']:m}=await modules(['checkpoint-notes']);
- for(const id of ['05-zrodla','05-zrodla-2','04a-dwa-tory-2']){
+ for(const id of ['05-zrodla','05-zrodla-2','04a-dwa-tory-3']){
   const s=slide(id);assert.equal(m.prepareCheckpointNotes(s),false);assert.equal(s.note.innerHTML,'existing variant notes');
   assert.ok(s.markers.every(marker=>marker.children.length===0));
  }

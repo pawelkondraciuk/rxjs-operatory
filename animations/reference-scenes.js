@@ -177,12 +177,12 @@ const coldFields=[{id:'A',key:'firstName',start:1},{id:'B',key:'lastName',start:
 // Pola widoku A/B/C wspólne dla Cold i Subject: ta sama kolumna (x/w 960/436), wiersze na torach, etykieta właściwości
 // i miejsce na wartość (tray.field). Kulka obiektu ma ten sam rozmiar na obu slajdach.
 const viewFieldBall={r:34,font:26};
-function viewFields(top,extra={}) {
+function viewFields(top,extra={},fields=coldFields) {
   const g={x:960,w:436},pos=f=>({x:g.x,w:g.w,y:laneRowY(top,f.slot)}),k=laneLook.textScale,inbox=laneInbox();
   const fieldLeft=g.x-g.w/2+inbox.left+laneLook.icon+8*k+22*k+16;
   return {left:g.x-g.w/2,
-    nodes:coldFields.map(f=>laneReceiver(f.id,f.id,pos(f),{ready:true,...extra})),
-    trays:coldFields.map(f=>({anchor:f.id,x:fieldLeft,y:pos(f).y,w:g.x+g.w/2-14-fieldLeft,field:{label:f.label,value:f.value}}))};
+    nodes:fields.map(f=>laneReceiver(f.id,f.id,pos(f),{ready:true,...extra})),
+    trays:fields.map(f=>({anchor:f.id,x:fieldLeft,y:pos(f).y,w:g.x+g.w/2-14-fieldLeft,field:{label:f.label,value:f.value}}))};
 }
 function configureColdFields(scene) {
   const ev=(type,edge)=>({type,edge}),during=(from,to)=>({from,to}),user=f=>E(f.response,coldUserSymbol,laneSubscribers[f.id].fill);
@@ -240,6 +240,7 @@ export function coldFieldsGraph(scene) {
 const defaultShareScenario=unsub=>[{id:'A',start:1,...(unsub?{unsub:4}:{})},{id:'B',start:3}];
 export function configureLanes(scene) {
   if((scene.lanesMode||'cold')==='cold')return configureColdFields(scene);
+  if(scene.lanesMode==='share'&&!scene.shareScenario)return configureShareFields(scene);
   const unsub=scene.lanesMode==='share-unsub',plan=shareSessions(scene.shareScenario||defaultShareScenario(unsub));
   Object.assign(scene,{graph:lanesGraph,playerLayout:'function',duration:plan.end+2,ink:'#26323B',...laneCodeLines(plan),
     // Dłuższa transformacja — kulka zatrzymuje się w map i zmienia 21 → 42.
@@ -273,6 +274,70 @@ export function configureLanes(scene) {
   });
   // Własny scenariusz share (np. kontrola A/B/C) nie ma postojów ani podpisów slajdu — tylko AUTO.
   if(scene.shareScenario)Object.assign(scene,{captions:[],playback:{entry:'auto',finish:'hold'}});
+}
+
+// share() (04a-dwa-tory-2): kontynuacja Cold → Subject. Ten sam wygląd co Subject + HTTP (kolumny 177/517, pola
+// widoku A/B z Cold), ale bez ręcznego podłączania: pierwszy Subscriber A przez share() uruchamia jedyne HTTP (tor #1
+// w kolorze A — wykonanie zainicjowane przez A, zarządzane przez share), B dołącza w trakcie requestu i jego
+// subskrypcja kończy się na share(). Jedna kulka User rozdziela się na porcie share() na dwa identyczne powiadomienia
+// next (kolor wspólnego wykonania), jedno complete trafia do A i B. Bez map, unsubscribe i ponownego requestu.
+const shareFieldTimes={a:1,b:3,response:5,complete:6};
+const shareFields=coldFields.slice(0,2).map(f=>({...f,edge:'share-'+f.id,start:shareFieldTimes[f.id.toLowerCase()]}));
+function configureShareFields(scene) {
+  const at=shareFieldTimes,ev=(type,edge)=>({type,edge}),during=(from,to)=>({from,to});
+  const http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},share={id:'share',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
+  const value=E(at.response,coldUserSymbol,laneSubscribers.A.fill);
+  // Kod łamany przed .pipe; http.get świeci podczas odpowiedzi, share() — przy rozesłaniu next i complete (jak Subject).
+  const lines=[[{text:'const user$ = '},{text:"http.get<User>('/api/users/42')",mark:http,
+      active:[during(ev('source-next','http-share'),ev('deliver-next','http-share'))]}],
+    [{text:'  .pipe('},{text:'share()',mark:share,active:[during(ev('deliver-next','http-share'),ev('source-next','share-A')),
+      during(ev('disconnected','http-share'),ev('disconnected','share-A'))]},{text:');'}]];
+  Object.assign(scene,{graph:shareFieldsGraph,shareFieldTimes:at,playerLayout:'function',duration:at.complete+2,ink:'#26323B',
+    title:'share(): jedno HTTP, dwóch odbiorców',playerClass:'rx-lanes rx-flat-tiles',
+    code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
+    // Dwa przeskoki subscribe A (share → HTTP), B tylko jeden (do share).
+    timing:{subscribe:1.6,travel:1,transform:1.4,terminal:.8,gap:.5},
+    rows:[R('HTTP #1',[value],[B(at.a,at.response,'request')],{completeAt:at.complete}),
+      ...shareFields.map(f=>R(`Pole ${f.label}`,[value],[],{completeAt:at.complete}))],
+    captions:[[0,'user$ = http.get(...).pipe(share()): jedna definicja. Nic jeszcze nie działa'],
+      [at.a,'A subskrybuje. share() sam podłącza się do HTTP i uruchamia jeden request'],
+      [at.b,'B dołącza do share(). HTTP nadal wykonuje jeden request'],
+      [at.response,'HTTP emituje jeden obiekt User. share() rozsyła go do A i B'],
+      [at.complete,'complete przechodzi przez share() do A i B']],
+    metrics:[{label:'Odbiorcy',value:t=>shareFields.filter(f=>t>=f.start).length},{label:'Requesty HTTP',count:'started'}],
+    playback:manual([
+      {id:'subscribed-a',event:ev('connected','http-share'),offset:.35,caption:'A subskrybuje. share() podłącza się do HTTP i uruchamia request'},
+      {id:'joined-b',event:ev('connected','share-B'),offset:.35,caption:'B dołącza. Jego subskrypcja kończy się na share(). HTTP nadal ma jeden request'},
+      {id:'multicast',event:ev('deliver-next','share-B'),offset:.35,caption:'HTTP emituje jeden obiekt User. share() rozsyła go do A i B'},
+      {id:'complete',event:ev('disconnected','share-B'),offset:.8,caption:'complete dociera przez share() do A i B. Jeden request, dwóch odbiorców'},
+    ]),
+  });
+}
+
+export function shareFieldsGraph(scene) {
+  const tall=scene.format==='4:3',top=tall?178:102,at=scene.shareFieldTimes;
+  // Kolumny jak w Subject + HTTP: HTTP GET 177/230, share() 517/230 (w miejscu Subject), pola A/B 960/436.
+  // Pola pojawiają się dopiero z subscribe (ready:false), wiersze rosną, gdy subskrypcja dociera do kafelka.
+  const g={httpX:177,httpW:230,shareX:517,shareW:230},fields=viewFields(top,{ready:false},shareFields);
+  const complete=end=>({at:end,kind:'complete'}),events=scene.rows[0].events;
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball:viewFieldBall,
+    // U1: wspólne wykonanie HTTP w kolorze A, który je uruchomił (konwencja share); B ma w share() lewy pasek tego koloru.
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,U1:{...laneSubscribers.A,label:'#1'}},
+    nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,progressUntilNext:true,...laneTile('source',top,{U1:0},1)},
+      // Wejście upstreamu na wysokości wiersza A (prosty kabel z #1); splitAt:0 — kulka rozdziela się na porcie wejściowym.
+      {id:'share',x:g.shareX,w:g.shareW,label:'share()',color:'op',splitBalls:true,splitAt:0,splitGuides:false,hubFan:false,
+        ...laneTile('operator',top,{U1:0,...Object.fromEntries(shareFields.map(f=>[f.id,f.slot]))},shareFields.length)},
+      ...fields.nodes],
+    edges:[{id:'http-share',from:'http',to:'share',subscriber:'U1',logicalStart:at.a,logicalEnd:complete(at.complete),events},
+      // Dwa powiadomienia jednej emisji: wspólny czas modelu i kolor, ten sam hold — wychodzą z share() jednocześnie.
+      ...shareFields.map(f=>({id:f.edge,from:'share',to:f.id,subscriber:f.id,logicalStart:f.start,logicalEnd:complete(at.complete),hold:1.2,events}))],
+    executions:[{id:'http-1',node:'http',edge:'http-share',duration:at.response-at.a}],
+    trays:fields.trays,
+    // .subscribe() A trwa do dotarcia impulsu do HTTP, B — tylko do share() (upstream już działa).
+    callouts:[subscribeCallout('A','share-A','http-share',{x:960,y:top/2}),subscribeCallout('B','share-B','share-B',{x:960,y:top/2})],
+    timeline:[{type:'share-summary',event:{type:'disconnected',edge:'share-B'},offset:1,
+      caption:'Jeden request, dwóch odbiorców. Bez ręcznego podłączania Subjecta do HTTP'}],
+  };
 }
 
 // Wymiary dla projektora, liczone dla 1024×768 (≈0,787 px ekranu na jednostkę viewBox, czyli ×1,27):
