@@ -783,10 +783,21 @@
 					<div class="rx-player" aria-label="Cztery sposoby ograniczania emisji"></div>
 					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
 <aside class="notes">
-                        <p><strong>Wspólne porównanie — MAIN:</strong> Jedno źródło zasila dwa operatory i dwóch odbiorców. Najpierw pytanie przed emisjami; potem audit daje D podczas trwania wejścia, a debounce daje G po ciszy. <strong>debounceTime:</strong> Wyszukiwanie po zakończeniu pisania. Każde wejście odlicza 3,5 s od nowa. Na pierwszym postoju debounce jeszcze milczy; pierwszy wynik G pojawia się po ciszy. W aplikacji zwykle użyjemy znacznie krótszego okresu.</p>
+                        <p><strong>Wspólne porównanie — MAIN:</strong> Dwa potoki jeden pod drugim: zdarzenia$ → debounceTime → S1 i zdarzenia$ → auditTime → S2; te same zdarzenia A 0 s, B 1 s, C 2 s, D 4 s, E 5 s. Timery w wierszach operatorów: debounce zaczyna od nowa przy każdej wartości, audit nie przesuwa końca okna. S2 dostaje C (3,5 s) i E (7,5 s), S1 dopiero E (8,5 s). <strong>debounceTime:</strong> Wyszukiwanie po zakończeniu pisania. W aplikacji zwykle użyjemy znacznie krótszego okresu.</p>
                         <p><strong>auditTime — na wspólnym MAIN i samodzielnie w EXTRAS:</strong> Aktualizacja układu podczas resize. Pierwsze wejście otwiera okno; kolejne aktualizują zapamiętaną wartość, bez przesuwania końca okna. Na pierwszym końcu okna odbiorca dostaje D. Audit pozwala aktualizować w trakcie ciągłego ruchu, debounce czeka na przerwę.</p>
                         <p><strong>throttleTime i sampleTime — EXTRAS:</strong> Throttle domyślnie przepuszcza pierwszą wartość okna (leading:true, trailing:false). Sample ma stały rytm od subskrypcji i pomija takt bez nowych wejść. Wszystkie źródła pozostają aktywne; nie porównujemy zdarzeń dokładnie na granicy okna.</p>
                     </aside>
+					<template data-checkpoint-notes="16-czas-cztery">
+                        <div data-checkpoint="ready"><p><strong>0 — Start</strong></p><p>Mamy dwa operatory, które na pierwszy rzut oka robią podobną rzecz. Oba ograniczają liczbę emisji, ale inaczej traktują czas.</p></div>
+                        <div data-checkpoint="a"><p><strong>1 — A</strong></p><p>Przychodzi A. Debounce zaczyna czekać na ciszę, a audit otwiera okno czasowe.</p></div>
+                        <div data-checkpoint="b"><p><strong>2 — B</strong></p><p>Przychodzi B. Debounce zaczyna odliczanie od nowa. Audit jedynie zapamiętuje B — jego okno nadal trwa.</p></div>
+                        <div data-checkpoint="c"><p><strong>3 — C (pytanie)</strong></p><p>Przychodzi C. Debounce znowu resetuje licznik. Audit zapamiętuje C, ale nie przesuwa końca okna. Jak myślicie, który operator pierwszy coś wyemituje?</p></div>
+                        <div data-checkpoint="audit-c"><p><strong>4 — Pierwsze okno audit</strong></p><p>Minęło 3,5 sekundy od początku okna auditTime. Emitujemy ostatnią zapamiętaną wartość, czyli C. Debounce nadal czeka.</p></div>
+                        <div data-checkpoint="d"><p><strong>5 — D</strong></p><p>Przychodzą kolejne wartości. Debounce za każdym razem zaczyna liczyć ciszę od nowa. Audit otwiera drugie okno przy D, a E tylko aktualizuje zapamiętaną wartość.</p></div>
+                        <div data-checkpoint="e"><p><strong>6 — E</strong></p><p>E: debounce znowu liczy ciszę od nowa, audit tylko aktualizuje zapamiętaną wartość — jego okno nadal kończy się w 7,5 s.</p></div>
+                        <div data-checkpoint="audit-e"><p><strong>7 — Drugie okno audit</strong></p><p>Audit emituje E po zakończeniu drugiego okna, mimo że od ostatniej wartości minęło mniej niż 3,5 sekundy.</p></div>
+                        <div data-checkpoint="finished"><p><strong>8 — Finał</strong></p><p>Dopiero gdy przez pełne 3,5 sekundy nie przyjdzie nic nowego, debounce emituje E. Czyli debounce czeka na ciszę, a audit wypuszcza ostatnią wartość na końcu okna.</p></div>
+                    </template>
 				</section>
 <section id="17-latest" class="animation-slide" data-extras data-animation="17-latest">
 					<h2>Kto ma prawo uruchomić pracę?</h2>

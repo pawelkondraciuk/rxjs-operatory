@@ -1400,3 +1400,79 @@ function distinctSwitchGraph(scene) {
   for(const edge of graph.edges.filter(e=>!e.internal))edge.preconnected=true;
   return graph;
 }
+
+// debounceTime i auditTime (MAIN 16-czas-cztery): dwa proste potoki jeden pod drugim — zdarzenia$ → debounceTime → S1
+// i zdarzenia$ → auditTime → S2. Kafelek zdarzenia$ jest powtórzony dla czytelności, ale obie subskrypcje dostają te same
+// emisje w tych samych chwilach (jedna lista zdarzeń, dwie krawędzie). Timery żyją w wierszach operatorów (laneTimer,
+// czas modelu): debounce zaczyna od nowa przy każdym wejściu, audit nie przesuwa końca okna. Bez complete źródła.
+const timeInputs=[{at:0,value:'A'},{at:1,value:'B'},{at:2,value:'C'},{at:4,value:'D'},{at:5,value:'E'}];
+// timeStart: czas modelu sceny = czas scenariusza + 0,6 s, żeby READY nie zaczynał od lecącego A; napisy pokazują czas scenariusza.
+const timeColors={A:'#6D4CD3',B:'#B85D05',C:'#087FAD',D:'#B73770',E:'#0F766E'},timePeriod=3.5,timeStart=.6;
+const seconds=at=>at.toFixed(1).replace('.',',')+' s';
+export function configureDebounceAudit(scene) {
+  const ev=(value,color=timeColors[value])=>E(0,value,color);
+  const input=timeInputs.map(v=>({...ev(v.value),at:v.at+timeStart}));
+  // Emisje wynikają z modelu: debounce po 3,5 s ciszy od ostatniego wejścia, audit na końcu okna otwartego pierwszym wejściem.
+  const debounce=[{...input.at(-1),at:input.at(-1).at+timePeriod}];
+  const audit=[];let open=null;
+  for(const v of input){
+    if(open&&v.at>=open.end){audit.push({...open.last,at:open.end});open=null;}
+    if(!open)open={end:v.at+timePeriod};
+    open.last=v;
+  }
+  if(open)audit.push({...open.last,at:open.end});
+  const op={id:'debounce',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
+  const deliver=(edge,value)=>({type:'deliver-next',edge,value}),emit=(edge,value)=>({type:'source-next',edge,value});
+  // Kod w dwóch liniach; operator świeci, gdy jego timer pracuje.
+  const lines=[[{text:'zdarzenia$.pipe('},{text:'debounceTime(3500)',mark:op,active:[{from:deliver('src1-deb','A'),to:emit('deb-obs1',debounce[0].value)}]},{text:')'}],
+    [{text:'zdarzenia$.pipe('},{text:'auditTime(3500)',mark:{...op,id:'audit'},active:audit.map((v,i)=>({from:deliver('src2-aud',i?input.find(x=>x.at>=audit[i-1].at).value:'A'),to:emit('aud-obs2',v.value)}))},{text:')'}]];
+  const at=v=>deliver('src1-deb',v);
+  Object.assign(scene,{graph:debounceAuditGraph,timeInput:input,timeOutputs:{debounce,audit},duration:debounce[0].at+1.5,preconnected:true,
+    title:'debounceTime i auditTime: cisza czy okno?',playerLayout:'expanded',playerClass:'rx-flat-tiles rx-catch-inside',
+    timing:{subscribe:1.6,travel:1,transform:1.4,terminal:.8,gap:.5},
+    code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
+    rows:[R('zdarzenia$',input),R('debounceTime',debounce),R('auditTime',audit)],
+    captions:[[0,'Te same zdarzenia trafiają do obu operatorów. Okres: 3,5 s']],
+    metrics:[{label:'S1 · debounce',value:t=>debounce.filter(v=>v.at<t).length},{label:'S2 · audit',value:t=>audit.filter(v=>v.at<t).length}],
+    playback:{entry:'manual',finish:'hold',afterLastManualStop:'start-auto',stops:[
+      {id:'a',event:at('A'),offset:.25,caption:'A: debounce zaczyna liczyć ciszę, audit otwiera okno 3,5 s'},
+      {id:'b',event:at('B'),offset:.25,caption:'B: debounce od nowa. Audit zapamiętuje B — okno trwa dalej'},
+      {id:'c',event:at('C'),offset:.25,caption:'C: debounce znowu od nowa, audit nadal w pierwszym oknie. Który operator wyemituje pierwszy?'},
+      {id:'audit-c',event:deliver('aud-obs2',audit[0].value),offset:.35,caption:'3,5 s: koniec okna — auditTime emituje C do S2. debounceTime nadal czeka'},
+      {id:'d',event:at('D'),offset:.25,caption:'D: debounce od nowa, audit otwiera drugie okno (do 7,5 s)'},
+      {id:'e',event:at('E'),offset:.25,caption:'E: debounce od nowa, audit tylko podmienia wartość — okno kończy się w 7,5 s'},
+      {id:'audit-e',event:deliver('aud-obs2',audit[1].value),offset:.35,caption:'7,5 s: koniec drugiego okna — S2 dostaje E. debounceTime nadal czeka na ciszę'},
+    ]},
+  });
+}
+
+function debounceAuditGraph(scene) {
+  const frame=frameFor(scene),large=scene.format==='4:3',defH=large?70:56,rowH=large?74:64;
+  const tops=large?[90,360]:[50,270],lane=top=>top+defH+rowH/2;
+  const subscribers={S1:{color:'#7457D9',fill:'#D9CFF5',ink:'#513A9A',label:'S1'},S2:{color:'#C2610C',fill:'#F6D9BC',ink:'#8A4507',label:'S2'},
+    N:{color:'#2A8C9A',ink:'#1F5F68',tint:'#EEF8FA'}};
+  const runtime={S1:'#EDE6F8',S2:'#FBEEE2'};
+  const tile=(id,label,x,w,top,subscriber,headerFill,extra={})=>({id,label,x,w,top,defH,rowH,laneSlots:{[subscriber]:0},growRows:true,ready:true,
+    y:top+(defH+rowH)/2,h:defH+rowH,headerFill,runtimeFill:runtime[subscriber],terminalBadge:true,detail:'',statusInside:false,rx:7,...extra});
+  const receiver=(id,top,subscriber)=>({id,label:'',x:1055,w:314,y:lane(top),h:rowH,top:lane(top)-rowH/2,defH:0,rowH,laneSlots:{[subscriber]:0},
+    labelOffset:0,ready:true,subscriber,headerFill:'#EAE4F7',runtimeFill:runtime[subscriber],terminalBadge:true,detail:'',statusInside:false,
+    inbox:{size:25,left:16,font:30},rx:7});
+  const pipelines=[['deb','debounceTime','S1','debounce','cisza'],['aud','auditTime','S2','audit','okno']];
+  const nodes=pipelines.flatMap(([op,label,subscriber,kind,timerLabel],i)=>[
+    tile('src'+(i+1),'zdarzenia$',138,220,tops[i],subscriber,'#8FC9D4'),
+    tile(op,label,573,560,tops[i],subscriber,'#D8B3E6',{laneTimer:{kind,period:timePeriod,label:timerLabel}}),
+    receiver('obs'+(i+1),tops[i],subscriber)]);
+  const out=scene.timeOutputs;
+  const edges=[['src1','deb',scene.timeInput,'S1'],['deb','obs1',out.debounce,'S1'],['src2','aud',scene.timeInput,'S2'],['aud','obs2',out.audit,'S2']]
+    .map(([from,to,events,subscriber])=>({from,to,events:events.map(e=>({...e})),subscriber,logicalStart:0,logicalEnd:null,preconnected:true}));
+  // Chwilowy napis next(X) · czas między potokami: ta sama emisja dla obu subskrypcji.
+  const calloutY=(tops[0]+defH+rowH+tops[1])/2;
+  const callouts=scene.timeInput.map(v=>({text:`next(${v.value}) · ${seconds(v.at-timeStart)}`,subscriber:'N',label:'',x:330,y:calloutY,size:34,
+    from:{type:'source-next',edge:'src1-deb',value:v.value},to:{type:'deliver-next',edge:'src1-deb',value:v.value,offset:.5}}));
+  const tray=(anchor,top)=>({anchor,x:1055-157+130,y:lane(top),w:170,balls:true,max:2,gap:8,ball:{r:29.5,font:34.2,textFill:'#fff'}});
+  return {layout:'fixed',formatAware:true,width:1240,height:frame.height,nodes,edges,subscribers,laneWire:5,portRadius:11,
+    ball:{r:25,font:29,textFill:'#fff'},...(large?{textScale:1.4,labelScale:1.6}:{}),
+    trays:[tray('obs1',tops[0]),tray('obs2',tops[1])],callouts,
+    timeline:[{type:'time-summary',event:{type:'deliver-next',edge:'deb-obs1'},offset:.35,
+      caption:'8,5 s: 3,5 s ciszy — debounceTime emituje E do S1. S1: E · S2: C, E'}]};
+}

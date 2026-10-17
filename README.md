@@ -499,21 +499,20 @@ Postoje: first (przed drugim A, HTTP A ~45%), question (drugie A w operatorze), 
 
 ### Cztery sposoby ograniczania emisji — `16-czas-cztery`
 
-**MAIN:** debounceTime i auditTime na jednej planszy: jedno źródło, dwa operatory i dwóch odbiorców z osobnymi boxami wyników. Postoje: pytanie przed pierwszym wynikiem → D z audit podczas trwania wejścia → G z debounce po ciszy → AUTO do końca pokazu. **EXTRAS:** samodzielny auditTime pod dotychczasowym ID -2, throttleTime i sampleTime. W notes: wyszukiwanie po przerwie w pisaniu i aktualizacja podczas resize.
+**MAIN:** debounceTime i auditTime na jednej planszy: dwa proste potoki jeden pod drugim — „zdarzenia$” → „debounceTime” → S1 (fiolet) i „zdarzenia$” → „auditTime” → S2 (pomarańcz), kolumny wyrównane, kompaktowe odbiorcy z inboxem. Kafelek „zdarzenia$” jest powtórzony dla czytelności; obie subskrypcje dostają tę samą listę zdarzeń: A 0 s, B 1 s, C 2 s, D 4 s, E 5 s (dwie identyczne kulki lecą jednocześnie, chwilowy napis `next(C) · 2,0 s` między potokami). Timery żyją w wierszach operatorów (tło na pełną wysokość wiersza, stan `cisza: 2,4 s` / `okno: 2,4 s`, slot `pamięć: C`) i płyną w czasie modelu — stoją podczas przelotu kulek. debounce przy każdej wartości wraca do początku; audit otwiera okno przy A i D, kolejne wartości tylko podmieniają pamięć. S2 dostaje C (3,5 s) i E (7,5 s), S1 dopiero E (8,5 s); bez complete. Postoje a, b, c (pytanie: kto pierwszy?), audit-c, d, e, audit-e, potem AUTO do emisji debounce. Notatki per checkpoint w `template[data-checkpoint-notes="16-czas-cztery"]` (75–90 s). **EXTRAS:** samodzielny auditTime pod dotychczasowym ID -2, throttleTime i sampleTime. W notes: wyszukiwanie po przerwie w pisaniu i aktualizacja podczas resize.
 
 **Temat:** porównanie ciszy i okna na wspólnym wejściu oraz samodzielne przykłady pozostałych strategii w EXTRAS.
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
-| 16-czas-cztery | debounceTime i auditTime: cisza czy okno? | `debounceTime(3500) / auditTime(3500)` |
+| 16-czas-cztery | debounceTime i auditTime: cisza czy okno? | `zdarzenia$.pipe(debounceTime(3500))`<br>`zdarzenia$.pipe(auditTime(3500))` |
 | 16-czas-cztery-2 | auditTime: ostatnia wartość okna | `auditTime(3500)` |
 | 16-czas-cztery-3 | throttleTime: pierwsza wartość okna | `throttleTime(3500)` |
 | 16-czas-cztery-4 | sampleTime: odczyt w stałym rytmie | `sampleTime(3500)` |
 
 **Na bloczkach i w animacji:**
 
-- „zdarzenia$” → „debounceTime” → „Odbiorca”: wynik po 3,5 s ciszy; nowe wejście odnawia odliczanie. Na postoju debounce przy źródle widać wychodzące H; podpis mówi, że znów zaczyna odliczanie.
-- „zdarzenia$” → „auditTime” → „Odbiorca”: pierwsze wejście otwiera okno 3,5 s, na końcu przechodzi ostatnia wartość.
+- EXTRAS „zdarzenia$” → „auditTime” → „Odbiorca” (-2): pierwsze wejście otwiera okno 3,5 s, na końcu przechodzi ostatnia wartość.
 - „zdarzenia$” → „throttleTime” → „Odbiorca”: pierwsza wartość przechodzi, kolejne w oknie są pomijane; leading=true, trailing=false.
 - „zdarzenia$” → „sampleTime” → „Odbiorca”: odczyt co 3,5 s od subskrypcji; brak nowej wartości oznacza brak nowej emisji.
 

@@ -462,6 +462,17 @@ export function renderScene(frame,options={}) {
         svg+=`<rect x="${x0}" y="${lane.y-h/2}" width="${(x1-x0)*lane.progress}" height="${h}" rx="${h/2}" fill="${stopped?'#b51e2e':lane.color}"/>`;
         if(!inRow)svg+=laneIcon(n.x+n.w/2-34*k,lane.y,lane,k,frame.time);
       } else if(lane.role==='operator'&&inRow) {
+        // Timer operatora (laneTimer): postęp jako tło całej wysokości wiersza z czołem w kolorze toru i czytelny stan
+        // (np. cisza: 2,4 s); reset wraca do początku, bo postęp liczy się od ostatniego startu.
+        const timerRow=lane.timer&&rows.find(r=>r.subscriber===lane.subscriber);
+        if(timerRow) {
+          const h=Math.max(0,timerRow.h*timerRow.growth-1),left=n.x-n.w/2+1+7*k,width=n.w-2-7*k,w=width*lane.timer.progress;
+          if(lane.timer.active) {
+            svg+=`<rect data-lane-timer="${lane.timer.progress}" x="${left}" y="${timerRow.top}" width="${w}" height="${h}" fill="${lane.progressFill||lane.fill||lane.color}"/>`;
+            if(lane.timer.progress>0)svg+=`<rect x="${left+w-3*k}" y="${timerRow.top}" width="${3*k}" height="${h}" fill="${lane.color}"/>`;
+          }
+          svg+=text(n.x-n.w/2+80*k,lane.y,lane.timer.text,22*k,`data-lane-timer-text="true" style="text-anchor:start;font-weight:${lane.timer.active?700:500};fill:${lane.timer.active?'#26323B':'#7A858C'}"`);
+        }
         // Wiersz operatora: sama litera toru; stan niesie tło wiersza.
         if(lane.label)svg+=text(chipLeft+(hubInputs.length&&n.hubFan!==false?18:6)*k,lane.y,lane.label,24*k,`style="font-weight:700;fill:${lane.labelColor||'#43525b'};text-anchor:start"`);
         // Chwilowy fallback (np. of([]) w catchError): pigułka przy prawej krawędzi wiersza, jak etap catchError w panelu prac.

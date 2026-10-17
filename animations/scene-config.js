@@ -1,4 +1,4 @@
-import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch } from './reference-scenes.js';
+import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureDebounceAudit } from './reference-scenes.js';
 
 // Końcowe ID po rozwinięciu wariantów; otwarcie pozostaje w kolejności HTML.
 export const mainOrder = [
@@ -42,6 +42,8 @@ export function configureScene(scene) {
   if(id==='13-limit')configureConcurrency(scene);
   // distinctUntilChanged przed switchMap: A, A, B, B, A → 3 requesty (osobny slajd po switchMap).
   if(id==='11a-distinct-switchmap')configureDistinctSwitch(scene);
+  // debounceTime i auditTime (MAIN): dwa potoki z timerami w wierszach operatorów; warianty -2…-4 w EXTRAS bez zmian.
+  if(scene.id==='16-czas-cztery')configureDebounceAudit(scene);
   // Oba warianty catchError w wyglądzie MAIN switchMap: wewnątrz (-2) i na zewnątrz (za switchMap).
   if(id==='b04-catcherror')(scene.catchInside?configureCatchInside:configureCatchOutside)(scene);
   if(id==='05-zrodla'&&scene.sourceExample===0)configureInterval(scene);
@@ -65,15 +67,6 @@ export function configureScene(scene) {
   if(id==='06a-cold-hot-2')scene.playerClass=[scene.playerClass,'rx-flat-tiles'].filter(Boolean).join(' ');
   if(scene.flattenLayout||scene.playback?.stops){
     if(stagedIds.has(scene.id))scene.playback={...scene.playback,controller:'stages'};
-    return scene;
-  }
-  if(id==='16-czas-cztery'&&scene.group==='main'){
-    scene.playerLayout='expanded';
-    scene.playback={entry:'manual',finish:'hold',afterLastManualStop:'start-auto',stops:[
-      {id:'question',modelTime:3.9,caption:'Wejście nadal emituje. Który operator pokaże wynik przed ciszą?'},
-      {id:'audit',event:{type:'deliver-next',edge:'op2-sink2',value:'D'},offset:.35,caption:'auditTime wyemitował D na końcu okna. debounceTime nadal czeka'},
-      {id:'debounce',event:{type:'deliver-next',edge:'op1-sink1',value:'G'},offset:.35,caption:'Po 3,5 s ciszy debounceTime wyemitował G. Nowe H właśnie wychodzi ze źródła i znów zaczyna odliczanie'},
-    ]};
     return scene;
   }
   const question={

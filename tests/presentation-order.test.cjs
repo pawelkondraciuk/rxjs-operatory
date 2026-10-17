@@ -93,22 +93,10 @@ test('removed comparisons stay absent from MAIN, EXTRAS, print and direct hashes
  assert.deepEqual(Array.from(end.histories.find(h=>h.anchor==='receiver1').values,e=>e.value),['2','3','4','5','6']);
 });
 
-test('combined time operators compare the same input and stop on audit before debounce',async()=>{
- const {scenes,compile}=await presentation(),scene=scenes.get('16-czas-cztery'),c=compile(scene);
+test('combined time operators: MAIN debounce/audit is manual, its throttle/sample/audit variants stay extras',async()=>{
+ const {scenes}=await presentation(),scene=scenes.get('16-czas-cztery');
  assert.equal(scene.playback.entry,'manual');assert.equal(scene.playback.finish,'hold');
- assert.deepEqual(Array.from(scene.seriesIndices),[1,2]);
- assert.deepEqual(Array.from(c.stops,s=>s.id),['question','audit','debounce']);
- const input=id=>Array.from(c.plan.records.get('source-op'+id).events,e=>[e.logicalAt,e.value]);
- assert.deepEqual(input(1),input(2));
- assert.equal(c.snapshot(0).nodes.length,5);
- const history=(f,id)=>Array.from(f.histories.find(h=>h.anchor==='sink'+id).values,e=>e.value);
- const question=c.snapshot(c.stops[0].time),audit=c.snapshot(c.stops[1].time),debounce=c.snapshot(c.stops[2].time);
- assert.deepEqual(history(question,1),[]);assert.deepEqual(history(question,2),[]);
- assert.deepEqual(history(audit,1),[]);assert.deepEqual(history(audit,2),['D']);
- assert.deepEqual(history(debounce,1),['G']);assert.deepEqual(history(debounce,2),['D','G']);
- const end=c.snapshot(c.duration);
- assert.deepEqual(history(end,1),['G','I','J']);assert.deepEqual(history(end,2),['D','G','I','J']);
- assert.ok(Array.from(c.plan.records.values()).every(e=>!e.end),'ongoing source does not complete');
+ // Szczegóły dwóch potoków i timerów: tests/debounce-audit.test.cjs.
  assert.equal(scenes.get('16-czas-cztery-2').group,'bonus');
  for(const id of ['08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12a-complete','13-limit'])assert.notEqual(scenes.get(id).playback.controller,'stages',id);
  for(const id of ['04-operator','05-zrodla','05-zrodla-2','05-zrodla-3','05-zrodla-4','05-zrodla-5','20-sharereplay','20-sharereplay-2'])assert.equal(scenes.get(id).playback.controller,'stages',id);

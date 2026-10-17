@@ -270,6 +270,7 @@ export function compileScene(scene) {
       if(role==='operator'&&shown&&time>=shown.from&&time<shown.to+fadeDuration)
         lane.fallback={label:n.laneFallback.label,opacity:Math.min(clamp((time-shown.from)/fadeDuration),1-clamp((time-shown.to)/fadeDuration))};
       if(role==='operator'&&n.memory)lane.memory=memoryOf(n,out,input,time);
+      if(role==='operator'&&n.laneTimer)Object.assign(lane,timerOf(n,out,input,time));
       if(role==='work') {
         // progressUntilNext: oczekiwanie kończy się z wysłaniem pierwszej wartości (odpowiedź HTTP), nie dopiero z complete.
         const firstNext=n.progressUntilNext?out.events[0]?.at:undefined;
@@ -293,6 +294,25 @@ export function compileScene(scene) {
     const last=updates.at(-1);
     return {label:n.memory.label??'prev',empty:n.memory.empty??'—',...(last?{value:last.value,color:last.color,since:last.at}:{}),
       ...(compared.length?{comparedAt:compared.at(-1)}:{})};
+  }
+  // laneTimer (opt-in, np. debounceTime/auditTime): timer operatora w czasie modelu — stoi podczas przelotów, płynie między
+  // zdarzeniami. Wejście liczy się od dotarcia do kafelka (czas ilustracji), okres i momenty w czasie modelu (logicalAt).
+  // debounce: każde wejście zaczyna odliczanie od nowa; audit: pierwsze wejście bez otwartego okna otwiera okno, kolejne
+  // tylko podmieniają zapamiętaną wartość. Po emisji (wyjście z logicalAt = koniec) operator nie trzyma wartości.
+  function timerOf(n,out,input,time) {
+    const {kind,period,label}=n.laneTimer,logical=plan.logicalTime(time);
+    const arrived=(input?.events||[]).filter(e=>e.arrival<=time);
+    let open=null;
+    for(const e of arrived){
+      if(kind==='debounce'||!open||e.logicalAt>=open.end)open={start:e.logicalAt,end:e.logicalAt+period,value:e.value,color:e.color||'a'};
+      else Object.assign(open,{value:e.value,color:e.color||'a'});
+    }
+    const emitted=open&&out.events.some(v=>v.logicalAt>=open.end-1e-9&&v.at<=time);
+    const active=open&&!emitted&&logical<open.end+1e-9;
+    const remaining=active?Math.max(0,open.end-logical):null;
+    return {timer:{label,progress:active?clamp((logical-open.start)/period):0,active:Boolean(active),
+      text:label+': '+(active?remaining.toFixed(1).replace('.',',')+' s':'—'),since:active?open.start:undefined},
+      memory:{label:n.laneTimer.memory??'pamięć',empty:'—',...(active?{value:open.value,color:open.color,since:arrived.at(-1).arrival}:{})}};
   }
   // Wiersz wykonania rezerwuje miejsce, gdy subscribe wyrusza do kafelka (kabel trafia w gotowy wiersz);
   // stan toru wypełnia go po dotarciu. Wiersze zostają po zakończeniu, więc kafelek tylko rośnie.

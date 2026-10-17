@@ -87,21 +87,7 @@ export function catalogGraph(s) {
    const sink=node("sink"+i,x,465,"Odbiorca","http",null,{w:Math.min(190,space-26)});
    edge(op,sink,values(i));tray(i,x,575,space-22,"Wynik");
   }
-  if(indices.length===2){
-   // Dwie gałęzie korzystają z tego samego wejścia i dotychczasowych modeli emisji.
-   const large=s.format==='4:3',ys=large?[110,390]:[80,300],h=large?120:86,panels=[];
-   Object.assign(source,{x:200,y:(ys[0]+ys[1])/2,w:330,h,ready:true});
-   indices.forEach((i,j)=>{
-    const op=nodes.find(n=>n.id==='op'+i),sink=nodes.find(n=>n.id==='sink'+i);
-    Object.assign(op,{x:620,y:ys[j],w:330,h,ready:true});
-    Object.assign(sink,{x:1040,y:ys[j],w:380,h,ready:true});
-    const box={x:sink.x-sink.w/2,y:sink.y+h/2+20,w:sink.w,h:large?110:84,
-     from:{x:sink.x,y:sink.y+h/2},showOn:{type:'deliver-next',edge:op.id+'-'+sink.id,value:values(i)[0].value}};
-    panels.push(box);Object.assign(trays[j],{anchor:sink.id,x:sink.x,y:box.y+box.h/2,w:box.w-16,lines:1,label:''});
-   });
-   return {nodes,edges,trays,panels,width:W,height:large?612:460,layout:'fixed',formatAware:true,
-    ...(large?{textScale:1.5,labelScale:1.75}:{})};
-  }else if(indices.length>2){
+  if(indices.length>2){
    // Cztery porównania: historia mieści się w odbiorcy, status pod operatorem.
    Object.assign(source,{x:150,y:170,w:240,h:70,ready:true});
    indices.forEach((i,j)=>{
