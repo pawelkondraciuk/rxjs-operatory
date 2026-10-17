@@ -1,7 +1,8 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules}=require('./v2-harness.cjs');
 // 11a-distinct-switchmap: selectedUserId$ → distinctUntilChanged → switchMap → S1, wejścia A, A, B, B, A.
-// Powtórzenia gasną w wierszu distinctUntilChanged (pamięć prev), do switchMap trafia A, B, A — trzy HTTP.
+// Powtórzenia gasną w wierszu distinctUntilChanged (pamięć: jedna kulka ostatniej przepuszczonej wartości), do switchMap
+// trafia A, B, A — trzy HTTP.
 async function deck(format='4:3'){
  const m=await modules(['catalog','scene-config','engine','renderer']);
  const scene=m['scene-config'].configureScene({...m.catalog.scenes.find(s=>s.id==='11a-distinct-switchmap'),format});
@@ -12,7 +13,7 @@ const memory=f=>f.nodes.find(n=>n.id==='distinct').laneStates[0].memory;
 const stop=(c,id)=>c.snapshot(c.stops.find(s=>s.id===id).time);
 const states=f=>Array.from(rows(f),r=>r.id+' · '+r.value+' '+r.state);
 
-test('one pipeline with S1 lanes, a prev slot inside the distinctUntilChanged lane and an instance panel below',async()=>{
+test('one pipeline with S1 lanes, an empty memory ball slot in the distinctUntilChanged lane and an instance panel below',async()=>{
  for(const format of ['4:3','16:9']){
   const {scene,c,render}=await deck(format),f=c.snapshot(0);
   assert.equal(scene.title,'distinctUntilChanged — czy coś się zmieniło?');
@@ -25,10 +26,10 @@ test('one pipeline with S1 lanes, a prev slot inside the distinctUntilChanged la
   assert.equal(ys.length>0&&new Set(ys).size,1,'S1 już zestawione, porty na wspólnej osi');
   assert.ok(f.nodes.filter(n=>n.laneStates?.length).every(n=>n.laneStates[0].state==='running'));
   assert.equal(memory(f).value,undefined);
-  const svg=render(f),slot=svg.match(/<g data-lane-memory="">[\s\S]*?<\/g>/)[0];
-  assert.match(slot,/prev: <tspan[^>]*>—<\/tspan>/);
-  const lane=f.nodes.find(n=>n.id==='distinct'),x=Number(slot.match(/<rect x="([\d.]+)"/)[1]);
-  assert.ok(x>lane.x-lane.w/2&&x<lane.x+lane.w/2,'slot wewnątrz wiersza operatora');
+  assert.equal(memory(f).ball,true);
+  assert.doesNotMatch(render(f),/data-lane-memory|prev:/,'pusta pamięć bez slotu i etykiety');
+  const lane=f.nodes.find(n=>n.id==='distinct'),first=stop(c,'first'),kept=render(first).match(/<g data-lane-memory="A" data-token="memory"><circle cx="([\d.]+)"/);
+  assert.ok(kept&&+kept[1]>lane.x&&+kept[1]<lane.x+lane.w/2,'kulka A wewnątrz wiersza operatora, przed portem');
   const panel=f.innerWorkPanels[0];
   assert.equal(panel.instances,true);assert.deepEqual(Array.from(panel.columns,col=>col.label),['HTTP GET']);
   assert.equal(rows(f).length,0);assert.equal(f.executionCounts.started,0);

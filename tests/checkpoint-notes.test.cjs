@@ -23,11 +23,11 @@ test('Subject checkpoint notes use native Reveal fragment notes and keep READY s
   assert.equal(marker.children.length,1);assert.equal(marker.children[0].className,'notes');
   assert.equal(marker.children[0].innerHTML,s.entries[i+1].innerHTML);
  }
- assert.match(s.markers.at(-1).children[0].innerHTML,/Kto będzie pilnował tego połączenia, kiedy odbiorcy się odłączą\?/);
+ assert.match(s.markers.at(-1).children[0].innerHTML,/Ale sami musieliśmy podłączyć źródło\. Czy RxJS może zrobić to za nas\?/);
 });
 test('checkpoint notes leave other variants untouched and print uses the final explanation',async()=>{
  const {['checkpoint-notes']:m}=await modules(['checkpoint-notes']);
- for(const id of ['05-zrodla','05-zrodla-2','04a-dwa-tory-3']){
+ for(const id of ['05-zrodla','05-zrodla-2','06-subskrypcja']){
   const s=slide(id);assert.equal(m.prepareCheckpointNotes(s),false);assert.equal(s.note.innerHTML,'existing variant notes');
   assert.ok(s.markers.every(marker=>marker.children.length===0));
  }

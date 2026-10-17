@@ -241,6 +241,7 @@ const defaultShareScenario=unsub=>[{id:'A',start:1,...(unsub?{unsub:4}:{})},{id:
 export function configureLanes(scene) {
   if((scene.lanesMode||'cold')==='cold')return configureColdFields(scene);
   if(scene.lanesMode==='share'&&!scene.shareScenario)return configureShareFields(scene);
+  if(scene.lanesMode==='share-interval'&&!scene.shareScenario)return configureShareInterval(scene);
   const unsub=scene.lanesMode==='share-unsub',plan=shareSessions(scene.shareScenario||defaultShareScenario(unsub));
   Object.assign(scene,{graph:lanesGraph,playerLayout:'function',duration:plan.end+2,ink:'#26323B',...laneCodeLines(plan),
     // Dłuższa transformacja — kulka zatrzymuje się w map i zmienia 21 → 42.
@@ -277,12 +278,12 @@ export function configureLanes(scene) {
 }
 
 // share() (04a-dwa-tory-2): kontynuacja Cold → Subject. Ten sam wygląd co Subject + HTTP (kolumny 177/517, pola
-// widoku A/B z Cold), ale bez ręcznego podłączania: pierwszy Subscriber A przez share() uruchamia jedyne HTTP (tor #1
-// w kolorze A — wykonanie zainicjowane przez A, zarządzane przez share), B dołącza w trakcie requestu i jego
-// subskrypcja kończy się na share(). Jedna kulka User rozdziela się na porcie share() na dwa identyczne powiadomienia
-// next (kolor wspólnego wykonania), jedno complete trafia do A i B. Bez map, unsubscribe i ponownego requestu.
-const shareFieldTimes={a:1,b:3,response:5,complete:6};
-const shareFields=coldFields.slice(0,2).map(f=>({...f,edge:'share-'+f.id,start:shareFieldTimes[f.id.toLowerCase()]}));
+// widoku A/B/C z Cold), ale bez ręcznego podłączania: pierwszy Subscriber A przez share() uruchamia jedyne HTTP (tor #1
+// w kolorze A — wykonanie zainicjowane przez A, zarządzane przez share), B i C dołączają w trakcie requestu i ich
+// subskrypcje kończą się na share(). Jedna kulka User rozdziela się na porcie share() na trzy identyczne powiadomienia
+// next (kolor wspólnego wykonania), jedno complete trafia do A, B i C. Bez map, unsubscribe i ponownego requestu.
+const shareFieldTimes={a:1,b:2.6,c:3.2,response:5,complete:6};
+const shareFields=coldFields.map(f=>({...f,edge:'share-'+f.id,start:shareFieldTimes[f.id.toLowerCase()]}));
 function configureShareFields(scene) {
   const at=shareFieldTimes,ev=(type,edge)=>({type,edge}),during=(from,to)=>({from,to});
   const http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},share={id:'share',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
@@ -293,50 +294,52 @@ function configureShareFields(scene) {
     [{text:'  .pipe('},{text:'share()',mark:share,active:[during(ev('deliver-next','http-share'),ev('source-next','share-A')),
       during(ev('disconnected','http-share'),ev('disconnected','share-A'))]},{text:');'}]];
   Object.assign(scene,{graph:shareFieldsGraph,shareFieldTimes:at,playerLayout:'function',duration:at.complete+2,ink:'#26323B',
-    title:'share(): jedno HTTP, dwóch odbiorców',playerClass:'rx-lanes rx-flat-tiles',
+    title:'share(): jedno HTTP, trzech odbiorców',playerClass:'rx-lanes rx-flat-tiles',
     code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
-    // Dwa przeskoki subscribe A (share → HTTP), B tylko jeden (do share).
+    // Dwa przeskoki subscribe A (share → HTTP), B i C tylko jeden (do share).
     timing:{subscribe:1.6,travel:1,transform:1.4,terminal:.8,gap:.5},
     rows:[R('HTTP #1',[value],[B(at.a,at.response,'request')],{completeAt:at.complete}),
       ...shareFields.map(f=>R(`Pole ${f.label}`,[value],[],{completeAt:at.complete}))],
     captions:[[0,'user$ = http.get(...).pipe(share()): jedna definicja. Nic jeszcze nie działa'],
       [at.a,'A subskrybuje. share() sam podłącza się do HTTP i uruchamia jeden request'],
       [at.b,'B dołącza do share(). HTTP nadal wykonuje jeden request'],
-      [at.response,'HTTP emituje jeden obiekt User. share() rozsyła go do A i B'],
-      [at.complete,'complete przechodzi przez share() do A i B']],
+      [at.c,'C też dołącza do share(). Nadal jeden request'],
+      [at.response,'HTTP emituje jeden obiekt User. share() rozsyła go do A, B i C'],
+      [at.complete,'complete przechodzi przez share() do A, B i C']],
     metrics:[{label:'Odbiorcy',value:t=>shareFields.filter(f=>t>=f.start).length},{label:'Requesty HTTP',count:'started'}],
     playback:manual([
       {id:'subscribed-a',event:ev('connected','http-share'),offset:.35,caption:'A subskrybuje. share() podłącza się do HTTP i uruchamia request'},
-      {id:'joined-b',event:ev('connected','share-B'),offset:.35,caption:'B dołącza. Jego subskrypcja kończy się na share(). HTTP nadal ma jeden request'},
-      {id:'multicast',event:ev('deliver-next','share-B'),offset:.35,caption:'HTTP emituje jeden obiekt User. share() rozsyła go do A i B'},
-      {id:'complete',event:ev('disconnected','share-B'),offset:.8,caption:'complete dociera przez share() do A i B. Jeden request, dwóch odbiorców'},
+      {id:'joined',event:ev('connected','share-C'),offset:.35,caption:'B i C dołączają. Ich subskrypcje kończą się na share(). HTTP nadal ma jeden request'},
+      {id:'multicast',event:ev('deliver-next','share-C'),offset:.35,caption:'HTTP emituje jeden obiekt User. share() rozsyła go do A, B i C'},
+      {id:'complete',event:ev('disconnected','share-C'),offset:.8,caption:'complete dociera przez share() do A, B i C. Jeden request, trzech odbiorców'},
     ]),
   });
 }
 
 export function shareFieldsGraph(scene) {
   const tall=scene.format==='4:3',top=tall?178:102,at=scene.shareFieldTimes;
-  // Kolumny jak w Subject + HTTP: HTTP GET 177/230, share() 517/230 (w miejscu Subject), pola A/B 960/436.
+  // Kolumny jak w Subject + HTTP: HTTP GET 177/230, share() 517/230 (w miejscu Subject), pola A/B/C 960/436.
   // Pola pojawiają się dopiero z subscribe (ready:false), wiersze rosną, gdy subskrypcja dociera do kafelka.
   const g={httpX:177,httpW:230,shareX:517,shareW:230},fields=viewFields(top,{ready:false},shareFields);
   const complete=end=>({at:end,kind:'complete'}),events=scene.rows[0].events;
   return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball:viewFieldBall,
     // U1: wspólne wykonanie HTTP w kolorze A, który je uruchomił (konwencja share); B ma w share() lewy pasek tego koloru.
-    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,U1:{...laneSubscribers.A,label:'#1'}},
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,C:laneSubscribers.C,U1:{...laneSubscribers.A,label:'#1'}},
     nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,progressUntilNext:true,...laneTile('source',top,{U1:0},1)},
       // Wejście upstreamu na wysokości wiersza A (prosty kabel z #1); splitAt:0 — kulka rozdziela się na porcie wejściowym.
       {id:'share',x:g.shareX,w:g.shareW,label:'share()',color:'op',splitBalls:true,splitAt:0,splitGuides:false,hubFan:false,
         ...laneTile('operator',top,{U1:0,...Object.fromEntries(shareFields.map(f=>[f.id,f.slot]))},shareFields.length)},
       ...fields.nodes],
     edges:[{id:'http-share',from:'http',to:'share',subscriber:'U1',logicalStart:at.a,logicalEnd:complete(at.complete),events},
-      // Dwa powiadomienia jednej emisji: wspólny czas modelu i kolor, ten sam hold — wychodzą z share() jednocześnie.
+      // Trzy powiadomienia jednej emisji: wspólny czas modelu i kolor, ten sam hold — wychodzą z share() jednocześnie.
       ...shareFields.map(f=>({id:f.edge,from:'share',to:f.id,subscriber:f.id,logicalStart:f.start,logicalEnd:complete(at.complete),hold:1.2,events}))],
     executions:[{id:'http-1',node:'http',edge:'http-share',duration:at.response-at.a}],
     trays:fields.trays,
-    // .subscribe() A trwa do dotarcia impulsu do HTTP, B — tylko do share() (upstream już działa).
-    callouts:[subscribeCallout('A','share-A','http-share',{x:960,y:top/2}),subscribeCallout('B','share-B','share-B',{x:960,y:top/2})],
-    timeline:[{type:'share-summary',event:{type:'disconnected',edge:'share-B'},offset:1,
-      caption:'Jeden request, dwóch odbiorców. Bez ręcznego podłączania Subjecta do HTTP'}],
+    // .subscribe() A trwa do dotarcia impulsu do HTTP, B i C — tylko do share() (upstream już działa).
+    callouts:[subscribeCallout('A','share-A','http-share',{x:960,y:top/2}),
+      ...shareFields.slice(1).map(f=>subscribeCallout(f.id,f.edge,f.edge,{x:960,y:top/2}))],
+    timeline:[{type:'share-summary',event:{type:'disconnected',edge:'share-C'},offset:1,
+      caption:'Jeden request, trzech odbiorców. Bez ręcznego podłączania Subjecta do HTTP'}],
   };
 }
 
@@ -732,71 +735,96 @@ export function subjectManualGraph(scene) {
 // pracuje bez końca. Ostatnia akcja (connection) to connection.unsubscribe(): szary impuls × biegnie od Subject do
 // interval, tor #1 szarzeje, nowych emisji nie ma. Subject nie dostaje complete — zostaje otwarty.
 const subjectIntervalTiming={first:.5,period:1,travel:.8,hold:.4,cancel:.8,calloutHold:.4,stopTail:1,window:30,keep:5,margin:2,
-  actions:['A','B','C','source','connection'],defaults:[3,6,9,12,15],settle:2.8,actionGap:1.5,defaultClose:17.9};
+  settle:2.8,actionGap:1.5};
 const subjectIntervalReceivers=[{id:'A',slot:0},{id:'B',slot:1},{id:'C',slot:2}];
-export function configureSubjectInterval(scene) {
-  const t=subjectIntervalTiming;
+// Dwa huby tej samej sceny: Subject (ręczne connection, akcje source i connection) i share() (bez ręcznego połączenia —
+// gdy odchodzi ostatni odbiorca, share() sam odłącza upstream; impuls × C biegnie przez share() aż do interval).
+const intervalHubs={
+  subject:{label:'Subject',title:'Subject — kto odłączy źródło?',actions:['A','B','C','source','connection'],defaults:[3,6,9,12,15],
+    defaultClose:17.9,playerClass:'rx-lanes rx-flat-tiles rx-two-lines',receiversLabel:'Odbiorcy Subject'},
+  share:{label:'share()',title:'share() — kto odłączy źródło?',actions:['A','B','C'],defaults:[3,6,9],
+    defaultClose:12.5,playerClass:'rx-lanes rx-flat-tiles',receiversLabel:'Odbiorcy share()'},
+};
+const intervalHubOf=scene=>scene.intervalHub||'subject';
+export function configureSubjectInterval(scene,kind='subject') {
+  const t=subjectIntervalTiming,hub=intervalHubs[kind];
   // Postoje to stabilne kadry akcji na umownej osi (defaults): znaczniki Reveal, notatki, hash i podgląd Notes.
   // Na żywo kontroler liczy etap z liczby wykonanych akcji, nie z czasu.
-  const settled=t.defaults.map((at,i)=>at+({source:.5,connection:2.2}[t.actions[i]]??t.settle));
-  Object.assign(scene,{graph:subjectIntervalGraph,playerLayout:'function',ink:'#26323B',playerClass:'rx-lanes rx-flat-tiles rx-two-lines',
-    title:'Subject — kto odłączy źródło?',
+  const settled=hub.defaults.map((at,i)=>at+({source:.5,connection:2.2}[hub.actions[i]]??t.settle));
+  Object.assign(scene,{intervalHub:kind,graph:subjectIntervalGraph,playerLayout:'function',ink:'#26323B',playerClass:hub.playerClass,
+    title:hub.title,
     rows:[R('interval(1000)'),...subjectIntervalReceivers.map(r=>R('Odbiorca '+r.id))],
-    live:{start:0,window:t.window,keep:t.keep,margin:t.margin,defaultClose:t.defaultClose,actions:t.actions,defaults:t.defaults,
+    live:{start:0,window:t.window,keep:t.keep,margin:t.margin,defaultClose:hub.defaultClose,actions:hub.actions,defaults:hub.defaults,
       actionGap:t.actionGap,settle:t.settle,autoplay:true,variant:subjectIntervalVariant},
-    playback:{entry:'manual',finish:'hold',live:true,stops:['unsub-a','unsub-b','unsub-c','source','connection'].map((id,i)=>({id,time:settled[i]}))},
+    playback:{entry:'manual',finish:'hold',live:true,stops:hub.actions.map((id,i)=>({id:{A:'unsub-a',B:'unsub-b',C:'unsub-c'}[id]??id,time:settled[i]}))},
   });
   Object.assign(scene,subjectIntervalVariant(scene,{from:0,to:t.window,closedAt:null,actions:[]}));
 }
+// share + interval (04a-dwa-tory-3): odpowiednik Subject + interval z interval(1000).pipe(share()).
+export const configureShareInterval=scene=>configureSubjectInterval(scene,'share');
 
 // Wariant dla okna [from, to], wykonanych akcji (czasy ilustracji, w kolejności live.actions) i opcjonalnego
 // zamrożenia closedAt (druk, „pokaż wynik”: skończona scena bez nowych emisji, źródło nadal bez complete).
-// Odbiorca dostaje wartości, które dotarły do Subject przed jego unsubscribe; potem rusza impuls ×.
-// connection.unsubscribe() w chwili u: interval nie emituje od u; wartość już wysłana dociera do Subject, potem
-// impuls × biegnie do interval. Scena staje się skończona (stopTail po migawce), więc player dochodzi do FINISHED.
+// Odbiorca dostaje wartości, które dotarły do huba przed jego unsubscribe; potem rusza impuls ×.
+// Zatrzymanie upstreamu w chwili u (Subject: connection.unsubscribe(), share: unsubscribe ostatniego odbiorcy):
+// interval nie emituje od u; wartość już wysłana dociera do huba (gaśnie), potem impuls × biegnie do interval —
+// w share dopiero, gdy × ostatniego odbiorcy dotrze do share(). Scena staje się skończona (stopTail po migawce).
 function subjectIntervalVariant(scene,{from,to,closedAt,actions=[]}) {
-  const t=subjectIntervalTiming,closed=closedAt!==null&&closedAt!==undefined;
+  const t=subjectIntervalTiming,kind=intervalHubOf(scene),hub=intervalHubs[kind],share=kind==='share',closed=closedAt!==null&&closedAt!==undefined;
   const emitAt=k=>t.first+t.period*k,arrival=k=>emitAt(k)+t.travel,split=k=>arrival(k)+t.hold,delivered=k=>split(k)+t.travel;
-  const stopCalledAt=actions[t.actions.indexOf('connection')];
-  const connection=stopCalledAt===undefined?null:(()=>{
-    const kLast=Math.ceil((stopCalledAt-t.first)/t.period)-1,unsubscribeAt=Math.max(stopCalledAt,kLast>=0?arrival(kLast):stopCalledAt);
-    return {kLast,calledAt:stopCalledAt,unsubscribeAt,doneAt:unsubscribeAt+t.cancel+t.calloutHold};
-  })();
-  const finite=connection?connection.doneAt+t.stopTail:Infinity,end=closed?closedAt:Math.min(to,finite);
-  const kFrom=Math.max(0,Math.floor((from-t.first)/t.period)-3),kTo=Math.min(Math.floor((end-t.first)/t.period),connection?connection.kLast:Infinity);
+  const stopCalledAt=share?(actions.length>=subjectIntervalReceivers.length?Math.max(...actions.slice(0,subjectIntervalReceivers.length)):undefined)
+    :actions[hub.actions.indexOf('connection')];
+  const kLast=stopCalledAt===undefined?Infinity:Math.ceil((stopCalledAt-t.first)/t.period)-1;
+  const kTo0=Math.min(Math.floor(((closed?closedAt:to)-t.first)/t.period),kLast);
   const receivers=subjectIntervalReceivers.map((r,i)=>{
     const at=actions[i];
-    if(at===undefined)return {...r,kMax:kTo,unsubscribeAt:null};
-    const kMax=Math.min(kTo,Math.ceil((at-t.first-t.travel)/t.period)-1);
+    if(at===undefined)return {...r,kMax:kTo0,unsubscribeAt:null};
+    const kMax=Math.min(kTo0,Math.ceil((at-t.first-t.travel)/t.period)-1);
     const unsubscribeAt=Math.max(at,kMax>=0?delivered(kMax):at);
     return {...r,kMax,calledAt:at,unsubscribeAt,doneAt:unsubscribeAt+t.cancel+t.calloutHold};
   });
-  const sourceAt=actions[t.actions.indexOf('source')];
+  const lastOut=share&&stopCalledAt!==undefined?receivers.reduce((a,b)=>b.unsubscribeAt>a.unsubscribeAt?b:a):null;
+  const connection=stopCalledAt===undefined?null:(()=>{
+    const floor=share?lastOut.unsubscribeAt+t.cancel:stopCalledAt,unsubscribeAt=Math.max(floor,kLast>=0?arrival(kLast):floor);
+    return {kLast,calledAt:stopCalledAt,unsubscribeAt,doneAt:unsubscribeAt+t.cancel+t.calloutHold};
+  })();
+  const finite=connection?connection.doneAt+t.stopTail:Infinity,end=closed?closedAt:Math.min(to,finite);
+  const kFrom=Math.max(0,Math.floor((from-t.first)/t.period)-3),kTo=Math.min(Math.floor((end-t.first)/t.period),kLast);
+  for(const r of receivers)if(r.unsubscribeAt===null)r.kMax=kTo;
+  const sourceAt=actions[hub.actions.indexOf('source')];
   const emitted=time=>Math.max(0,Math.min(kTo+1,Math.floor((time-t.first)/t.period)+1));
-  const subjectMark={id:'subject',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
-  // connection bez stałego wyróżnienia; świeci od ostatniego etapu (źródło pracuje bez odbiorców).
+  const hubMark={id:kind,bg:'rgba(216,179,230,.45)',line:'#b384c6'};
+  // Subject: connection bez stałego wyróżnienia; świeci od etapu source (źródło pracuje bez odbiorców).
+  // share: share() świeci, gdy sam odłącza upstream (× ostatniego odbiorcy dotarł do share() → interval zatrzymany).
   const connectionMark={id:'connection',bg:'rgba(35,143,131,.16)',line:subjectUpstream.color,quiet:true};
-  const lines=[[{text:'const subject$ = '},{text:'new Subject<number>()',mark:subjectMark},{text:';'}],
-    [{text:'const connection = '},{text:'interval(1000).subscribe(subject$)',mark:connectionMark,
-      active:sourceAt===undefined?[]:[{from:{type:'connection-focus'},to:{type:'connection-focus-end'}}]},{text:';'}]];
+  const lines=share?[[{text:'const shared$ = interval(1000).pipe('},{text:'share()',mark:hubMark,
+      active:connection?[{from:{type:'disconnected',edge:'share-'+lastOut.id},to:{type:'disconnected',edge:'interval-share'}}]:[]},{text:');'}]]
+    :[[{text:'const subject$ = '},{text:'new Subject<number>()',mark:hubMark},{text:';'}],
+      [{text:'const connection = '},{text:'interval(1000).subscribe(subject$)',mark:connectionMark,
+        active:sourceAt===undefined?[]:[{from:{type:'connection-focus'},to:{type:'connection-focus-end'}}]},{text:';'}]];
   const unsubscribed=receivers.filter(r=>r.unsubscribeAt!==null);
+  const leaving=share?{A:'A się odłącza. share() nadal subskrybuje interval — B i C odbierają',B:'B się odłącza. Odbiera już tylko C',
+    C:'Odłącza się ostatni odbiorca. Co zrobi share()?'}:{A:'A się odłącza. B i C nadal odbierają',B:'B się odłącza. Odbiera już tylko C',
+    C:'Odłącza się ostatni odbiorca. Co stanie się z interval?'};
   return {...scene,subjectIntervalPlan:{kFrom,kTo,receivers,sourceAt,connection,end},
     duration:closed?closedAt:Math.min(to,finite),
-    liveBusyUntil:t.actions.map((id,i)=>id==='connection'?connection?.doneAt:receivers.find(r=>r.id===id)?.doneAt??actions[i]),
+    liveBusyUntil:hub.actions.map((id,i)=>id==='connection'||lastOut?.id===id?connection?.doneAt:receivers.find(r=>r.id===id)?.doneAt??actions[i]),
     code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
     metrics:[{label:'Emisje interval',value:emitted},
-      {label:'Odbiorcy Subject',value:time=>receivers.length-unsubscribed.filter(r=>time>=r.unsubscribeAt).length}],
-    captions:[[0,'interval emituje co sekundę. Subject rozsyła każdą wartość do A, B i C'],
-      ...unsubscribed.map(r=>[r.calledAt,{A:'A się odłącza. B i C nadal odbierają',B:'B się odłącza. Odbiera już tylko C',
-        C:'Odłącza się ostatni odbiorca. Co stanie się z interval?'}[r.id]]),
+      {label:hub.receiversLabel,value:time=>receivers.length-unsubscribed.filter(r=>time>=r.unsubscribeAt).length}],
+    captions:[[0,`interval emituje co sekundę. ${hub.label} rozsyła każdą wartość do A, B i C`],
+      ...unsubscribed.map(r=>[r.calledAt,leaving[r.id]]),
       ...(sourceAt===undefined?[]:[[sourceAt,'interval nadal emituje do Subject. connection pozostaje aktywne']]),
-      ...(connection?[[connection.calledAt,'connection.unsubscribe(): odłączamy interval od Subjecta'],
-        [connection.doneAt,'interval zatrzymany. Subject nadal otwarty — bez complete']]:[])]};
+      ...(connection&&!share?[[connection.calledAt,'connection.unsubscribe(): odłączamy interval od Subjecta'],
+        [connection.doneAt,'interval zatrzymany. Subject nadal otwarty — bez complete']]:[]),
+      ...(connection&&share?[[connection.unsubscribeAt,'Nikt już nie słucha: share() sam odłącza interval'],
+        [connection.doneAt,'interval zatrzymany przez share(). Bez complete i bez ręcznego connection']]:[])]};
 }
 
 export function subjectIntervalGraph(scene) {
   const tall=scene.format==='4:3',top=tall?178:102,t=subjectIntervalTiming,{kFrom,kTo,receivers,sourceAt,connection,end}=scene.subjectIntervalPlan;
-  // Kolumny: interval(1000) mieści etykietę w jednej linii, Subject jak na slajdzie HTTP, kompaktowi odbiorcy; odstępy 110.
+  const kind=intervalHubOf(scene),hubId=kind,share=kind==='share',upstream='interval-'+hubId;
+  // Kolumny: interval(1000) mieści etykietę w jednej linii, hub (Subject/share()) jak na slajdzie HTTP, kompaktowi odbiorcy; odstępy 110.
   const g={sourceX:212,sourceW:310,subjectX:592,subjectW:230,recvX:1000,recvW:366};
   const pos=r=>({x:g.recvX,w:g.recvW,y:laneRowY(top,r.slot)});
   // Kulka liczby mieści trzy cyfry; wartości mają kolor emisji (fill toru #1) jak w Subject + HTTP.
@@ -809,28 +837,28 @@ export function subjectIntervalGraph(scene) {
   return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball,
     subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,C:laneSubscribers.C,U:subjectUpstream},
     nodes:[{id:'interval',x:g.sourceX,w:g.sourceW,label:'interval(1000)',...laneTile('source',top,{U:0},1)},
-      {id:'subject',x:g.subjectX,w:g.subjectW,label:'Subject',splitBalls:true,splitAt:0,splitGuides:false,upstreamStripe:false,hubFan:false,
+      {id:hubId,x:g.subjectX,w:g.subjectW,label:intervalHubs[kind].label,...(share?{color:'op'}:{}),splitBalls:true,splitAt:0,splitGuides:false,upstreamStripe:false,hubFan:false,
         dropBalls:true,...laneTile('operator',top,{U:0,...Object.fromEntries(receivers.map(r=>[r.id,r.slot]))},receivers.length)},
       ...receivers.map(r=>laneReceiver(r.id,r.id,pos(r),{ready:true}))],
-    edges:[{id:'interval-subject',from:'interval',to:'subject',subscriber:'U',logicalStart:-2,cancelPulse:true},
-      ...receivers.map(r=>({id:'subject-'+r.id,from:'subject',to:r.id,subscriber:r.id,logicalStart:-2,cancelPulse:true}))],
-    schedule:{'interval-subject':{...preconnected,events:range(kFrom,kTo).map(k=>value(k,emitAt(k),emitAt(k)+t.travel)),
-      // connection.unsubscribe(): wyłącznie unsubscribe połączenia (impuls × od Subject do interval), nigdy complete.
+    edges:[{id:upstream,from:'interval',to:hubId,subscriber:'U',logicalStart:-2,cancelPulse:true},
+      ...receivers.map(r=>({id:hubId+'-'+r.id,from:hubId,to:r.id,subscriber:r.id,logicalStart:-2,cancelPulse:true}))],
+    schedule:{[upstream]:{...preconnected,events:range(kFrom,kTo).map(k=>value(k,emitAt(k),emitAt(k)+t.travel)),
+      // Zatrzymanie upstreamu: wyłącznie unsubscribe połączenia (impuls × od huba do interval), nigdy complete.
       ...(connection?{end:{at:connection.unsubscribeAt,logicalAt:connection.unsubscribeAt,kind:'unsubscribe',duration:t.cancel}}:{})},
-      ...Object.fromEntries(receivers.map(r=>['subject-'+r.id,{...preconnected,
+      ...Object.fromEntries(receivers.map(r=>[hubId+'-'+r.id,{...preconnected,
         // Także ostatnie wartości sprzed okna: odłączony odbiorca zachowuje ostatnią odebraną liczbę.
         events:range(Math.max(0,Math.min(kFrom,r.kMax-1)),r.kMax).map(k=>{const split=emitAt(k)+t.travel+t.hold;return value(k,split,split+t.travel);}),
         ...(r.unsubscribeAt===null?{}:{end:{at:r.unsubscribeAt,logicalAt:r.unsubscribeAt,kind:'unsubscribe',duration:t.cancel}})}]))},
     trays:receivers.map(r=>({...laneTray(r.id,pos(r),1,ball),x:trayX})),
     // subX.unsubscribe() w miejscu nagłówka kolumny odbiorców (odbiorcy nie mają nagłówka), z literą i kolorem toru:
-    // od wywołania do chwili po dotarciu impulsu × do Subject.
+    // od wywołania do chwili po dotarciu impulsu × do huba.
     callouts:[...receivers.filter(r=>r.unsubscribeAt!==null).map(r=>({...laneCallout(`sub${r.id}.unsubscribe()`,r.id,
-      {type:'unsubscribe-call',edge:'subject-'+r.id},laneEvent('disconnected','subject-'+r.id,t.calloutHold),{x:g.recvX,y:top+laneLook.defH/2}),size:34})),
-      // connection.unsubscribe() nad połączeniem interval → Subject, z etykietą toru #1.
-      ...(connection?[{...laneCallout('connection.unsubscribe()','U',{type:'unsubscribe-call',edge:'interval-subject'},
-        laneEvent('disconnected','interval-subject',t.calloutHold),{x:(g.sourceX+g.sourceW/2+g.subjectX-g.subjectW/2)/2,y:top/2}),size:34,label:'#1'}]:[])],
-    timeline:[...receivers.filter(r=>r.unsubscribeAt!==null).map(r=>({type:'unsubscribe-call',edge:'subject-'+r.id,at:r.calledAt})),
-      ...(connection?[{type:'unsubscribe-call',edge:'interval-subject',at:connection.calledAt}]:[]),
+      {type:'unsubscribe-call',edge:hubId+'-'+r.id},laneEvent('disconnected',hubId+'-'+r.id,t.calloutHold),{x:g.recvX,y:top+laneLook.defH/2}),size:34})),
+      // connection.unsubscribe() nad połączeniem interval → Subject, z etykietą toru #1 (share() robi to sam, bez migawki).
+      ...(connection&&!share?[{...laneCallout('connection.unsubscribe()','U',{type:'unsubscribe-call',edge:upstream},
+        laneEvent('disconnected',upstream,t.calloutHold),{x:(g.sourceX+g.sourceW/2+g.subjectX-g.subjectW/2)/2,y:top/2}),size:34,label:'#1'}]:[])],
+    timeline:[...receivers.filter(r=>r.unsubscribeAt!==null).map(r=>({type:'unsubscribe-call',edge:hubId+'-'+r.id,at:r.calledAt})),
+      ...(connection&&!share?[{type:'unsubscribe-call',edge:upstream,at:connection.calledAt}]:[]),
       ...(sourceAt===undefined?[]:[{type:'connection-focus',at:sourceAt},{type:'connection-focus-end',at:end+1}])],
   };
 }
@@ -1320,7 +1348,8 @@ function catchOutsideGraph(scene) {
 }
 
 // distinctUntilChanged + switchMap: jeden potok źródło → distinctUntilChanged → switchMap → S1, dół PRACE WEWNĘTRZNE
-// z instancjami HTTP GET → inbox jak w 09–12. distinctUntilChanged pamięta ostatnią przepuszczoną wartość (prev w wierszu),
+// z instancjami HTTP GET → inbox jak w 09–12. distinctUntilChanged pamięta ostatnią przepuszczoną wartość (memory.ball: sama
+// kulka w wierszu, jak pamięć debounceTime/auditTime),
 // powtórzenie wjeżdża do wiersza, czeka (decide) i gaśnie — bez kabla dalej, bez nowego HTTP i bez anulowania.
 // Dwa profile tego samego modelu:
 // 11a-distinct-switchmap — S1 zestawione przed READY, A, A, B, B, A: B i drugie A anulują trwające HTTP (switchMap).
@@ -1331,26 +1360,24 @@ const distinctProfiles={
     input:[{at:.6,value:'A'},{at:3,value:'A',dup:true},{at:4.2,value:'B'},{at:5.4,value:'B',dup:true},{at:6.6,value:'A'}],
     colors:{A:'#6D4CD3',B:'#B85D05'},decide:1.2,durations:[4.4,3,1.5],preconnected:true,
     source:'selectedUserId$',url:'url(id)',title:'distinctUntilChanged — czy coś się zmieniło?',inputsLabel:'wejścia',
-    captions:jobs=>[[0,'S1 już subskrybuje. distinctUntilChanged pamięta ostatnią przepuszczoną wartość'],
-      [jobs[0].at,'A: brak poprzedniej wartości — przechodzi. switchMap uruchamia HTTP A'],
-      [jobs[1].at,'B ≠ prev: A — przechodzi. switchMap anuluje HTTP A i uruchamia HTTP B'],
-      [jobs[2].at,'A ≠ prev: B — przechodzi. Porównanie z ostatnią wartością, nie z całą historią'],
+    captions:jobs=>[[0,'S1 już subskrybuje. distinctUntilChanged pamięta tylko ostatnią przepuszczoną wartość'],
+      [jobs[0].at,'A: brak poprzedniej wartości — przechodzi i zostaje w pamięci. switchMap uruchamia HTTP A'],
+      [jobs[1].at,'B ≠ A — przechodzi i zastępuje A w pamięci. switchMap anuluje HTTP A i uruchamia HTTP B'],
+      [jobs[2].at,'A ≠ B — przechodzi. Porównanie z ostatnią wartością, nie z całą historią'],
       [jobs.at(-1).end,'HTTP A zwraca wynik do S1 i kończy się complete. S1 czeka na kolejne ID']],
     stops:({ev,arrived,dups,decide})=>[
-      {id:'first',event:ev('source-next',{edge:'source-distinct',logicalAt:dups[0].at}),offset:-.4,caption:'A przeszło: prev: A. switchMap uruchomił HTTP A'},
+      {id:'first',event:ev('source-next',{edge:'source-distinct',logicalAt:dups[0].at}),offset:-.4,caption:'A przeszło i zostało w pamięci operatora. switchMap uruchomił HTTP A'},
       {id:'question',event:arrived(dups[0].at),offset:.6,caption:'HTTP A trwa, a znowu przychodzi A. Czy switchMap anuluje request i uruchomi go ponownie?'},
-      {id:'answer',event:arrived(dups[0].at),offset:decide+.6,caption:'A === prev: A — odrzucone w distinctUntilChanged. HTTP A pracuje dalej'},
-      {id:'switched',event:ev('inner-subscribe',{edge:'inner1-op'}),offset:.3,caption:'B ≠ prev: A — switchMap anulował HTTP A i uruchomił HTTP B'},
-      {id:'repeat-b',event:arrived(dups[1].at),offset:decide+.6,caption:'B === prev: B — odrzucone. HTTP B bez restartu'},
-      {id:'again-a',event:ev('inner-subscribe',{edge:'inner2-op'}),offset:.3,caption:'A ≠ prev: B — przechodzi. HTTP B anulowany, startuje HTTP #3 · A'}],
-    reject:v=>`${v.value} === prev: ${v.value} — odrzucone. HTTP ${v.value} pracuje dalej`,
+      {id:'answer',event:arrived(dups[0].at),offset:decide+.6,caption:'A === A — odrzucone w distinctUntilChanged. HTTP A pracuje dalej'},
+      {id:'switched',event:ev('inner-subscribe',{edge:'inner1-op'}),offset:.3,caption:'B ≠ A — w pamięci jest teraz B. switchMap anulował HTTP A i uruchomił HTTP B'},
+      {id:'repeat-b',event:arrived(dups[1].at),offset:decide+.6,caption:'B === B — odrzucone. HTTP B bez restartu'},
+      {id:'again-a',event:ev('inner-subscribe',{edge:'inner2-op'}),offset:.3,caption:'A ≠ B — przechodzi. HTTP B anulowany, startuje HTTP #3 · A'}],
+    reject:v=>`${v.value} === ${v.value} — odrzucone. HTTP ${v.value} pracuje dalej`,
     summary:'5 wejść, 3 requesty: A, B, A. distinctUntilChanged odrzuca tylko kolejne powtórzenia'},
   '14-distinct':{
     input:[{at:1,value:'42'},{at:2.6,value:'42',dup:true},{at:5.4,value:'43'},{at:7,value:'43',dup:true},{at:9.8,value:'42'}],
     // Dłuższe decide: powtórzenie wyraźnie stoi w wierszu distinctUntilChanged, zanim zgaśnie.
     colors:{42:'#6D4CD3',43:'#B85D05'},decide:1.6,durations:[3.6,3.6,2],preconnected:false,subscribeAt:.3,
-    // Pamięć jako sama kulka ostatniej przepuszczonej wartości (jak pamięć debounceTime/auditTime), bez prostokąta prev.
-    memoryBall:true,
     source:'id$',url:'`/api/users/${id}`',title:'To samo ID — kolejny request?',inputsLabel:'emisje ID',
     captions:jobs=>[[0,'distinctUntilChanged porówna każde ID z ostatnią przepuszczoną wartością'],
       [jobs[0].at,'42: brak poprzedniej wartości — przechodzi. switchMap uruchamia HTTP #1'],
@@ -1387,7 +1414,7 @@ export function configureDistinctSwitch(scene,profileId=scene.id) {
         ev(job.cancelled?'inner-unsubscribe':'inner-next',{edge:`inner${i}-op`})))},{text:'))'}]];
   // Wynik S1: każde niezanulowane HTTP zwraca swoją wartość.
   const results=jobs.filter(job=>!job.cancelled);
-  Object.assign(scene,{jobs,operatorName:'switchMap',distinctInput,distinctColors:colors,distinctDecide:decide,distinctMemoryBall:Boolean(profile.memoryBall),
+  Object.assign(scene,{jobs,operatorName:'switchMap',distinctInput,distinctColors:colors,distinctDecide:decide,
     distinctReject:profile.reject,distinctSummary:profile.summary,subscribeAt:profile.subscribeAt??.1,
     graph:distinctSwitchGraph,duration:last.end+1.4,preconnected:profile.preconnected,
     title:profile.title,playerLayout:'expanded',playerClass:'rx-flat-tiles rx-catch-inside',
@@ -1410,8 +1437,9 @@ function distinctSwitchGraph(scene) {
   // Numer wykonania HTTP trwającego w chwili odrzucenia (napis „HTTP #k pracuje dalej”).
   const runningJob=at=>'#'+(scene.jobs.findLastIndex(job=>job.start<=at)+1);
   const nodes=[{id:'source',label:scene.rows[0].label,color:'source',ready:true},
-    // Pamięć prev i odrzucenie powtórzeń w wierszu S1 operatora; przepuszczona kulka przejeżdża przez wiersz (hold).
-    {id:'distinct',label:'distinctUntilChanged',color:'op',ready:true,memory:{label:'prev',...(scene.distinctMemoryBall?{ball:true}:{})},rejectBalls:true,rejectAt:.42,transformBalls:true},
+    // Pamięć (kulka ostatniej przepuszczonej wartości) i odrzucenie powtórzeń w wierszu S1 operatora; przepuszczona kulka
+    // przejeżdża przez wiersz (hold).
+    {id:'distinct',label:'distinctUntilChanged',color:'op',ready:true,memory:{label:'prev',ball:true},rejectBalls:true,rejectAt:.42,transformBalls:true},
     {id:'op',label:'switchMap',color:'op',ready:true},{id:'observer',label:'',ready:true},
     ...scene.jobs.map((job,i)=>({id:'inner'+i,label:'HTTP '+job.value,inner:true,workRow:true,panel:'jobs',slot:i,ready:false,born:job.start}))];
   const edges=[

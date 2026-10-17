@@ -2,13 +2,17 @@ import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenP
 
 // Końcowe ID po rozwinięciu wariantów; otwarcie pozostaje w kolejności HTML.
 export const mainOrder = [
-  '05-zrodla-2','05-zrodla','04-operator','04a-dwa-tory','05-zrodla-5','05-zrodla-3','05-zrodla-4','04a-dwa-tory-2','04a-dwa-tory-3',
-  '20-sharereplay','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','11a-distinct-switchmap','12-exhaustmap',
-  'b04-catcherror-2','b04-catcherror','14-distinct','16-czas-cztery','25-podsumowanie','pytania',
+  // Cold → Subject (ręcznie, HTTP) → share HTTP → Subject + interval → share + interval → późny odbiorca share/shareReplay.
+  '05-zrodla-2','05-zrodla','04-operator','04a-dwa-tory','05-zrodla-5','05-zrodla-3','04a-dwa-tory-2','05-zrodla-4','04a-dwa-tory-3',
+  // Cztery *Map obok siebie, potem distinctUntilChanged przed switchMap.
+  '20-sharereplay','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','11a-distinct-switchmap',
+  'b04-catcherror-2','b04-catcherror','16-czas-cztery','25-podsumowanie','pytania',
 ];
 export const extraOrder = [
   // Dogrywka przy braku pytań: trzy slajdy, około 4–6 minut.
   '12a-complete','12a-complete-2','13-limit',
+  // Drugi profil distinctUntilChanged (42/43, bez anulowań) — duplikat 11a w MAIN, zachowany jako materiał do pytań.
+  '14-distinct',
   '06-subskrypcja','b01-defer','b02-first-take','b02-first-take-2','b05-finalize','b05-finalize-2','b05-finalize-3',
   '06a-cold-hot-2','19-share','18-async','18-async-2','21-share-miejsce','21-share-miejsce-2',
   '21a-share-pozycja','21a-share-pozycja-2','22-refcount','22-refcount-2',
@@ -17,7 +21,7 @@ export const extraOrder = [
   '23-angular-alias','24-signals','26-resolver-problem','27-resolver-microtask','28-resolver-batch',
 ];
 export const extraIds = new Set(extraOrder);
-const stagedIds = new Set(['04-operator','05-zrodla','05-zrodla-2','05-zrodla-3','05-zrodla-4','05-zrodla-5','20-sharereplay','20-sharereplay-2']);
+const stagedIds = new Set(['04-operator','04a-dwa-tory-3','05-zrodla','05-zrodla-2','05-zrodla-3','05-zrodla-4','05-zrodla-5','20-sharereplay','20-sharereplay-2']);
 
 // Sceny z finish:hold kończą się ok. 2 s po ostatnim zdarzeniu modelu, żeby AUTO nie stało długo
 // przed FINISHED (każde „dalej” w bezruchu tylko kończy animację). 22-refcount celowo pokazuje ciszę.

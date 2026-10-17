@@ -187,5 +187,5 @@ test('Subject checkpoint notes follow the stops and end with the question about 
  assert.match(notes.received,/HTTP emituje go do Subjecta/);
  assert.match(notes.multicast,/wyświetla tylko potrzebne pole/);
  assert.match(notes.complete,/Subject przekazuje complete wszystkim odbiorcom/);
- assert.match(notes.finished,/zamiast trzech requestów mamy jeden[\s\S]*kiedy odbiorcy się odłączą\?/);
+ assert.match(notes.finished,/zamiast trzech requestów mamy jeden[\s\S]*Czy RxJS może zrobić to za nas\?/);
 });

@@ -1,7 +1,9 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules}=require('./v2-harness.cjs');
 
-async function lanes(format='4:3',id='04a-dwa-tory'){
+// mode: wymuszony lanesMode na kopii sceny (share-unsub — share za map z unsubscribe A; nie jest już slajdem MAIN,
+// ale ścieżka lanesGraph nadal obsługuje scenariusze shareScenario).
+async function lanes(format='4:3',id='04a-dwa-tory',mode){
  class Slide{
   constructor(id){this.id=id;this.dataset={animation:id};this.heading={};this.player={setAttribute(){}};}
   querySelector(s){return s==='h2'?this.heading:this.player;}
@@ -9,14 +11,17 @@ async function lanes(format='4:3',id='04a-dwa-tory'){
   after(){}
  }
  const slides=[...fs.readFileSync('index.html','utf8').matchAll(/data-animation="([^"]+)"/g)].map(m=>new Slide(m[1]));
- const m=await modules(['catalog','presentation','engine','renderer'],{document:{querySelectorAll:()=>slides}});
- const c=m.engine.compileScene(m.presentation.prepareSlides(m.catalog.scenes,{format}).get(id));
+ const m=await modules(['catalog','presentation','engine','renderer','reference-scenes'],{document:{querySelectorAll:()=>slides}});
+ let scene=m.presentation.prepareSlides(m.catalog.scenes,{format}).get(id);
+ if(mode){scene={...scene,lanesMode:mode};m['reference-scenes'].configureLanes(scene);}
+ const c=m.engine.compileScene(scene);
  return {c,render:m.renderer.renderScene,at:id=>c.stops.find(s=>s.id===id).time};
 }
 const node=(frame,id)=>frame.nodes.find(n=>n.id===id);
 const dots=(frame,id)=>Array.from(node(frame,id).socketDots,d=>d.side+d.subscriber).sort();
 const lanesOf=(frame,id)=>Array.from(node(frame,id).laneStates,l=>`${l.role}:${l.subscriber}:${l.state}`);
 
+const shareUnsub=(format='4:3')=>lanes(format,'04a-dwa-tory-2','share-unsub');
 const fieldOf=(svg,id)=>svg.slice(svg.indexOf(`data-field="${id}"`),svg.indexOf('</g>',svg.indexOf(`data-field="${id}"`)));
 
 test('cold: one user$ definition, three view fields subscribe and start three simultaneous HTTP requests',async()=>{
@@ -138,8 +143,9 @@ test('callouts also support a manual .unsubscribe() during the cancel animation 
  const fs2=require('node:fs');
  class Slide{constructor(id){this.id=id;this.dataset={animation:id};this.heading={};this.player={setAttribute(){}};}querySelector(s){return s==='h2'?this.heading:this.player;}cloneNode(){return new Slide(this.id);}after(){}}
  const slides=[...fs2.readFileSync('index.html','utf8').matchAll(/data-animation="([^"]+)"/g)].map(m=>new Slide(m[1]));
- const m=await require('./v2-harness.cjs').modules(['catalog','presentation','engine'],{document:{querySelectorAll:()=>slides}});
- const scene=m.presentation.prepareSlides(m.catalog.scenes,{format:'4:3'}).get('04a-dwa-tory-3');
+ const m=await require('./v2-harness.cjs').modules(['catalog','presentation','engine','reference-scenes'],{document:{querySelectorAll:()=>slides}});
+ const scene={...m.presentation.prepareSlides(m.catalog.scenes,{format:'4:3'}).get('04a-dwa-tory-2'),lanesMode:'share-unsub'};
+ m['reference-scenes'].configureLanes(scene);
  const graph=scene.graph(scene);
  const copy={...scene,graph:{...graph,callouts:[{text:'.unsubscribe()',subscriber:'A',y:60,
   from:{type:'inner-unsubscribe',edge:'share-A'},to:{type:'disconnected',edge:'share-A'}}]}};
@@ -150,11 +156,11 @@ test('callouts also support a manual .unsubscribe() during the cancel animation 
  assert.equal(c.snapshot(ev('stream-complete','share-B')+.1).callouts?.length||0,0,'complete B bez napisu');
 });
 
-test('share(): HTTP GET → share() → A/B — A starts the only request, B joins at share(), one User reaches both',async()=>{
+test('share(): HTTP GET → share() → A/B/C — A starts the only request, B and C join at share(), one User reaches all three',async()=>{
  for(const format of ['4:3','16:9']){
   const {c,at,render}=await lanes(format,'04a-dwa-tory-2');
   const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge)?.at;
-  assert.deepEqual(Array.from(c.stops,s=>s.id),['subscribed-a','joined-b','multicast','complete']);
+  assert.deepEqual(Array.from(c.stops,s=>s.id),['subscribed-a','joined','multicast','complete']);
   const ready=c.snapshot(0);
   assert.deepEqual(Array.from(ready.nodes.filter(n=>n.opacity>0),n=>n.id),['http','share'],'READY: same nagłówki definicji');
   assert.ok(!ready.nodes.some(n=>n.id==='map'),'bez map');
@@ -163,41 +169,45 @@ test('share(): HTTP GET → share() → A/B — A starts the only request, B joi
   assert.deepEqual(lanesOf(a,'http'),['work:U1:running']);assert.deepEqual(lanesOf(a,'share'),['operator:A:running']);
   assert.ok(ev('subscribe','share-A')<ev('subscribe','http-share'),'impuls A biegnie przez share() do HTTP');
   assert.equal(a.metrics.find(m=>m.label==='Requesty HTTP').value,1);
-  const b=c.snapshot(at('joined-b')),progressA=node(a,'http').laneStates[0].progress,progressB=node(b,'http').laneStates[0].progress;
-  assert.deepEqual(lanesOf(b,'http'),['work:U1:running'],'B nie dodaje wiersza HTTP');
-  assert.ok(progressB>progressA&&progressB<1,'ten sam request trwa dalej, bez resetu postępu');
-  assert.deepEqual(lanesOf(b,'share'),['operator:A:running','operator:B:running']);
-  assert.deepEqual(Array.from(node(b,'share').laneRows,r=>r.subscriber+':'+r.stripe),['A:#7457D9','B:#7457D9'],'lewy pasek B = kolor wspólnego upstreamu');
-  assert.deepEqual(dots(b,'share'),['inU1','outA','outB'],'jedno wejście, osobne wyjścia');
-  assert.equal(c.events.filter(e=>e.type==='subscribe'&&e.edge==='http-share').length,1,'B nie subskrybuje HTTP');
-  assert.ok(ev('connected','share-B')<ev('source-next','http-share'),'B dołącza przed emisją HTTP');
-  assert.equal(b.metrics.find(m=>m.label==='Requesty HTTP').value,1);assert.equal(b.metrics.find(m=>m.label==='Odbiorcy').value,2);
-  // Porty share() nie przesuwają się po dołączeniu B.
+  const j=c.snapshot(at('joined')),progressA=node(a,'http').laneStates[0].progress,progressJ=node(j,'http').laneStates[0].progress;
+  assert.deepEqual(lanesOf(j,'http'),['work:U1:running'],'B i C nie dodają wiersza HTTP');
+  assert.ok(progressJ>progressA&&progressJ<1,'ten sam request trwa dalej, bez resetu postępu');
+  assert.deepEqual(lanesOf(j,'share'),['operator:A:running','operator:B:running','operator:C:running']);
+  assert.deepEqual(Array.from(node(j,'share').laneRows,r=>r.subscriber+':'+r.stripe),['A:#7457D9','B:#7457D9','C:#7457D9'],'lewy pasek = kolor wspólnego upstreamu');
+  assert.deepEqual(dots(j,'share'),['inU1','outA','outB','outC'],'jedno wejście, osobne wyjścia');
+  assert.equal(c.events.filter(e=>e.type==='subscribe'&&e.edge==='http-share').length,1,'B i C nie subskrybują HTTP');
+  assert.ok(ev('connected','share-C')<ev('source-next','http-share'),'C dołącza przed emisją HTTP');
+  assert.equal(j.metrics.find(m=>m.label==='Requesty HTTP').value,1);assert.equal(j.metrics.find(m=>m.label==='Odbiorcy').value,3);
+  // Porty share() nie przesuwają się po dołączeniu B i C.
   const port=(f,side,id)=>node(f,'share').socketDots.find(d=>d.side===side&&d.subscriber===id).y;
-  assert.equal(port(b,'in','U1'),port(a,'in','U1'));assert.equal(port(b,'out','A'),port(a,'out','A'));
-  // Jedna kulka User wchodzi do share(), dwie identyczne wychodzą jednocześnie.
-  assert.equal(ev('source-next','share-A'),ev('source-next','share-B'),'wspólny wylot');
+  assert.equal(port(j,'in','U1'),port(a,'in','U1'));assert.equal(port(j,'out','A'),port(a,'out','A'));
+  // Jedna kulka User wchodzi do share(), trzy identyczne wychodzą jednocześnie.
+  assert.equal(ev('source-next','share-A'),ev('source-next','share-C'),'wspólny wylot');
   const mid=ev('source-next','share-A')+.3,balls=c.snapshot(mid).tokens.filter(t=>t.value==='{…}');
-  assert.equal(balls.length,2);assert.equal(new Set(balls.map(t=>t.color)).size,1,'ten sam kolor');
-  assert.ok(Math.abs(balls[0].x-balls[1].x)<1e-6,'jadą równo');
+  assert.equal(balls.length,3);assert.equal(new Set(balls.map(t=>t.color)).size,1,'ten sam kolor');
+  assert.equal(new Set(balls.map(t=>t.x.toFixed(6))).size,1,'jadą równo');
   const m=c.snapshot(at('multicast'));
-  assert.deepEqual(Array.from(m.histories,h=>h.anchor+':'+Array.from(h.values,v=>v.value).join()),['A:{…}','B:{…}']);
-  assert.match(fieldOf(render(m),'A'),/Paweł/);assert.match(fieldOf(render(m),'B'),/Kondraciuk/);
+  assert.deepEqual(Array.from(m.histories,h=>h.anchor+':'+Array.from(h.values,v=>v.value).join()),['A:{…}','B:{…}','C:{…}']);
+  const svg=render(m);
+  assert.match(fieldOf(svg,'A'),/Paweł/);assert.match(fieldOf(svg,'B'),/Kondraciuk/);assert.match(fieldOf(svg,'C'),/Białystok/);
   const done=c.snapshot(at('complete'));
-  for(const id of ['http','share','A','B'])assert.ok(node(done,id).laneStates.every(l=>l.state==='completed'),id+': completed');
-  assert.ok(['http-share','share-A','share-B'].every(e=>ev('stream-complete',e)!==undefined),'complete dociera do A i B');
+  for(const id of ['http','share','A','B','C'])assert.ok(node(done,id).laneStates.every(l=>l.state==='completed'),id+': completed');
+  assert.ok(['http-share','share-A','share-B','share-C'].every(e=>ev('stream-complete',e)!==undefined),'complete dociera do A, B i C');
   assert.equal(c.events.filter(e=>e.type==='inner-unsubscribe').length,0,'bez unsubscribe');
   const end=c.snapshot(c.duration);
   assert.equal(end.metrics.find(m=>m.label==='Requesty HTTP').value,1);assert.equal(node(end,'http').laneRows.length,1);
   assert.ok(end.nodes.every(n=>n.y+n.h/2<=end.height),format+': mieści się w ramce');
-  for(const id of ['A','B'])assert.ok(end.edges.find(e=>e.id==='share-'+id).points.every(p=>p[1]===node(end,id).y),'połączenia poziome');
+  for(const id of ['A','B','C'])assert.ok(end.edges.find(e=>e.id==='share-'+id).points.every(p=>p[1]===node(end,id).y),'połączenia poziome');
+  // Te same pola i ta sama geometria co Cold i Subject + HTTP.
+  const cold=(await lanes(format)).c.snapshot(0);
+  for(const id of ['A','B','C']){assert.equal(node(end,id).x,node(cold,id).x);assert.equal(node(end,id).y,node(cold,id).y);}
   // Cofanie: wcześniejszy kadr jest deterministyczny i nie zna przyszłości.
-  const back=c.snapshot(at('joined-b'));
-  assert.deepEqual(Array.from(back.histories,h=>h.values.length),[0,0]);assert.deepEqual(lanesOf(back,'share'),lanesOf(b,'share'));
+  const back=c.snapshot(at('joined'));
+  assert.deepEqual(Array.from(back.histories,h=>h.values.length),[0,0,0]);assert.deepEqual(lanesOf(back,'share'),lanesOf(j,'share'));
  }
 });
 
-test('share(): code is only user$ = http.get<User>(...).pipe(share()) with marks; transient .subscribe() A to HTTP, B only to share()',async()=>{
+test('share(): code is only user$ = http.get<User>(...).pipe(share()) with marks; transient .subscribe() A to HTTP, B and C only to share()',async()=>{
  const {c,at}=await lanes('4:3','04a-dwa-tory-2');
  const code=Array.from(c.snapshot(0).codeView,line=>Array.from(line,p=>p.text).join('')).join('\n');
  assert.equal(code,"const user$ = http.get<User>('/api/users/42')\n  .pipe(share());");
@@ -208,7 +218,9 @@ test('share(): code is only user$ = http.get<User>(...).pipe(share()) with marks
  assert.deepEqual(active((ev('deliver-next','http-share')+ev('source-next','share-A'))/2),['share']);
  assert.deepEqual(shown((ev('subscribe','share-A')+ev('connected','http-share'))/2),['.subscribe() A']);
  assert.deepEqual(shown((ev('subscribe','share-B')+ev('connected','share-B'))/2),['.subscribe() B']);
- for(const id of ['subscribed-a','joined-b','multicast','complete'])assert.deepEqual(shown(at(id)),[]);
+ assert.deepEqual(shown((ev('subscribe','share-C')+ev('connected','share-C'))/2),['.subscribe() C']);
+ for(let t=0;t<c.duration;t+=.05)assert.ok(shown(t).length<=1,'napisy subscribe nie nakładają się');
+ for(const id of ['subscribed-a','joined','multicast','complete'])assert.deepEqual(shown(at(id)),[]);
 });
 
 test('share(): checkpoint notes for READY, every manual stop and the handoff',async()=>{
@@ -217,11 +229,12 @@ test('share(): checkpoint notes for READY, every manual stop and the handoff',as
  const source=html.match(/<template data-checkpoint-notes="04a-dwa-tory-2">([\s\S]*?)<\/template>/)[1];
  const notes=Object.fromEntries([...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)].map(([,id,text])=>[id,text]));
  assert.deepEqual(Object.keys(notes),['ready',...Array.from(c.stops,s=>s.id),'finished']);
- assert.match(notes.ready,/ręcznie podłączyliśmy HTTP do Subjecta/);
+ assert.match(notes.ready,/Ten sam przykład co w Cold/);
  assert.match(notes['subscribed-a'],/Share automatycznie subskrybuje HTTP i uruchamia request/);
- assert.match(notes['joined-b'],/jego subskrypcja kończy się na share\. HTTP nadal wykonuje się tylko raz/);
- assert.match(notes.multicast,/ten sam obiekt do obu odbiorców, dokładnie tak jak wcześniej Subject/);
- assert.match(notes.complete,/Jeden request, dwóch odbiorców\. Bez ręcznego podłączania Subjecta do HTTP/);
+ assert.match(notes.joined,/ich subskrypcje kończą się na share\. HTTP nadal wykonuje się tylko raz/);
+ assert.match(notes.multicast,/ten sam obiekt do wszystkich trzech odbiorców, dokładnie tak jak wcześniej Subject/);
+ assert.match(notes.complete,/Jeden request zamiast trzech/);
+ assert.match(notes.finished,/Share współdzieli request automatycznie\. Ale współdzielenie to nie wszystko\. Co dzieje się ze źródłem, gdy odbiorcy rezygnują\?/);
 });
 
 test('tiles grow: a fixed definition part, then one execution row per subscription reaching the tile',async()=>{
@@ -240,7 +253,7 @@ test('tiles grow: a fixed definition part, then one execution row per subscripti
  const growing=tile(connected-.1,'http');
  assert.ok(growing.laneRows.length===1&&growing.laneRows[0].growth<1&&growing.laneStates.length===0,'wiersz rozszerza kafelek tuż przed dotarciem subscribe');
  assert.equal(tile(connected,'http').laneRows[0].growth,1);
- const share=await lanes('4:3','04a-dwa-tory-3');
+ const share=await shareUnsub();
  const end=share.c.snapshot(share.c.duration);
  assert.equal(node(end,'http').laneRows.length,1,'share: jeden wiersz w HTTP');
  assert.equal(node(end,'map').laneRows.length,1);
@@ -267,7 +280,7 @@ test('producer progress is the row background moving forward, then the row turns
 });
 
 test('share(): A unsubscribes while B stays — A greys (stripe too), B keeps the purple upstream, the result splits only to B',async()=>{
- const {c,at,render}=await lanes('4:3','04a-dwa-tory-3');
+ const {c,at,render}=await shareUnsub();
  const edge=(f,id)=>f.edges.find(e=>e.id===id);
  const cancelled=c.snapshot(at('cancelled'));
  assert.deepEqual(lanesOf(cancelled,'share'),['operator:A:cancelled','operator:B:running']);
@@ -293,7 +306,7 @@ test('share scenarios: C joins the running upstream; the last unsubscribe cancel
  class Slide{constructor(id){this.id=id;this.dataset={animation:id};this.heading={};this.player={setAttribute(){}};}querySelector(s){return s==='h2'?this.heading:this.player;}cloneNode(){return new Slide(this.id);}after(){}}
  const slides=[...fs2.readFileSync('index.html','utf8').matchAll(/data-animation="([^"]+)"/g)].map(m=>new Slide(m[1]));
  const m=await require('./v2-harness.cjs').modules(['catalog','presentation','engine','reference-scenes'],{document:{querySelectorAll:()=>slides}});
- const base=m.presentation.prepareSlides(m.catalog.scenes,{format:'4:3'}).get('04a-dwa-tory-3');
+ const base=m.presentation.prepareSlides(m.catalog.scenes,{format:'4:3'}).get('04a-dwa-tory-2');
  const compile=scenario=>{const scene={...base,shareScenario:scenario};m['reference-scenes'].configureLanes(scene);return m.engine.compileScene(scene);};
  const ev=(c,type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge)?.at;
  // C dołącza po odejściu A, B nadal aktywny
@@ -337,7 +350,7 @@ test('cold: compact field receivers on the lanes in both formats; map transform 
   const sent=c.events.find(e=>e.type==='source-next'&&e.edge==='http-A').at;
   assert.equal(node(c.snapshot(sent),'http').laneStates[0].progress,1,'postęp HTTP kończy się z odpowiedzią');
  }
- const {c}=await lanes('4:3','04a-dwa-tory-3'),map=node(c.snapshot(c.duration),'map');
+ const {c}=await shareUnsub(),map=node(c.snapshot(c.duration),'map');
  const arrival=c.events.find(e=>e.type==='deliver-next'&&e.edge==='http-map').at,departure=c.events.find(e=>e.type==='source-next'&&e.edge==='map-share').at;
  assert.ok(departure-arrival>=1,'kulka zatrzymuje się w map');
  const ballAt=t=>c.snapshot(t).tokens.find(t=>t.phase==='transform');
@@ -356,8 +369,8 @@ test('receiver history keeps at most three latest balls at a constant size',asyn
 });
 
 test('share slides use the cold look: pipeline code, transient subscribe/unsubscribe overlays, balls and compact receivers',async()=>{
- for(const id of ['04a-dwa-tory-3']){
-  const {c,at}=await lanes('4:3',id);
+ for(const id of ['share-unsub']){
+  const {c,at}=await shareUnsub();
   const code=Array.from(c.snapshot(0).codeView,line=>Array.from(line,p=>p.text).join('')).join('\n');
   assert.equal(code,'http.get<number>(url)\n  .pipe(map(x => x * 2), share())',id+': sam pipeline, łamany przed .pipe');
   const marks=Array.from(c.snapshot(0).codeView).flat().filter(p=>p.mark).map(p=>p.mark.id);
@@ -374,9 +387,9 @@ test('share slides use the cold look: pipeline code, transient subscribe/unsubsc
    assert.ok(end.edges.find(e=>e.id==='share-'+r.id).points.every(p=>p[1]===r.y),'połączenia poziome');
   assert.equal(map.laneRows.length,1,'jeden wspólny wiersz map');
   assert.deepEqual(Array.from(c.snapshot(0).metrics,m=>m.label),['Pipeline','Requesty HTTP','Odbiorcy share']);
-  for(let t=0;t<c.duration;t+=.05)assert.ok(!shown(t).some(x=>x.startsWith('.unsubscribe'))||id.endsWith('-3'),'unsubscribe tylko przy ręcznym wywołaniu');
+  for(let t=0;t<c.duration;t+=.05)assert.ok(!shown(t).some(x=>x.startsWith('.unsubscribe'))||id==='share-unsub','unsubscribe tylko przy ręcznym wywołaniu');
  }
- const {c,at}=await lanes('4:3','04a-dwa-tory-3');
+ const {c,at}=await shareUnsub();
  const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at;
  assert.deepEqual(Array.from(c.snapshot(at('question')).callouts,x=>x.text+' '+x.label),['.unsubscribe() A']);
  assert.equal((c.snapshot(at('cancelled')).callouts||[]).length,0,'po animacji anulowania napis znika');
@@ -393,5 +406,5 @@ test('cold has checkpoint notes for READY, each manual stop and the handoff to t
  assert.match(notes.first,/Każdy z nich subskrybuje ten sam Observable\. Pierwszy uruchamia HTTP\./);
  assert.match(notes.requests,/Drugi też uruchamia HTTP, a trzeci robi dokładnie to samo/);
  assert.match(notes.received,/Każdy request zwraca cały obiekt użytkownika/);
- assert.match(notes.finished,/backend dostał trzy identyczne requesty[\s\S]*wykonując HTTP tylko raz\?/);
+ assert.match(notes.finished,/Trzy miejsca w widoku potrzebują tych samych danych\. Wszystko działa, ale backend dostaje trzy identyczne requesty\. Spróbujmy wykonać tylko jeden\./);
 });

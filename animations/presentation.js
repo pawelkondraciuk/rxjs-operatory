@@ -35,10 +35,11 @@ export function prepareSlides(scenes, { format = '4:3' } = {}) {
         metrics:[original.metrics[after?1:0]],
       }));
     } else if (original.id === '04a-dwa-tory') {
-      // Tory wykonania: cold (trzy pola widoku, trzy requesty user$), share() (HTTP GET → share() → A/B, jeden request) i share z unsubscribe A.
-      variants = ['cold', 'share', 'share-unsub'].map(mode => ({ ...original, lanesMode: mode,
-        title: { cold: 'Cold: jedna definicja, trzy wykonania', share: 'share(): jedno HTTP, dwóch odbiorców',
-          'share-unsub': 'share(): A rezygnuje, B zostaje' }[mode] }));
+      // Tory wykonania: cold (trzy pola widoku, trzy requesty user$), share() (HTTP GET → share() → A/B/C, jeden request)
+      // i share + interval (odpowiednik Subject + interval: ostatni odbiorca odłącza źródło).
+      variants = ['cold', 'share', 'share-interval'].map(mode => ({ ...original, lanesMode: mode,
+        title: { cold: 'Cold: jedna definicja, trzy wykonania', share: 'share(): jedno HTTP, trzech odbiorców',
+          'share-interval': 'share() — kto odłączy źródło?' }[mode] }));
     } else if (original.id === 'b04-catcherror') {
       variants = [false,true].map(inside => ({ ...original, catchInside:inside }));
     } else if (original.id === '16-czas-cztery') {

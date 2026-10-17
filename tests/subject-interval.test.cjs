@@ -184,11 +184,11 @@ test('speaker notes template covers every checkpoint with the planned narration'
  const ids=Array.from(source.matchAll(/data-checkpoint="([^"]+)"/g),x=>x[1]);
  assert.deepEqual(ids,['ready','unsub-a','unsub-b','unsub-c','source','connection','finished']);
  const note=id=>source.match(new RegExp(`data-checkpoint="${id}">([\\s\\S]*?)</div>`))[1];
- assert.match(note('ready'),/zamiast HTTP wykorzystamy dobrze już znany interval/);
+ assert.match(note('ready'),/Zamiast HTTP bierzemy dobrze już znany interval/);
  assert.match(note('unsub-c'),/Teraz odłączamy ostatniego\. I jak myślicie, co powinno się wydarzyć ze źródłem\?/);
  assert.match(note('source'),/Wszyscy odbiorcy już się odłączyli\. Ale zobaczcie — interval nadal emituje wartości\. Subject ciągle je odbiera, chociaż nikogo już nimi nie powiadamia\./);
  assert.match(note('connection'),/Bo mamy jeszcze jedną subskrypcję, którą sami stworzyliśmy\. To połączenie interval z Subjectem\. I dopiero teraz ręcznie je odłączamy\./);
- assert.match(note('finished'),/Interval przestaje pracować\. Ale Subject nadal istnieje — nie dostał complete\. Musieliśmy sami zarządzać tym połączeniem\. Za chwilę zobaczymy, jak share\(\) robi to automatycznie\./);
+ assert.match(note('finished'),/W Subject wszyscy się odłączyli, ale interval nadal pracował[\s\S]*Zobaczmy, co zrobi share w dokładnie tej samej sytuacji\./);
 });
 
 test('last next: connection.unsubscribe() — grey × from Subject to interval, interval cancelled, no more emissions, Subject without complete',async()=>{
