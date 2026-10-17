@@ -1,15 +1,15 @@
 const clamp = value => Math.max(0,Math.min(1,value));
 
 // Geometria jak w kafelkach głównego toru: nagłówek HTTP GET ma wysokość nagłówka definicji (headerH), wiersz — wysokość
-// toru (rowH), o ile wszystkie sloty mieszczą się nad dolnym marginesem. Linia podziału stoi w połowie odstępu od kafelków,
-// napis panelu — na wysokości nagłówka, przy prawej krawędzi, nad kablami wyników. Kafelek prac zajmuje zakres
+// toru (rowH), o ile wszystkie sloty mieszczą się nad dolnym marginesem. Linia podziału stoi w połowie odstępu od kafelków;
+// panel nie ma własnego napisu (separator wystarcza, bez dużego nagłówka nad pracami). Kafelek prac zajmuje zakres
 // tileLeft–tileRight, a wynik biegnie od jego prawej krawędzi do granicy panelu.
 export function createInnerWorkPanel({works,columns,height,large=false,id='jobs',minRows=4,headerH=large?70:56,rowH=large?74:64,
   dividerY=large?203:146,headerTop=large?234:162,tileLeft=44,tileRight=796,instances=false}) {
   const x=28,w=1184,bottom=height-(large?12:8),rowsTop=headerTop+headerH;
   if(instances)return createInstancePanel({works,columns,height,large,id,minRows,tileLeft,x,w,bottom});
   const slots=Math.max(minRows,works.length),rowHeight=Math.min(rowH,(bottom-rowsTop)/slots);
-  return {id,innerWork:true,frameless:true,label:'PRACE WEWNĘTRZNE',labelY:headerTop+headerH/2,x,y:dividerY,w,h:bottom-dividerY,dividerY,
+  return {id,innerWork:true,frameless:true,x,y:dividerY,w,h:bottom-dividerY,dividerY,
     slots:works.length,rowsTop,rowStep:rowHeight,rowHeight,headerH,tileLeft,tileRight,
     identifierW:large?184:172,stageGap:72,font:large?30:25,columns,works};
 }
@@ -23,7 +23,7 @@ function createInstancePanel({works,columns,height,large,id,minRows,tileLeft,x,w
   const rowsTop=bottom-slots*(headerH+rowH)-(slots-1)*gap,dividerY=Math.round((rowsTop+(large?172:130))/2);
   const identifierW=large?140:120,identifierGap=large?16:14,stageW=310,stageGap=110,inboxW=large?64:56;
   const stagesLeft=tileLeft+identifierW+identifierGap,inboxX=stagesLeft+columns.length*(stageW+stageGap);
-  return {id,innerWork:true,instances:true,frameless:true,label:'PRACE WEWNĘTRZNE',labelY:rowsTop+headerH/2,x,y:dividerY,w,h:bottom-dividerY,
+  return {id,innerWork:true,instances:true,frameless:true,x,y:dividerY,w,h:bottom-dividerY,
     dividerY,slots:works.length,rowsTop,rowStep:headerH+rowH+gap,rowHeight:rowH,headerH,tileLeft,tileRight:inboxX+inboxW,
     identifierW,stagesLeft,stageW,stageGap,inboxX,inboxW,font:large?30:25,columns,works};
 }

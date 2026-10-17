@@ -40,7 +40,7 @@ test('real concatMap queue is visible at the answer, while concatAll queues exis
  assert.equal(queued.label,'B (wartość)');assert.equal(queued.opacity,1);assert.equal(q.executionCounts.started,1);
  assert.equal(q.executions.some(e=>e.id==='B'),false);
  const done=render(c.snapshot(c.duration));assert.equal((done.match(/data-inner-state="completed"/g)||[]).length,3);
- assert.match(done,/PRACE WEWNĘTRZNE/);assert.doesNotMatch(done,/data-queue=|EMISJE|ODBIÓR/);
+ assert.doesNotMatch(done,/PRACE WEWNĘTRZNE|data-queue=|EMISJE|ODBIÓR/);assert.match(done,/data-panel-divider="true"/);
  const all=compile(scenes.get('08-map-strumienie')),f=all.snapshot(all.stops.at(-1).time),svg=render(f);
  assert.equal(f.executionCounts.started,1);assert.match(svg,/W KOLEJCE · Observable/);
  assert.deepEqual(Array.from(f.innerWorkPanels[0].rows.filter(r=>r.state==='queued'),r=>r.value),['B$','C$']);

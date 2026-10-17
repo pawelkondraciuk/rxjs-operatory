@@ -185,6 +185,8 @@ test('speaker notes template covers every checkpoint with the planned narration'
  assert.deepEqual(ids,['ready','unsub-a','unsub-b','unsub-c','source','connection','finished']);
  const note=id=>source.match(new RegExp(`data-checkpoint="${id}">([\\s\\S]*?)</div>`))[1];
  assert.match(note('ready'),/Zamiast HTTP bierzemy dobrze już znany interval/);
+ assert.match(note('unsub-b'),/B również się odłącza\. C nadal otrzymuje wartości\. Ale czy obecność C w ogóle ma wpływ na działanie źródła\?/);
+ assert.doesNotMatch(note('unsub-b'),/bo mamy jeszcze trzeciego odbiorcę/);
  assert.match(note('unsub-c'),/Teraz odłączamy ostatniego\. I jak myślicie, co powinno się wydarzyć ze źródłem\?/);
  assert.match(note('source'),/Wszyscy odbiorcy już się odłączyli\. Ale zobaczcie — interval nadal emituje wartości\. Subject ciągle je odbiera, chociaż nikogo już nimi nie powiadamia\./);
  assert.match(note('connection'),/Bo mamy jeszcze jedną subskrypcję, którą sami stworzyliśmy\. To połączenie interval z Subjectem\. I dopiero teraz ręcznie je odłączamy\./);

@@ -155,6 +155,13 @@ test('concatMap answer: B in the queue, no projection until A completes',async()
  assert.match(render(c.snapshot(t)),/>w kolejce</);
  const doneA=find(c,{type:'stream-complete',edge:'inner0-op'}).at,bornB=find(c,{type:'inner-create',node:'inner1'}).at;
  assert.ok(bornB>=doneA);assert.equal(c.snapshot(t).executionCounts.started,1);
+ // C przychodzi dopiero po complete B: kolejka pusta, więc HTTP C startuje od razu — i nigdy przed końcem B.
+ const doneB=find(c,{type:'stream-complete',edge:'inner1-op'}).at,arrivedC=find(c,{type:'deliver-next',edge:'source-op',value:'C'}).at;
+ const startC=find(c,{type:'inner-subscribe',edge:'inner2-op'}).at;
+ assert.ok(doneB<arrivedC&&arrivedC<startC);
+ assert.deepEqual(Array.from(rows(c,arrivedC),r=>r.state).slice(0,2),['completed','completed']);
+ const html=require('node:fs').readFileSync('index.html','utf8'),notes=html.match(/<template data-checkpoint-notes="09-concatmap">([\s\S]*?)<\/template>/)[1];
+ assert.match(notes,/B kończy się, zanim przyjdzie C/);
 });
 
 test('mergeMap answer: two active HTTP rows, B returns before A',async()=>{

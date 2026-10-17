@@ -42,7 +42,7 @@ test('the main pipeline keeps source empty and puts four responses inside the re
  assert.equal(f.histories.length,1);assert.equal(f.histories[0].anchor,'observer');
  assert.ok(f.histories.every(h=>h.y===ys[0]&&h.balls));
  const svg=render(f);
- assert.match(svg,/data-panel-divider="true"/);assert.match(svg,/PRACE WEWNĘTRZNE/);
+ assert.match(svg,/data-panel-divider="true"/);assert.doesNotMatch(svg,/PRACE WEWNĘTRZNE/,'separator bez napisu');
  assert.doesNotMatch(svg,/<rect[^>]*x="28"[^>]*rx="12"/);
  assert.doesNotMatch(svg,/stroke="#111"/);
  assert.ok(top.filter(n=>n.id!=='observer').every(n=>n.defH>0&&n.growRows));

@@ -1,7 +1,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules}=require('./v2-harness.cjs');
 // b04-catcherror: catchError za switchMap w tym samym wyglądzie co catchError wewnątrz. Góra klik$ → switchMap → catchError → S1,
-// dół PRACE WEWNĘTRZNE z instancją HTTP GET → inbox. Błąd A przechodzi przez switchMap, catchError odłącza klik$,
+// w dolnej części instancja HTTP GET → inbox. Błąd A przechodzi przez switchMap, catchError odłącza klik$,
 // subskrybuje of([]) ([] i complete do S1), a klik B nie uruchamia HTTP.
 async function deck(format='4:3'){
  const m=await modules(['catalog','scene-config','engine','renderer']);
@@ -29,7 +29,7 @@ test('catchError outside: four-tile top pipeline on one port axis and an HTTP GE
   assert.equal(new Set(ys).size,1,'wszystkie porty na wspólnej osi Y');
   assert.ok(f.edges.filter(e=>e.subscriber).every(e=>e.subscriber==='S1'));
   const panel=f.innerWorkPanels[0];
-  assert.equal(panel.instances,true);assert.equal(panel.label,'PRACE WEWNĘTRZNE');assert.equal(panel.frameless,true);
+  assert.equal(panel.instances,true);assert.equal(panel.label,undefined,'bez dużego napisu nad pracami');assert.equal(panel.frameless,true);
   assert.deepEqual(Array.from(panel.columns,col=>col.label),['HTTP GET']);
   assert.deepEqual(Array.from(panel.rows,r=>r.id+' · '+r.value),['#1 · A']);
   const svg=render(f);

@@ -1203,7 +1203,7 @@ export function configureConcurrency(scene) {
   scene.metrics=[{label:'aktywne / 3',count:'active'},{label:'w kolejce',value:t=>jobs.filter(j=>j.at<=t&&t<j.start).length}];
 }
 
-// catchError wewnątrz (b04-catcherror-2) w wyglądzie MAIN switchMap: góra klik$ → switchMap → S1, dół PRACE WEWNĘTRZNE
+// catchError wewnątrz (b04-catcherror-2) w wyglądzie MAIN switchMap: góra klik$ → switchMap → S1, w dolnej części
 // z etapami HTTP GET → catchError w każdym wierszu. Błąd HTTP A kończy tylko etap HTTP (czerwony impuls do catchError);
 // catchError pokazuje chwilowe of([]), emituje [] i kończy inner A complete. Outer (klik$, switchMap, S1) nie kończy się,
 // więc klik B uruchamia nowy HTTP z poprawnym wynikiem. [] wychodzi 0,5 s, a complete 1 s modelu po błędzie (jak
@@ -1277,7 +1277,7 @@ function catchInsideGraph(scene) {
 }
 
 // catchError na zewnątrz (b04-catcherror) w tym samym wyglądzie co wewnątrz: góra klik$ → switchMap → catchError → S1,
-// dół PRACE WEWNĘTRZNE z instancją HTTP GET → inbox. Ten sam klik A i ten sam błąd HTTP, ale wewnątrz nie ma catchError:
+// w dolnej części instancja HTTP GET → inbox. Ten sam klik A i ten sam błąd HTTP, ale wewnątrz nie ma catchError:
 // error przechodzi przez inbox inner i switchMap do zewnętrznego catchError. catchError odłącza pierwotny strumień
 // (teardown switchMap i klik$, szary impuls ×, bez complete), dopiero potem subskrybuje of([]): [] i complete trafiają do S1.
 // Klik B pojawia się w odłączonym klik$ i gaśnie: nie dociera do switchMap, nie ma projekcji ani HTTP.
@@ -1347,7 +1347,7 @@ function catchOutsideGraph(scene) {
   return graph;
 }
 
-// distinctUntilChanged + switchMap: jeden potok źródło → distinctUntilChanged → switchMap → S1, dół PRACE WEWNĘTRZNE
+// distinctUntilChanged + switchMap: jeden potok źródło → distinctUntilChanged → switchMap → S1, w dolnej części
 // z instancjami HTTP GET → inbox jak w 09–12. distinctUntilChanged pamięta ostatnią przepuszczoną wartość (memory.ball: sama
 // kulka w wierszu, jak pamięć debounceTime/auditTime),
 // powtórzenie wjeżdża do wiersza, czeka (decide) i gaśnie — bez kabla dalej, bez nowego HTTP i bez anulowania.
