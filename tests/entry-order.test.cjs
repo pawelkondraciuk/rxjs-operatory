@@ -45,17 +45,14 @@ test('a tile shows complete or error only once it sends it, or receives it as a 
 test('the error source shows the error before operators downstream, and the outer source is detached after it arrives',async()=>{
  const {scenes,compile}=await deck();
  const c=compile(scenes.get('b04-catcherror'));
- const sent=c.events.find(e=>e.type==='stream-error'&&e.edge==='http-a-switch').at;
- const arrived=c.events.find(e=>e.type==='disconnected'&&e.edge==='http-a-switch').at;
- const detach=c.events.find(e=>e.type==='inner-unsubscribe'&&e.edge==='clicks-switch').at;
- assert.ok(detach>=arrived,`klik$ odłączony @${detach}, błąd dotarł @${arrived}`);
- const http=c.snapshot(sent+.05).nodes.find(n=>n.id==='http-a');
- assert.equal(http.workState,'errored');assert.equal(http.showProgress,false);
- assert.notEqual(c.snapshot(sent+.05).nodes.find(n=>n.id==='switch').workState,'errored');
- for(const id of ['b04-catcherror']){
-  const model=compile(scenes.get(id)),error=model.events.find(e=>e.type==='stream-error'&&e.edge.startsWith('http-a-')).at;
-  assert.notEqual(model.snapshot(error+.1).nodes.find(n=>n.id==='http-a').status,'praca trwa',id);
- }
+ const find=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at;
+ const sent=find('stream-error','inner0-op'),arrived=find('disconnected','inner0-op');
+ const caught=find('disconnected','op-catch'),detach=find('inner-unsubscribe','source-op');
+ assert.ok(detach>=caught&&caught>arrived,`klik$ odłączony @${detach}, błąd w catchError @${caught}, w switchMap @${arrived}`);
+ const f=c.snapshot(sent+.05),row=f.innerWorkPanels[0].rows[0];
+ assert.equal(row.stages[0].state,'errored');assert.equal(row.receiver.state,'active','inbox dostaje error dopiero po dotarciu');
+ const op=f.nodes.find(n=>n.id==='op');
+ assert.notEqual(op.workState,'errored');assert.equal(op.laneStates[0].state,'running');
 });
 
 test('„subskrybuje” needs a drawn connection: not before it, not after unsubscribe starts',async()=>{

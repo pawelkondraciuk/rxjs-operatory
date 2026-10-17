@@ -40,7 +40,7 @@ Kolejność po otwarciu:
 1. HTTP (`05-zrodla-2`) → interval na żywo (`05-zrodla`) → map, pipe i wykonanie (`04-operator`) → cold (`04a-dwa-tory`) → Subject — ręczna emisja (`05-zrodla-5`) → ręczny multicast HTTP przez Subject (`05-zrodla-3`) → Subject + interval: kto odłączy źródło? (`05-zrodla-4`) → share(): jedno HTTP, dwóch odbiorców (`04a-dwa-tory-2`) → share z unsubscribe A (`04a-dwa-tory-3`).
 2. Następnie późny odbiorca z share/shareReplay (`20-sharereplay`, `20-sharereplay-2`). Cold i współdzielenie HTTP pokazują wcześniej tory `04a`; powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
 3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap.
-4. catchError na zewnątrz/wewnątrz → distinctUntilChanged → wspólne porównanie debounceTime i auditTime (`16-czas-cztery`).
+4. catchError wewnątrz/na zewnątrz → distinctUntilChanged → wspólne porównanie debounceTime i auditTime (`16-czas-cztery`).
 5. Cztery pytania podsumowania → „Pytania?” → rozmowa z salą albo dodatkowe przykłady.
 
 | Część właściwa | Budżet |
@@ -335,9 +335,9 @@ Slajd startuje już działający: wszystkie subskrypcje są zestawione przed t =
 
 Cztery slajdy pokazują identyczną sytuację i zmieniają wyłącznie operator. Kod: `source$.pipe(<operator>(id => http.get(url(id))))`. Te same wejścia, kolory i tempo: A w 0,6 s uruchamia długi HTTP (3 s), B przychodzi w 2,1 s (A w połowie, HTTP B 1,2 s), C w 5,2 s — po zakończeniu A (HTTP C 1,2 s); source$ kończy się w 5,6 s. Kolory prac: A indygo #6D4CD3, B pomarańcz #B85D05, C niebieski #087FAD.
 
-Góra bez zmian: source$ → operator → kompaktowy Odbiorca, jeden główny tor S1 (nie powstaje nowa subskrypcja główna dla wartości). Dół: PRACE WEWNĘTRZNE w stylu catchError wewnątrz — wiersz na wartość wejściową (#1 · A, #2 · B, #3 · C), wspólny nagłówek HTTP GET, porty i poziomy kabel do prawej granicy, progress w tle, complete zielone, anulowanie szare, error czerwony. Wiersz identyfikuje wartość i jej ewentualną pracę, nie Subscribera.
+Góra bez zmian: source$ → operator → kompaktowy Odbiorca, jeden główny tor S1 (nie powstaje nowa subskrypcja główna dla wartości). Dół: PRACE WEWNĘTRZNE — maksymalnie trzy sloty (A, B, C) o stałej wysokości. **Każde uruchomione inner Observable to osobna instancja HTTP GET z własną wewnętrzną subskrypcją**, wyglądająca jak znany z prezentacji pipeline `HTTP GET → inbox`: po lewej prostokątny identyfikator `#1 · A` (pełny kolor wartości, biały tekst), na środku standardowy kafelek z turkusowym nagłówkiem HTTP GET i jednym execution lane pod nim (pasek koloru pracy po lewej, progress na całą wysokość lane, stan tekstem), po prawej krótki kabel z portami do kompaktowego inboxa (sama ikona, bez nagłówka, na wysokości lane). complete — jasnozielone lane, anulowanie — szare, error — jasnoczerwone. Wartość bez inner (oczekuje „?”, „w kolejce”, „pominięte”) ma tylko identyfikator i neutralny placeholder w miejscu lane — bez nagłówka HTTP GET, progressu, portów, kabla i inboxa. Po starcie pracy placeholder przechodzi w pełny kafelek w tym samym slocie; „pominięte” nigdy. Układ przewiduje kolejne etapy w rzędzie (np. `HTTP GET ── catchError ── inbox`), ale catchError nie jest dodany do 09–12.
 
-**Wspólny postój `question`:** S1 aktywne, HTTP A pracuje (pasek ok. 46% — identyczny na czterech slajdach), kulka B czeka na porcie wejścia operatora, a wiersz #2 · B ma tylko identyfikator i znak „?”: bez W KOLEJCE, POMINIĘTE, projekcji, HTTP, portów i progressu. Następne „dalej” (osobny ręczny postój `answer`) dopiero uruchamia reakcję operatora; AUTO włącza się po odpowiedzi.
+**Wspólny postój `question`:** S1 aktywne, HTTP A pracuje (pasek ok. 46% — identyczny na czterech slajdach), kulka B czeka na porcie wejścia operatora, a #2 · B ma tylko identyfikator i znak „?”: bez „w kolejce”, „pominięte”, projekcji, kafelka HTTP GET, inboxa, portów i progressu. Następne „dalej” (osobny ręczny postój `answer`) dopiero uruchamia reakcję operatora; AUTO włącza się po odpowiedzi.
 
 **Subskrypcja główna:** tylko concatMap pokazuje pełną sekwencję (subscribe → A → projekcja → inner HTTP). mergeMap, switchMap i exhaustMap zaczynają w READY od zestawionego S1; jedno „dalej” prowadzi przez emisję A, start HTTP A i dotarcie B wprost do pytania.
 
@@ -349,12 +349,12 @@ Góra bez zmian: source$ → operator → kompaktowy Odbiorca, jeden główny to
 | --- | --- | --- |
 | 09-concatmap | concatMap — Po kolei | `source$.pipe(concatMap(id => http.get(url(id))))` |
 
-**Na bloczkach:** postoje subscribe, first (A dociera, projekcja), active (inner A subskrybowany, HTTP A startuje), question, answer. Odpowiedź: #2 · B przechodzi w W KOLEJCE (przerywany placeholder) — wartość bez projekcji, inner i HTTP. Po complete A placeholder płynnie zmienia się w pracę B w tym samym slocie: projekcja, subskrypcja, progress. C przychodzi, gdy nic nie czeka, i od razu startuje. Wynik A, B, C.
+**Na bloczkach:** postoje subscribe, first (A dociera, projekcja), active (inner A subskrybowany, HTTP A startuje), question, answer. Odpowiedź: #2 · B przechodzi w „w kolejce” (przerywany placeholder) — wartość bez projekcji, inner, kafelka HTTP GET i inboxa. Po complete A placeholder płynnie zmienia się w nowy kafelek HTTP GET B z własnym inboxem w tym samym slocie: projekcja, subskrypcja, progress. C przychodzi, gdy nic nie czeka, i od razu dostaje swój HTTP. Wynik A, B, C.
 
 **Speaker notes (per checkpoint, szablon `data-checkpoint-notes`):**
 
 - **Start:** Operatory, które dla każdej wartości mogą uruchomić osobną pracę. Projekcja zwraca Observable, operator decyduje, kiedy go zasubskrybować.
-- **subscribe / A / HTTP A:** jedna główna subskrypcja S1; projekcja tylko tworzy Observable, request rusza dopiero z subskrypcją inner.
+- **subscribe / A / HTTP A:** jedna główna subskrypcja S1; projekcja tylko tworzy Observable (własny kafelek HTTP GET), request rusza dopiero, gdy inbox — wewnętrzny subskrybent — go zasubskrybuje.
 - **A pracuje, przychodzi B:** Uruchomimy drugi request czy poczekamy?
 - **Odpowiedź:** concatMap kolejkowuje B. Dopóki A się nie skończy, nie wywołujemy nawet projekcji dla B.
 - **Wynik:** Kolejność zachowana, kolejka zwiększa opóźnienie.
@@ -367,7 +367,7 @@ Góra bez zmian: source$ → operator → kompaktowy Odbiorca, jeden główny to
 | --- | --- | --- |
 | 10-mergemap | mergeMap — Równocześnie | `source$.pipe(mergeMap(id => http.get(url(id))))` |
 
-**Na bloczkach:** READY z zestawionym S1, postoje question i answer. Odpowiedź: projekcja B i drugi aktywny wiersz HTTP równolegle z A (dwa wiersze „w trakcie”, licznik aktywne 2). Krótszy HTTP B kończy przed A: odbiorca dostaje B, A, C w kolejności nadejścia.
+**Na bloczkach:** READY z zestawionym S1, postoje question i answer. Odpowiedź: projekcja B i druga, osobna instancja HTTP GET z własnym inboxem równolegle z A (dwa kafelki „w trakcie”, licznik aktywne 2). Krótszy HTTP B kończy przed A: odbiorca dostaje B, A, C w kolejności nadejścia.
 
 **Speaker notes:**
 
@@ -383,7 +383,7 @@ Góra bez zmian: source$ → operator → kompaktowy Odbiorca, jeden główny to
 | --- | --- | --- |
 | 11-switchmap | switchMap — Najnowsza subskrypcja | `source$.pipe(switchMap(id => http.get(url(id))))` |
 
-**Na bloczkach:** READY z zestawionym S1, postoje question, answer, started. Odpowiedź: szary impuls × jedzie od prawej granicy (operator) po kablu inner A do HTTP GET — teardown wewnętrznej subskrypcji A; po jego dotarciu wiersz #1 · A jest „anulowane” (szary, zatrzymany pasek, bez impulsu complete i bez odpowiedzi). Górny tor S1 pozostaje aktywny. Potem projekcja B, nowy inner i HTTP B (postój started); wynik B, potem C.
+**Na bloczkach:** READY z zestawionym S1, postoje question, answer, started. Odpowiedź: szary impuls × jedzie od inboxa A po kablu do HTTP GET A — teardown wewnętrznej subskrypcji A (inbox szarzeje od razu); po jego dotarciu lane #1 · A jest „anulowane” (szary, zatrzymany pasek, bez impulsu complete i bez odpowiedzi) i zostaje widoczne do końca. Górny tor S1 pozostaje aktywny. Potem projekcja B: nowy kafelek HTTP GET B z inboxem (postój started); wynik B, potem C.
 
 **Speaker notes:**
 
@@ -400,7 +400,7 @@ Góra bez zmian: source$ → operator → kompaktowy Odbiorca, jeden główny to
 | --- | --- | --- |
 | 12-exhaustmap | exhaustMap — Jestem zajęty | `source$.pipe(exhaustMap(id => http.get(url(id))))` |
 
-**Na bloczkach:** READY z zestawionym S1, postoje question i answer. Odpowiedź: #2 · B — POMINIĘTE, bez projekcji, inner, HTTP, portów i kolejki; B nie wraca później. A kończy się normalnie; C przychodzi po zakończeniu A i uruchamia nowy HTTP. Wynik A, C.
+**Na bloczkach:** READY z zestawionym S1, postoje question i answer. Odpowiedź: #2 · B — placeholder „pominięte”, bez projekcji, inner, kafelka HTTP GET, inboxa, portów i kolejki; B nie wraca później. A kończy się normalnie; C przychodzi po zakończeniu A i dostaje własny kafelek HTTP GET z inboxem. Wynik A, C.
 
 **Speaker notes:**
 
@@ -777,25 +777,27 @@ Modele są symulacją dydaktyczną, nie usługą produkcyjną. Testy sprawdzają
 
 ### catchError — `b04-catcherror`
 
-**Temat:** miejsce obsługi błędu wpływa na kolejne zapytania.
+**Temat:** miejsce obsługi błędu wpływa na kolejne zapytania. W MAIN najpierw wewnątrz (`-2`), potem na zewnątrz.
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
-| b04-catcherror | catchError na zewnątrz | `klik$.pipe(switchMap(() => http$), catchError(() => of([])))` |
 | b04-catcherror-2 | catchError wewnątrz | `klik$.pipe(switchMap(id =>`<br>`  http.get(url(id)).pipe(catchError(() => of([])))))` |
+| b04-catcherror | catchError na zewnątrz | `klik$.pipe(switchMap(id =>`<br>`  http.get(url(id))), catchError(() => of([])))` |
 
 **Na bloczkach i w animacji:**
 
-- Na zewnątrz: górny potok „klik$” → „switchMap” → „catchError” → „Odbiorca”. W ramce poniżej HTTP A; błąd dociera przez switchMap do zewnętrznego catchError. Odbiorca otrzymuje [] i complete. Klik B pozostaje przy odłączonym źródle, bez utworzenia HTTP B.
 - Wewnątrz (wygląd MAIN switchMap): góra „klik$” → „switchMap” → kompaktowy odbiorca S1, jeden tor S1 przez cały czas aktywny (bez complete). Pod linią podziału PRACE WEWNĘTRZNE z dwoma kolumnami „HTTP GET” i „catchError”; wiersz na każdy inner (#1 · A, #2 · B) z portami i poziomym kablem do prawej krawędzi. Bez kafelka wyniku i bez kontenera.
 - Przebieg wewnątrz (czas modelu): subscribe S1 w 0,3 s, klik A w 1 s uruchamia HTTP A. W 4 s HTTP A kończy się błędem: czerwony impuls biegnie tylko do catchError, etap HTTP pokazuje „error”, do S1 nic nie dociera. catchError pokazuje chwilową pigułkę `of([])`, w 4,5 s emituje kulkę [] (przez switchMap do S1), w 5 s inner A kończy się complete (zielony etap catchError). Klik B w 6,5 s tworzy #2 · B i nowy HTTP, który w 9 s zwraca B → S1 i kończy inner B. S1 ma [] i B, nadal słucha kliknięć. Licznik requestów HTTP: 1, potem 2.
 - Postoje wewnątrz: subscribe, click-a, request, error, fallback, click-b, potem AUTO do sukcesu B. Notatki per checkpoint w `template[data-checkpoint-notes="b04-catcherror-2"]` (0–7, 60–90 s).
-- HTTP A pokazuje „× error” w chwili wysłania błędu; klik$ zostaje odłączony dopiero po dotarciu błędu do switchMap. Zewnętrzny catchError robi się zielony („✓ complete”) dopiero po wysłaniu complete za [].
-- Na zewnątrz: error jest oznaczony podpisem i czerwonym obramowaniem pracy. Ręczne postoje: HTTP A pracuje → błąd → [] i pytanie o klik B. Kolejny krok uruchamia AUTO do wyniku. Historia odbiorcy zmienia się po dotarciu wartości. Licznik pokazuje 1 lub 2 requesty.
+- Na zewnątrz (ten sam design): góra „klik$” → „switchMap” → „catchError” → kompaktowy odbiorca S1 — cztery kafelki z execution lanes, porty i kable toru S1 na jednej wysokości. Pod linią podziału PRACE WEWNĘTRZNE z instancją jak w 09–12: `#1 · A`, turkusowy kafelek HTTP GET z lane (progress na pełną wysokość) i krótki kabel do kompaktowego inboxa; bez etapu catchError w dole i bez kontenera.
+- Przebieg na zewnątrz (czas modelu): S1 subskrybuje w 0,3 s, klik A w 1 s tworzy inner #1 i HTTP A. W 4 s HTTP A emituje error (bez complete): lane i inbox czerwone, czerwony impuls biegnie do inboxa, a potem przez switchMap do zewnętrznego catchError. Po jego dotarciu catchError odłącza pierwotny strumień: szary impuls × od switchMap do klik$, wiersze klik$ i switchMap szare (teardown, bez czerwieni i complete). Następnie w wierszu catchError chwilowo widać `of([])`: catchError subskrybuje Observable zastępczy, kulka [] (kolor S1) dociera do S1 w 5,5 s, a zielony impuls complete w 6 s (catchError i S1 zielone). Klik B w 7,3 s pojawia się w szarym wierszu klik$ i gaśnie: nie dociera do switchMap, nie ma projekcji, inner ani HTTP. Licznik requestów HTTP: 1.
+- Postoje na zewnątrz: click-a, error, caught, fallback, click-b, potem AUTO do podsumowania. Notatki per checkpoint w `template[data-checkpoint-notes="b04-catcherror"]` (start, HTTP A, błąd, przechwycenie, fallback, kolejne kliknięcie, podsumowanie).
 
 **Speaker notes:**
 
-> Porównaj położenie catchError: osobny operator za switchMap albo operator wewnątrz ramki każdego HTTP. http$ jest zimnym Observable, a każde kliknięcie tworzy jego nową subskrypcję. Ręczne postoje pokazują pracę A, błąd i wynik zastępczy []. W obu wariantach catchError subskrybuje of([]), które emituje i kończy się. Na zewnątrz kończy się cały wynik, a subskrypcja klik$ znika. Klik B nadal może wystąpić w źródle, lecz nie uruchamia HTTP B. Wewnątrz kończy się tylko inner A: kolejne kliknięcie uruchamia HTTP B z własnym catchError i przekazuje wynik B. Przerywana linia wskazuje zakres prac tworzonych przez switchMap; nie jest subskrypcją. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik: tutaj wynika to z wyboru of([]).
+> Porównaj położenie catchError: wewnątrz pipe każdego HTTP albo osobny operator za switchMap. Każde kliknięcie tworzy nową subskrypcję http.get(url(id)). W obu wariantach catchError subskrybuje of([]), które emituje i kończy się. Wewnątrz kończy się tylko inner A: kolejne kliknięcie uruchamia HTTP B z własnym catchError i przekazuje wynik B. Na zewnątrz catchError odłącza pierwotny strumień (klik$ i switchMap), a S1 dostaje [] i complete; klik B nie uruchamia HTTP B. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik: tutaj wynika to z wyboru of([]).
+>
+> Na zewnątrz (per checkpoint): „Przed chwilą catchError znajdował się wewnątrz switchMap. Teraz przenosimy go na zewnątrz. Zobaczmy, co się zmieni.” → „Pierwsze kliknięcie uruchamia request. Na razie zachowanie jest dokładnie takie samo.” → „HTTP emituje błąd. Ale wewnątrz nie mamy już catchError, więc błąd propaguje się przez switchMap.” → „Dopiero tutaj łapie go zewnętrzny catchError. Problem polega na tym, że oryginalny strumień zostaje odsubskrybowany.” → „CatchError przełącza się na zastępcze of([]). Dostajemy pustą tablicę, a potem complete.” → „I teraz klikamy ponownie. Nic się nie dzieje. Nie dlatego, że switchMap zignorował kliknięcie, tylko dlatego, że nie mamy już aktywnej subskrypcji kliknięć.” → „CatchError wewnątrz ratuje pojedynczą operację. CatchError na zewnątrz zastępuje cały strumień po błędzie. Samo umiejscowienie operatora zmienia zachowanie aplikacji.”
 
 Semantyka zastępowania błędu: [implementacja catchError w RxJS 7.8.2](https://github.com/ReactiveX/rxjs/blob/7.8.2/src/internal/operators/catchError.ts).
 
@@ -885,7 +887,7 @@ Semantyka zastępowania błędu: [implementacja catchError w RxJS 7.8.2](https:/
 
 - `index.html`: statyczne slajdy, kolejność i speaker notes (`<aside class="notes">`).
 - `animations/catalog.js`: wartości, czasy, podpisy pod diagramem, liczniki i dane scen.
-- `animations/reference-scenes.js`, `catch-scenes.js`, `scene-config.js`, `resolver-scenes.js`: konfiguracje rodzin, zakresy catchError, postoje i finał resolvera.
+- `animations/reference-scenes.js`, `scene-config.js`, `resolver-scenes.js`: konfiguracje rodzin, zakresy catchError, postoje i finał resolvera.
 - `animations/presentation.js`: końcowe tytuły i warianty tworzonych slajdów.
 - `public/`: fotografie, plakaty, logo i QR.
 
@@ -903,7 +905,7 @@ Slajdy MAIN 08–12 korzystają ze wspólnego adaptera `configureHttpWorkPanel` 
 
 Dół zajmuje ponad 90% szerokości diagramu: poziomy separator, kafelek HTTP GET pod źródłem i operatorem (nagłówek tej samej wysokości co u góry, wiersze prac jak tory: pasek koloru, #1 · A, postęp w tle, stan tekstem) oraz napis PRACE WEWNĘTRZNE obok nagłówka, nad kablami wyników. Postęp HTTP kończy się z odpowiedzią. Nie ma zaokrąglonego kontenera ani przewodów między poziomami. Wynik wychodzi do prawej granicy panelu, a dopiero potem z górnego operatora do odbiorcy. Każdy zakończony request daje jedną odpowiedź; anulowany nie daje complete. concatAll kolejkuje już utworzone Observable (#2 · B$, W KOLEJCE · Observable); concatMap kolejkuje wartości przed projekcją. W 09–12 wiersz B przed decyzją operatora ma tylko „?”. mergeMap uruchamia równoległe wiersze (B wraca przed A). switchMap anuluje inner A szarym impulsem × bez terminalnego impulsu complete. exhaustMap zachowuje wiersz pominiętego wejścia z identyfikatorem i napisem POMINIĘTE, bez inner i kolejki.
 
-Dodatki 12a/13-limit i prototypy QA zachowują poprzednie modele oraz geometrię. Cold/share i catchError również pozostają bez zmian; dodatkowa obsługa catchError w nowym panelu jest odłożona.
+Dodatki 12a/13-limit i prototypy QA zachowują poprzednie modele oraz geometrię. Cold/share pozostają bez zmian. Oba warianty catchError korzystają z tego samego adaptera: wewnątrz ze wspólnym kafelkiem HTTP GET → catchError, na zewnątrz z instancją HTTP GET → inbox i catchError w górnym potoku.
 
 W concatMap B pojawia się jako wartość W KOLEJCE; dopiero po complete poprzednika powstaje B$ i jego subskrypcja. concatAll pokazuje istniejące B$ i C$ czekające bez subskrypcji; wpis kolejki wchodzi z fade-in dopiero, gdy Observable utworzone przez map dotrze do concatAll. Wiersze zakończone pozostają zielone; pominięte wejścia exhaustMap nie tworzą wykonań. Standardowa siatka ma cztery miejsca; przykład limitu używa pięciu. Kapsułki emisji i odbioru wchodzą przez 0,3 s. Postęp jest wyliczany w czasie ilustracji; w MAIN 08–12 kulka najpierw przechodzi po lokalnym wyjściu do prawej granicy panelu, a potem wychodzi z operatora. Dodatki i prototypy zachowują krótki, niewidoczny powrót.
 

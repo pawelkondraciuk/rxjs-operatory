@@ -51,7 +51,8 @@ test('4:3 slot rows grow and stay inside the jobs panel',async()=>{
  for(const id of ['09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','13-limit']){
   const jobs=compile(scenes.find(s=>s.id===id)).snapshot(0).panels.find(p=>p.id==='jobs');
   assert.ok(jobs.rowHeight>=60,id);
-  assert.ok(jobs.rowsTop+(Math.max(4,jobs.slots)-1)*jobs.rowStep+jobs.rowHeight<=jobs.y+jobs.h,id);
+  // 09–12: trzy sloty instancji (nagłówek + lane); 13-limit: siatka czterech slotów.
+  assert.ok(jobs.rowsTop+(Math.max(jobs.instances?3:4,jobs.slots)-1)*jobs.rowStep+(jobs.instances?jobs.headerH:0)+jobs.rowHeight<=jobs.y+jobs.h,id);
  }
 });
 

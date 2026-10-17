@@ -148,6 +148,8 @@ export function compileScene(scene) {
     if(!found)throw new Error(`${scene.id}: nierozwiązany ${label}`);
     return found.at+offset;
   };
+  const fallbackTimes=new Map(nodes.filter(n=>n.laneFallback).map(n=>[n.id,
+    {from:eventTime(n.laneFallback.from,'fallback'),to:eventTime(n.laneFallback.to,'fallback')}]));
   const codeLines=(scene.codeLines||[]).map(line=>line.map(segment=>({...segment,
     shownAt:segment.show?eventTime(segment.show,'fragment kodu'):0,
     activeIntervals:(segment.active||[]).map(({from,to})=>[eventTime(from,'start wyróżnienia kodu'),eventTime(to,'koniec wyróżnienia kodu')])})));
@@ -253,10 +255,20 @@ export function compileScene(scene) {
         since=out.end.at+(out.end.kind==='unsubscribe'?out.end.duration||transitionDuration:0);
         state=out.end.kind==='complete'?'completed':out.end.kind==='error'?'error':'cancelled';stoppedAt=out.end.at;
       }
+      // teardownEdge (opt-in): operator przekazał błąd dalej, ale jego pierwotne wykonanie zamyka teardown wskazanej
+      // krawędzi (np. switchMap przed zewnętrznym catchError) — wiersz trwa do odłączenia źródła i szarzeje bez czerwieni.
+      const teardown=role!=='receiver'&&n.teardownEdge?laneRecords.find(r=>r.id===n.teardownEdge)?.end:null;
+      if(teardown?.kind==='unsubscribe'){
+        if(time>=teardown.at){state='cancelled';since=stoppedAt=teardown.at;}else{state='running';since=from;stoppedAt=undefined;}
+      }
       const lane={role,subscriber,label:graph.subscribers?.[subscriber]?.label??subscriber,y:laneY(n,subscriber),color:subscriberColor(subscriber),fill:graph.subscribers?.[subscriber]?.fill,
         progressFill:graph.subscribers?.[subscriber]?.progress??graph.subscribers?.[subscriber]?.fill,
         state,since,status:laneStatus[state==='running'&&role!=='work'?'waiting':state],opacity:clamp((time-from)/fadeDuration),
         ...(n.rowTint?{labelColor:graph.subscribers?.[subscriber]?.ink}:{})};
+      // laneFallback (opt-in, np. catchError → of([])): chwilowa pigułka w wierszu operatora, fade-in i fade-out 0,3 s.
+      const shown=fallbackTimes.get(n.id);
+      if(role==='operator'&&shown&&time>=shown.from&&time<shown.to+fadeDuration)
+        lane.fallback={label:n.laneFallback.label,opacity:Math.min(clamp((time-shown.from)/fadeDuration),1-clamp((time-shown.to)/fadeDuration))};
       if(role==='work') {
         // progressUntilNext: oczekiwanie kończy się z wysłaniem pierwszej wartości (odpowiedź HTTP), nie dopiero z complete.
         const firstNext=n.progressUntilNext?out.events[0]?.at:undefined;
@@ -365,7 +377,11 @@ export function compileScene(scene) {
       const [x,y]=pointAt(r.points||geometry(r.a,r.b),1);
       tokens.push({x,y,value:e.value,color:e.color||'a',edge:r.id,phase:'decide',opacity:1-clamp((time-e.arrival-e.decide)/fadeDuration)});
     }
-    for(const e of sourceTokens) if(time>=e.at&&time<e.until)tokens.push({...e});
+    // fade (opt-in): token wchodzi fade-in, a na końcu gaśnie jak wartość bez odbiorcy (krycie → 0, skala → 0,6).
+    for(const e of sourceTokens) if(time>=e.at&&time<e.until) {
+      const drop=e.fade?clamp((time-(e.until-dropDuration))/dropDuration):0;
+      tokens.push(e.fade?{...e,opacity:Math.min(clamp((time-e.at)/fadeDuration),1-drop),scale:1-.4*drop}:{...e});
+    }
     // transformBalls: między dotarciem wartości do kafelka a wyjściem wyniku kulka wjeżdża do środka wiersza,
     // zatrzymuje się, zmienia wartość (krótki puls) i jedzie do portu wyjścia. Czas modelu stoi, to wyłącznie ilustracja.
     // splitBalls (hub, np. share): jedna kulka wspólnego upstreamu wjeżdża do punktu rozdzielenia, tam rozchodzi się
@@ -439,7 +455,8 @@ export function compileScene(scene) {
       };
       const completeTime=terminalTime('complete'),errorTime=terminalTime('error');
       const completed=Boolean(r.completeAt!==undefined&&(completeTime!==undefined?time>=completeTime:t>=r.completeAt));
-      const errored=errorTime!==undefined?time>=errorTime:r.events.some(e=>e.kind==='error'&&e.at<=t)||span?.kind==='error'&&t>=span.end;
+      // teardownEdge: operator przekazał błąd dalej, ale sam kończy się teardown — bez czerwonego obrysu kafelka.
+      const errored=n.teardownEdge?false:errorTime!==undefined?time>=errorTime:r.events.some(e=>e.kind==='error'&&e.at<=t)||span?.kind==='error'&&t>=span.end;
       const active=Boolean(span&&started&&!canceled&&!completed&&!errored&&t<span.end);
       const queued=r.spans.some(p=>p.kind==='queue'&&p.start<=t&&t<p.end)||
         Boolean(n.createdBy&&n.inner&&time>=births.get(n.id)&&!started&&r.spans.some(p=>p.kind==='queue'));

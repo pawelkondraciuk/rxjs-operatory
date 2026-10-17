@@ -24,7 +24,8 @@ test('catchError inside: the top pipeline is the MAIN switchMap pipeline with on
   const panel=f.innerWorkPanels[0];
   assert.deepEqual(Array.from(panel.columns,col=>col.label),['HTTP GET','catchError']);
   assert.equal(panel.frameless,true);assert.equal(panel.label,'PRACE WEWNĘTRZNE');
-  assert.equal(panel.dividerY,s.innerWorkPanels[0].dividerY);
+  // Dolny panel zostaje przy wspólnym kafelku z etapami (09–12 mają osobne instancje); podział między górą a nagłówkiem.
+  assert.ok(panel.dividerY>Math.max(...top(f).map(n=>n.y+n.h/2))&&panel.dividerY<panel.rowsTop-panel.headerH,format);
   assert.deepEqual(Array.from(rows(f),r=>r.id+' · '+r.value),['#1 · A','#2 · B']);
  }
 });

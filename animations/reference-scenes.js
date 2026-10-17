@@ -966,16 +966,18 @@ export function flattenGraph(scene) {
 
 // Główny tor S1 nad lokalnymi requestami. Prototypy i dodatki zachowują swoje modele.
 // Opcjonalne columns/stages/edge pozwalają dodać kolejne etapy wiersza (np. HTTP GET → catchError); domyślnie jeden etap HTTP GET.
+// tiles nadpisuje górne kafelki [id,x,w,nagłówek] (np. klik$ → switchMap → catchError), instances wybiera panel instancji.
 export function configureHttpWorkPanel(graph,scene,frame,{columns=[{id:'source',label:'HTTP GET',fill:'#8FC9D4',runtime:'#E3F0F3'}],
-  stages=i=>[{column:'source',edge:'inner'+i+'-op',progress:true}],edge=i=>'inner'+i+'-op'}={}) {
+  stages=i=>[{column:'source',edge:'inner'+i+'-op',progress:true}],edge=i=>'inner'+i+'-op',tiles:customTiles,
+  instances=comparisonSlides.has(scene.id)}={}) {
   const large=scene.format==='4:3',top=large?28:10,defH=large?70:56,rowH=large?74:64;
   const all=scene.operatorName==='concatAll';
   const laneY=top+defH+rowH/2;
   const main={color:'#7457D9',fill:'#D9CFF5',ink:'#513A9A',label:'S1'};
   Object.assign(graph,{subscribers:{S1:main},laneWire:5,portRadius:11,ball:{r:25,font:29,textFill:'#fff'},
     ...(large?{textScale:1.4,labelScale:1.6}:{})});
-  const tiles=all?[['source',145,190,'#8FC9D4'],['projection',400,230,'#D8B3E6'],['op',677.5,235,'#D8B3E6']]:
-    [['source',205,310,'#8FC9D4'],['op',600,310,'#D8B3E6']];
+  const tiles=customTiles||(all?[['source',145,190,'#8FC9D4'],['projection',400,230,'#D8B3E6'],['op',677.5,235,'#D8B3E6']]:
+    [['source',205,310,'#8FC9D4'],['op',600,310,'#D8B3E6']]);
   for(const [id,x,w,headerFill] of tiles) {
     Object.assign(graph.nodes.find(n=>n.id===id),{x,w,top,defH,rowH,laneSlots:{S1:0},growRows:true,
       y:top+(defH+rowH)/2,h:defH+rowH,headerFill,runtimeFill:'#EDE6F8',terminalBadge:true,detail:'',statusInside:false,rx:7});
@@ -996,16 +998,18 @@ export function configureHttpWorkPanel(graph,scene,frame,{columns=[{id:'source',
     duration:job.dur??job.end-job.start,stages:stages(i)}));
   // Kafelek prac stoi pod źródłem i operatorem (lewa krawędź źródła – prawa krawędź operatora), z nagłówkiem
   // i wierszami tej samej wysokości co u góry; porty i kabel wyniku jak w głównym torze.
+  // Porównanie 09–12 i catchError na zewnątrz: każde uruchomione inner to osobna instancja HTTP GET (nagłówek + lane)
+  // z własnym inboxem; trzy sloty. Pozostałe sceny zachowują wspólny kafelek z wierszami.
   const source=graph.nodes.find(n=>n.id==='source'),op=graph.nodes.find(n=>n.id==='op');
   const panel=createInnerWorkPanel({works,height:frame.height,large,headerH:defH,rowH,
     tileLeft:source.x-source.w/2,tileRight:op.x+op.w/2,
-    columns});
-  Object.assign(panel,{ballText:'#fff',portRadius:11,wire:5,ball:graph.ball,
+    columns,...(instances?{instances:true,minRows:3}:{})});
+  Object.assign(panel,{ballText:'#fff',portRadius:11,wire:5,ball:instances&&!large?{r:20,font:23}:graph.ball,
     // Porównanie 09–12: teardown anulowanego inner jako szary impuls × (switchMap).
-    ...(comparisonSlides.has(scene.id)?{cancelPulse:true,pace:true}:{})});
+    ...(instances?{cancelPulse:true,pace:true}:{})});
   graph.panels=[panel];
   for(const node of graph.nodes.filter(n=>n.workRow))Object.assign(node,{x:panel.x+panel.w/2,
-    y:panel.rowsTop+node.slot*panel.rowHeight+panel.rowHeight/2,w:panel.w-32,h:panel.rowHeight});
+    y:panel.rowsTop+node.slot*panel.rowStep+(panel.instances?panel.headerH:0)+panel.rowHeight/2,w:panel.w-32,h:panel.rowHeight});
   // Subscribe inner trwa tyle co jeden krok głównego toru (0,8 s), nie cały łańcuch.
   for(const edge of graph.edges.filter(e=>e.internal))Object.assign(edge,{travel:1,connect:.8});
   const byValue=new Map(scene.jobs.flatMap((job,i)=>[[job.value,works[i].color],[job.value+'$',works[i].color]]));
@@ -1100,7 +1104,7 @@ function configureComparison(scene,mode) {
   const first=mode==='concatMap',question='A wciąż pracuje. Przychodzi B. Co teraz?';
   const ev=(type,extra)=>({type,...extra}),arrivedB=ev('deliver-next',{edge:'source-op',value:'B'});
   const answer={
-    concatMap:{id:'answer',event:arrivedB,offset:comparison.decide+.4,caption:'concatMap: B czeka W KOLEJCE. Projekcja B nie została wywołana'},
+    concatMap:{id:'answer',event:arrivedB,offset:comparison.decide+.4,caption:'concatMap: B czeka w kolejce. Projekcja B nie została wywołana'},
     mergeMap:{id:'answer',event:ev('inner-subscribe',{node:'inner1'}),offset:.05,caption:'mergeMap: projekcja B i drugi HTTP równolegle z A'},
     switchMap:{id:'answer',event:ev('disconnected',{edge:'inner0-op'}),offset:.35,caption:'switchMap: unsubscribe inner A — anulowane, bez complete. S1 działa dalej'},
     exhaustMap:{id:'answer',event:arrivedB,offset:comparison.decide+.4,caption:'exhaustMap: B pominięte. Bez projekcji, bez HTTP, bez kolejki'},
@@ -1241,5 +1245,76 @@ function catchInsideGraph(scene) {
     stages:i=>[{column:'source',edge:`inner${i}-catch${i}`,progress:true},
       {column:'catch',edge:`catch${i}-op`,handles:{edge:`inner${i}-catch${i}`,label:'of([])'}}],
     edge:i=>`catch${i}-op`});
+  return graph;
+}
+
+// catchError na zewnątrz (b04-catcherror) w tym samym wyglądzie co wewnątrz: góra klik$ → switchMap → catchError → S1,
+// dół PRACE WEWNĘTRZNE z instancją HTTP GET → inbox. Ten sam klik A i ten sam błąd HTTP, ale wewnątrz nie ma catchError:
+// error przechodzi przez inbox inner i switchMap do zewnętrznego catchError. catchError odłącza pierwotny strumień
+// (teardown switchMap i klik$, szary impuls ×, bez complete), dopiero potem subskrybuje of([]): [] i complete trafiają do S1.
+// Klik B pojawia się w odłączonym klik$ i gaśnie: nie dociera do switchMap, nie ma projekcji ani HTTP.
+const outsideTimes={subscribe:.3,a:1,error:4,teardown:4.2,fallback:5.5,done:6,b:7.3};
+export function configureCatchOutside(scene) {
+  const at=outsideTimes;
+  const jobs=[{value:'A',at:at.a,start:at.a,end:at.error,dur:at.error-at.a,errored:true}];
+  const fallback=E(at.fallback,'[]','#7457D9');
+  const ev=(type,edge,extra={})=>({type,edge,...extra}),during=(from,to)=>({from,to});
+  const op={id:'switch',bg:'rgba(216,179,230,.45)',line:'#b384c6'},http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'};
+  // Te same dwie linie co wewnątrz; zmienia się tylko miejsce catchError (za switchMap zamiast w .pipe HTTP).
+  const lines=[[{text:'klik$.pipe('},{text:'switchMap',mark:op,active:[during(ev('deliver-next','source-op',{value:'A'}),ev('inner-subscribe','inner0-op'))]},{text:'(id =>'}],
+    [{text:'  '},{text:'http.get(url(id))',mark:http,active:[during(ev('inner-subscribe','inner0-op'),ev('stream-error','inner0-op'))]},
+      {text:'), '},{text:'catchError(() => of([]))',mark:{...op,id:'catch'},active:[during(ev('disconnected','op-catch'),ev('disconnected','catch-observer'))]},{text:')'}]];
+  Object.assign(scene,{jobs,operatorName:'switchMap',catchTimes:at,graph:catchOutsideGraph,duration:at.b+2.5,
+    title:'catchError na zewnątrz',playerLayout:'expanded',playerClass:'rx-flat-tiles rx-catch-inside',
+    timing:{subscribe:2.4,travel:1,transform:1.4,terminal:.8,gap:.5},
+    code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
+    rows:[R('klik$',[E(at.a,'A')]),
+      R('HTTP A',[],[{start:at.a,end:at.error,label:'HTTP A',kind:'error',color:'http'}]),
+      R('wynik',[fallback],[],{completeAt:at.done})],
+    captions:[[0,'catchError za switchMap: jedna obsługa błędu dla całego strumienia'],
+      [at.a,'Klik A: switchMap uruchamia HTTP — tak samo jak wcześniej'],
+      [at.error,'HTTP A: error. Wewnątrz nie ma catchError — błąd idzie przez switchMap'],
+      [at.teardown,'catchError odłącza pierwotny strumień: teardown switchMap i klik$'],
+      [at.fallback,'catchError subskrybuje of([]): pusta tablica trafia do S1'],
+      [at.done,'of([]) kończy się: S1 dostaje complete. Wynikowy strumień zakończony']],
+    metrics:[{label:'requesty HTTP',count:'started'},{label:'aktywne',count:'active'}],
+    playback:{entry:'manual',finish:'hold',afterLastManualStop:'start-auto',stops:[
+      {id:'click-a',event:ev('inner-subscribe','inner0-op'),offset:.5,caption:'Klik A: switchMap tworzy inner #1 i uruchamia HTTP'},
+      {id:'error',event:ev('disconnected','op-catch'),offset:.1,caption:'HTTP A: error przeszedł przez switchMap do zewnętrznego catchError'},
+      {id:'caught',event:ev('disconnected','source-op'),offset:.35,caption:'catchError przechwycił błąd i odłączył klik$. Do S1 nie dotarł error'},
+      {id:'fallback',event:ev('disconnected','catch-observer'),offset:.35,caption:'catchError subskrybował of([]): S1 dostał [] i complete'},
+      {id:'click-b',event:{type:'source-unobserved',node:'source'},offset:.6,caption:'Klik B: klik$ nie ma już subskrypcji. Brak projekcji i HTTP'},
+    ]},
+  });
+}
+
+function catchOutsideGraph(scene) {
+  const frame=frameFor(scene),at=scene.catchTimes,[clicks,,result]=scene.rows,job=scene.jobs[0];
+  const nodes=[{id:'source',label:'klik$',color:'source',ready:true},{id:'op',label:'switchMap',color:'op',ready:true},
+    // Pełnoprawny operator górnego potoku: pokazuje chwilowe of([]) po teardown i własne complete.
+    {id:'catch',label:'catchError',color:'op',ready:true,terminalEdge:'catch-observer',
+      laneFallback:{label:'of([])',from:{type:'disconnected',edge:'source-op',offset:.4},to:{type:'disconnected',edge:'catch-observer'}}},
+    {id:'observer',label:'',ready:true},
+    {id:'inner0',label:'HTTP A',inner:true,workRow:true,panel:'jobs',slot:0,ready:false,born:job.start}];
+  const edges=[
+    // Teardown po błędzie: catchError odłącza switchMap, a switchMap — klik$ (szary impuls ×, bez complete).
+    {from:'source',to:'op',events:clicks.events,logicalStart:at.subscribe,logicalEnd:{at:at.teardown,kind:'unsubscribe'},cancelPulse:true},
+    {from:'op',to:'catch',events:[],logicalStart:at.subscribe,logicalEnd:{at:at.error,kind:'error'}},
+    {from:'catch',to:'observer',events:result.events,logicalStart:at.subscribe,logicalEnd:{at:at.done,kind:'complete'}},
+    {id:'inner0-op',from:'inner0',to:'op',events:[],logicalStart:at.a,logicalEnd:{at:at.error,kind:'error'},gateWork:true,internal:true}];
+  const graph={layout:'fixed',formatAware:true,width:1240,height:frame.height,illustratedWork:true,nodes,edges,
+    executions:[{id:job.value,node:'inner0',edge:'inner0-op',panel:'jobs',value:job.value,label:'HTTP '+job.value,duration:job.dur}],
+    timeline:[{at:at.b,type:'source-unobserved',node:'source',value:'B'},
+      {type:'catch-summary',event:{type:'source-unobserved',node:'source'},offset:1.8,
+        caption:'Błąd A zastąpił cały strumień: of([]) i complete. Kolejne kliknięcia nie uruchamiają HTTP'}]};
+  // Cztery kafelki u góry jak map + concatAll: klik$, switchMap, catchError i S1 na tej samej osi portów.
+  configureHttpWorkPanel(graph,scene,frame,{instances:true,
+    tiles:[['source',145,190,'#8FC9D4'],['op',400,230,'#D8B3E6'],['catch',677.5,235,'#D8B3E6']]});
+  // Odłączony klik$ nadal może emitować: B pojawia się w jego wierszu przy porcie wyjścia i gaśnie bez kabla do switchMap.
+  const source=nodes[0];
+  graph.tokens=[{at:at.b,until:at.b+1.4,modelTime:true,fade:true,value:'B',color:'#B85D05',phase:'unobserved',
+    x:source.x+source.w/2-graph.ball.r-18,y:source.top+source.defH+source.rowH/2}];
+  // switchMap nie kończy się czerwienią w górnym torze: jego pierwotne wykonanie zamyka teardown.
+  nodes[1].teardownEdge='source-op';
   return graph;
 }

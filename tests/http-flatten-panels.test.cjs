@@ -14,7 +14,9 @@ test('the four HTTP slides share S1, frameless rows, palette and one response pe
  const expected={concatAll:['A','B','C'],concatMap:['A','B','C'],mergeMap:['B','A','C'],switchMap:['B','C'],exhaustMap:['A','C']};
  for(const format of ['4:3','16:9'])for(const [id,mode]of definitions){
   const s=scene(id,format),c=compile(s),f=c.snapshot(c.duration),panel=f.panels[0],receiver=f.nodes.find(n=>n.id==='observer');
-  assert.equal(s.http,true);assert.equal(panel.frameless,true);assert.equal(panel.rowStep,panel.rowHeight);
+  assert.equal(s.http,true);assert.equal(panel.frameless,true);
+  // 09–12: osobne instancje (nagłówek + lane + odstęp); 08 zachowuje przylegające wiersze wspólnego kafelka.
+  if(mode==='concatAll')assert.equal(panel.rowStep,panel.rowHeight);else assert.ok(panel.instances&&panel.rowStep>panel.headerH+panel.rowHeight,id);
   assert.equal(f.histories.length,1);assert.equal(f.histories[0].anchor,'observer');
   assert.deepEqual(Array.from(f.histories[0].values,v=>v.value),expected[mode]);
   assert.ok(f.edges.filter(e=>e.subscriber).every(e=>e.subscriber==='S1'&&e.points.every(p=>p[1]===e.points[0][1])));
@@ -64,7 +66,7 @@ test('the four strategies stop at the same moment: A works at half, B arrived, i
   assert.equal(s.code,`source$.pipe(${mode}(id => http.get(url(id))))`);
   assert.deepEqual(Array.from(r,row=>[row.id,row.value,row.state]),[['#1','A','active'],['#2','B','pending']],id);
   assert.equal(r[1].question,1);assert.equal(r[1].stages,undefined);assert.equal(r[1].wires,undefined);
-  assert.doesNotMatch(svg,/W KOLEJCE|POMINIĘTE|anulowane|data-inner-cancel/,id);
+  assert.doesNotMatch(svg,/w kolejce|pominięte|anulowane|data-inner-cancel/,id);
   assert.equal(f.executionCounts.started,1);assert.equal(f.executionCounts.active,1);
   assert.equal(f.histories[0].values.length,0);
   assert.ok(find(c,{type:'deliver-next',edge:'source-op',value:'B'}).at<t,id);
@@ -100,10 +102,57 @@ test('only concatMap animates the main subscription; the other three start with 
  }
 });
 
+const groups=svg=>svg.split('<g data-inner-work="').slice(1).map(part=>part.split('<g data-inner-work="')[0]);
+const count=(text,pattern)=>(text.match(pattern)||[]).length;
+
+test('09–12: each started inner is its own HTTP GET tile (header + one lane) wired to its own inbox; values without inner have no HTTP',async()=>{
+ const {scene,compile,render}=await family();
+ for(const format of ['4:3','16:9'])for(const [id]of comparison){
+  const c=compile(scene(id,format)),panel=c.snapshot(0).panels[0],top=c.snapshot(0).nodes.find(n=>n.id==='source');
+  assert.ok(panel.instances,id);assert.deepEqual(Array.from(panel.columns,col=>col.label),['HTTP GET']);
+  assert.equal(panel.works.length,3,id);
+  // Trzy sloty mieszczą się między górnym pipeline'em a dołem ramki; inbox stoi za kablem, na wysokości lane.
+  assert.ok(panel.rowsTop>top.y+top.h/2&&panel.dividerY<panel.rowsTop,id);
+  assert.ok(panel.rowsTop+2*panel.rowStep+panel.headerH+panel.rowHeight<=c.snapshot(0).height-8,id);
+  assert.ok(panel.inboxX>panel.stagesLeft+panel.stageW&&panel.inboxX+panel.inboxW<panel.x+panel.w,id);
+  for(const t of [stopAt(c,'question'),stopAt(c,'answer'),c.duration]){
+   const f=c.snapshot(t),svg=render(f),parts=groups(svg),rows=f.innerWorkPanels[0].rows;
+   // Kafelek HTTP GET istnieje tylko dla utworzonego inner (projekcja wywołana); subskrypcja może jeszcze trwać.
+   assert.equal(count(svg,/data-inner-header=/g),rows.filter(r=>r.stages).length,id+' '+t);
+   assert.ok(rows.filter(r=>r.stages).length>=f.executionCounts.started,id+' '+t);
+   for(const [i,row]of rows.entries()){
+    const part=parts[i],lane=row.y+panel.headerH;
+    assert.equal(count(part,/data-inner-identifier=/g),1);
+    assert.match(part,new RegExp(`data-inner-identifier="${row.value}"><rect x="${panel.tileLeft}" y="${lane}"`));
+    assert.match(part,/style="fill:#fff;font-weight:700">#\d · [ABC]</);
+    if(['pending','queued','ignored'].includes(row.state)){
+     assert.doesNotMatch(part,/data-inner-header|data-inner-lane|data-inner-inbox|data-inner-port|data-inner-progress|data-inner-wire/,id+' '+row.state);
+    }else{
+     assert.equal(count(part,/data-inner-header=/g),1);assert.equal(count(part,/data-inner-lane=/g),1);assert.equal(count(part,/data-inner-inbox=/g),1);
+     assert.match(part,new RegExp(`data-inner-header="source" x="${panel.stagesLeft}" y="${row.y}" width="${panel.stageW}" height="${panel.headerH}"`));
+     assert.match(part,new RegExp(`<rect x="${panel.inboxX}" y="${lane}" width="${panel.inboxW}"`));
+     assert.doesNotMatch(part,/inner subscriber|>sub</);
+    }
+   }
+  }
+ }
+});
+
+test('the instance layout leaves room for another stage per inner (e.g. catchError) before the inbox',async()=>{
+ const {createInnerWorkPanel}=(await modules(['inner-work-panel']))['inner-work-panel'];
+ const columns=[{id:'source',label:'HTTP GET'},{id:'catch',label:'catchError'}];
+ for(const large of [true,false]){
+  const one=createInnerWorkPanel({works:[],columns:columns.slice(0,1),height:large?612:460,large,tileLeft:50,instances:true,minRows:3});
+  const two=createInnerWorkPanel({works:[],columns,height:large?612:460,large,tileLeft:50,instances:true,minRows:3});
+  assert.equal(two.inboxX-one.inboxX,one.stageW+one.stageGap);assert.equal(two.rowsTop,one.rowsTop);
+  assert.ok(two.inboxX+two.inboxW<two.x+two.w);
+ }
+});
+
 test('concatMap answer: B in the queue, no projection until A completes',async()=>{
  const {scene,compile,render}=await family(),c=compile(scene('09-concatmap')),t=stopAt(c,'answer');
  assert.deepEqual(Array.from(rows(c,t),r=>r.state),['active','queued']);
- assert.match(render(c.snapshot(t)),/W KOLEJCE/);
+ assert.match(render(c.snapshot(t)),/>w kolejce</);
  const doneA=find(c,{type:'stream-complete',edge:'inner0-op'}).at,bornB=find(c,{type:'inner-create',node:'inner1'}).at;
  assert.ok(bornB>=doneA);assert.equal(c.snapshot(t).executionCounts.started,1);
 });
@@ -142,7 +191,7 @@ test('exhaustMap answer: B ignored without inner or queue; C after A starts a ne
  const {scene,compile,render}=await family(),c=compile(scene('12-exhaustmap'));
  const t=stopAt(c,'answer'),ignored=rows(c,t)[1];
  assert.equal(ignored.state,'ignored');assert.equal(ignored.stages,undefined);assert.equal(ignored.wires,undefined);
- assert.match(render(c.snapshot(t)),/POMINIĘTE/);
+ assert.match(render(c.snapshot(t)),/>pominięte</);
  assert.ok(!c.events.some(e=>e.type==='inner-create'&&e.node==='inner1'));
  assert.ok(find(c,{type:'inner-create',node:'inner2'}).at>find(c,{type:'stream-complete',edge:'inner0-op'}).at);
  assert.deepEqual(Array.from(rows(c,c.duration),r=>r.state),['completed','ignored','completed']);

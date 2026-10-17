@@ -18,12 +18,12 @@ test('concatMap: B waits undecided at the question, then queues without inner, p
  assert.deepEqual(Array.from(asked,r=>r.state),['active','pending']);
  assert.equal(asked[1].question,1);assert.equal(asked[1].stages,undefined);assert.equal(asked[1].wires,undefined);
  assert.match(placeholder(stop('question'),asked[1]),/>\?</);
- assert.doesNotMatch(placeholder(stop('question'),asked[1]),/W KOLEJCE|data-inner-port|data-inner-progress|data-inner-wire/);
+ assert.doesNotMatch(placeholder(stop('question'),asked[1]),/w kolejce|data-inner-port|data-inner-progress|data-inner-wire|data-inner-header|data-inner-inbox/);
  const waiting=rows(c,stop('answer'));
  assert.deepEqual(Array.from(waiting,r=>r.state),['active','queued']);
  assert.equal(waiting[1].stages,undefined);assert.equal(waiting[1].wires,undefined);assert.equal(waiting[1].y,asked[1].y);
- assert.match(placeholder(stop('answer'),waiting[1]),/W KOLEJCE/);
- assert.doesNotMatch(placeholder(stop('answer'),waiting[1]),/data-inner-port|data-inner-progress|data-inner-wire/);
+ assert.match(placeholder(stop('answer'),waiting[1]),/>w kolejce</);
+ assert.doesNotMatch(placeholder(stop('answer'),waiting[1]),/data-inner-port|data-inner-progress|data-inner-wire|data-inner-header|data-inner-inbox/);
  assert.ok(event(c,{type:'inner-create',node:'inner1'}).at>stop('answer'));
  const r=c.plan.records.get('inner1-op'),starting=rows(c,r.start+.1);
  assert.equal(starting[0].state,'completed');assert.equal(starting[1].state,'subscribing');
@@ -52,9 +52,9 @@ test('the main pipeline keeps source empty and puts four responses inside the re
  assert.equal(done.nodes.find(n=>n.id==='op').laneStates[0].state,'completed');
 });
 
-test('inner result reaches the right border before main next, with consistent work colours and deterministic rewind',async()=>{
+test('inner result reaches its inbox before main next, with consistent work colours and deterministic rewind',async()=>{
  const {c,render}=await harness(),panel=c.snapshot(0).panels[0];
- assert.equal(panel.rowStep,panel.rowHeight);assert.ok(panel.w/c.snapshot(0).width>.9);
+ assert.ok(panel.instances);assert.equal(panel.rowStep,panel.headerH+panel.rowHeight+14);assert.ok(panel.w/c.snapshot(0).width>.9);
  for(const r of [...c.plan.records.values()].filter(r=>/^inner\d+-op$/.test(r.id)))for(const v of r.events){
   const output=c.plan.records.get('op-observer').events.find(e=>e.execution===v.execution&&e.logicalAt===v.logicalAt&&e.value===v.value);
   assert.ok(output.at>=v.arrival);

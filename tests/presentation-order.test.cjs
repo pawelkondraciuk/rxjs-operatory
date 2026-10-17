@@ -5,7 +5,7 @@ const {modules}=require('./v2-harness.cjs');
 
 const expectedMain=['05-zrodla-2','05-zrodla','04-operator','04a-dwa-tory','05-zrodla-5','05-zrodla-3','05-zrodla-4','04a-dwa-tory-2','04a-dwa-tory-3',
  '20-sharereplay','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap',
- 'b04-catcherror','b04-catcherror-2','14-distinct','16-czas-cztery','25-podsumowanie','pytania'];
+ 'b04-catcherror-2','b04-catcherror','14-distinct','16-czas-cztery','25-podsumowanie','pytania'];
 
 async function presentation(options={}){
  const container={children:[],append(slide){slide.remove();this.children.push(slide);slide.parent=this;},

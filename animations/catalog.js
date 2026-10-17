@@ -258,7 +258,7 @@ add("b03-buffertime","Potrzebuję wszystkich zdarzeń — w paczkach","bufferTim
  R("bufferTime",[E(6,"ABC"),E(12,"DE","b"),E(18,"F","c")],[B(0,6,"paczka 1","muted","window"),B(6,12,"paczka 2","muted","window"),B(12,18,"paczka 3","muted","window")]),
  R("HTTP · paczki",[E(8.5,"✓","a"),E(14.5,"✓","b"),E(20.5,"✓","c")],[B(6.5,8.5,"ABC"),B(12.5,14.5,"DE"),B(18.5,20.5,"F")])
 ],[[0,"API w tym przykładzie przyjmuje paczki zdarzeń."],[6,"Pierwsze trzy wartości trafiają do jednego requestu."],[12,"Druga paczka zachowuje D i E."],[21,"6 zdarzeń, 3 requesty. Żadne zdarzenie nie zostało pominięte."]],"Zwykłe nienakładające się okna bufferTime. Odfiltruj puste paczki. Potrzebny jest endpoint obsługujący paczki; trzeba osobno zaprojektować błędy i powtórki.",{...bonus,metrics:[{label:"zdarzenia",value:t=>count(batchInput,t)},{label:"requesty zbiorcze",value:t=>[6.5,12.5,18.5].filter(at=>at<=t).length}]});
-// Model, graf i postoje powstają po wybraniu catchInside w configureCatch.
+// Model, graf i postoje powstają w configureCatchInside/configureCatchOutside (reference-scenes.js).
 add("b04-catcherror","Jeden błąd. Czy następny klik zadziała?","catchError wewnątrz vs za switchMap",12,[],[],
  "Oba warianty zwracają of([]), które emituje i kończy się. Catch wewnątrz dotyczy błędu inner Observable. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik.");
 add("b05-finalize","Sprzątanie także po odsubskrybowaniu","request$.pipe(finalize(cleanup))",22,[

@@ -5,12 +5,27 @@ const clamp = value => Math.max(0,Math.min(1,value));
 // napis panelu — na wysokości nagłówka, przy prawej krawędzi, nad kablami wyników. Kafelek prac zajmuje zakres
 // tileLeft–tileRight, a wynik biegnie od jego prawej krawędzi do granicy panelu.
 export function createInnerWorkPanel({works,columns,height,large=false,id='jobs',minRows=4,headerH=large?70:56,rowH=large?74:64,
-  dividerY=large?203:146,headerTop=large?234:162,tileLeft=44,tileRight=796}) {
+  dividerY=large?203:146,headerTop=large?234:162,tileLeft=44,tileRight=796,instances=false}) {
   const x=28,w=1184,bottom=height-(large?12:8),rowsTop=headerTop+headerH;
+  if(instances)return createInstancePanel({works,columns,height,large,id,minRows,tileLeft,x,w,bottom});
   const slots=Math.max(minRows,works.length),rowHeight=Math.min(rowH,(bottom-rowsTop)/slots);
   return {id,innerWork:true,frameless:true,label:'PRACE WEWNĘTRZNE',labelY:headerTop+headerH/2,x,y:dividerY,w,h:bottom-dividerY,dividerY,
     slots:works.length,rowsTop,rowStep:rowHeight,rowHeight,headerH,tileLeft,tileRight,
     identifierW:large?184:172,stageGap:72,font:large?30:25,columns,works};
+}
+
+// instances (opt-in): każde uruchomione inner to osobny pipeline z własnymi kafelkami etapów (nagłówek definicji
+// i jeden execution lane pod nim) oraz kompaktowym odbiornikiem inbox na wysokości lane. Po lewej identyfikator
+// wartości (#1 · A) na wysokości lane. Slot = nagłówek + lane + odstęp; kolejne etapy (np. catchError) stoją w tym
+// samym rzędzie, oddzielone kablem tej samej długości co kabel do inboxa. Sloty mieszczą się nad dolnym marginesem.
+function createInstancePanel({works,columns,height,large,id,minRows,tileLeft,x,w,bottom}) {
+  const headerH=large?56:44,rowH=large?64:50,gap=large?14:10,slots=Math.max(minRows,works.length);
+  const rowsTop=bottom-slots*(headerH+rowH)-(slots-1)*gap,dividerY=Math.round((rowsTop+(large?172:130))/2);
+  const identifierW=large?140:120,identifierGap=large?16:14,stageW=310,stageGap=110,inboxW=large?64:56;
+  const stagesLeft=tileLeft+identifierW+identifierGap,inboxX=stagesLeft+columns.length*(stageW+stageGap);
+  return {id,innerWork:true,instances:true,frameless:true,label:'PRACE WEWNĘTRZNE',labelY:rowsTop+headerH/2,x,y:dividerY,w,h:bottom-dividerY,
+    dividerY,slots:works.length,rowsTop,rowStep:headerH+rowH+gap,rowHeight:rowH,headerH,tileLeft,tileRight:inboxX+inboxW,
+    identifierW,stagesLeft,stageW,stageGap,inboxX,inboxW,font:large?30:25,columns,works};
 }
 
 // Widok lokalnego pipeline'u z istniejącego planu. Nie planuje subskrypcji ani nie prowadzi zegara.
@@ -35,7 +50,7 @@ export function innerWorkPanelSnapshot(panel, records, births, time) {
     const output = record(work.edge), born = births.get(work.node) ?? Infinity;
     const queuedAt = work.queuedNode ? births.get(work.queuedNode) : undefined;
     const ignoredAt=work.ignoredNode?births.get(work.ignoredNode):undefined;
-    const y = panel.rowsTop + work.slot * panel.rowHeight;
+    const y = panel.rowsTop + work.slot * (panel.rowStep ?? panel.rowHeight);
     const color = work.color || '#7457D9';
     const base = {id:work.id, slot:work.slot, value:work.value, color, y, h:panel.rowHeight};
     // work.input (opt-in): wejście dotarło do operatora, ale jego los nie jest jeszcze rozstrzygnięty (decide we flow).
@@ -108,8 +123,14 @@ export function innerWorkPanelSnapshot(panel, records, births, time) {
     });
     // Wiersz widoczny wcześniej (kolejka albo nierozstrzygnięte wejście) płynnie odsłania wykonanie w tym samym slocie.
     const shown=waitingAt!==undefined||pending!==null;
+    // instances: inbox inner subscriber na końcu ostatniego etapu. Unsubscribe zaczyna się w nim (od razu szary),
+    // complete/error widać po dotarciu terminala — jak odbiorca toru u góry.
+    const last = record(work.stages.at(-1).edge || work.edge), end = last?.end;
+    const receiver = panel.instances ? (end?.kind === 'unsubscribe' && time >= end.at ? {state:'cancelled', since:end.at} :
+      {state:stateOf(last, true), ...(end ? {since:end.at+end.duration} : {})}) : undefined;
     return [{...base,state,queueLabel:work.queueLabel,opacity:shown?1:reveal,reveal:shown?reveal:1,
-      ...(shown?{from:waitingAt!==undefined&&born>=waitingAt?'queued':'pending',question:pending?1-pending.decided:0}:{}),stages,wires,tokens}];
+      ...(shown?{from:waitingAt!==undefined&&born>=waitingAt?'queued':'pending',question:pending?1-pending.decided:0}:{}),stages,wires,tokens,
+      ...(receiver?{receiver}:{})}];
   });
   return {...panel, rows};
 }

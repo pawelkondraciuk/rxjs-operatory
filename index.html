@@ -522,15 +522,15 @@
 				<section id="09-concatmap" class="animation-slide" data-animation="09-concatmap">
 					<h2>concatMap — Po kolei</h2>
 					<div class="rx-player" aria-label="concatMap — Po kolei"></div>
-					<aside class="notes"><ul><li><strong>Porównanie:</strong> concatMap otwiera serię czterech slajdów z tym samym problemem: A pracuje długo, B przychodzi w połowie, C po zakończeniu A. Tylko tutaj pokazujemy całą subskrypcję S1.</li><li><strong>Pytanie:</strong> A pracuje, przychodzi B — czekamy czy drugi request? Czekamy: B W KOLEJCE, bez projekcji, inner i HTTP.</li><li><strong>Wniosek:</strong> Jedna praca naraz; kolejność zachowana, kolejka zwiększa opóźnienie.</li></ul></aside>
+					<aside class="notes"><ul><li><strong>Porównanie:</strong> concatMap otwiera serię czterech slajdów z tym samym problemem: A pracuje długo, B przychodzi w połowie, C po zakończeniu A. Tylko tutaj pokazujemy całą subskrypcję S1.</li><li><strong>Pytanie:</strong> A pracuje, przychodzi B — czekamy czy drugi request? Czekamy: B w kolejce, bez projekcji, inner i HTTP.</li><li><strong>Wniosek:</strong> Jedna praca naraz; kolejność zachowana, kolejka zwiększa opóźnienie.</li></ul></aside>
 					<template data-checkpoint-notes="09-concatmap">
-                        <div data-checkpoint="ready"><p><strong>0 — Start</strong></p><p>Teraz dochodzimy do operatorów, które dla każdej wartości mogą uruchomić osobną pracę. Funkcja projekcji zwraca Observable, a operator decyduje, kiedy go zasubskrybować.</p><p>Na górze jest jeden pipeline: source$ → concatMap → S1. Na dole, w PRACACH WEWNĘTRZNYCH, każda wartość wejściowa dostaje własny wiersz: #1 · A, #2 · B, #3 · C.</p></div>
+                        <div data-checkpoint="ready"><p><strong>0 — Start</strong></p><p>Teraz dochodzimy do operatorów, które dla każdej wartości mogą uruchomić osobną pracę. Funkcja projekcji zwraca Observable, a operator decyduje, kiedy go zasubskrybować.</p><p>Na górze jest jeden pipeline: source$ → concatMap → S1. Na dole, w PRACACH WEWNĘTRZNYCH, każda wartość ma identyfikator #1 · A, #2 · B, #3 · C, a każde uruchomione inner Observable to osobny, znany już pipeline: własny kafelek HTTP GET i własny inbox — osobna wewnętrzna subskrypcja.</p></div>
                         <div data-checkpoint="subscribe"><p><strong>1 — subscribe()</strong></p><p>Wywołujemy subscribe: S1 subskrybuje concatMap, a concatMap — source$. To jedna główna subskrypcja; nie powstaje nowa dla każdej wartości.</p></div>
                         <div data-checkpoint="first"><p><strong>2 — A dociera</strong></p><p>Źródło emituje A. concatMap nic nie czeka, więc wywołuje projekcję: id => http.get(url(A)). Projekcja tylko tworzy Observable — request jeszcze nie ruszył.</p></div>
-                        <div data-checkpoint="active"><p><strong>3 — HTTP A</strong></p><p>Dopiero subskrypcja inner Observable uruchamia HTTP A. Wiersz #1 · A pokazuje postęp.</p></div>
-                        <div data-checkpoint="question"><p><strong>4 — A pracuje, przychodzi B</strong></p><p>A już wykonuje HTTP. Przychodzi B. Co teraz? Uruchomimy drugi request czy poczekamy?</p><p>Nie podpowiadaj: wiersz #2 · B ma tylko znak zapytania.</p></div>
-                        <div data-checkpoint="answer"><p><strong>5 — Odpowiedź: kolejka</strong></p><p>concatMap kolejkowuje B. Dopóki A się nie skończy, nie wywołujemy nawet projekcji dla B.</p><p>W KOLEJCE to wartość B, nie Observable: brak portów, progressu i HTTP. Dalej odtwarza się samo.</p></div>
-                        <div data-checkpoint="finished"><p><strong>6 — Wynik</strong></p><p>A complete → dopiero teraz projekcja B, inner B i HTTP B w tym samym wierszu. C przychodzi, gdy nic nie czeka, i od razu startuje.</p><p>Wyniki A, B, C w kolejności wejść. Koszt: B czekało na całe A.</p></div>
+                        <div data-checkpoint="active"><p><strong>3 — HTTP A</strong></p><p>Obok #1 · A stoi własny kafelek HTTP GET. Inbox po prawej to wewnętrzny subskrybent concatMap: dopiero jego subskrypcja uruchamia HTTP A. Postęp wypełnia lane pod nagłówkiem.</p></div>
+                        <div data-checkpoint="question"><p><strong>4 — A pracuje, przychodzi B</strong></p><p>A już wykonuje HTTP. Przychodzi B. Co teraz? Uruchomimy drugi request czy poczekamy?</p><p>Nie podpowiadaj: #2 · B ma tylko identyfikator i znak zapytania — nie ma jeszcze kafelka HTTP GET.</p></div>
+                        <div data-checkpoint="answer"><p><strong>5 — Odpowiedź: kolejka</strong></p><p>concatMap kolejkowuje B. Dopóki A się nie skończy, nie wywołujemy nawet projekcji dla B.</p><p>„w kolejce” to wartość B, nie Observable: brak kafelka HTTP GET, inboxa, portów i progressu. Dalej odtwarza się samo.</p></div>
+                        <div data-checkpoint="finished"><p><strong>6 — Wynik</strong></p><p>A complete → dopiero teraz projekcja B: placeholder zamienia się w nowy kafelek HTTP GET z własnym inboxem. C przychodzi, gdy nic nie czeka, i od razu dostaje swój HTTP.</p><p>Wyniki A, B, C w kolejności wejść. Koszt: B czekało na całe A.</p></div>
                     </template>
 				</section>
 
@@ -541,7 +541,7 @@
 					<template data-checkpoint-notes="10-mergemap">
                         <div data-checkpoint="ready"><p><strong>0 — Wprowadzenie</strong></p><p>Zostawiamy identyczną sytuację. A pracuje i pojawia się B. Ale tym razem mamy mergeMap.</p><p>S1 już subskrybuje — nie powtarzamy tej animacji. Dalej: A startuje i dochodzi do połowy.</p></div>
                         <div data-checkpoint="question"><p><strong>1 — A pracuje, przychodzi B</strong></p><p>Czy naprawdę musimy czekać na zakończenie A?</p></div>
-                        <div data-checkpoint="answer"><p><strong>2 — Odpowiedź: równolegle</strong></p><p>Nie. mergeMap uruchamia oba wewnętrzne Observable równolegle. Wyniki mogą wracać w dowolnej kolejności.</p><p>Dwa aktywne wiersze: #1 · A i #2 · B, każdy z własnym HTTP i postępem. Dalej odtwarza się samo.</p></div>
+                        <div data-checkpoint="answer"><p><strong>2 — Odpowiedź: równolegle</strong></p><p>Nie. mergeMap uruchamia oba wewnętrzne Observable równolegle. Wyniki mogą wracać w dowolnej kolejności.</p><p>Dwa osobne kafelki HTTP GET: #1 · A i #2 · B, każdy z własnym lane, postępem i inboxem. Dalej odtwarza się samo.</p></div>
                         <div data-checkpoint="finished"><p><strong>3 — Wynik</strong></p><p>B wróciło przed A, bo krótszy request skończył się wcześniej. S1 dostaje wyniki w kolejności nadejścia: B, A, C.</p></div>
                     </template>
 				</section>
@@ -553,8 +553,8 @@
 					<template data-checkpoint-notes="11-switchmap">
                         <div data-checkpoint="ready"><p><strong>0 — Wprowadzenie</strong></p><p>A już pracuje. Teraz przychodzi B.</p><p>S1 już subskrybuje — dalej: A startuje i dochodzi do połowy.</p></div>
                         <div data-checkpoint="question"><p><strong>1 — A pracuje, przychodzi B</strong></p><p>Co stanie się z A? Dokończy pracę czy zostanie anulowane?</p></div>
-                        <div data-checkpoint="answer"><p><strong>2 — Odpowiedź: anulowanie A</strong></p><p>switchMap odsubskrybowuje poprzednie wewnętrzne Observable i przełącza się na nowe. Główna subskrypcja S1 nadal działa.</p><p>Szary × to teardown inner A: request po stronie klienta przerwany, brak complete i brak odpowiedzi A.</p></div>
-                        <div data-checkpoint="started"><p><strong>3 — Nowy inner B</strong></p><p>Dopiero teraz projekcja B: nowy inner i nowy HTTP. Dalej odtwarza się samo.</p></div>
+                        <div data-checkpoint="answer"><p><strong>2 — Odpowiedź: anulowanie A</strong></p><p>switchMap odsubskrybowuje poprzednie wewnętrzne Observable i przełącza się na nowe. Główna subskrypcja S1 nadal działa.</p><p>Szary × biegnie od inboxa A do HTTP A — to teardown wewnętrznej subskrypcji A: request po stronie klienta przerwany, lane szarzeje, brak complete i brak odpowiedzi A.</p></div>
+                        <div data-checkpoint="started"><p><strong>3 — Nowy inner B</strong></p><p>Dopiero teraz projekcja B: nowy kafelek HTTP GET z własnym inboxem. A zostaje widoczne jako anulowane. Dalej odtwarza się samo.</p></div>
                         <div data-checkpoint="finished"><p><strong>4 — Wynik</strong></p><p>S1 dostaje B i C. Anulowane A nie wraca. Pamiętaj: unsubscribe nie cofa operacji na serwerze.</p></div>
                     </template>
 				</section>
@@ -562,12 +562,12 @@
 				<section id="12-exhaustmap" class="animation-slide" data-animation="12-exhaustmap">
 					<h2>exhaustMap — Jestem zajęty</h2>
 					<div class="rx-player" aria-label="exhaustMap — Jestem zajęty"></div>
-					<aside class="notes"><ul><li><strong>Porównanie:</strong> Te same A/B/C; po kolejkowaniu, równoległości i anulowaniu — ignorowanie.</li><li><strong>Pytanie:</strong> A co, jeśli nie chcemy przyjmować kolejnej pracy? B POMINIĘTE: bez projekcji, requestu i kolejki.</li><li><strong>Wniosek:</strong> Po zakończeniu A exhaustMap przyjmuje C.</li></ul></aside>
+					<aside class="notes"><ul><li><strong>Porównanie:</strong> Te same A/B/C; po kolejkowaniu, równoległości i anulowaniu — ignorowanie.</li><li><strong>Pytanie:</strong> A co, jeśli nie chcemy przyjmować kolejnej pracy? B pominięte: bez projekcji, requestu i kolejki.</li><li><strong>Wniosek:</strong> Po zakończeniu A exhaustMap przyjmuje C.</li></ul></aside>
 					<template data-checkpoint-notes="12-exhaustmap">
                         <div data-checkpoint="ready"><p><strong>0 — Wprowadzenie</strong></p><p>A pracuje. Przychodzi B. Poznaliśmy już kolejkowanie, równoległość i anulowanie.</p><p>S1 już subskrybuje — dalej: A startuje i dochodzi do połowy.</p></div>
                         <div data-checkpoint="question"><p><strong>1 — A pracuje, przychodzi B</strong></p><p>A co, jeśli nie chcemy teraz przyjmować żadnej kolejnej pracy?</p></div>
-                        <div data-checkpoint="answer"><p><strong>2 — Odpowiedź: pominięte</strong></p><p>exhaustMap ignoruje B. Nie uruchamia projekcji, nie tworzy requestu i nie zapisuje B na później. Dopiero po zakończeniu A może przyjąć następną wartość.</p><p>Dalej odtwarza się samo.</p></div>
-                        <div data-checkpoint="finished"><p><strong>3 — Wynik</strong></p><p>A kończy się normalnie, B nie wraca. C przychodzi po zakończeniu A i uruchamia nowy HTTP. S1 dostaje A i C.</p></div>
+                        <div data-checkpoint="answer"><p><strong>2 — Odpowiedź: pominięte</strong></p><p>exhaustMap ignoruje B. Nie uruchamia projekcji, nie tworzy requestu i nie zapisuje B na później: #2 · B ma tylko placeholder „pominięte”, bez kafelka HTTP GET i inboxa. Dopiero po zakończeniu A może przyjąć następną wartość.</p><p>Dalej odtwarza się samo.</p></div>
+                        <div data-checkpoint="finished"><p><strong>3 — Wynik</strong></p><p>A kończy się normalnie, B nie wraca. C przychodzi po zakończeniu A i dostaje własny kafelek HTTP GET z inboxem. S1 dostaje A i C.</p></div>
                     </template>
 				</section>
 
@@ -643,9 +643,18 @@
 					<h2>Jeden błąd. Czy następny klik zadziała?</h2>
 					<div class="rx-player" aria-label="Jeden błąd. Czy następny klik zadziała?"></div>
 					<aside class="notes">
-						<p>Porównaj położenie catchError: osobny operator za switchMap albo operator wewnątrz ramki każdego HTTP. http$ jest zimnym Observable, a każde kliknięcie tworzy jego nową subskrypcję. Ręczne postoje pokazują pracę A, błąd i wynik zastępczy []. W obu wariantach catchError subskrybuje of([]), które emituje i kończy się. Na zewnątrz kończy się cały wynik, a subskrypcja klik$ znika. Klik B nadal może wystąpić w źródle, lecz nie uruchamia HTTP B. Wewnątrz kończy się tylko inner A: kolejne kliknięcie uruchamia HTTP B z własnym catchError i przekazuje wynik B. Przerywana linia wskazuje zakres prac tworzonych przez switchMap; nie jest subskrypcją. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik: tutaj wynika to z wyboru of([]).</p>
+						<p>Porównaj położenie catchError: wewnątrz pipe każdego HTTP albo osobny operator za switchMap. Każde kliknięcie tworzy nową subskrypcję http.get(url(id)). W obu wariantach catchError subskrybuje of([]), które emituje i kończy się. Wewnątrz kończy się tylko inner A: kolejne kliknięcie uruchamia HTTP B z własnym catchError i przekazuje wynik B. Na zewnątrz catchError odłącza pierwotny strumień (klik$ i switchMap), a S1 dostaje [] i complete; klik B nie uruchamia HTTP B. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik: tutaj wynika to z wyboru of([]).</p>
 						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
 					</aside>
+					<template data-checkpoint-notes="b04-catcherror">
+                        <div data-checkpoint="ready"><p><strong>0 — Start</strong></p><p>Przed chwilą catchError znajdował się wewnątrz switchMap. Teraz przenosimy go na zewnątrz. Zobaczmy, co się zmieni.</p></div>
+                        <div data-checkpoint="click-a"><p><strong>1 — HTTP A</strong></p><p>Pierwsze kliknięcie uruchamia request. Na razie zachowanie jest dokładnie takie samo.</p></div>
+                        <div data-checkpoint="error"><p><strong>2 — Błąd</strong></p><p>HTTP emituje błąd. Ale wewnątrz nie mamy już catchError, więc błąd propaguje się przez switchMap.</p></div>
+                        <div data-checkpoint="caught"><p><strong>3 — Przechwycenie</strong></p><p>Dopiero tutaj łapie go zewnętrzny catchError. Problem polega na tym, że oryginalny strumień zostaje odsubskrybowany.</p></div>
+                        <div data-checkpoint="fallback"><p><strong>4 — Fallback</strong></p><p>CatchError przełącza się na zastępcze of([]). Dostajemy pustą tablicę, a potem complete.</p></div>
+                        <div data-checkpoint="click-b"><p><strong>5 — Kolejne kliknięcie</strong></p><p>I teraz klikamy ponownie. Nic się nie dzieje. Nie dlatego, że switchMap zignorował kliknięcie, tylko dlatego, że nie mamy już aktywnej subskrypcji kliknięć.</p></div>
+                        <div data-checkpoint="finished"><p><strong>6 — Podsumowanie</strong></p><p>CatchError wewnątrz ratuje pojedynczą operację. CatchError na zewnątrz zastępuje cały strumień po błędzie. Samo umiejscowienie operatora zmienia zachowanie aplikacji.</p></div>
+                    </template>
 					<template data-checkpoint-notes="b04-catcherror-2">
                         <div data-checkpoint="ready"><p><strong>0 — Definicja</strong></p><p>Zobaczmy, co się stanie, gdy HTTP zwróci błąd, ale catchError znajduje się wewnątrz switchMap.</p></div>
                         <div data-checkpoint="subscribe"><p><strong>1 — Subscribe</strong></p><p>Subskrybujemy zewnętrzny strumień kliknięć.</p></div>
