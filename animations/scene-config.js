@@ -1,9 +1,9 @@
-import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside } from './reference-scenes.js';
+import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch } from './reference-scenes.js';
 
 // Końcowe ID po rozwinięciu wariantów; otwarcie pozostaje w kolejności HTML.
 export const mainOrder = [
   '05-zrodla-2','05-zrodla','04-operator','04a-dwa-tory','05-zrodla-5','05-zrodla-3','05-zrodla-4','04a-dwa-tory-2','04a-dwa-tory-3',
-  '20-sharereplay','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap',
+  '20-sharereplay','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','11a-distinct-switchmap','12-exhaustmap',
   'b04-catcherror-2','b04-catcherror','14-distinct','16-czas-cztery','25-podsumowanie','pytania',
 ];
 export const extraOrder = [
@@ -40,6 +40,8 @@ export function configureScene(scene) {
     scene.graph=flattenGraph;configureFlattenPlayback(scene);
   }
   if(id==='13-limit')configureConcurrency(scene);
+  // distinctUntilChanged przed switchMap: A, A, B, B, A → 3 requesty (osobny slajd po switchMap).
+  if(id==='11a-distinct-switchmap')configureDistinctSwitch(scene);
   // Oba warianty catchError w wyglądzie MAIN switchMap: wewnątrz (-2) i na zewnątrz (za switchMap).
   if(id==='b04-catcherror')(scene.catchInside?configureCatchInside:configureCatchOutside)(scene);
   if(id==='05-zrodla'&&scene.sourceExample===0)configureInterval(scene);

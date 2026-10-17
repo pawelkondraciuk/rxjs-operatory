@@ -1318,3 +1318,85 @@ function catchOutsideGraph(scene) {
   nodes[1].teardownEdge='source-op';
   return graph;
 }
+
+// distinctUntilChanged + switchMap (11a-distinct-switchmap): jeden potok selectedUserId$ → distinctUntilChanged → switchMap
+// → S1 (S1 zestawione przed READY), dół PRACE WEWNĘTRZNE z instancjami HTTP GET → inbox jak w 09–12. Wejścia A, A, B, B, A:
+// distinctUntilChanged pamięta ostatnią przepuszczoną wartość (prev w wierszu), powtórzenie wjeżdża do wiersza, czeka na
+// pytanie (decide) i gaśnie — bez kabla dalej, bez nowego HTTP i bez anulowania. Do switchMap trafia A, B, A: 3 requesty.
+const distinctInput=[{at:.6,value:'A'},{at:3,value:'A',dup:true},{at:4.2,value:'B'},{at:5.4,value:'B',dup:true},{at:6.6,value:'A'}];
+const distinctColors={A:'#6D4CD3',B:'#B85D05'},distinctDecide=1.2;
+export function configureDistinctSwitch(scene) {
+  const passed=distinctInput.filter(v=>!v.dup),dups=distinctInput.filter(v=>v.dup),durations=[4.4,3,1.5];
+  const jobs=passed.map((v,i)=>{
+    const next=passed[i+1],natural=v.at+durations[i],end=next?Math.min(natural,next.at):natural;
+    return {value:v.value,at:v.at,start:v.at,end,dur:durations[i],cancelled:end<natural};
+  });
+  const last=jobs.at(-1);
+  const ev=(type,extra)=>({type,...extra}),during=(from,to)=>({from,to}),arrived=at=>ev('deliver-next',{edge:'source-distinct',logicalAt:at});
+  const op={id:'switch',bg:'rgba(216,179,230,.45)',line:'#b384c6'},http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'};
+  // Kod w dwóch liniach (jak catchError); fragmenty świecą, gdy dany operator albo request pracuje.
+  const lines=[[{text:'selectedUserId$.pipe('},{text:'distinctUntilChanged()',mark:{...op,id:'distinct'},active:distinctInput.map(v=>during(arrived(v.at),
+      v.dup?{...arrived(v.at),offset:distinctDecide}:ev('source-next',{edge:'distinct-op',logicalAt:v.at})))},{text:','}],
+    [{text:'  '},{text:'switchMap',mark:op,active:jobs.map((job,i)=>during(ev('deliver-next',{edge:'distinct-op',logicalAt:job.at}),ev('inner-subscribe',{edge:`inner${i}-op`})))},
+      {text:'(id => '},{text:'http.get(url(id))',mark:http,active:jobs.map((job,i)=>during(ev('inner-subscribe',{edge:`inner${i}-op`}),
+        ev(job.cancelled?'inner-unsubscribe':'inner-next',{edge:`inner${i}-op`})))},{text:'))'}]];
+  Object.assign(scene,{jobs,operatorName:'switchMap',distinctInput,graph:distinctSwitchGraph,duration:last.end+1.4,preconnected:true,
+    title:'distinctUntilChanged — czy coś się zmieniło?',playerLayout:'expanded',playerClass:'rx-flat-tiles rx-catch-inside',
+    timing:{subscribe:2.4,travel:1,transform:1.4,terminal:.8,gap:.5},
+    code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
+    rows:[R('selectedUserId$',distinctInput.map(v=>E(v.at,v.value,distinctColors[v.value]))),
+      R('distinctUntilChanged',passed.map(v=>E(v.at,v.value,distinctColors[v.value]))),
+      ...jobs.map(job=>R('HTTP '+job.value,job.cancelled?[]:[E(job.end,job.value,distinctColors[job.value])],
+        [B(job.start,job.end,job.value,job.cancelled?'cancel':'work',{duration:job.dur})],{completeAt:job.cancelled?undefined:job.end})),
+      R('wynik',[E(last.end,last.value,distinctColors[last.value])])],
+    captions:[[0,'S1 już subskrybuje. distinctUntilChanged pamięta ostatnią przepuszczoną wartość'],
+      [jobs[0].at,'A: brak poprzedniej wartości — przechodzi. switchMap uruchamia HTTP A'],
+      [jobs[1].at,'B ≠ prev: A — przechodzi. switchMap anuluje HTTP A i uruchamia HTTP B'],
+      [jobs[2].at,'A ≠ prev: B — przechodzi. Porównanie z ostatnią wartością, nie z całą historią'],
+      [last.end,'HTTP A zwraca wynik do S1 i kończy się complete. S1 czeka na kolejne ID']],
+    metrics:[{label:'wejścia',value:t=>distinctInput.filter(v=>v.at<=t).length},{label:'requesty HTTP',count:'started'},{label:'aktywne',count:'active'}],
+    playback:{entry:'manual',finish:'hold',afterLastManualStop:'start-auto',stops:[
+      {id:'first',event:ev('source-next',{edge:'source-distinct',logicalAt:dups[0].at}),offset:-.4,caption:'A przeszło: prev: A. switchMap uruchomił HTTP A'},
+      {id:'question',event:arrived(dups[0].at),offset:.6,caption:'HTTP A trwa, a znowu przychodzi A. Czy switchMap anuluje request i uruchomi go ponownie?'},
+      {id:'answer',event:arrived(dups[0].at),offset:distinctDecide+.6,caption:'A === prev: A — odrzucone w distinctUntilChanged. HTTP A pracuje dalej'},
+      {id:'switched',event:ev('inner-subscribe',{edge:'inner1-op'}),offset:.3,caption:'B ≠ prev: A — switchMap anulował HTTP A i uruchomił HTTP B'},
+      {id:'repeat-b',event:arrived(dups[1].at),offset:distinctDecide+.6,caption:'B === prev: B — odrzucone. HTTP B bez restartu'},
+      {id:'again-a',event:ev('inner-subscribe',{edge:'inner2-op'}),offset:.3,caption:'A ≠ prev: B — przechodzi. HTTP B anulowany, startuje HTTP #3 · A'},
+    ]},
+  });
+}
+
+function distinctSwitchGraph(scene) {
+  const frame=frameFor(scene),[input,passed,,,,result]=scene.rows,decide=distinctDecide;
+  const nodes=[{id:'source',label:'selectedUserId$',color:'source',ready:true},
+    // Pamięć prev i odrzucenie powtórzeń w wierszu S1 operatora; przepuszczona kulka przejeżdża przez wiersz (hold).
+    {id:'distinct',label:'distinctUntilChanged',color:'op',ready:true,memory:{label:'prev'},rejectBalls:true,rejectAt:.42,transformBalls:true},
+    {id:'op',label:'switchMap',color:'op',ready:true},{id:'observer',label:'',ready:true},
+    ...scene.jobs.map((job,i)=>({id:'inner'+i,label:'HTTP '+job.value,inner:true,workRow:true,panel:'jobs',slot:i,ready:false,born:job.start}))];
+  const edges=[
+    {from:'source',to:'distinct',events:input.events.map(e=>scene.distinctInput.find(v=>v.at===e.at).dup?{...e,decide}:e),logicalStart:.1,logicalEnd:null},
+    {from:'distinct',to:'op',events:passed.events,logicalStart:.1,logicalEnd:null,hold:1},
+    {from:'op',to:'observer',events:result.events,logicalStart:.1,logicalEnd:null},
+    ...scene.jobs.map((job,i)=>({id:`inner${i}-op`,from:'inner'+i,to:'op',events:scene.rows[2+i].events.map(e=>({...e,execution:'#'+(i+1)})),
+      logicalStart:job.start,logicalEnd:{at:job.end,kind:job.cancelled?'unsubscribe':'complete'},gateWork:true,internal:true}))];
+  const graph={layout:'fixed',formatAware:true,width:1240,height:frame.height,illustratedWork:true,nodes,edges,
+    executions:scene.jobs.map((job,i)=>({id:'#'+(i+1),node:'inner'+i,edge:`inner${i}-op`,panel:'jobs',value:job.value,label:'HTTP '+job.value,duration:job.dur})),
+    timeline:[
+      ...scene.distinctInput.filter(v=>v.dup).map(v=>({type:'distinct-reject',event:{type:'deliver-next',edge:'source-distinct',logicalAt:v.at},offset:decide,
+        caption:`${v.value} === prev: ${v.value} — odrzucone. HTTP ${v.value} pracuje dalej`})),
+      {type:'distinct-summary',event:{type:'deliver-next',edge:'op-observer'},offset:1.2,
+        caption:'5 wejść, 3 requesty: A, B, A. distinctUntilChanged odrzuca tylko kolejne powtórzenia'}]};
+  // Cztery kafelki na wspólnej osi portów; kompaktowy odbiorca S1 mieści jedną kulkę wyniku.
+  configureHttpWorkPanel(graph,scene,frame,{instances:true,
+    tiles:[['source',178,300,'#8FC9D4'],['distinct',568,400,'#D8B3E6'],['op',905.5,195,'#D8B3E6']]});
+  const receiver=nodes.find(n=>n.id==='observer');
+  Object.assign(receiver,{x:1127.5,w:169});
+  Object.assign(graph.trays[0],{x:1168,w:60,max:1});
+  // Kolor należy do wartości: oba wykonania A mają ten sam kolor, B — własny.
+  for(const edge of graph.edges)edge.events=edge.events.map(e=>({...e,color:distinctColors[e.value]||e.color}));
+  for(const work of graph.panels[0].works)work.color=distinctColors[work.value];
+  // Postęp HTTP w czasie modelu: stoi podczas przelotów i pytania, przy anulowaniu zostaje na ułamku modelu.
+  graph.panels[0].modelProgress=true;
+  for(const edge of graph.edges.filter(e=>!e.internal))edge.preconnected=true;
+  return graph;
+}

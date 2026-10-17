@@ -558,6 +558,21 @@
                         <div data-checkpoint="finished"><p><strong>4 — Wynik</strong></p><p>S1 dostaje B i C. Anulowane A nie wraca. Pamiętaj: unsubscribe nie cofa operacji na serwerze.</p></div>
                     </template>
 				</section>
+				<section id="11a-distinct-switchmap" class="animation-slide" data-animation="11a-distinct-switchmap">
+					<h2>distinctUntilChanged — czy coś się zmieniło?</h2>
+					<div class="rx-player" aria-label="distinctUntilChanged — czy coś się zmieniło?"></div>
+					<aside class="notes"><p>Jeden potok selectedUserId$ → distinctUntilChanged → switchMap → S1; wejścia A, A, B, B, A. distinctUntilChanged pamięta ostatnią przepuszczoną wartość (prev) osobno dla każdej subskrypcji i porównuje przez ===. Powtórzenia gasną w operatorze: bez nowego HTTP i bez anulowania trwającego. Do switchMap trafia A, B, A — 3 requesty zamiast 5. To nie jest cache: A po B przechodzi. 60–90 s.</p></aside>
+					<template data-checkpoint-notes="11a-distinct-switchmap">
+                        <div data-checkpoint="ready"><p><strong>0 — Gotowy pipeline</strong></p><p>Widzieliśmy, że switchMap anuluje poprzedni request, gdy przychodzi nowa wartość. Ale jest pewien problem. Co jeśli ta nowa wartość jest identyczna?</p></div>
+                        <div data-checkpoint="first"><p><strong>1 — Pierwsze A</strong></p><p>Wybieramy użytkownika A. Operator przepuszcza pierwszy identyfikator i uruchamiamy HTTP.</p></div>
+                        <div data-checkpoint="question"><p><strong>2 — Drugie A: pytanie</strong></p><p>HTTP jeszcze trwa, a my ponownie wybieramy A. Sam switchMap anulowałby poprzedni request i uruchomił go jeszcze raz. Czy naprawdę tego chcemy?</p></div>
+                        <div data-checkpoint="answer"><p><strong>2 — Drugie A: odpowiedź</strong></p><p>distinctUntilChanged pamięta ostatnią przepuszczoną wartość. A jest równe A, więc niczego nie emituje dalej. HTTP może spokojnie pracować.</p></div>
+                        <div data-checkpoint="switched"><p><strong>3 — Pierwsze B</strong></p><p>Teraz wybieramy B. To już zmiana, więc wartość przechodzi do switchMap. Poprzedni HTTP zostaje anulowany i startuje nowy.</p></div>
+                        <div data-checkpoint="repeat-b"><p><strong>4 — Drugie B</strong></p><p>Drugie B ponownie zostaje odrzucone. Nie przerywamy wykonywanego requestu.</p></div>
+                        <div data-checkpoint="again-a"><p><strong>5 — Ponowne A</strong></p><p>A teraz znowu wybieramy A. I uwaga: tym razem wartość przechodzi. distinctUntilChanged porównuje ją z ostatnim B, a nie ze wszystkimi wartościami z historii.</p></div>
+                        <div data-checkpoint="finished"><p><strong>6 — Wynik</strong></p><p>Czyli distinctUntilChanged nie jest cache'em. Po prostu nie przepuszcza kolejnych identycznych wartości. Umieszczony przed switchMap pozwala uniknąć niepotrzebnych anulowań i requestów.</p></div>
+                    </template>
+				</section>
 
 				<section id="12-exhaustmap" class="animation-slide" data-animation="12-exhaustmap">
 					<h2>exhaustMap — Jestem zajęty</h2>

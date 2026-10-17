@@ -30,7 +30,7 @@ function createInstancePanel({works,columns,height,large,id,minRows,tileLeft,x,w
 
 // Widok lokalnego pipeline'u z istniejącego planu. Nie planuje subskrypcji ani nie prowadzi zegara.
 // Każdy etap wiąże się z własną krawędzią; jego terminal nie kończy automatycznie całego inner.
-export function innerWorkPanelSnapshot(panel, records, births, time) {
+export function innerWorkPanelSnapshot(panel, records, births, time, logicalTime = time) {
   const record = id => records.find(r => r.id === id);
   const connected = r => r ? r.start + r.connectDuration : Infinity;
   // panel.cancelPulse (opt-in): unsubscribe biegnie szarym impulsem × od operatora do pracy; praca jest anulowana po jego dotarciu.
@@ -92,6 +92,12 @@ export function innerWorkPanelSnapshot(panel, records, births, time) {
         const rate = pivot.fraction/(pivot.at-start), t = Math.min(time, stop);
         progress = t < pivot.at ? (t-start)*rate : r.events.length ?
           pivot.fraction+(1-pivot.fraction)*clamp((t-pivot.at)/Math.max(.001,stop-pivot.at)) : Math.min(1, pivot.fraction+(t-pivot.at)*rate);
+      }
+      // panel.modelProgress (opt-in): postęp w czasie modelu — stoi, gdy model stoi (przeloty, pytanie), kończy się
+      // z odpowiedzią albo zostaje na ułamku modelu w chwili anulowania.
+      if (panel.modelProgress && r && stage.progress && progress > 0) {
+        const until = r.events[0]?.logicalAt ?? r.end?.logicalAt ?? Infinity;
+        progress = clamp((Math.min(logicalTime, until) - r.logicalStart)/work.duration);
       }
       const since = r?.end ? r.end.at + (stage.receiver || pulsed(r) ? r.end.duration : 0) : undefined;
       // handles: etap obsługi błędu (np. catchError) pokazuje chwilowy fallback (label, np. of([])) od dotarcia błędu

@@ -269,6 +269,7 @@ export function compileScene(scene) {
       const shown=fallbackTimes.get(n.id);
       if(role==='operator'&&shown&&time>=shown.from&&time<shown.to+fadeDuration)
         lane.fallback={label:n.laneFallback.label,opacity:Math.min(clamp((time-shown.from)/fadeDuration),1-clamp((time-shown.to)/fadeDuration))};
+      if(role==='operator'&&n.memory)lane.memory=memoryOf(n,out,input,time);
       if(role==='work') {
         // progressUntilNext: oczekiwanie kończy się z wysłaniem pierwszej wartości (odpowiedź HTTP), nie dopiero z complete.
         const firstNext=n.progressUntilNext?out.events[0]?.at:undefined;
@@ -279,6 +280,20 @@ export function compileScene(scene) {
     });
   }
 
+  // memory (opt-in, np. distinctUntilChanged): pamięć osobna dla każdej subskrypcji operatora — ostatnia przepuszczona
+  // wartość. Zmienia się w połowie przejścia przepuszczonej kulki przez wiersz; odrzucenie (wejście bez wyjścia) jej nie
+  // zmienia, tylko zaznacza chwilę porównania (comparedAt = koniec decide).
+  function memoryOf(n,out,input,time) {
+    const inputs=input?.events||[];
+    const updates=out.events.map(v=>{
+      const e=inputs.find(i=>i.logicalAt===v.logicalAt&&i.arrival<=v.at);
+      return {value:v.value,color:v.color||'a',at:e?(e.arrival+v.at)/2:v.at};
+    }).filter(u=>u.at<=time);
+    const compared=inputs.filter(e=>!out.events.some(v=>v.logicalAt===e.logicalAt)).map(e=>e.arrival+(e.decide||0)).filter(at=>at<=time);
+    const last=updates.at(-1);
+    return {label:n.memory.label??'prev',empty:n.memory.empty??'—',...(last?{value:last.value,color:last.color,since:last.at}:{}),
+      ...(compared.length?{comparedAt:compared.at(-1)}:{})};
+  }
   // Wiersz wykonania rezerwuje miejsce, gdy subscribe wyrusza do kafelka (kabel trafia w gotowy wiersz);
   // stan toru wypełnia go po dotarciu. Wiersze zostają po zakończeniu, więc kafelek tylko rośnie.
   function laneRowsOf(n,time) {
@@ -373,7 +388,7 @@ export function compileScene(scene) {
       tokens.push({x,y,value:e.value,color:e.color||'a',edge:r.id,phase:e.phase||'travel'});
     }
     // Wartość z decide (flow.js) czeka na porcie wejścia odbiorcy, aż operator pokaże reakcję; potem gaśnie.
-    for(const r of records) for(const e of r.events) if(!r.internal&&e.decide&&time>=e.arrival&&time<e.arrival+e.decide+fadeDuration) {
+    for(const r of records) for(const e of r.events) if(!r.internal&&!r.b.rejectBalls&&e.decide&&time>=e.arrival&&time<e.arrival+e.decide+fadeDuration) {
       const [x,y]=pointAt(r.points||geometry(r.a,r.b),1);
       tokens.push({x,y,value:e.value,color:e.color||'a',edge:r.id,phase:'decide',opacity:1-clamp((time-e.arrival-e.decide)/fadeDuration)});
     }
@@ -407,6 +422,16 @@ export function compileScene(scene) {
         tokens.push({x:split.x+(target.x-split.x)*u,y:split.y+(target.y-split.y)*u,
           value:out.value,color:out.color,phase:out.buffer?'buffer-in':'split-out',scale:1+.15*Math.max(0,1-Math.abs(p-.4)/.08)});
       }
+    }
+    // rejectBalls (opt-in, np. distinctUntilChanged): wejście bez wyjścia o tym samym logicalAt wjeżdża do wiersza
+    // (n.rejectAt·w), stoi do końca decide (pytanie, porównanie z pamięcią), potem kurczy się i gaśnie w wierszu.
+    for(const n of nodes) if(n.rejectBalls) for(const input of laneRecords.filter(r=>r.b.id===n.id)) for(const e of input.events) {
+      if(laneRecords.some(out=>out.a.id===n.id&&out.events.some(v=>v.logicalAt===e.logicalAt)))continue;
+      const decided=e.arrival+(e.decide||0),left=n.x-n.w/2,x=left+n.w*(n.rejectAt??.5);
+      if(time<e.arrival||time>=decided+dropDuration)continue;
+      const enter=clamp((time-e.arrival)/Math.min(.5,Math.max(.001,decided-e.arrival))),u=enter*enter*(3-2*enter),drop=clamp((time-decided)/dropDuration);
+      tokens.push({x:left+(x-left)*u,y:laneY(n,input.subscriber),value:e.value,color:e.color||'a',edge:input.id,phase:'reject',
+        ...(drop>0?{opacity:1-drop,scale:1-.4*drop}:{})});
     }
     // dropBalls (hub, np. Subject bez odbiorców): wartość, której nikt nie odbiera, kurczy się i gaśnie na porcie wejścia.
     for(const n of nodes) if(n.dropBalls) for(const input of laneRecords.filter(r=>r.b.id===n.id)) for(const e of input.events) {
@@ -534,7 +559,7 @@ export function compileScene(scene) {
           color:subscriber.color||colors.a,ink:subscriber.ink||subscriber.color||'#26323B',fill:subscriber.tint||'#fff'}];
       })}:{}),
       ...executionState,
-      ...((graph.panels||[]).some(p=>p.innerWork)?{innerWorkPanels:graph.panels.filter(p=>p.innerWork).map(p=>innerWorkPanelSnapshot(p,records,births,time))}:{}),
+      ...((graph.panels||[]).some(p=>p.innerWork)?{innerWorkPanels:graph.panels.filter(p=>p.innerWork).map(p=>innerWorkPanelSnapshot(p,records,births,time,logicalTime))}:{}),
       metrics:(scene.metrics||[]).map(m=>({label:m.label,value:m.count?executionState.executionCounts[m.count]:m.value(logicalTime)})),
       queue:graph.queue?evaluate(graph.queue,logicalTime):null};
   }

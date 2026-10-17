@@ -470,6 +470,14 @@ export function renderScene(frame,options={}) {
           svg+=`<g data-lane-fallback="${esc(lane.fallback.label)}" opacity="${reduced?1:+lane.fallback.opacity.toFixed(3)}"><rect x="${fx}" y="${lane.y-font*.75}" width="${fw}" height="${font*1.5}" rx="${font*.75}" fill="#F3E6F8" stroke="#B384C6" stroke-width="2"/>`+
             text(fx+fw/2,lane.y+1,lane.fallback.label,font,'style="font-family:Consolas,ui-monospace,monospace;font-weight:700;fill:#6B3D80"')+'</g>';
         }
+        // Pamięć operatora (np. prev: A) przy prawej krawędzi wiersza; zmiana wartości i porównanie krótko podświetlają slot.
+        if(lane.memory) {
+          const m=lane.memory,font=20*k,h=font*1.6,w=(m.label.length+3)*.6*font+20*k,x0=n.x+n.w/2-12*k-w,since=t=>t!==undefined&&!reduced?clamp((frame.time-t)/.6):1;
+          const changed=1-since(m.since),compared=1-since(m.comparedAt),value=m.value??m.empty;
+          svg+=`<g data-lane-memory="${esc(String(m.value??''))}"><title>${esc(m.label+': '+value)}</title>`+
+            `<rect x="${x0}" y="${lane.y-h/2}" width="${w}" height="${h}" rx="${6*k}" fill="#fff" stroke="${changed>0?m.color&&colors[m.color]||m.color||'#7457D9':compared>0?'#808890':'#B9AFC9'}" stroke-width="${2+3*Math.max(changed,compared)}"/>`+
+            `<text x="${x0+10*k}" y="${lane.y}" font-size="${+font.toFixed(2)}" dominant-baseline="middle" style="font-family:Consolas,ui-monospace,monospace;fill:#55636c;text-anchor:start">${esc(m.label)}: <tspan style="font-weight:700;fill:${m.value===undefined?'#8b979e':m.color&&colors[m.color]||m.color||'#26323B'}">${esc(value)}</tspan></text></g>`;
+        }
       } else if(lane.role==='operator') {
         const x0=chipLeft,x1=n.x+n.w/2-22*k,h=58*k;
         svg+=`<rect x="${x0}" y="${lane.y-h/2}" width="${x1-x0}" height="${h}" rx="${12*k}" fill="#fff" fill-opacity=".62"/>`;

@@ -17,7 +17,7 @@ Sceny MAIN z pytaniami zaczynają od nieruchomego READY. Prawo / Page Down uruch
 
 W oknie prelegenta (`S`) podgląd następnego slajdu domyślnie pokazuje dużą nazwę, np. **switchMap**, i krótki podtytuł. Wskazuje kolejny slajd, także podczas ręcznych postojów bieżącej animacji. Przełącznik **Podgląd: Tytuł / Slajd** w prawym dolnym rogu tego pola przywraca standardowy podgląd. Wybór jest zapamiętywany w przeglądarce. Notatki pozostają w standardowym polu Notes. Opcjonalne `data-speaker-title` na sekcji ustawia własny podpis wyłącznie dla prelegenta.
 
-Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 67 slajdów daje 83 strony PDF.
+Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 68 slajdów daje 84 strony PDF.
 
 Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przywraca ekran panoramiczny 1280×720. `W` przeładowuje stronę w drugim formacie, zostając na tym samym slajdzie i fragmencie; animacja wraca do stanu tego fragmentu. Linki do EXTRAS i powrót do pytań zachowują wybrany format. Druk działa w obu: `?print-pdf` (4:3) lub `?print-pdf&ratio=16:9`. W 4:3 slajdy wykorzystują pełną wysokość: większe zdjęcia i kody QR, wyższe diagramy, większy tekst i kapsułki w animacjach (×1,15), etykiety kafelków do ×1,3 oraz większy tytuł (64 px; za długi zmniejsza się, by został w jednej linii), kod (42 px, długi łańcuch przechodzi do nowej linii przed .pipe/.subscribe) i podpis.
 
@@ -33,25 +33,25 @@ Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorz
 
 Pełne otwarcie pozostaje bez zmian: społeczność, historia meet.js, fotografie, autor, tytuł i pytania o operatory. Budżet **30–35 minut dotyczy tylko części właściwej**; otwarcie, pytania i dogrywka są dodatkowo.
 
-MAIN ma **32 slajdy (21 animowanych)**. EXTRAS zawiera **35 wariantów**. Całość obejmuje 48 bazowych slajdów HTML, 67 po rozwinięciu, 56 animowanych. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
+MAIN ma **33 slajdy (22 animowane)**. EXTRAS zawiera **35 wariantów**. Całość obejmuje 49 bazowych slajdów HTML, 68 po rozwinięciu, 57 animowanych. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
 
 Kolejność po otwarciu:
 
 1. HTTP (`05-zrodla-2`) → interval na żywo (`05-zrodla`) → map, pipe i wykonanie (`04-operator`) → cold (`04a-dwa-tory`) → Subject — ręczna emisja (`05-zrodla-5`) → ręczny multicast HTTP przez Subject (`05-zrodla-3`) → Subject + interval: kto odłączy źródło? (`05-zrodla-4`) → share(): jedno HTTP, dwóch odbiorców (`04a-dwa-tory-2`) → share z unsubscribe A (`04a-dwa-tory-3`).
 2. Następnie późny odbiorca z share/shareReplay (`20-sharereplay`, `20-sharereplay-2`). Cold i współdzielenie HTTP pokazują wcześniej tory `04a`; powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
-3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap.
+3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → distinctUntilChanged przed switchMap (`11a-distinct-switchmap`) → exhaustMap.
 4. catchError wewnątrz/na zewnątrz → distinctUntilChanged → wspólne porównanie debounceTime i auditTime (`16-czas-cztery`).
 5. Cztery pytania podsumowania → „Pytania?” → rozmowa z salą albo dodatkowe przykłady.
 
 | Część właściwa | Budżet |
 | --- | --- |
 | HTTP, źródła, map/pipe, wykonania, Subject i share/replay | 9 min |
-| map + concatAll oraz cztery operatory *Map | 12 min |
+| map + concatAll, cztery operatory *Map i distinctUntilChanged przed switchMap | 13,5 min |
 | catchError | 4 min |
 | distinctUntilChanged, debounceTime, auditTime | 4 min |
 | Podsumowanie | 1,5 min |
 | Rezerwa na interakcję i przejścia | 2 min |
-| **Łącznie** | **32,5 min** |
+| **Łącznie** | **34 min** |
 
 Na map + concatAll i przejście do concatMap przewidziano około 3 minut z bloku flatteningu. Czasy są planem prelegenta, nie pomiarem odtwarzacza.
 
@@ -391,6 +391,20 @@ Góra bez zmian: source$ → operator → kompaktowy Odbiorca, jeden główny to
 - **Pytanie:** Co stanie się z A? Dokończy pracę czy zostanie anulowane?
 - **Odpowiedź:** switchMap odsubskrybowuje poprzednie wewnętrzne Observable i przełącza się na nowe. Główna subskrypcja S1 nadal działa.
 - **Pułapka:** ABORT klienta ≠ cofnięcie operacji serwera; unsubscribe ≠ complete.
+
+### distinctUntilChanged przed switchMap — `11a-distinct-switchmap`
+
+**Temat:** sam switchMap przy powtórzonym ID anuluje request i uruchamia go od nowa; distinctUntilChanged przed nim zatrzymuje kolejne powtórzenia.
+
+| ID slajdu | Tytuł na ekranie | Kod nad diagramem |
+| --- | --- | --- |
+| 11a-distinct-switchmap | distinctUntilChanged — czy coś się zmieniło? | `selectedUserId$.pipe(distinctUntilChanged(),`<br>`  switchMap(id => http.get(url(id))))` |
+
+**Na bloczkach:** jeden potok „selectedUserId$” → „distinctUntilChanged” → „switchMap” → kompaktowy odbiorca S1 (S1 zestawione w READY, bez animacji subscribe). W wierszu S1 operatora distinctUntilChanged stoi slot pamięci `prev: —`, który zmienia się (z podświetleniem w kolorze wartości) w połowie przejazdu przepuszczonej kulki; porównanie z powtórzeniem podświetla go na szaro. Dół: PRACE WEWNĘTRZNE jak w 09–12 — każde uruchomione HTTP to `#n · X`, kafelek HTTP GET z lane i inbox. Wejścia A, A, B, B, A (A zawsze indygo, B pomarańczowe). Powtórzenie wjeżdża do wiersza distinctUntilChanged, stoi na pytaniu i gaśnie — bez kabla dalej, bez HTTP, inboxu i placeholdera, bez anulowania trwającej pracy. B po A i A po B przechodzą: switchMap anuluje poprzedni HTTP (szary impuls ×) i startuje nowy. Do switchMap trafia A, B, A: 3 requesty zamiast 5. #3 · A zwraca wynik do S1 i kończy się complete; S1, źródło i operatory pozostają aktywne. Postęp HTTP liczony w czasie modelu, więc stoi podczas przelotów i pytania.
+
+Postoje: first (przed drugim A, HTTP A ~45%), question (drugie A w operatorze), answer (zgasło, prev: A, HTTP A pracuje), switched (#1 anulowane, #2 · B), repeat-b (drugie B odrzucone), again-a (#3 · A, prev: A), potem AUTO do wyniku. Notatki per checkpoint w `template[data-checkpoint-notes="11a-distinct-switchmap"]` (60–90 s).
+
+**Speaker notes (skrót):** switchMap anuluje przy każdej nowej wartości, także identycznej → distinctUntilChanged pamięta ostatnią przepuszczoną wartość i porównuje przez === → nie jest cache'em: A po B przechodzi.
 
 ### exhaustMap — `12-exhaustmap`
 
