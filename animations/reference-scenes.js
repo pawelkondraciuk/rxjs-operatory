@@ -662,23 +662,24 @@ export function subjectManualGraph(scene) {
 // Subject i interval (05-zrodla-4): kto odłączy źródło? interval(1000) → Subject → A/B/C, wygląd jak Subject + HTTP.
 // READY: wszystkie subskrypcje zestawione przed t = 0 — także connection (tor #1: interval → Subject) — i interval
 // od razu emituje. Scena na żywo z akcjami (scene.live.actions): kolejne „dalej” wywołują subA/subB/subC.unsubscribe()
-// (odłącza się wyłącznie Subject → X; szary impuls × kończy się na Subject), a ostatnia akcja (source) niczego nie
-// wywołuje — wyróżnia w kodzie connection. Wartości bez odbiorców docierają do Subject i tam gasną (dropBalls).
-// Bez complete i bez connection.unsubscribe(): interval pracuje, dopóki prowadzący nie zmieni slajdu.
-const subjectIntervalTiming={first:.5,period:1,travel:.8,hold:.4,cancel:.8,calloutHold:.4,window:30,keep:5,margin:2,
-  actions:['A','B','C','source'],defaults:[3,6,9,12],settle:2.8,actionGap:1.5,defaultClose:14.9};
+// (odłącza się wyłącznie Subject → X; szary impuls × kończy się na Subject), akcja source niczego nie wywołuje —
+// wyróżnia w kodzie connection. Wartości bez odbiorców docierają do Subject i tam gasną (dropBalls); interval
+// pracuje bez końca. Ostatnia akcja (connection) to connection.unsubscribe(): szary impuls × biegnie od Subject do
+// interval, tor #1 szarzeje, nowych emisji nie ma. Subject nie dostaje complete — zostaje otwarty.
+const subjectIntervalTiming={first:.5,period:1,travel:.8,hold:.4,cancel:.8,calloutHold:.4,stopTail:1,window:30,keep:5,margin:2,
+  actions:['A','B','C','source','connection'],defaults:[3,6,9,12,15],settle:2.8,actionGap:1.5,defaultClose:17.9};
 const subjectIntervalReceivers=[{id:'A',slot:0},{id:'B',slot:1},{id:'C',slot:2}];
 export function configureSubjectInterval(scene) {
   const t=subjectIntervalTiming;
   // Postoje to stabilne kadry akcji na umownej osi (defaults): znaczniki Reveal, notatki, hash i podgląd Notes.
   // Na żywo kontroler liczy etap z liczby wykonanych akcji, nie z czasu.
-  const settled=t.defaults.map((at,i)=>at+(t.actions[i]==='source'?.5:t.settle));
+  const settled=t.defaults.map((at,i)=>at+({source:.5,connection:2.2}[t.actions[i]]??t.settle));
   Object.assign(scene,{graph:subjectIntervalGraph,playerLayout:'function',ink:'#26323B',playerClass:'rx-lanes rx-flat-tiles rx-two-lines',
     title:'Subject — kto odłączy źródło?',
     rows:[R('interval(1000)'),...subjectIntervalReceivers.map(r=>R('Odbiorca '+r.id))],
     live:{start:0,window:t.window,keep:t.keep,margin:t.margin,defaultClose:t.defaultClose,actions:t.actions,defaults:t.defaults,
       actionGap:t.actionGap,settle:t.settle,autoplay:true,variant:subjectIntervalVariant},
-    playback:{entry:'manual',finish:'hold',live:true,stops:['unsub-a','unsub-b','unsub-c','source'].map((id,i)=>({id,time:settled[i]}))},
+    playback:{entry:'manual',finish:'hold',live:true,stops:['unsub-a','unsub-b','unsub-c','source','connection'].map((id,i)=>({id,time:settled[i]}))},
   });
   Object.assign(scene,subjectIntervalVariant(scene,{from:0,to:t.window,closedAt:null,actions:[]}));
 }
@@ -686,10 +687,18 @@ export function configureSubjectInterval(scene) {
 // Wariant dla okna [from, to], wykonanych akcji (czasy ilustracji, w kolejności live.actions) i opcjonalnego
 // zamrożenia closedAt (druk, „pokaż wynik”: skończona scena bez nowych emisji, źródło nadal bez complete).
 // Odbiorca dostaje wartości, które dotarły do Subject przed jego unsubscribe; potem rusza impuls ×.
+// connection.unsubscribe() w chwili u: interval nie emituje od u; wartość już wysłana dociera do Subject, potem
+// impuls × biegnie do interval. Scena staje się skończona (stopTail po migawce), więc player dochodzi do FINISHED.
 function subjectIntervalVariant(scene,{from,to,closedAt,actions=[]}) {
-  const t=subjectIntervalTiming,closed=closedAt!==null&&closedAt!==undefined,end=closed?closedAt:to;
+  const t=subjectIntervalTiming,closed=closedAt!==null&&closedAt!==undefined;
   const emitAt=k=>t.first+t.period*k,arrival=k=>emitAt(k)+t.travel,split=k=>arrival(k)+t.hold,delivered=k=>split(k)+t.travel;
-  const kFrom=Math.max(0,Math.floor((from-t.first)/t.period)-3),kTo=Math.floor((end-t.first)/t.period);
+  const stopCalledAt=actions[t.actions.indexOf('connection')];
+  const connection=stopCalledAt===undefined?null:(()=>{
+    const kLast=Math.ceil((stopCalledAt-t.first)/t.period)-1,unsubscribeAt=Math.max(stopCalledAt,kLast>=0?arrival(kLast):stopCalledAt);
+    return {kLast,calledAt:stopCalledAt,unsubscribeAt,doneAt:unsubscribeAt+t.cancel+t.calloutHold};
+  })();
+  const finite=connection?connection.doneAt+t.stopTail:Infinity,end=closed?closedAt:Math.min(to,finite);
+  const kFrom=Math.max(0,Math.floor((from-t.first)/t.period)-3),kTo=Math.min(Math.floor((end-t.first)/t.period),connection?connection.kLast:Infinity);
   const receivers=subjectIntervalReceivers.map((r,i)=>{
     const at=actions[i];
     if(at===undefined)return {...r,kMax:kTo,unsubscribeAt:null};
@@ -706,19 +715,22 @@ function subjectIntervalVariant(scene,{from,to,closedAt,actions=[]}) {
     [{text:'const connection = '},{text:'interval(1000).subscribe(subject$)',mark:connectionMark,
       active:sourceAt===undefined?[]:[{from:{type:'connection-focus'},to:{type:'connection-focus-end'}}]},{text:';'}]];
   const unsubscribed=receivers.filter(r=>r.unsubscribeAt!==null);
-  return {...scene,subjectIntervalPlan:{kFrom,kTo,receivers,sourceAt,end},
-    duration:closed?closedAt:to,liveBusyUntil:t.actions.map((id,i)=>receivers.find(r=>r.id===id)?.doneAt??actions[i]),
+  return {...scene,subjectIntervalPlan:{kFrom,kTo,receivers,sourceAt,connection,end},
+    duration:closed?closedAt:Math.min(to,finite),
+    liveBusyUntil:t.actions.map((id,i)=>id==='connection'?connection?.doneAt:receivers.find(r=>r.id===id)?.doneAt??actions[i]),
     code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
     metrics:[{label:'Emisje interval',value:emitted},
       {label:'Odbiorcy Subject',value:time=>receivers.length-unsubscribed.filter(r=>time>=r.unsubscribeAt).length}],
     captions:[[0,'interval emituje co sekundę. Subject rozsyła każdą wartość do A, B i C'],
       ...unsubscribed.map(r=>[r.calledAt,{A:'A się odłącza. B i C nadal odbierają',B:'B się odłącza. Odbiera już tylko C',
         C:'Odłącza się ostatni odbiorca. Co stanie się z interval?'}[r.id]]),
-      ...(sourceAt===undefined?[]:[[sourceAt,'interval nadal emituje do Subject. connection pozostaje aktywne']])]};
+      ...(sourceAt===undefined?[]:[[sourceAt,'interval nadal emituje do Subject. connection pozostaje aktywne']]),
+      ...(connection?[[connection.calledAt,'connection.unsubscribe(): odłączamy interval od Subjecta'],
+        [connection.doneAt,'interval zatrzymany. Subject nadal otwarty — bez complete']]:[])]};
 }
 
 export function subjectIntervalGraph(scene) {
-  const tall=scene.format==='4:3',top=tall?178:102,t=subjectIntervalTiming,{kFrom,kTo,receivers,sourceAt,end}=scene.subjectIntervalPlan;
+  const tall=scene.format==='4:3',top=tall?178:102,t=subjectIntervalTiming,{kFrom,kTo,receivers,sourceAt,connection,end}=scene.subjectIntervalPlan;
   // Kolumny: interval(1000) mieści etykietę w jednej linii, Subject jak na slajdzie HTTP, kompaktowi odbiorcy; odstępy 110.
   const g={sourceX:212,sourceW:310,subjectX:592,subjectW:230,recvX:1000,recvW:366};
   const pos=r=>({x:g.recvX,w:g.recvW,y:laneRowY(top,r.slot)});
@@ -735,9 +747,11 @@ export function subjectIntervalGraph(scene) {
       {id:'subject',x:g.subjectX,w:g.subjectW,label:'Subject',splitBalls:true,splitAt:0,splitGuides:false,upstreamStripe:false,hubFan:false,
         dropBalls:true,...laneTile('operator',top,{U:0,...Object.fromEntries(receivers.map(r=>[r.id,r.slot]))},receivers.length)},
       ...receivers.map(r=>laneReceiver(r.id,r.id,pos(r),{ready:true}))],
-    edges:[{id:'interval-subject',from:'interval',to:'subject',subscriber:'U',logicalStart:-2},
+    edges:[{id:'interval-subject',from:'interval',to:'subject',subscriber:'U',logicalStart:-2,cancelPulse:true},
       ...receivers.map(r=>({id:'subject-'+r.id,from:'subject',to:r.id,subscriber:r.id,logicalStart:-2,cancelPulse:true}))],
-    schedule:{'interval-subject':{...preconnected,events:range(kFrom,kTo).map(k=>value(k,emitAt(k),emitAt(k)+t.travel))},
+    schedule:{'interval-subject':{...preconnected,events:range(kFrom,kTo).map(k=>value(k,emitAt(k),emitAt(k)+t.travel)),
+      // connection.unsubscribe(): wyłącznie unsubscribe połączenia (impuls × od Subject do interval), nigdy complete.
+      ...(connection?{end:{at:connection.unsubscribeAt,logicalAt:connection.unsubscribeAt,kind:'unsubscribe',duration:t.cancel}}:{})},
       ...Object.fromEntries(receivers.map(r=>['subject-'+r.id,{...preconnected,
         // Także ostatnie wartości sprzed okna: odłączony odbiorca zachowuje ostatnią odebraną liczbę.
         events:range(Math.max(0,Math.min(kFrom,r.kMax-1)),r.kMax).map(k=>{const split=emitAt(k)+t.travel+t.hold;return value(k,split,split+t.travel);}),
@@ -745,9 +759,13 @@ export function subjectIntervalGraph(scene) {
     trays:receivers.map(r=>({...laneTray(r.id,pos(r),1,ball),x:trayX})),
     // subX.unsubscribe() w miejscu nagłówka kolumny odbiorców (odbiorcy nie mają nagłówka), z literą i kolorem toru:
     // od wywołania do chwili po dotarciu impulsu × do Subject.
-    callouts:receivers.filter(r=>r.unsubscribeAt!==null).map(r=>({...laneCallout(`sub${r.id}.unsubscribe()`,r.id,
+    callouts:[...receivers.filter(r=>r.unsubscribeAt!==null).map(r=>({...laneCallout(`sub${r.id}.unsubscribe()`,r.id,
       {type:'unsubscribe-call',edge:'subject-'+r.id},laneEvent('disconnected','subject-'+r.id,t.calloutHold),{x:g.recvX,y:top+laneLook.defH/2}),size:34})),
+      // connection.unsubscribe() nad połączeniem interval → Subject, z etykietą toru #1.
+      ...(connection?[{...laneCallout('connection.unsubscribe()','U',{type:'unsubscribe-call',edge:'interval-subject'},
+        laneEvent('disconnected','interval-subject',t.calloutHold),{x:(g.sourceX+g.sourceW/2+g.subjectX-g.subjectW/2)/2,y:top/2}),size:34,label:'#1'}]:[])],
     timeline:[...receivers.filter(r=>r.unsubscribeAt!==null).map(r=>({type:'unsubscribe-call',edge:'subject-'+r.id,at:r.calledAt})),
+      ...(connection?[{type:'unsubscribe-call',edge:'interval-subject',at:connection.calledAt}]:[]),
       ...(sourceAt===undefined?[]:[{type:'connection-focus',at:sourceAt},{type:'connection-focus-end',at:end+1}])],
   };
 }

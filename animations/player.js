@@ -56,7 +56,7 @@ function paint(){
  el.play.textContent=staged&&time>=playbackDuration?'Wynik':running?'Pauza':time>=playbackDuration?'Powtórz':time>0?'Kontynuuj':'Odtwórz';
  el.back.disabled=!staged&&time<=0; el.next.disabled=!staged&&!controls.step&&time>=playbackDuration;
  el.play.disabled=staged&&time>=playbackDuration;
- el.clock.textContent=Math.min(time,playbackDuration).toFixed(1).replace('.',',')+(live&&liveClosed===null?' s · bez końca':' / '+playbackDuration.toFixed(1).replace('.',',')+' s');
+ el.clock.textContent=Math.min(time,playbackDuration).toFixed(1).replace('.',',')+(live&&liveClosed===null&&playbackDuration>=liveTo?' s · bez końca':' / '+playbackDuration.toFixed(1).replace('.',',')+' s');
  el.slider.value=String(Math.min(time,playbackDuration));
  el.slider.setAttribute('aria-valuetext',Math.min(time,playbackDuration).toFixed(1)+' sekund');
  listeners.forEach(listener=>listener());
@@ -78,10 +78,12 @@ function closeLive(){
 }
 function reopenLive(){if(!live)return;liveClosed=null;liveActs=[];liveFrom=0;liveTo=live.window;rebuild();}
 // Sekwencja akcji: „pokaż wynik” wykonuje pozostałe akcje co actionGap i zamraża kadr po settle;
-// z READY (druk) — umowne chwile live.defaults i defaultClose.
+// z READY (druk) — umowne chwile live.defaults i defaultClose. Wariant skończony po ostatniej akcji (np. zatrzymane
+// źródło) nie wymaga zamrożenia: wynik to jego koniec.
 function finishActions(){
  if(time<=0){liveActs=[...live.defaults];liveClosed=live.defaultClose;liveFrom=0;return;}
  const remaining=live.actions.length-liveActs.length;
+ if(!remaining&&playbackDuration<liveTo)return;
  liveActs=[...liveActs,...Array.from({length:remaining},(_,i)=>time+i*live.actionGap)];
  liveClosed=remaining?liveActs.at(-1)+live.settle:time;
 }
