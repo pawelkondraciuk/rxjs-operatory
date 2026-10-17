@@ -596,8 +596,8 @@
 					<aside class="notes"><p>Jeden potok id$ → distinctUntilChanged → switchMap → S1; emisje 42, 42, 43, 43, 42. distinctUntilChanged porównuje z ostatnią przepuszczoną wartością (domyślnie ===), osobno dla każdej subskrypcji. Powtórzenie gaśnie w operatorze — to nie jest error, complete ani unsubscribe. Nie powstaje inner, nie ma HTTP ani anulowania. 5 emisji, 3 requesty. To nie jest globalne usuwanie duplikatów.</p></aside>
 					<template data-checkpoint-notes="14-distinct">
                         <div data-checkpoint="ready"><p><strong>0 — Start</strong></p><p>Wiemy już, jak switchMap zarządza requestami. Ale co, jeśli dostanie kilka razy to samo ID?</p></div>
-                        <div data-checkpoint="subscribe"><p><strong>1 — subscribe()</strong></p><p>Powstaje lane S1. distinctUntilChanged nie ma jeszcze żadnej wartości: prev: —.</p></div>
-                        <div data-checkpoint="first"><p><strong>2 — Pierwsze 42</strong></p><p>Nowa wartość przechodzi i uruchamia HTTP.</p></div>
+                        <div data-checkpoint="subscribe"><p><strong>1 — subscribe()</strong></p><p>Powstaje lane S1. distinctUntilChanged nie ma jeszcze żadnej wartości — miejsce pamięci w jego lane jest puste.</p></div>
+                        <div data-checkpoint="first"><p><strong>2 — Pierwsze 42</strong></p><p>Nowa wartość przechodzi i uruchamia HTTP. Kulka 42 zostaje w lane operatora — to ostatnia przepuszczona wartość.</p></div>
                         <div data-checkpoint="duplicate"><p><strong>3 — Drugie 42</strong></p><p>Wartość się nie zmieniła, więc distinctUntilChanged ją zatrzymuje. SwitchMap niczego nie anuluje.</p></div>
                         <div data-checkpoint="second"><p><strong>4 — 43</strong></p><p>Nowe ID przechodzi i uruchamia kolejny request.</p></div>
                         <div data-checkpoint="duplicate-2"><p><strong>5 — Drugie 43</strong></p><p>Znów odrzucamy duplikat.</p></div>

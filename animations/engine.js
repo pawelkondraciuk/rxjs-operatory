@@ -14,7 +14,7 @@ const laneY=(n,id)=>{
   if(n.laneSlots&&id in n.laneSlots)return n.top+n.defH+(n.laneSlots[id]+.5)*n.rowH;
   const i=(n.laneIds||[]).indexOf(id);return i<0?n.y:n.y+(n.laneTop||0)+i*(n.laneStep||0);
 };
-const rowGrowth=.35,dropDuration=.5,emitMove=.6;
+const rowGrowth=.35,dropDuration=.5,emitMove=.6,storeMove=.4;
 const workSpans=row=>(row.spans||[]).filter(p=>!['queue','state','window','subscription'].includes(p.kind));
 
 // Kompilacja wykonuje się raz. Cały graf (także niewidoczne inner) rezerwuje miejsca.
@@ -284,16 +284,26 @@ export function compileScene(scene) {
   // memory (opt-in, np. distinctUntilChanged): pamięć osobna dla każdej subskrypcji operatora — ostatnia przepuszczona
   // wartość. Zmienia się w połowie przejścia przepuszczonej kulki przez wiersz; odrzucenie (wejście bez wyjścia) jej nie
   // zmienia, tylko zaznacza chwilę porównania (comparedAt = koniec decide). chars: najdłuższa wartość — szerokość slotu.
+  // memory.ball (opt-in): pamięć jako zwykła kulka przy prawej krawędzi wiersza (memorySlot), bez ramki i etykiety;
+  // zmienia się, gdy przepuszczona kulka (transformBalls) mija slot w drodze do portu wyjścia.
   function memoryOf(n,out,input,time) {
-    const inputs=input?.events||[];
+    const inputs=input?.events||[],slot=n.memory.ball?memorySlot(n):null;
     const updates=out.events.map(v=>{
       const e=inputs.find(i=>i.logicalAt===v.logicalAt&&i.arrival<=v.at);
-      return {value:v.value,color:v.color||'a',at:e?(e.arrival+v.at)/2:v.at};
+      return {value:v.value,color:v.color||'a',at:!e?v.at:slot!==null?e.arrival+(v.at-e.arrival)*transformPassAt(n,slot):(e.arrival+v.at)/2};
     }).filter(u=>u.at<=time);
     const compared=inputs.filter(e=>!out.events.some(v=>v.logicalAt===e.logicalAt)).map(e=>e.arrival+(e.decide||0)).filter(at=>at<=time);
     const last=updates.at(-1);
     return {label:n.memory.label??'prev',empty:n.memory.empty??'—',chars:Math.max(1,...out.events.map(v=>String(v.value).length)),...(last?{value:last.value,color:last.color,since:last.at}:{}),
-      ...(compared.length?{comparedAt:compared.at(-1)}:{})};
+      ...(compared.length?{comparedAt:compared.at(-1)}:{}),...(slot!==null?{ball:true,x:slot}:{})};
+  }
+  // Środek kulki pamięci: tuż przed portem wyjścia, w odległości jak kulka czekająca przy porcie.
+  function memorySlot(n){return n.x+n.w/2-(graph.ball?.r??25)-18;}
+  // Ułamek przejazdu transformBalls, w którym kulka mija x: wyjazd od środka do prawej krawędzi w ostatnich 30%
+  // (smoothstep), więc odwracamy smoothstep: u = 1/2 − sin(asin(1 − 2f)/3).
+  function transformPassAt(n,x) {
+    const f=clamp((x-n.x)/Math.max(1e-9,n.w/2));
+    return .7+.3*(.5-Math.sin(Math.asin(1-2*f)/3));
   }
   // laneTimer (opt-in, np. debounceTime/auditTime): timer operatora w czasie modelu — stoi podczas przelotów, płynie między
   // zdarzeniami. Wejście liczy się od dotarcia do kafelka (czas ilustracji), okres i momenty w czasie modelu (logicalAt).
@@ -310,9 +320,13 @@ export function compileScene(scene) {
     const emitted=open&&out.events.some(v=>v.logicalAt>=open.end-1e-9&&v.at<=time);
     const active=open&&!emitted&&logical<open.end+1e-9;
     const remaining=active?Math.max(0,open.end-logical):null;
+    // ball (opt-in): wejście dojeżdża do kulki pamięci (storeMove), dopiero wtedy zastępuje poprzednią wartość.
+    const ball=n.laneTimer.ball,stored=ball?arrived.filter(e=>e.arrival+storeMove<=time).at(-1):arrived.at(-1);
+    const keep=active&&stored&&!out.events.some(v=>v.logicalAt>=stored.logicalAt&&v.at<=time);
     return {timer:{label,progress:active?clamp((logical-open.start)/period):0,active:Boolean(active),
       text:label+': '+(active?remaining.toFixed(1).replace('.',',')+' s':'—'),since:active?open.start:undefined},
-      memory:{label:n.laneTimer.memory??'pamięć',empty:'—',...(active?{value:open.value,color:open.color,since:arrived.at(-1).arrival}:{})}};
+      memory:{label:n.laneTimer.memory??'pamięć',empty:'—',...(ball?{ball:true,x:memorySlot(n)}:{}),
+        ...(keep?{value:ball?stored.value:open.value,color:ball?stored.color||'a':open.color,since:stored.arrival+(ball?storeMove:0)}:{})}};
   }
   // Wiersz wykonania rezerwuje miejsce, gdy subscribe wyrusza do kafelka (kabel trafia w gotowy wiersz);
   // stan toru wypełnia go po dotarciu. Wiersze zostają po zakończeniu, więc kafelek tylko rośnie.
@@ -452,6 +466,13 @@ export function compileScene(scene) {
       const enter=clamp((time-e.arrival)/Math.min(.5,Math.max(.001,decided-e.arrival))),u=enter*enter*(3-2*enter),drop=clamp((time-decided)/dropDuration);
       tokens.push({x:left+(x-left)*u,y:laneY(n,input.subscriber),value:e.value,color:e.color||'a',edge:input.id,phase:'reject',
         ...(drop>0?{opacity:1-drop,scale:1-.4*drop}:{})});
+    }
+    // laneTimer.ball (opt-in, np. debounceTime/auditTime): wejście wjeżdża przez wiersz do kulki pamięci przy prawej
+    // krawędzi (storeMove) i tam staje się zapamiętaną wartością; wyjście rusza z portu przy emisji timera.
+    for(const n of nodes) if(n.laneTimer?.ball) for(const input of laneRecords.filter(r=>r.b.id===n.id)) for(const e of input.events) {
+      if(time<e.arrival||time>=e.arrival+storeMove)continue;
+      const left=n.x-n.w/2,u=(time-e.arrival)/storeMove,ease=u*u*(3-2*u);
+      tokens.push({x:left+(memorySlot(n)-left)*ease,y:laneY(n,input.subscriber),value:e.value,color:e.color||'a',edge:input.id,phase:'store'});
     }
     // dropBalls (hub, np. Subject bez odbiorców): wartość, której nikt nie odbiera, kurczy się i gaśnie na porcie wejścia.
     for(const n of nodes) if(n.dropBalls) for(const input of laneRecords.filter(r=>r.b.id===n.id)) for(const e of input.events) {

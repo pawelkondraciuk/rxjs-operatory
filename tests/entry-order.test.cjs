@@ -84,7 +84,7 @@ test('manual question stops do not reveal the replayed value or freeze fading ca
 
 test('model captions appear with their first visible effect, not while the value is still leaving the source',async()=>{
  const {scenes,compile}=await deck();
- const c=compile(scenes.get('14-distinct')),caption='43 ≠ prev: 42 — przechodzi. switchMap uruchamia HTTP #2';
+ const c=compile(scenes.get('14-distinct')),caption='43 ≠ 42 — przechodzi i zastępuje 42 w pamięci. switchMap uruchamia HTTP #2';
  const arrival=c.events.find(e=>e.type==='deliver-next'&&e.edge==='source-distinct'&&e.logicalAt===5.4).at;
  assert.notEqual(c.snapshot(arrival-.05).caption,caption);
  assert.equal(c.snapshot(arrival+.4).caption,caption);

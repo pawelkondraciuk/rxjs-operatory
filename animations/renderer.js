@@ -483,7 +483,13 @@ export function renderScene(frame,options={}) {
         }
         // Pamięć operatora (np. prev: A) przy prawej krawędzi wiersza; zmiana wartości i porównanie krótko podświetlają slot.
         // Szerokość mieści najdłuższą wartość sceny (m.chars), więc slot nie zmienia rozmiaru przy przejściu — → 42.
-        if(lane.memory) {
+        if(lane.memory?.ball) {
+          // Pamięć jako kulka (memory.ball): zwykła kulka wartości przed portem wyjścia, bez ramki i etykiety; pusta pamięć
+          // nic nie rysuje. Nowa wartość podmienia kulkę pod nadjeżdżającą kulką, porównanie daje krótki puls skali.
+          const m=lane.memory,pulse=m.comparedAt===undefined||reduced?0:clamp(1-(frame.time-m.comparedAt)/.3);
+          if(m.value!==undefined)svg+=ball(m.x,lane.y,m.value,m.color,frame.ball||{r:25,font:29,textFill:'#fff'},1+.15*pulse,
+            `data-lane-memory="${esc(String(m.value))}" data-token="memory"`);
+        } else if(lane.memory) {
           const m=lane.memory,font=20*k,h=font*1.6,w=(m.label.length+2+(m.chars||1))*.6*font+20*k,x0=n.x+n.w/2-12*k-w,since=t=>t!==undefined&&!reduced?clamp((frame.time-t)/.6):1;
           const changed=1-since(m.since),compared=1-since(m.comparedAt),value=m.value??m.empty;
           svg+=`<g data-lane-memory="${esc(String(m.value??''))}"><title>${esc(m.label+': '+value)}</title>`+

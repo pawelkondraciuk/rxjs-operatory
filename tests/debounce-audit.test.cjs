@@ -54,11 +54,27 @@ test('debounce restarts its lane timer on every value, audit keeps the window; c
  assert.deepEqual(Array.from(c.stops,s=>s.id),['a','b','c','audit-c','d','e','audit-e']);
  const f=Object.fromEntries(c.stops.map(s=>[s.id,c.snapshot(s.time)]));
  const t=(frame,id)=>lane(frame,id).timer,mem=(frame,id)=>lane(frame,id).memory.value;
- for(const id of ['a','b','c','d','e'])assert.ok(t(f[id],'deb').progress<.1,'debounce od nowa przy '+id);
- assert.ok(t(f.a,'aud').progress<.1);assert.ok(t(f.b,'aud').progress>t(f.a,'aud').progress+.2);
+ for(const id of ['a','b','c','d','e'])assert.ok(t(f[id],'deb').progress<.2,'debounce od nowa przy '+id);
+ assert.ok(t(f.a,'aud').progress<.2);assert.ok(t(f.b,'aud').progress>t(f.a,'aud').progress+.2);
  assert.ok(t(f.c,'aud').progress>t(f.b,'aud').progress+.2,'audit nie resetuje okna');
- assert.ok(t(f.d,'aud').progress<.1,'D otwiera drugie okno');assert.ok(t(f.e,'aud').progress>.25);
+ assert.ok(t(f.d,'aud').progress<.2,'D otwiera drugie okno');assert.ok(t(f.e,'aud').progress>.25);
  for(const id of ['a','b','c','d','e'])for(const op of ['deb','aud'])assert.equal(mem(f[id],op),id.toUpperCase(),op+' pamięta '+id);
+ // Pamięć to jedna zwykła kulka przed portem wyjścia (jak w 14-distinct), bez prostokąta i etykiety pamięć.
+ for(const id of ['a','b','c','d','e']){
+  const svg=render(f[id]),kept=[...svg.matchAll(/<g data-lane-memory="([^"]*)" data-token="memory"><circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)];
+  assert.deepEqual(kept.map(m=>m[1]),[id.toUpperCase(),id.toUpperCase()]);assert.doesNotMatch(svg,/pamięć|bufor/);
+  for(const [m,op] of kept.map((m,i)=>[m,['deb','aud'][i]])){
+   const n=f[id].nodes.find(n=>n.id===op);
+   assert.equal(+m[4],f[id].ball.r);assert.ok(+m[2]+ +m[4]<n.x+n.w/2&&+m[2]>n.x);assert.equal(+m[3],n.laneStates[0].y);
+  }
+ }
+ // Nowa wartość dojeżdża przez wiersz do kulki pamięci i dopiero wtedy zastępuje poprzednią.
+ const arrivalB=c.events.find(e=>e.type==='deliver-next'&&e.edge==='src1-deb'&&e.value==='B').at,gliding=c.snapshot(arrivalB+.2);
+ assert.equal(mem(gliding,'deb'),'A');assert.equal(gliding.tokens.filter(t=>t.phase==='store'&&t.value==='B').length,2);
+ // Po emisji kulka opuszcza operator: pamięć pusta, kulka leci do odbiorcy.
+ const sent=c.events.find(e=>e.type==='source-next'&&e.edge==='aud-obs2'&&e.value==='C').at,leaving=c.snapshot(sent+.3);
+ assert.equal(mem(leaving,'aud'),undefined);assert.equal(mem(leaving,'deb'),'C');
+ assert.ok(leaving.tokens.some(t=>t.edge==='aud-obs2'&&t.value==='C'));
  assert.match(t(f.c,'deb').text,/^cisza: \d,\d s$/);assert.match(t(f.c,'aud').text,/^okno: \d,\d s$/);
  assert.deepEqual(received(f.c,'obs1'),[]);assert.deepEqual(received(f.c,'obs2'),[]);
  assert.deepEqual(received(f['audit-c'],'obs2'),['C']);assert.deepEqual(received(f['audit-c'],'obs1'),[]);

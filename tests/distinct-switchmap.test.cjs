@@ -99,7 +99,7 @@ test('speaker notes follow the checkpoints; rewind and reset are deterministic i
 });
 
 // 14-distinct: ten sam model w profilu id$ → distinctUntilChanged → switchMap → S1, emisje 42, 42, 43, 43, 42.
-// subscribe w animacji (lane S1 i prev: — powstają na pierwszym postoju), każde HTTP kończy się przed kolejnym nowym ID,
+// subscribe w animacji (lane S1 z pustą pamięcią powstaje na pierwszym postoju; pamięć to sama kulka, bez prev:), każde HTTP kończy się przed kolejnym nowym ID,
 // więc powtórzenia jedynie gasną w operatorze: bez inner, HTTP i anulowania. 5 emisji, 3 requesty, 3 wyniki.
 async function deck14(format='4:3'){
  const m=await modules(['catalog','scene-config','engine','renderer']);
@@ -108,7 +108,7 @@ async function deck14(format='4:3'){
 }
 const lanes=f=>f.nodes.filter(n=>n.laneStates?.length);
 
-test('14-distinct: switchMap layout, subscribe creates the S1 lane with an empty prev slot',async()=>{
+test('14-distinct: switchMap layout, subscribe creates the S1 lane with an empty memory (no prev box)',async()=>{
  for(const format of ['4:3','16:9']){
   const {scene,c,render}=await deck14(format),ready=c.snapshot(0);
   assert.equal(scene.title,'To samo ID — kolejny request?');
@@ -123,7 +123,8 @@ test('14-distinct: switchMap layout, subscribe creates the S1 lane with an empty
   const ys=sub.edges.filter(e=>e.subscriber&&e.visible).flatMap(e=>e.points.map(p=>p[1]));
   assert.equal(ys.length>0&&new Set(ys).size,1,'porty na wspólnej osi');
   assert.equal(memory(sub).value,undefined);
-  assert.match(render(sub).match(/<g data-lane-memory="">[\s\S]*?<\/g>/)[0],/prev: <tspan[^>]*>—<\/tspan>/);
+  assert.equal(memory(sub).ball,true);
+  assert.doesNotMatch(render(sub),/data-lane-memory|prev:/,'pusta pamięć bez slotu i etykiety');
   assert.equal(sub.executionCounts.started,0);
  }
 });
@@ -150,6 +151,12 @@ test('14-distinct: each duplicate stops inside distinctUntilChanged during a run
  assert.deepEqual(Array.from(c.stops,s=>s.id),['subscribe','first','duplicate','second','duplicate-2','again']);
  const first=stop(c,'first');
  assert.equal(memory(first).value,'42');assert.deepEqual(states(first),['#1 · 42 active']);
+ // Pamięć: jedna zwykła kulka 42 tuż przed portem wyjścia wiersza distinctUntilChanged, bez prostokąta i napisu prev.
+ const op=first.nodes.find(n=>n.id==='distinct'),kept=[...render(first).matchAll(/<g data-lane-memory="([^"]*)" data-token="memory"><circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)];
+ assert.equal(kept.length,1);assert.equal(kept[0][1],'42');
+ assert.equal(+kept[0][4],first.ball.r);assert.ok(+kept[0][2]+ +kept[0][4]<op.x+op.w/2&&+kept[0][2]>op.x,'po prawej stronie lane, przed portem');
+ assert.equal(+kept[0][3],op.laneStates[0].y);
+ assert.doesNotMatch(render(first),/prev:/);
  for(const [i,[id,running,value]] of [['duplicate','#1',`42`],['duplicate-2','#2','43']].entries()){
   const reject=c.events.filter(e=>e.type==='distinct-reject')[i],frame=c.snapshot(reject.at-.3);
   const ball=frame.tokens.find(t=>t.phase==='reject'),lane=frame.nodes.find(n=>n.id==='distinct');
@@ -159,6 +166,7 @@ test('14-distinct: each duplicate stops inside distinctUntilChanged during a run
   assert.equal(after.tokens.some(t=>t.phase==='reject'),false,'kulka zgasła w operatorze');
   assert.equal(same.state,'active');assert.ok(same.stages[0].progress>row.stages[0].progress-1e-9&&same.stages[0].progress<1);
   assert.equal(memory(after).value,value);assert.equal(rows(after).length,i+1,'bez nowego wiersza');
+  assert.equal([...render(after).matchAll(/data-lane-memory="/g)].length,1,'jedna kulka pamięci');
   assert.doesNotMatch(render(after),/data-inner-cancel|anulowane/);
  }
  const second=stop(c,'second');

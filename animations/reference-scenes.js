@@ -1349,22 +1349,24 @@ const distinctProfiles={
     input:[{at:1,value:'42'},{at:2.6,value:'42',dup:true},{at:5.4,value:'43'},{at:7,value:'43',dup:true},{at:9.8,value:'42'}],
     // Dłuższe decide: powtórzenie wyraźnie stoi w wierszu distinctUntilChanged, zanim zgaśnie.
     colors:{42:'#6D4CD3',43:'#B85D05'},decide:1.6,durations:[3.6,3.6,2],preconnected:false,subscribeAt:.3,
+    // Pamięć jako sama kulka ostatniej przepuszczonej wartości (jak pamięć debounceTime/auditTime), bez prostokąta prev.
+    memoryBall:true,
     source:'id$',url:'`/api/users/${id}`',title:'To samo ID — kolejny request?',inputsLabel:'emisje ID',
     captions:jobs=>[[0,'distinctUntilChanged porówna każde ID z ostatnią przepuszczoną wartością'],
       [jobs[0].at,'42: brak poprzedniej wartości — przechodzi. switchMap uruchamia HTTP #1'],
       [jobs[0].end,'HTTP #1 zwraca wynik do S1 i kończy się complete'],
-      [jobs[1].at,'43 ≠ prev: 42 — przechodzi. switchMap uruchamia HTTP #2'],
+      [jobs[1].at,'43 ≠ 42 — przechodzi i zastępuje 42 w pamięci. switchMap uruchamia HTTP #2'],
       [jobs[1].end,'HTTP #2 zwraca wynik do S1 i kończy się complete'],
-      [jobs[2].at,'42 ≠ prev: 43 — przechodzi. Porównanie z ostatnią przepuszczoną wartością, nie z historią'],
+      [jobs[2].at,'42 ≠ 43 — przechodzi. Porównanie z ostatnią przepuszczoną wartością, nie z historią'],
       [jobs[2].end,'HTTP #3 zwraca wynik do S1 i kończy się complete']],
     stops:({ev,arrived,dups,decide})=>[
-      {id:'subscribe',event:ev('connected',{edge:'source-distinct'}),offset:.35,caption:'subscribe(): powstał lane S1. distinctUntilChanged nie ma jeszcze wartości — prev: —'},
-      {id:'first',event:ev('inner-subscribe',{edge:'inner0-op'}),offset:.3,caption:'42 przeszło: prev: 42. switchMap uruchomił HTTP #1'},
-      {id:'duplicate',event:arrived(dups[0].at),offset:decide+.6,caption:'42 === prev: 42 — zatrzymane w distinctUntilChanged. HTTP #1 pracuje dalej, bez anulowania'},
-      {id:'second',event:ev('inner-subscribe',{edge:'inner1-op'}),offset:.3,caption:'43 ≠ prev: 42 — przechodzi. switchMap uruchomił HTTP #2'},
-      {id:'duplicate-2',event:arrived(dups[1].at),offset:decide+.6,caption:'43 === prev: 43 — odrzucone. HTTP #2 trwa dalej'},
-      {id:'again',event:ev('inner-subscribe',{edge:'inner2-op'}),offset:.3,caption:'42 ≠ prev: 43 — przechodzi. Startuje HTTP #3'}],
-    reject:(v,job)=>`${v.value} === prev: ${v.value} — odrzucone. HTTP ${job} pracuje dalej`,
+      {id:'subscribe',event:ev('connected',{edge:'source-distinct'}),offset:.35,caption:'subscribe(): powstał lane S1. distinctUntilChanged nie ma jeszcze zapamiętanej wartości'},
+      {id:'first',event:ev('inner-subscribe',{edge:'inner0-op'}),offset:.3,caption:'42 przeszło i zostało w pamięci operatora. switchMap uruchomił HTTP #1'},
+      {id:'duplicate',event:arrived(dups[0].at),offset:decide+.6,caption:'42 === 42 — zatrzymane w distinctUntilChanged. HTTP #1 pracuje dalej, bez anulowania'},
+      {id:'second',event:ev('inner-subscribe',{edge:'inner1-op'}),offset:.3,caption:'43 ≠ 42 — przechodzi, w pamięci jest teraz 43. switchMap uruchomił HTTP #2'},
+      {id:'duplicate-2',event:arrived(dups[1].at),offset:decide+.6,caption:'43 === 43 — odrzucone. HTTP #2 trwa dalej'},
+      {id:'again',event:ev('inner-subscribe',{edge:'inner2-op'}),offset:.3,caption:'42 ≠ 43 — przechodzi. Startuje HTTP #3'}],
+    reject:(v,job)=>`${v.value} === ${v.value} — odrzucone. HTTP ${job} pracuje dalej`,
     summary:'5 emisji ID, 3 requesty HTTP. Powtórzenia zatrzymał distinctUntilChanged, zanim dotarły do switchMap'},
 };
 export function configureDistinctSwitch(scene,profileId=scene.id) {
@@ -1385,7 +1387,7 @@ export function configureDistinctSwitch(scene,profileId=scene.id) {
         ev(job.cancelled?'inner-unsubscribe':'inner-next',{edge:`inner${i}-op`})))},{text:'))'}]];
   // Wynik S1: każde niezanulowane HTTP zwraca swoją wartość.
   const results=jobs.filter(job=>!job.cancelled);
-  Object.assign(scene,{jobs,operatorName:'switchMap',distinctInput,distinctColors:colors,distinctDecide:decide,
+  Object.assign(scene,{jobs,operatorName:'switchMap',distinctInput,distinctColors:colors,distinctDecide:decide,distinctMemoryBall:Boolean(profile.memoryBall),
     distinctReject:profile.reject,distinctSummary:profile.summary,subscribeAt:profile.subscribeAt??.1,
     graph:distinctSwitchGraph,duration:last.end+1.4,preconnected:profile.preconnected,
     title:profile.title,playerLayout:'expanded',playerClass:'rx-flat-tiles rx-catch-inside',
@@ -1409,7 +1411,7 @@ function distinctSwitchGraph(scene) {
   const runningJob=at=>'#'+(scene.jobs.findLastIndex(job=>job.start<=at)+1);
   const nodes=[{id:'source',label:scene.rows[0].label,color:'source',ready:true},
     // Pamięć prev i odrzucenie powtórzeń w wierszu S1 operatora; przepuszczona kulka przejeżdża przez wiersz (hold).
-    {id:'distinct',label:'distinctUntilChanged',color:'op',ready:true,memory:{label:'prev'},rejectBalls:true,rejectAt:.42,transformBalls:true},
+    {id:'distinct',label:'distinctUntilChanged',color:'op',ready:true,memory:{label:'prev',...(scene.distinctMemoryBall?{ball:true}:{})},rejectBalls:true,rejectAt:.42,transformBalls:true},
     {id:'op',label:'switchMap',color:'op',ready:true},{id:'observer',label:'',ready:true},
     ...scene.jobs.map((job,i)=>({id:'inner'+i,label:'HTTP '+job.value,inner:true,workRow:true,panel:'jobs',slot:i,ready:false,born:job.start}))];
   const edges=[
@@ -1472,13 +1474,14 @@ export function configureDebounceAudit(scene) {
     rows:[R('zdarzenia$',input),R('debounceTime',debounce),R('auditTime',audit)],
     captions:[[0,'Te same zdarzenia trafiają do obu operatorów. Okres: 3,5 s']],
     metrics:[{label:'S1 · debounce',value:t=>debounce.filter(v=>v.at<t).length},{label:'S2 · audit',value:t=>audit.filter(v=>v.at<t).length}],
+    // Postoje przy wejściach: +0,5 s, gdy wartość dojechała już do kulki pamięci (storeMove 0,4 s).
     playback:{entry:'manual',finish:'hold',afterLastManualStop:'start-auto',stops:[
-      {id:'a',event:at('A'),offset:.25,caption:'A: debounce zaczyna liczyć ciszę, audit otwiera okno 3,5 s'},
-      {id:'b',event:at('B'),offset:.25,caption:'B: debounce od nowa. Audit zapamiętuje B — okno trwa dalej'},
-      {id:'c',event:at('C'),offset:.25,caption:'C: debounce znowu od nowa, audit nadal w pierwszym oknie. Który operator wyemituje pierwszy?'},
+      {id:'a',event:at('A'),offset:.5,caption:'A: debounce zaczyna liczyć ciszę, audit otwiera okno 3,5 s'},
+      {id:'b',event:at('B'),offset:.5,caption:'B: debounce od nowa. Audit zapamiętuje B — okno trwa dalej'},
+      {id:'c',event:at('C'),offset:.5,caption:'C: debounce znowu od nowa, audit nadal w pierwszym oknie. Który operator wyemituje pierwszy?'},
       {id:'audit-c',event:deliver('aud-obs2',audit[0].value),offset:.35,caption:'3,5 s: koniec okna — auditTime emituje C do S2. debounceTime nadal czeka'},
-      {id:'d',event:at('D'),offset:.25,caption:'D: debounce od nowa, audit otwiera drugie okno (do 7,5 s)'},
-      {id:'e',event:at('E'),offset:.25,caption:'E: debounce od nowa, audit tylko podmienia wartość — okno kończy się w 7,5 s'},
+      {id:'d',event:at('D'),offset:.5,caption:'D: debounce od nowa, audit otwiera drugie okno (do 7,5 s)'},
+      {id:'e',event:at('E'),offset:.5,caption:'E: debounce od nowa, audit tylko podmienia wartość — okno kończy się w 7,5 s'},
       {id:'audit-e',event:deliver('aud-obs2',audit[1].value),offset:.35,caption:'7,5 s: koniec drugiego okna — S2 dostaje E. debounceTime nadal czeka na ciszę'},
     ]},
   });
@@ -1498,7 +1501,7 @@ function debounceAuditGraph(scene) {
   const pipelines=[['deb','debounceTime','S1','debounce','cisza'],['aud','auditTime','S2','audit','okno']];
   const nodes=pipelines.flatMap(([op,label,subscriber,kind,timerLabel],i)=>[
     tile('src'+(i+1),'zdarzenia$',138,220,tops[i],subscriber,'#8FC9D4'),
-    tile(op,label,573,560,tops[i],subscriber,'#D8B3E6',{laneTimer:{kind,period:timePeriod,label:timerLabel}}),
+    tile(op,label,573,560,tops[i],subscriber,'#D8B3E6',{laneTimer:{kind,period:timePeriod,label:timerLabel,ball:true}}),
     receiver('obs'+(i+1),tops[i],subscriber)]);
   const out=scene.timeOutputs;
   const edges=[['src1','deb',scene.timeInput,'S1'],['deb','obs1',out.debounce,'S1'],['src2','aud',scene.timeInput,'S2'],['aud','obs2',out.audit,'S2']]
