@@ -80,7 +80,7 @@ test('4:3 tile labels grow to 1.3× when they fit and keep 1.15× for long names
  };
  assert.equal(label('09-concatmap','source'),41.6); // Powiększony nagłówek tylko concatMap.
  assert.equal(label('12-exhaustmap','source'),41.6); // Odbiorca jest teraz wierszem bez nagłówka.
- assert.equal(label('14-distinct','distinct'),29.9);
+ assert.equal(label('23-angular-alias','async'),29.9); // „async · alias user” nie mieści się w 1,3×.
 });
 
 test('04-operator in 4:3 is a centred lane pipeline and the receiver row shows 2, 4, 6',async()=>{

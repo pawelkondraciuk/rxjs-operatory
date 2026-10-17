@@ -482,8 +482,9 @@ export function renderScene(frame,options={}) {
             text(fx+fw/2,lane.y+1,lane.fallback.label,font,'style="font-family:Consolas,ui-monospace,monospace;font-weight:700;fill:#6B3D80"')+'</g>';
         }
         // Pamięć operatora (np. prev: A) przy prawej krawędzi wiersza; zmiana wartości i porównanie krótko podświetlają slot.
+        // Szerokość mieści najdłuższą wartość sceny (m.chars), więc slot nie zmienia rozmiaru przy przejściu — → 42.
         if(lane.memory) {
-          const m=lane.memory,font=20*k,h=font*1.6,w=(m.label.length+3)*.6*font+20*k,x0=n.x+n.w/2-12*k-w,since=t=>t!==undefined&&!reduced?clamp((frame.time-t)/.6):1;
+          const m=lane.memory,font=20*k,h=font*1.6,w=(m.label.length+2+(m.chars||1))*.6*font+20*k,x0=n.x+n.w/2-12*k-w,since=t=>t!==undefined&&!reduced?clamp((frame.time-t)/.6):1;
           const changed=1-since(m.since),compared=1-since(m.comparedAt),value=m.value??m.empty;
           svg+=`<g data-lane-memory="${esc(String(m.value??''))}"><title>${esc(m.label+': '+value)}</title>`+
             `<rect x="${x0}" y="${lane.y-h/2}" width="${w}" height="${h}" rx="${6*k}" fill="#fff" stroke="${changed>0?m.color&&colors[m.color]||m.color||'#7457D9':compared>0?'#808890':'#B9AFC9'}" stroke-width="${2+3*Math.max(changed,compared)}"/>`+

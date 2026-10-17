@@ -469,17 +469,17 @@ Postoje: first (przed drugim A, HTTP A ~45%), question (drugie A w operatorze), 
 
 ### distinctUntilChanged — `14-distinct`
 
-**Temat:** pomijanie kolejnych identycznych identyfikatorów przed kosztownym HTTP.
+**Temat:** powtarzające się ID zatrzymują się na distinctUntilChanged, zanim dotrą do switchMap — bez zbędnych HTTP i bez anulowania trwającego requestu.
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
-| 14-distinct | Czy ten sam identyfikator wymaga kolejnego HTTP? | `map(x => x.id) → distinctUntilChanged() → mergeMap(http)` |
+| 14-distinct | To samo ID — kolejny request? | ``id$.pipe(distinctUntilChanged(),``<br>``  switchMap(id => http.get(`/api/users/${id}`)))`` |
 
-**Na bloczkach:** „id$” rozdziela się na „bez filtra” → „HTTP” i „distinctUntilChanged” → „HTTP”. Wejście A, A, B, B, A. Bez filtra 5 requestów, z filtrem 3; A po B przechodzi ponownie. Pytanie pada, gdy drugie A dolatuje do operatorów, zanim widać drugi request i liczniki. Liczniki pokazują obie liczby żądań. Kolor kapsułki należy do wartości (A pomarańczowe, B zielone) w obu potokach.
+**Na bloczkach:** wygląd MAIN switchMap — jeden potok „id$” → „distinctUntilChanged” → „switchMap” → kompaktowy odbiorca S1 z execution lanes; dół PRACE WEWNĘTRZNE z kafelkiem HTTP GET (lane, postęp w tle, inbox) dla każdego uruchomionego requestu. W wierszu S1 distinctUntilChanged slot pamięci `prev: —`, zmieniany przy przepuszczonych wartościach. Emisje 42, 42, 43, 43, 42 (42 indygo, 43 pomarańczowe). subscribe() jest częścią animacji: dopiero wtedy powstaje lane S1. Każde powtórzenie przychodzi podczas trwającego HTTP, wjeżdża do wiersza distinctUntilChanged, stoi i gaśnie — bez error, complete, unsubscribe, bez wiersza inner i bez anulowania. Każde HTTP kończy się wynikiem i complete przed kolejnym nowym ID. 42 po 43 przechodzi (porównanie z ostatnią przepuszczoną wartością). Wynik: 5 emisji ID, 3 requesty HTTP (#1 · 42, #2 · 43, #3 · 42), S1 dostaje 42, 43, 42.
 
-**Speaker notes:**
+Postoje: subscribe (lane S1, prev: —), first (HTTP #1 startuje), duplicate (drugie 42 zgasło, HTTP #1 ~60%), second (#1 complete, HTTP #2 · 43), duplicate-2 (drugie 43 zgasło), again (prev: 42, HTTP #3), potem AUTO do wyniku. Notatki per checkpoint w `template[data-checkpoint-notes="14-distinct"]`.
 
-> Porównanie z ostatnią przepuszczoną wartością; domyślnie ===. Identyfikator jest prymitywem. To nie jest globalne usuwanie duplikatów.
+**Speaker notes (skrót):** Start: co, jeśli switchMap dostanie kilka razy to samo ID? → nowa wartość uruchamia HTTP → duplikat zatrzymany, switchMap niczego nie anuluje → 43 uruchamia kolejny request → znów duplikat → 42 przechodzi, bo porównujemy z ostatnią przepuszczoną (43) → pięć emisji, trzy requesty.
 
 ### debounceTime, auditTime, throttleTime i sampleTime — `15-debounce-audit`
 

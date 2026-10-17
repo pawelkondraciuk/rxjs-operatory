@@ -591,12 +591,19 @@
 
 
 				<section id="14-distinct" class="animation-slide" data-animation="14-distinct">
-					<h2>Czy ten sam identyfikator wymaga kolejnego HTTP?</h2>
-					<div class="rx-player" aria-label="Czy ten sam identyfikator wymaga kolejnego HTTP?"></div>
-					<aside class="notes">
-						<p>Porównanie z ostatnią przepuszczoną wartością; domyślnie ===. Identyfikator jest prymitywem. To nie jest globalne usuwanie duplikatów.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
+					<h2>To samo ID — kolejny request?</h2>
+					<div class="rx-player" aria-label="To samo ID — kolejny request?"></div>
+					<aside class="notes"><p>Jeden potok id$ → distinctUntilChanged → switchMap → S1; emisje 42, 42, 43, 43, 42. distinctUntilChanged porównuje z ostatnią przepuszczoną wartością (domyślnie ===), osobno dla każdej subskrypcji. Powtórzenie gaśnie w operatorze — to nie jest error, complete ani unsubscribe. Nie powstaje inner, nie ma HTTP ani anulowania. 5 emisji, 3 requesty. To nie jest globalne usuwanie duplikatów.</p></aside>
+					<template data-checkpoint-notes="14-distinct">
+                        <div data-checkpoint="ready"><p><strong>0 — Start</strong></p><p>Wiemy już, jak switchMap zarządza requestami. Ale co, jeśli dostanie kilka razy to samo ID?</p></div>
+                        <div data-checkpoint="subscribe"><p><strong>1 — subscribe()</strong></p><p>Powstaje lane S1. distinctUntilChanged nie ma jeszcze żadnej wartości: prev: —.</p></div>
+                        <div data-checkpoint="first"><p><strong>2 — Pierwsze 42</strong></p><p>Nowa wartość przechodzi i uruchamia HTTP.</p></div>
+                        <div data-checkpoint="duplicate"><p><strong>3 — Drugie 42</strong></p><p>Wartość się nie zmieniła, więc distinctUntilChanged ją zatrzymuje. SwitchMap niczego nie anuluje.</p></div>
+                        <div data-checkpoint="second"><p><strong>4 — 43</strong></p><p>Nowe ID przechodzi i uruchamia kolejny request.</p></div>
+                        <div data-checkpoint="duplicate-2"><p><strong>5 — Drugie 43</strong></p><p>Znów odrzucamy duplikat.</p></div>
+                        <div data-checkpoint="again"><p><strong>6 — Powrót do 42</strong></p><p>Operator nie pamięta wszystkich historycznych wartości. Porównuje z ostatnią przepuszczoną — 43 — więc 42 przechodzi.</p></div>
+                        <div data-checkpoint="finished"><p><strong>7 — Koniec</strong></p><p>Pięć emisji, trzy requesty. Filtrujemy zbędną pracę, zanim w ogóle dotrze do switchMap.</p></div>
+                    </template>
 				</section>
 
 				<section id="15-debounce-audit" class="animation-slide" data-animation="15-debounce-audit">

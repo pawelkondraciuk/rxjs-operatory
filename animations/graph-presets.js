@@ -61,18 +61,6 @@ export function catalogGraph(s) {
    edge(op,sink,values(ri),{born:start,until:end});
    tray(ri,x,575,400,"");
   });
- }else if(caseId==="14-distinct"){
-  const source=node("source",550,70,"id$","source",0);
-  const plain=node("plain",260,235,"bez filtra","muted",null,{w:240});
-  const distinct=node("distinct",835,235,"distinctUntilChanged","op",2,{w:300});
-  edge(source,plain,values(0));edge(source,distinct,values(0));
-  const a=node("http-a",260,410,"HTTP","http",1,{work:true,w:220});
-  const b=node("http-b",835,410,"HTTP","http",3,{work:true,w:220});
-  // Kolor należy do wartości (A, B), nie do gałęzi: to samo A wygląda tak samo w obu potokach.
-  const request=p=>{const value=p.label.replace("GET ","");return {at:p.start,value,color:row(0).events.find(e=>e.value===value)?.color||"a"};};
-  edge(plain,a,row(1).spans.map(request));
-  edge(distinct,b,row(3).spans.map(request));
-  tray(1,260,555,450,"Odpowiedzi · bez filtra");tray(3,835,555,450,"Odpowiedzi · z filtrem");
  }else if(caseId==="15-debounce-audit"||caseId==="16-czas-cztery"){
   const source=node("source",550,65,"zdarzenia$","source",0);
   const indices=s.seriesIndices||s.rows.slice(1).map((_,i)=>i+1),space=1040/indices.length;

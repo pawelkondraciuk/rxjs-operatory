@@ -283,7 +283,7 @@ export function compileScene(scene) {
 
   // memory (opt-in, np. distinctUntilChanged): pamięć osobna dla każdej subskrypcji operatora — ostatnia przepuszczona
   // wartość. Zmienia się w połowie przejścia przepuszczonej kulki przez wiersz; odrzucenie (wejście bez wyjścia) jej nie
-  // zmienia, tylko zaznacza chwilę porównania (comparedAt = koniec decide).
+  // zmienia, tylko zaznacza chwilę porównania (comparedAt = koniec decide). chars: najdłuższa wartość — szerokość slotu.
   function memoryOf(n,out,input,time) {
     const inputs=input?.events||[];
     const updates=out.events.map(v=>{
@@ -292,7 +292,7 @@ export function compileScene(scene) {
     }).filter(u=>u.at<=time);
     const compared=inputs.filter(e=>!out.events.some(v=>v.logicalAt===e.logicalAt)).map(e=>e.arrival+(e.decide||0)).filter(at=>at<=time);
     const last=updates.at(-1);
-    return {label:n.memory.label??'prev',empty:n.memory.empty??'—',...(last?{value:last.value,color:last.color,since:last.at}:{}),
+    return {label:n.memory.label??'prev',empty:n.memory.empty??'—',chars:Math.max(1,...out.events.map(v=>String(v.value).length)),...(last?{value:last.value,color:last.color,since:last.at}:{}),
       ...(compared.length?{comparedAt:compared.at(-1)}:{})};
   }
   // laneTimer (opt-in, np. debounceTime/auditTime): timer operatora w czasie modelu — stoi podczas przelotów, płynie między

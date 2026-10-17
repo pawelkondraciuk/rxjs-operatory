@@ -69,16 +69,9 @@ function mapping(mode){
 });
 const limited=[{at:1,start:1,end:7,v:"A",color:"a"},{at:2,start:2,end:8,v:"B",color:"b"},{at:3,start:3,end:9,v:"C",color:"c"},{at:4,start:7,end:13,v:"D",color:"a"},{at:5,start:8,end:14,v:"E",color:"b"}];
 add("13-limit","100 zadań. Ile naraz?","mergeMap(request$, 3)",20,limited.map(j=>R(j.v,[E(j.end,j.v+" ✓",j.color)],[...(j.start>j.at?[B(j.at,j.start,"kolejka","muted","queue")]:[]),B(j.start,j.end,"HTTP",j.color)],{completeAt:j.end})),[[0,"W przykładzie pięć zadań i limit trzech aktywnych requestów."],[4,"Trzy requesty pracują. D i E czekają."],[7,"A zwalnia miejsce. Rusza D."],[14,"Limit dotyczy współbieżności, a nie liczby requestów na sekundę."]],"Limit ogranicza liczbę aktywnych subskrypcji wewnętrznych. Dalsze wejścia są buforowane, więc limit nie jest pełnym mechanizmem backpressure.",{metrics:[{label:"aktywne / 3",value:t=>limited.filter(j=>j.start<=t&&j.end>t).length},{label:"w kolejce",value:t=>limited.filter(j=>j.at<=t&&j.start>t).length}]});
-const distinctIn=[E(1,"A"),E(4,"A"),E(7,"B","b"),E(10,"B","b"),E(13,"A")];
-const distinctOut=distinctIn.filter((e,i,a)=>i===0||e.value!==a[i-1].value);
-// Model, graf i postoje: configureDistinctSwitch (reference-scenes.js).
+// Model, graf i postoje obu slajdów distinctUntilChanged: configureDistinctSwitch (reference-scenes.js).
 add("11a-distinct-switchmap","distinctUntilChanged — czy coś się zmieniło?","",1,[],[],"");
-add("14-distinct","Czy ten sam identyfikator wymaga kolejnego HTTP?","map(x => x.id) → distinctUntilChanged() → mergeMap(http)",20,[
- R("wejście",distinctIn),
- R("HTTP · bez filtra",distinctIn.map(e=>E(e.at+2.5,e.value,e.color)),distinctIn.map(e=>B(e.at+.5,e.at+2.5,"GET "+e.value,"http"))),
- R("distinctUntilChanged",distinctOut),
- R("HTTP · z filtrem",distinctOut.map(e=>E(e.at+2.5,e.value,e.color)),distinctOut.map(e=>B(e.at+.5,e.at+2.5,"GET "+e.value,"http")))
-],[[0,"Te same wartości A, A, B, B, A w obu potokach."],[4,"Drugie A nie uruchamia HTTP w filtrowanym potoku."],[10,"Drugie B również zostaje pominięte."],[13,"A po B jest zmianą — przechodzi ponownie."],[16,"5 → 3 żądania. Filtrujemy przed kosztowną operacją."]],"Porównanie z ostatnią przepuszczoną wartością; domyślnie ===. Identyfikator jest prymitywem. To nie jest globalne usuwanie duplikatów.",{metrics:[{label:"HTTP bez filtra",value:t=>distinctIn.filter(e=>e.at+.5<=t).length},{label:"HTTP z filtrem",value:t=>distinctOut.filter(e=>e.at+.5<=t).length}]});
+add("14-distinct","To samo ID — kolejny request?","",1,[],[],"");
 const timeInput=[1,2,3,4,6,7.2,8.3,12,13,18].map((t,i)=>E(t,String.fromCharCode(65+i),i<4?"a":i<7?"b":"c"));
 const period=3.5;
 const debounce=timeInput.filter((e,i,a)=>!a[i+1]||a[i+1].at-e.at>=period).map(e=>({...e,at:e.at+period}));

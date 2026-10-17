@@ -21,7 +21,7 @@ const stagedIds = new Set(['04-operator','05-zrodla','05-zrodla-2','05-zrodla-3'
 
 // Sceny z finish:hold kończą się ok. 2 s po ostatnim zdarzeniu modelu, żeby AUTO nie stało długo
 // przed FINISHED (każde „dalej” w bezruchu tylko kończy animację). 22-refcount celowo pokazuje ciszę.
-const trimmedTails = new Set(['06-subskrypcja','12a-complete','13-limit','14-distinct','18-async','20-sharereplay']);
+const trimmedTails = new Set(['06-subskrypcja','12a-complete','13-limit','18-async','20-sharereplay']);
 function trimTail(scene) {
   const times=[...scene.rows.flatMap(r=>[...r.events.map(e=>e.at),
     ...r.spans.filter(p=>!['state','subscription'].includes(p.kind)).map(p=>p.end),...(r.completeAt===undefined?[]:[r.completeAt])]),
@@ -42,6 +42,8 @@ export function configureScene(scene) {
   if(id==='13-limit')configureConcurrency(scene);
   // distinctUntilChanged przed switchMap: A, A, B, B, A → 3 requesty (osobny slajd po switchMap).
   if(id==='11a-distinct-switchmap')configureDistinctSwitch(scene);
+  // 14-distinct w wyglądzie switchMap: 42, 42, 43, 43, 42 → 3 requesty, powtórzenia gasną przed switchMap.
+  if(id==='14-distinct')configureDistinctSwitch(scene);
   // debounceTime i auditTime (MAIN): dwa potoki z timerami w wierszach operatorów; warianty -2…-4 w EXTRAS bez zmian.
   if(scene.id==='16-czas-cztery')configureDebounceAudit(scene);
   // Oba warianty catchError w wyglądzie MAIN switchMap: wewnątrz (-2) i na zewnątrz (za switchMap).
@@ -72,7 +74,7 @@ export function configureScene(scene) {
   const question={
     '06-subskrypcja':6,'06a-cold-hot-2':6,'18-async':1,
     '20-sharereplay':10,'22-refcount':10,
-    '14-distinct':5,'15-debounce-audit':5,
+    '15-debounce-audit':5,
   }[id];
   const first={
       '06a-cold-hot-2':{id:'first',modelTime:0,caption:'A subskrybuje. B jeszcze nie słucha.'},
@@ -82,17 +84,14 @@ export function configureScene(scene) {
   if(question!==undefined)scene.playback={entry:'manual',finish:'hold',afterLastManualStop:'start-auto',stops:[
     ...(first?[first]:[]),
     // Pytanie nie może pokazywać odpowiedzi. 20: tuż przed wylotem wartości z bufora shareReplay.
-    // 14: tuż przed dotarciem drugiego A do operatorów, zanim widać drugi request i liczniki.
     {id:'question',...({
       '20-sharereplay':{event:{type:'connected',edge:'hub-receiver1'},offset:-.001},
-      '14-distinct':{event:{type:'deliver-next',edge:'source-distinct',value:'A',logicalAt:4},offset:-.001},
     }[id]||{modelTime:question}),caption:{
       '06-subskrypcja':'Dopiero subscribe uruchomiło HTTP. Deklaracja nie wykonała requestu.',
       '06a-cold-hot-2':'B dołączył. Czy dostanie wcześniejsze wartości, czy kolejne emisje wspólnego timera?',
       '18-async':'A i B subskrybują ten sam user$. Ile requestów uruchomili?',
       '20-sharereplay':'B dołączył po complete. Nowe HTTP czy zachowany bufor?',
       '22-refcount':'Odbiorców: 0. Czy źródło nadal pracuje?',
-      '14-distinct':'Znowu A. Czy powtórzone ID uruchomi nowe HTTP w obu potokach?',
       '15-debounce-audit':'Throttle: A. Sample: C. Audit: D. Dlaczego debounce nadal czeka?',
     }[id]},
   ]};

@@ -67,7 +67,7 @@ test('„subskrybuje” needs a drawn connection: not before it, not after unsub
  }
 });
 
-test('the same value keeps its colour in both distinctUntilChanged branches',async()=>{
+test('the same value keeps its colour in every distinctUntilChanged execution',async()=>{
  const {scenes,compile}=await deck();
  const c=compile(scenes.get('14-distinct')),colours=new Map();
  for(const r of c.plan.records.values())for(const e of r.events){
@@ -84,10 +84,10 @@ test('manual question stops do not reveal the replayed value or freeze fading ca
 
 test('model captions appear with their first visible effect, not while the value is still leaving the source',async()=>{
  const {scenes,compile}=await deck();
- const c=compile(scenes.get('14-distinct'));
- const arrival=c.events.find(e=>e.type==='deliver-next'&&e.edge==='source-distinct'&&e.logicalAt===4).at;
- assert.notEqual(c.snapshot(arrival-.05).caption,'Drugie A nie uruchamia HTTP w filtrowanym potoku.');
- assert.equal(c.snapshot(arrival+.4).caption,'Drugie A nie uruchamia HTTP w filtrowanym potoku.');
+ const c=compile(scenes.get('14-distinct')),caption='43 ≠ prev: 42 — przechodzi. switchMap uruchamia HTTP #2';
+ const arrival=c.events.find(e=>e.type==='deliver-next'&&e.edge==='source-distinct'&&e.logicalAt===5.4).at;
+ assert.notEqual(c.snapshot(arrival-.05).caption,caption);
+ assert.equal(c.snapshot(arrival+.4).caption,caption);
  const flat=compile(scenes.get('09-concatmap')),a=flat.events.find(e=>e.type==='deliver-next'&&e.edge==='source-op'&&e.value==='A').at;
  assert.notEqual(flat.snapshot(a-.05).caption,'A uruchamia pierwszą pracę.');
 });
