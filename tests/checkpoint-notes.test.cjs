@@ -133,3 +133,30 @@ test('a Notes preview frame shows the still checkpoint frame and never plays',as
  assert.deepEqual(calls,[['seek',9],['seek',0],['finish']]);
 });
 
+
+test('the Notes current-slide preview mirrors the painted frames of the main window for the same slide',async()=>{
+ const {['checkpoint-notes']:m}=await modules(['checkpoint-notes']);
+ const part=()=>({_v:'',writes:0,get innerHTML(){return this._v;},set innerHTML(v){this._v=v;this.writes++;}});
+ const playerRoot=()=>{const parts={'.rx-code':part(),'.rx-stage':part(),'.rx-caption':part(),'.rx-metrics':part()};
+  return {parts,querySelector:s=>parts[s]};};
+ const mainSlide={id:'09-concatmap',root:playerRoot()},otherSlide={id:'10-mergemap',root:playerRoot()};
+ let mainCurrent=mainSlide;
+ const main={location:{origin:'http://localhost'}};main.parent=main;
+ const mirror=m.installNotesMirror({getCurrentSlide:()=>mainCurrent},{view:main,getRoot:s=>s.root});
+ const frameSlide={id:'09-concatmap',root:playerRoot()};let frameCurrent=frameSlide;
+ const frame={location:{origin:'http://localhost'},parent:{opener:main},frameElement:{parentElement:{id:'current-slide'}},addEventListener(){}};
+ const preview=m.installNotesMirror({getCurrentSlide:()=>frameCurrent},{view:frame,getRoot:s=>s.root});
+ mainSlide.root.parts['.rx-stage'].innerHTML='<svg>t1</svg>';mainSlide.root.parts['.rx-caption'].innerHTML='A';
+ mirror.notify(mainSlide);
+ assert.equal(frameSlide.root.parts['.rx-stage'].innerHTML,'<svg>t1</svg>');assert.equal(frameSlide.root.parts['.rx-caption'].innerHTML,'A');
+ const writes=frameSlide.root.parts['.rx-stage'].writes;mirror.notify(mainSlide);
+ assert.equal(frameSlide.root.parts['.rx-stage'].writes,writes,'bez zmian kadru nie ma zapisu DOM');
+ // Kadr innego slajdu (główne okno już dalej) nie trafia do ramki; pull po własnym kadrze ramki przywraca lustro.
+ mirror.notify(otherSlide);assert.equal(frameSlide.root.parts['.rx-stage'].innerHTML,'<svg>t1</svg>');
+ frameSlide.root.parts['.rx-stage'].innerHTML='<svg>still</svg>';
+ assert.equal(preview.pull(),true);assert.equal(frameSlide.root.parts['.rx-stage'].innerHTML,'<svg>t1</svg>');
+ mainCurrent=otherSlide;assert.equal(preview.pull(),false,'inny slajd w głównym oknie — zostaje nieruchomy kadr');
+ // Ramka upcoming nie subskrybuje lustra.
+ const upcoming=m.installNotesMirror({getCurrentSlide:()=>frameCurrent},{view:{...frame,frameElement:{parentElement:{id:'upcoming-slide'}}},getRoot:s=>s.root});
+ assert.equal(upcoming.pull(),false);
+});

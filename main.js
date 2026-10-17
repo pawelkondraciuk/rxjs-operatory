@@ -16,7 +16,7 @@ import { compileScene } from './animations/engine.js';
 import { installRevealStages } from './animations/reveal-stages.js';
 import { installAutoFinishGuard } from './animations/reveal-auto-finish.js';
 import { installSpeakerPreview } from './animations/speaker-preview.js';
-import { prepareCheckpointNotes, installCheckpointNotesReceiver, installNotesKeyBridge, isNotesPreview, showNotesPreviewFrame } from './animations/checkpoint-notes.js';
+import { prepareCheckpointNotes, installCheckpointNotesReceiver, installNotesKeyBridge, installNotesMirror, isNotesPreview, showNotesPreviewFrame } from './animations/checkpoint-notes.js';
 import { FORMATS, formatFromSearch, withFormat, toggledFormatUrl } from './animations/format.js';
 
 const params = new URLSearchParams(location.search);
@@ -62,6 +62,8 @@ const deck = new Reveal({
 });
 
 installSpeakerPreview(deck);
+// Główne okno udostępnia gotowe kadry odtwarzaczy ramce current-slide okna Notes.
+const notesMirror = installNotesMirror(deck);
 
 const players = new Map();
 let activePlayer;
@@ -183,11 +185,16 @@ function playerFor(slide) {
       step: stepAnimation, reset: resetAnimation, toggle: toggleAnimation,
     } : { step: stepAnimation }));
     autoFinish.observe(slide, players.get(slide));
+    if (!notesPreview) players.get(slide).subscribe(() => notesMirror.notify(slide));
   }
   return players.get(slide);
 }
 
-function showPreviewFrame(slide) { showNotesPreviewFrame(slide, playerFor(slide), { still: stateFor(slide).mode === 'static' }); }
+// Ramka current-slide kopiuje kadr głównego okna (ta sama animacja), upcoming i brak lustra — nieruchomy checkpoint.
+function showPreviewFrame(slide) {
+  showNotesPreviewFrame(slide, playerFor(slide), { still: stateFor(slide).mode === 'static' });
+  notesMirror.pull?.();
+}
 
 function activate(slide) {
   if (notesPreview) {

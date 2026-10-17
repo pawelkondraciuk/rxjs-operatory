@@ -70,6 +70,47 @@ export function showNotesPreviewFrame(slide,player,{still=false}={}) {
   else if(!still)player.finish();
 }
 
+// Lustro kadru dla ramki current-slide okna Notes: główne okno po każdym odmalowaniu odtwarzacza udostępnia gotowy
+// kadr (kod, diagram, podpis, liczniki), a ramka kopiuje go do swojego odtwarzacza tego samego slajdu. Animacja
+// w podglądzie jest więc identyczna z główną, bez drugiego silnika, RAF i zwrotnych komend. Ramka upcoming zostaje
+// przy nieruchomym kadrze (showNotesPreviewFrame).
+const mirroredParts=['.rx-code','.rx-stage','.rx-caption','.rx-metrics'];
+export function installNotesMirror(deck,{view=window,getRoot=slide=>slide?.querySelector('.rx-player')}={}) {
+  if(!isNotesPreview(view)) {
+    if(view.parent!==view)return {notify(){}};
+    const listeners=new Set();
+    view.rxNotesMirror={
+      subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener);},
+      current(){const slide=deck.getCurrentSlide();return slide?{id:slide.id,root:getRoot(slide)}:null;},
+    };
+    return {notify(slide){
+      if(!listeners.size||slide!==deck.getCurrentSlide())return;
+      const root=getRoot(slide);
+      for(const listener of [...listeners]){try{listener(slide.id,root);}catch{listeners.delete(listener);}}
+    }};
+  }
+  if(view.frameElement.parentElement.id!=='current-slide')return {pull:()=>false};
+  let source=null;
+  try{source=view.parent.opener?.rxNotesMirror||null;}catch{}
+  const last=new Map();
+  function copy(id,mainRoot) {
+    const slide=deck.getCurrentSlide(),root=getRoot(slide);
+    if(!root||!mainRoot||slide.id!==id)return false;
+    for(const selector of mirroredParts) {
+      const from=mainRoot.querySelector(selector),to=root.querySelector(selector);
+      if(!from||!to)continue;
+      const html=from.innerHTML;
+      if(last.get(to)!==html){to.innerHTML=html;last.set(to,html);}
+    }
+    return true;
+  }
+  const unsubscribe=source?.subscribe(copy);
+  view.addEventListener('pagehide',()=>unsubscribe?.());
+  // Na zmianę slajdu/fragmentu w ramce: kadr głównego okna, o ile pokazuje ten sam slajd.
+  // Ramka mogła odmalować własny kadr, więc pull kopiuje bez porównania z poprzednią kopią.
+  return {pull(){const current=source?.current?.();last.clear();return current?copy(current.id,current.root):false;}};
+}
+
 // Klawisze naciśnięte w oknie Notes (przekazywane przez plugin do ramki current-slide jako triggerKey albo
 // wciśnięte z fokusem w ramce) trafiają do głównego okna i działają jak pilot; ramka sama nie nawiguje.
 // W głównym oknie przyjmujemy je wyłącznie od ramki podglądu okna Notes otwartego z tej prezentacji.
