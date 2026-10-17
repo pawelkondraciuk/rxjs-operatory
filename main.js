@@ -16,11 +16,14 @@ import { compileScene } from './animations/engine.js';
 import { installRevealStages } from './animations/reveal-stages.js';
 import { installAutoFinishGuard } from './animations/reveal-auto-finish.js';
 import { installSpeakerPreview } from './animations/speaker-preview.js';
-import { prepareCheckpointNotes, installCheckpointNotesReceiver } from './animations/checkpoint-notes.js';
+import { prepareCheckpointNotes, installCheckpointNotesReceiver, installNotesKeyBridge, isNotesPreview, showNotesPreviewFrame } from './animations/checkpoint-notes.js';
 import { FORMATS, formatFromSearch, withFormat, toggledFormatUrl } from './animations/format.js';
 
 const params = new URLSearchParams(location.search);
 const printMode = params.has('print-pdf');
+// Ramki podglądu w oknie Notes (bieżący i następny slajd) pokazują nieruchomy kadr checkpointu:
+// bez własnego RAF, autoplay i korekt fragmentów, które plugin Notes odsyłałby do głównego okna.
+const notesPreview = isNotesPreview();
 // Domyślnie projektor 4:3; ?ratio=16:9 (lub klawisz W) przełącza na ekran panoramiczny.
 const format = formatFromSearch(location.search);
 document.documentElement.dataset.ratio = format.replace(':', '-');
@@ -54,6 +57,8 @@ const deck = new Reveal({
   maxScale: 2.0,
   view: 'slide',
   navigationMode: 'linear',
+  // Podgląd nie nawiguje sam (strzałki Reveal); klawisze idą do głównego okna przez installNotesKeyBridge.
+  ...(notesPreview ? { controls: false } : {}),
 });
 
 installSpeakerPreview(deck);
@@ -161,7 +166,7 @@ const autoFinish = installAutoFinishGuard(deck, {
   }),
   getPlayer: slide => players.get(slide),
   getMode: slide => stateFor(slide).mode,
-  isEnabled: () => !printMode,
+  isEnabled: () => !printMode && !notesPreview,
 });
 
 function playerFor(slide) {
@@ -182,7 +187,16 @@ function playerFor(slide) {
   return players.get(slide);
 }
 
+function showPreviewFrame(slide) { showNotesPreviewFrame(slide, playerFor(slide), { still: stateFor(slide).mode === 'static' }); }
+
 function activate(slide) {
+  if (notesPreview) {
+    activeSlide = slide;
+    activePlayer = playerFor(slide);
+    activePlayer?.hideControls();
+    showPreviewFrame(slide);
+    return;
+  }
   suspendedPlaying = false;
   if (activeSlide && activePlayer) stateFor(activeSlide).wasPlaying = activePlayer.isPlaying;
   if (activePlayer?.controller) activePlayer.controller.suspend('slide'); else activePlayer?.pause();
@@ -229,9 +243,9 @@ function autoplayLive() {
   if (activePlayer?.live?.autoplay && !activePlayer.isPlaying && activePlayer.state !== 'finished') activePlayer.controller.toggle();
 }
 let suspendedPlaying = false;
-function suspend() { if (activePlayer?.controller) { activePlayer.controller.suspend('environment'); return; } suspendedPlaying ||= Boolean(activePlayer?.isPlaying); activePlayer?.pause(); }
+function suspend() { if (notesPreview) return; if (activePlayer?.controller) { activePlayer.controller.suspend('environment'); return; } suspendedPlaying ||= Boolean(activePlayer?.isPlaying); activePlayer?.pause(); }
 function resume() {
-  if (!printMode && !deck.isOverview() && !deck.isPaused() && !document.hidden) {
+  if (!printMode && !notesPreview && !deck.isOverview() && !deck.isPaused() && !document.hidden) {
     if (activePlayer?.controller) { activePlayer.controller.resume('environment'); if (activePlayer.state === 'ready') autoplayLive(); return; }
     if (suspendedPlaying) {
       if (isStepped() && stateFor().mode === 'manual') activePlayer?.playTo(fragmentTime());
@@ -242,6 +256,7 @@ function resume() {
 }
 
 deck.on('fragmentshown', event => {
+  if (notesPreview) { if (event.fragment.closest('.rx-fragment-steps')) showPreviewFrame(event.fragment.closest('section')); return; }
   if (isStaged() || printMode || restoringSlide || stateFor().mode !== 'manual' || !event.fragment.closest('.rx-fragment-steps') || event.fragment.closest('section') !== activeSlide) return;
   if (activePlayer?.finishStep()) {
     // Reveal już odsłoniło kolejny fragment. Zatrzymaj bieżący etap i oddaj mu fragment.
@@ -255,6 +270,7 @@ deck.on('fragmentshown', event => {
   playerFor(deck.getCurrentSlide())?.playTo(fragmentTime());
 });
 deck.on('fragmenthidden', event => {
+  if (notesPreview) { if (event.fragment.closest('.rx-fragment-steps')) showPreviewFrame(event.fragment.closest('section')); return; }
   if (isStaged() || printMode || restoringSlide || stateFor().mode !== 'manual' || !event.fragment.closest('.rx-fragment-steps') || event.fragment.closest('section') !== activeSlide) return;
   stateFor().fragmentIndex = activeSlide.querySelectorAll('.rx-step.visible').length - 1;
   playerFor(deck.getCurrentSlide())?.seek(fragmentTime());
@@ -292,9 +308,10 @@ const stageReveal = installRevealStages(deck, {
   getController: slide => players.get(slide)?.controller,
   getPlayer: slide => stateFor(slide).mode === 'static' ? null : players.get(slide),
   getManualTarget: slide => isStepped(slide) && stateFor(slide).mode === 'manual' ? fragmentTime(slide) : null,
-  isEnabled: () => !printMode,
+  isEnabled: () => !printMode && !notesPreview,
 });
 installCheckpointNotesReceiver(deck, stageReveal, { getPlayer: playerFor });
+installNotesKeyBridge(deck);
 
 // Po użyciu suwaka pilot nadal zmienia slajdy, zamiast przesuwać suwak.
 document.addEventListener('keydown', event => {

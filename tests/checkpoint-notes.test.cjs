@@ -70,7 +70,7 @@ test('restoring fragment state does not turn Notes synchronization into pilot ac
  deck.press(39);assert.equal(next,1);adapter.destroy();
 });
 
-test('an uninitialized Notes preview cannot rewind the main slide before its handshake',async()=>{
+test('the main window ignores every setState from the Notes window, before and after the handshake',async()=>{
  const {['checkpoint-notes']:m}=await modules(['checkpoint-notes']);const s=slide(),calls=[];let listener;
  s.markers.forEach((marker,i)=>marker.dataset.time=String(i+1));
  const view={location:{origin:'http://localhost'},addEventListener:(type,fn)=>listener=fn};view.parent=view;
@@ -79,6 +79,57 @@ test('an uninitialized Notes preview cannot rewind the main slide before its han
  m.installCheckpointNotesReceiver(deck,{restore:fn=>fn()},{view,getPlayer:()=>({duration:20,controller:{seek:time=>calls.push(['seek',time])}})});
  const send=data=>listener({source:popup,origin:view.location.origin,data:JSON.stringify(data),stopImmediatePropagation:()=>calls.push(['stop'])});
  send({method:'setState',args:[{indexh:14,indexf:-1}]});assert.deepEqual(calls,[['stop']]);
- calls.length=0;send({namespace:'reveal-notes',type:'connected'});
- send({method:'setState',args:[{indexh:14,indexf:3}]});assert.deepEqual(calls,[['stop'],['state',3],['seek',4]]);
+ calls.length=0;send({namespace:'reveal-notes',type:'connected'});assert.deepEqual(calls,[],'handshake przechodzi do pluginu');
+ send({method:'setState',args:[{indexh:14,indexf:3}]});assert.deepEqual(calls,[['stop']],'podgląd nie steruje główną prezentacją');
+ s.id='05-zrodla-2';calls.length=0;send({method:'setState',args:[{indexh:3,indexf:0}]});assert.deepEqual(calls,[['stop']],'także slajdy bez szablonu');
+ // Inne okna (nie Notes otwarte z tej prezentacji) nie są dotykane.
+ calls.length=0;listener({source:{},origin:view.location.origin,data:JSON.stringify({method:'setState',args:[{indexh:1}]}),stopImmediatePropagation:()=>calls.push(['stop'])});
+ assert.deepEqual(calls,[]);
 });
+
+test('keys pressed in the Notes window reach the main deck like the remote; the preview frame never navigates itself',async()=>{
+ const {['checkpoint-notes']:m}=await modules(['checkpoint-notes']);
+ const main={location:{origin:'http://localhost'},listeners:[],addEventListener(type,fn){this.listeners.push(fn);}};main.parent=main;
+ const speaker={opener:main};
+ const keys=[];const doc={listeners:[],addEventListener(type,fn,capture){this.listeners.push({type,fn,capture});}};
+ const frame={location:{origin:'http://localhost'},parent:speaker,frameElement:{parentElement:{id:'current-slide'}},document:doc,
+  listeners:[],addEventListener(type,fn,capture){this.listeners.push({type,fn,capture});}};
+ main.postMessage=undefined;speaker.opener.postMessage=(data,origin)=>{for(const fn of main.listeners)fn({source:frame,origin,data});};
+ m.installNotesKeyBridge({triggerKey:k=>keys.push(['frame',k])},frame);
+ m.installNotesKeyBridge({triggerKey:k=>keys.push(['main',k])},main);
+ assert.equal(frame.listeners[0].capture,true);assert.equal(doc.listeners[0].capture,true);
+ let stopped=0;
+ frame.listeners[0].fn({source:speaker,origin:'http://localhost',data:JSON.stringify({method:'triggerKey',args:[39]}),stopImmediatePropagation:()=>stopped++});
+ assert.deepEqual(keys,[['main',39]]);assert.equal(stopped,1,'ramka nie obsługuje triggerKey sama');
+ let prevented=0;
+ doc.listeners[0].fn({keyCode:37,preventDefault:()=>prevented++,stopImmediatePropagation:()=>{}});
+ assert.deepEqual(keys,[['main',39],['main',37]]);assert.equal(prevented,1);
+ // S (kolejne okno Notes) i W (przeładowanie formatu) nie są przekazywane.
+ frame.listeners[0].fn({source:speaker,origin:'http://localhost',data:JSON.stringify({method:'triggerKey',args:[83]}),stopImmediatePropagation:()=>{}});
+ frame.listeners[0].fn({source:speaker,origin:'http://localhost',data:JSON.stringify({method:'triggerKey',args:[87]}),stopImmediatePropagation:()=>{}});
+ assert.equal(keys.length,2);
+ // Główne okno przyjmuje klawisze tylko od ramki podglądu okna Notes otwartego z tej prezentacji.
+ for(const fn of main.listeners)fn({source:{parent:{opener:{}},frameElement:{parentElement:{id:'current-slide'}}},origin:'http://localhost',data:JSON.stringify({namespace:'rx-notes',type:'key',keyCode:39})});
+ for(const fn of main.listeners)fn({source:frame,origin:'http://evil',data:JSON.stringify({namespace:'rx-notes',type:'key',keyCode:39})});
+ assert.equal(keys.length,2);
+ // Ramka upcoming nie przekazuje niczego.
+ const upcoming={...frame,frameElement:{parentElement:{id:'upcoming-slide'}},listeners:[],addEventListener(){this.listeners.push(1);}};
+ m.installNotesKeyBridge({triggerKey(){}},upcoming);assert.equal(upcoming.listeners.length,0);
+});
+
+test('a Notes preview frame shows the still checkpoint frame and never plays',async()=>{
+ const {['checkpoint-notes']:m}=await modules(['checkpoint-notes']);
+ const marker=(time,visible,handoff=false)=>({dataset:{time:String(time),...(handoff?{handoff:'true'}:{})},visible});
+ const slideWith=markers=>({querySelectorAll:sel=>markers.filter(x=>sel.includes('.visible')?x.visible:true)});
+ const calls=[],staged={duration:9,controller:{seekCheckpoint:(t,f)=>calls.push(['checkpoint',t,f]),reset:()=>calls.push(['reset'])},play:()=>calls.push(['play'])};
+ m.showNotesPreviewFrame(slideWith([marker(1,true),marker(2,true),marker(2,false,true)]),staged);
+ m.showNotesPreviewFrame(slideWith([marker(1,true),marker(2,true),marker(2,true,true)]),staged);
+ m.showNotesPreviewFrame(slideWith([marker(1,false)]),staged);
+ assert.deepEqual(calls,[['checkpoint',2,false],['checkpoint',2,true],['reset']]);
+ calls.length=0;const stepped={duration:9,seek:t=>calls.push(['seek',t]),finish:()=>calls.push(['finish']),play:()=>calls.push(['play'])};
+ m.showNotesPreviewFrame(slideWith([marker(3,true),marker(3,true,true)]),stepped);
+ m.showNotesPreviewFrame(slideWith([marker(3,false)]),stepped);
+ m.showNotesPreviewFrame(slideWith([]),stepped);m.showNotesPreviewFrame(slideWith([]),stepped,{still:true});
+ assert.deepEqual(calls,[['seek',9],['seek',0],['finish']]);
+});
+

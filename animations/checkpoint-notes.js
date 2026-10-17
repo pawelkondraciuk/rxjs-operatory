@@ -21,13 +21,20 @@ export function prepareCheckpointNotes(slide,{printMode=false}={}) {
   return true;
 }
 
+// Ramka podglądu w standardowym oknie Notes (current-slide / upcoming-slide).
+export function isNotesPreview(view=window) {
+  try{return ['current-slide','upcoming-slide'].includes(view.frameElement?.parentElement?.id);}catch{return false;}
+}
+
 // Podgląd Notes dostaje setState przez postMessage. Jego fragmenty nie są
 // kliknięciami pilota: seek odtwarza kadr, bez startu animacji i zwrotnego cofania
 // głównej prezentacji. Opt-in: tylko wariant z szablonem notatek checkpointów.
+// Główne okno ignoruje setState z okna Notes: podgląd tylko odzwierciedla główną prezentację,
+// a jego własne zmiany fragmentów (debounce 500 ms w pluginie) cofałyby albo przeskakiwały animację.
+// Sterowanie z okna Notes idzie klawiszami (installNotesKeyBridge), jak z pilota.
 export function installCheckpointNotesReceiver(deck,stages,{getPlayer,view=window}={}) {
-  const receiver=['current-slide','upcoming-slide'].includes(view.frameElement?.parentElement?.id);
+  const receiver=isNotesPreview(view);
   if(!receiver&&view.parent!==view)return;
-  const connected=new WeakSet();
   view.addEventListener('message',event=>{
     if(event.origin!==view.location.origin)return;
     try{
@@ -35,15 +42,12 @@ export function installCheckpointNotesReceiver(deck,stages,{getPlayer,view=windo
     }catch{return;}
     let data;
     try{data=typeof event.data==='string'?JSON.parse(event.data):event.data;}catch{return;}
-    if(!receiver&&data?.namespace==='reveal-notes'&&data.type==='connected')connected.add(event.source);
     const state=data?.method==='setState'?data.args?.[0]:null;
     if(!state||!Number.isInteger(state.indexh))return;
+    if(!receiver){event.stopImmediatePropagation();return;}
     const slide=deck.getSlide(state.indexh,state.indexv||0);
     if(!slide?.querySelector(`template[data-checkpoint-notes="${slide.id}"]`))return;
     event.stopImmediatePropagation();
-    // Iframe startuje bez fragmentu i przed handshake wysyła indexf:-1.
-    // To inicjalizacja podglądu, nie polecenie cofnięcia głównej prezentacji.
-    if(!receiver&&!connected.has(event.source))return;
     stages.restore(()=>{
       deck.setState(state);
       const player=getPlayer(slide),marker=slide.querySelectorAll('.rx-step')[state.indexf];
@@ -53,4 +57,48 @@ export function installCheckpointNotesReceiver(deck,stages,{getPlayer,view=windo
       else if(player?.controller)player.controller.seek(handoff?player.duration:time);
     });
   },true);
+}
+
+// Kadr ramki podglądu Notes, bez odtwarzania: checkpoint ostatniego widocznego znacznika rx-step (handoff — wynik),
+// bez widocznego znacznika — READY; scena bez postojów pokazuje wynik (statyczna zostaje bez zmian).
+export function showNotesPreviewFrame(slide,player,{still=false}={}) {
+  if(!player)return;
+  const markers=[...slide.querySelectorAll('.rx-step')],marker=markers[slide.querySelectorAll('.rx-step.visible').length-1];
+  const handoff=marker?.dataset.handoff==='true',time=Number(marker?.dataset.time||0);
+  if(player.controller){if(marker)player.controller.seekCheckpoint(time,handoff);else player.controller.reset();}
+  else if(markers.length)player.seek(handoff?player.duration:time);
+  else if(!still)player.finish();
+}
+
+// Klawisze naciśnięte w oknie Notes (przekazywane przez plugin do ramki current-slide jako triggerKey albo
+// wciśnięte z fokusem w ramce) trafiają do głównego okna i działają jak pilot; ramka sama nie nawiguje.
+// W głównym oknie przyjmujemy je wyłącznie od ramki podglądu okna Notes otwartego z tej prezentacji.
+const forwardedKeys=new Set([32,33,34,35,36,37,38,39,40,65,70,72,74,75,76,77,78,80,82,85,219,221]);
+export function installNotesKeyBridge(deck,view=window) {
+  if(isNotesPreview(view)) {
+    if(view.frameElement.parentElement.id!=='current-slide')return;
+    const forward=keyCode=>{try{view.parent.opener?.postMessage(JSON.stringify({namespace:'rx-notes',type:'key',keyCode}),view.location.origin);}catch{}};
+    view.addEventListener('message',event=>{
+      if(event.source!==view.parent||event.origin!==view.location.origin)return;
+      let data;
+      try{data=typeof event.data==='string'?JSON.parse(event.data):event.data;}catch{return;}
+      if(data?.method!=='triggerKey')return;
+      event.stopImmediatePropagation();
+      if(forwardedKeys.has(data.args?.[0]))forward(data.args[0]);
+    },true);
+    view.document.addEventListener('keydown',event=>{
+      if(event.ctrlKey||event.metaKey||event.altKey)return;
+      event.preventDefault();event.stopImmediatePropagation();
+      if(forwardedKeys.has(event.keyCode))forward(event.keyCode);
+    },true);
+    return;
+  }
+  if(view.parent!==view)return;
+  view.addEventListener('message',event=>{
+    if(event.origin!==view.location.origin)return;
+    try{if(event.source?.parent?.opener!==view||!isNotesPreview(event.source))return;}catch{return;}
+    let data;
+    try{data=typeof event.data==='string'?JSON.parse(event.data):event.data;}catch{return;}
+    if(data?.namespace==='rx-notes'&&data.type==='key'&&forwardedKeys.has(data.keyCode))deck.triggerKey(data.keyCode);
+  });
 }
