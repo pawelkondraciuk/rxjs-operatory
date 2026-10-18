@@ -343,7 +343,7 @@ export function compileScene(scene) {
       const period=window ? window.end-window.start : 1;
       const remaining=window ? Math.max(0,window.end-time) : null;
       return {timer:{label:n.laneTimer.label,progress:window?clamp((time-window.start)/period):0,active:Boolean(window),
-        text:window?`${n.laneTimer.label} ${remaining.toFixed(1).replace('.',',')} s`:'gotowy',since:window?.start}};
+        text:window?`${n.laneTimer.label} ${remaining.toFixed(1).replace('.',',')} s`:'',since:window?.start}};
     }
     const {kind,period,label}=n.laneTimer,logical=plan.logicalTime(time);
     const arrived=(input?.events||[]).filter(e=>e.arrival<=time);

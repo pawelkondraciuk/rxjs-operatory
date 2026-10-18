@@ -49,8 +49,6 @@ export function createStageController(player,options={}) {
     if(player.state==='finished'){options.onNavigate?.(1);return;}
     if(player.live){nextLive(player.live);return;}
     if(player.isPlaying){
-      // Niektóre etapy reprezentują realny czas (np. exponential backoff). Kolejne „dalej” nie może ich skrócić.
-      if(player.canSkip===false)return;
       const end=target??nextCheckpoint();player.seek(end);target=null;changed();
     }else start();
   }

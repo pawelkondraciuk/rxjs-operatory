@@ -32,16 +32,15 @@ test('backoff lasts exactly 1, 2 and 4 seconds and no HTTP is active while waiti
   assert.match(svg,/data-lane-timer="0\.5"/);
   assert.match(svg,/czekam [0-9],[05] s/);
  }
- assert.deepEqual(Array.from(scene.playback.unskippable,w=>Math.round((w.to-w.from)*10)/10),[1,2,4]);
 });
 
 test('three errors end at retry; A receives only User and complete from the fourth request',async()=>{
  const {c,render}=await deck(),output=c.plan.records.get('retry-observer');
- assert.deepEqual(Array.from(output.events,e=>e.value),['User']);
+ assert.deepEqual(Array.from(output.events,e=>e.value),['{…}']);
  assert.equal(output.end.kind,'complete');
  for(let i=1;i<=3;i++)assert.equal(c.plan.records.get(`source-retry-${i}`).end.kind,'error');
  const success=frame(c,'success'),history=success.histories.find(h=>h.anchor==='observer');
- assert.deepEqual(Array.from(history.values,v=>v.value),['User']);
+ assert.deepEqual(Array.from(history.values,v=>v.value),['{…}']);
  const svg=render(success);
  assert.equal((svg.match(/data-row-state="error"/g)||[]).length,3);
  assert.match(svg,/data-execution-row="#4"[^>]*data-row-state="completed"/);
@@ -93,17 +92,17 @@ test('code keeps RxJS 7 retry config and highlights http.get, retry and timer',a
  const {m,scene,c}=await deck(),kinds=m['code-syntax'].codeTokens(scene.code),kind=word=>{
   const i=scene.code.indexOf(word);return new Set(kinds.slice(i,i+word.length));
  };
- assert.equal(scene.code,"http.get<User>('/api/users/42').pipe(\n  retry({\n    count: 3,\n    delay: (_error, retryCount) =>\n      timer(1000 * 2 ** (retryCount - 1))\n  })\n)");
+ assert.equal(scene.code,"http.get<User>('/api/users/42').pipe(\n  retry({ count: 3, delay: (_error, retryCount) =>\n    timer(1000 * 2 ** (retryCount - 1)) }));");
+ assert.match(scene.playerClass,/rx-lanes rx-flat-tiles rx-two-lines/);
  assert.deepEqual([...kind('http')],['src']);assert.deepEqual([...kind('retry')],['op']);assert.deepEqual([...kind('timer')],['op']);
  assert.deepEqual(Array.from(c.snapshot(0).codeView.flat().filter(part=>part.mark),part=>part.mark.id),['retry-http','retry-op','retry-timer']);
 });
 
-test('MANUAL cannot skip a running countdown; rewind/reset are deterministic and notes/order include the third EXTRA',async()=>{
+test('MANUAL: next during a countdown finishes the stage; rewind/reset are deterministic and notes/order include the third EXTRA',async()=>{
  const {scene,c,m}=await deck(),h=await playbackHarness(),{player,controller}=h.create({scene});
- controller.seek(at(c,'error-1'));controller.next();h.advance(300);const during=player.time;
- controller.next();assert.equal(player.time,during,'drugie dalej nie przeskakuje odliczania');
- h.advance(800);assert.ok(player.time>=5.9,'odliczanie trwa pełną sekundę');
- controller.seek(at(c,'error-3'));controller.next();h.advance(1000);controller.next();assert.ok(player.time<19.1,'4 s nie można skrócić');
+ controller.seek(at(c,'error-1'));controller.next();h.advance(300);assert.ok(player.time<5.9,'odliczanie trwa');
+ controller.next();assert.equal(player.time,at(c,'request-2'),'drugie dalej kończy etap odliczania');assert.equal(player.isPlaying,false);
+ controller.seek(at(c,'error-3'));controller.next();h.advance(1000);controller.next();assert.equal(player.time,at(c,'request-4'),'4 s też można pominąć');
  controller.previous();assert.equal(player.time,at(c,'error-3'));
  controller.previous();assert.equal(player.time,at(c,'request-3'));
  controller.reset();assert.equal(player.time,0);assert.equal(player.state,'ready');assert.equal(h.frames.size,0);

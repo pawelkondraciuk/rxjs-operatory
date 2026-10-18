@@ -1640,6 +1640,7 @@ function debounceAuditGraph(scene) {
 
 // retry z exponential backoff (EXTRAS): jedna subskrypcja A, cztery kolejne subskrypcje tego samego cold HTTP.
 // Trzy błędy kończą się na retry; okna 1/2/4 s są częścią jednego deterministycznego zegara sceny.
+// Odliczanie można pominąć („dalej” kończy etap) — scena pokazuje kolejność, a nie mierzy prawdziwy czas.
 export function configureRetryBackoff(scene) {
   const windows=[{start:4.9,end:5.9,seconds:1},{start:9.5,end:11.5,seconds:2},{start:15.1,end:19.1,seconds:4}];
   const attempts=[
@@ -1656,30 +1657,26 @@ export function configureRetryBackoff(scene) {
     ev(i<3?'stream-error':'stream-complete',`source-retry-${i+1}`)));
   const retryActive=[...windows.map((_,i)=>during(ev('stream-error',`source-retry-${i+1}`),ev('subscribe',`source-retry-${i+2}`))),
     during(ev('deliver-next','source-retry-4'),ev('disconnected','retry-observer'))];
+  // Trzy linie jak w x01 (rx-two-lines: 36/24 px): pełna konfiguracja retry z RxJS 7, bez skracania wzoru backoff.
   const lines=[
     [{text:'http.get',mark:httpMark,active:httpActive},{text:"<User>('/api/users/42').pipe("}],
-    [{text:'  '},{text:'retry',mark:retryMark,active:retryActive},{text:'({' }],
-    [{text:'    count: 3,'}],
-    [{text:'    delay: (_error, retryCount) =>'}],
-    [{text:'      '},{text:'timer',mark:timerMark,active:windows.map((_,i)=>retryActive[i])},{text:'(1000 * 2 ** (retryCount - 1))'}],
-    [{text:'  })'}],
-    [{text:')'}],
+    [{text:'  '},{text:'retry',mark:retryMark,active:retryActive},{text:'({ count: 3, delay: (_error, retryCount) =>'}],
+    [{text:'    '},{text:'timer',mark:timerMark,active:windows.map((_,i)=>retryActive[i])},{text:'(1000 * 2 ** (retryCount - 1)) }));'}],
   ];
   const code=lines.map(line=>line.map(part=>part.text).join('')).join('\n');
-  Object.assign(scene,{title:'retry — nie udało się? Spróbuj później',graph:retryBackoffGraph,playerLayout:'expanded',
-    playerClass:'rx-flat-tiles rx-retry',duration:26,ink:'#26323B',code,codeLines:lines,
+  Object.assign(scene,{title:'retry — nie udało się? Spróbuj później',graph:retryBackoffGraph,playerLayout:'function',
+    playerClass:'rx-lanes rx-flat-tiles rx-two-lines',duration:26,ink:'#26323B',code,codeLines:lines,codeFrames:[],
     retryPlan:{windows,attempts},
-    rows:[...attempts.map((attempt,i)=>R(`#${i+1} · HTTP GET`,i===3?[E(attempt.next,'User','a')]:[],
+    rows:[...attempts.map((attempt,i)=>R(`#${i+1} · HTTP GET`,i===3?[E(attempt.next,coldUserSymbol,'a')]:[],
       [B(attempt.connected,attempt.end,'request',attempt.kind==='error'?'error':'work')],attempt.kind==='complete'?{completeAt:attempt.end}:{})),
-      R('A',[E(22.8,'User','a')],[],{completeAt:23.7})],
+      R('A',[E(22.8,coldUserSymbol,'a')],[],{completeAt:23.7})],
     captions:[[0,'Definicja Observable. Request jeszcze nie istnieje'],[1.3,'A subskrybuje raz; retry subskrybuje źródło HTTP'],
       [4.9,'Błąd #1 przechwycony. A nadal czeka. Backoff: 1 s'],[9.5,'Błąd #2 przechwycony. Backoff rośnie z 1 s do 2 s'],
       [15.1,'Błąd #3 przechwycony. Teraz czekamy 4 s'],[19.1,'Po 4 s retry uruchamia czwarte wykonanie HTTP'],
       [24.5,'Czwarty request: User i complete. A nie dostał pośrednich błędów'],
       [25.35,'#1 error → 1 s · #2 error → 2 s · #3 error → 4 s · #4 User + complete']],
     metrics:[{label:'Requesty HTTP',count:'started'},{label:'Aktywne',count:'active'}],
-    playback:{entry:'manual',finish:'hold',afterLastManualStop:'start-auto',controller:'stages',resetOnExit:true,
-      unskippable:windows.map(({start,end})=>({from:start,to:end})),stops:[
+    playback:{entry:'manual',finish:'hold',afterLastManualStop:'start-auto',controller:'stages',resetOnExit:true,stops:[
         {id:'request-1',time:2.45,caption:'A subskrybuje. Powstaje HTTP #1 — pierwszy request jest natychmiastowy'},
         {id:'error-1',time:4.9,caption:'HTTP #1: error. retry go przechwytuje; A nie dostaje błędu'},
         {id:'request-2',time:7.05,caption:'Po pełnej 1 sekundzie retry ponownie subskrybuje źródło: HTTP #2'},
@@ -1693,35 +1690,32 @@ export function configureRetryBackoff(scene) {
   });
 }
 
+// Wygląd torów (laneTile/laneReceiver/laneTray, kolumny jak x01). Stos czterech wykonań HTTP musi zmieścić się pod
+// nagłówkiem, więc 16:9 ma niższe wiersze (66) i mniejszą kulkę; 4:3 zachowuje wymiary torów 79/89.
 function retryBackoffGraph(scene) {
-  const large=scene.format==='4:3',height=large?612:460,top=large?105:70,defH=large?56:46,rowH=large?68:52;
-  const y=top+defH+rowH/2,subscriber={A:{color:'#7457D9',fill:'#D9CFF5',progress:'#C4B6F0',ink:'#513A9A',label:'A'}};
-  const tile=(id,label,x,w,kind,extra={})=>({id,label,x,w,top,defH,rowH,laneSlots:{A:0},growRows:true,
-    y:top+(defH+rowH)/2,h:defH+rowH,ready:true,detail:'',statusInside:false,terminalBadge:true,rx:7,
-    ...(kind==='source'?{headerFill:'#8FC9D4',runtimeFill:'#E3F0F3'}:{headerFill:'#D8B3E6',runtimeFill:'#EDE6F8'}),...extra});
-  const colors=Array(4).fill('#7457D9');
-  const stackItems=scene.retryPlan.attempts.map((_,i)=>({id:`#${i+1}`,edge:`source-retry-${i+1}`,color:colors[i]}));
-  const nodes=[tile('source','HTTP GET',180,300,'source',{growRows:false,workLanes:true,progressUntilNext:true,
-      y:top+defH/2,h:defH,executionStack:{items:stackItems,shiftDuration:.4}}),
-    tile('retry','retry',600,340,'operator',{laneTimer:{kind:'countdown',label:'czekam',windows:scene.retryPlan.windows}}),
-    {id:'observer',label:'',x:1055,w:310,y,h:rowH,top:y-rowH/2,defH:0,rowH,laneSlots:{A:0},ready:false,born:.2,subscriber:'A',
-      headerFill:'#EAE4F7',runtimeFill:'#EDE6F8',terminalBadge:true,detail:'',statusInside:false,laneTerminalText:true,
-      inbox:{size:large?27:24,left:16,font:large?30:27},rx:7}],edges=[],schedule={};
-  scene.retryPlan.attempts.forEach((attempt,i)=>{
-    const id=`source-retry-${i+1}`,events=i===3?[{...E(attempt.next,'User',colors[i]),arrival:22.7}]:[];
+  const tall=scene.format==='4:3',top=tall?150:96,defH=tall?laneLook.defH:62,rowH=tall?laneLook.rowH:66;
+  const size={defH,rowH},y=top+defH+rowH/2,ball=tall?viewFieldBall:{r:27,font:21},color=laneSubscribers.A.color;
+  const receiver={x:1030,w:340,y},attempts=scene.retryPlan.attempts;
+  const nodes=[{id:'source',x:200,w:300,label:'HTTP GET',...laneTile('source',top,{A:0},0,{...size,growRows:false,workLanes:true,
+      progressUntilNext:true,y:top+defH/2,h:defH,executionStack:{items:attempts.map((_,i)=>({id:`#${i+1}`,edge:`source-retry-${i+1}`,color})),shiftDuration:.4}})},
+    {id:'retry',x:600,w:360,label:'retry',...laneTile('operator',top,{A:0},1,{...size,y:top+(defH+rowH)/2,h:defH+rowH,
+      laneTimer:{kind:'countdown',label:'czekam',windows:scene.retryPlan.windows}})},
+    laneReceiver('observer','A',receiver,{ready:false,born:.2,laneTerminalText:true,h:rowH-6,top:y-rowH/2+3,rowH:rowH-6})];
+  const edges=[],schedule={};
+  attempts.forEach((attempt,i)=>{
+    const id=`source-retry-${i+1}`,events=i===3?[{...E(attempt.next,coldUserSymbol,laneSubscribers.A.fill),arrival:22.7}]:[];
     edges.push({id,from:'source',to:'retry',subscriber:'A',retryAttempt:true,hideAfterTerminal:true,logicalStart:attempt.start,
       logicalEnd:{at:attempt.end,kind:attempt.kind}});
     schedule[id]={start:attempt.start,connectDuration:.8,events,
       end:{at:attempt.end,logicalAt:attempt.end,kind:attempt.kind,duration:.8}};
   });
   edges.push({id:'retry-observer',from:'retry',to:'observer',subscriber:'A',logicalStart:.5,logicalEnd:{at:23.7,kind:'complete'}});
-  schedule['retry-observer']={start:.5,connectDuration:.8,events:[{...E(22.8,'User','#7457D9'),arrival:23.6}],
+  schedule['retry-observer']={start:.5,connectDuration:.8,events:[{...E(22.8,coldUserSymbol,laneSubscribers.A.fill),arrival:23.6}],
     end:{at:23.7,logicalAt:23.7,kind:'complete',duration:.8}};
-  return {layout:'fixed',formatAware:true,width:1240,height,nodes,edges,schedule,trays:[{anchor:'observer',x:1025,y,w:190,balls:true,max:1}],
-    subscribers:subscriber,laneWire:5,portRadius:11,ball:{r:large?27:23,font:large?25:22,textFill:'#fff'},
-    executions:scene.retryPlan.attempts.map((attempt,i)=>({id:`http-${i+1}`,node:'source',edge:`source-retry-${i+1}`,
-      value:`#${i+1}`,label:`HTTP #${i+1}`,duration:attempt.end-attempt.start})),
-    ...(large?{textScale:1.18,labelScale:1.3}:{})};
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball,
+    nodes,edges,schedule,trays:[laneTray('observer',receiver,1,ball)],subscribers:{A:laneSubscribers.A},
+    executions:attempts.map((attempt,i)=>({id:`http-${i+1}`,node:'source',edge:`source-retry-${i+1}`,
+      value:`#${i+1}`,label:`HTTP #${i+1}`,duration:attempt.end-attempt.start}))};
 }
 
 // combineLatest (drugi EXTRAS): dwa kontrolowane źródła i lokalny stan jednego wykonania operatora.
