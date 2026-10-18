@@ -994,10 +994,11 @@ export function flattenGraph(scene) {
 
 // Główny tor S1 nad lokalnymi requestami. Prototypy i dodatki zachowują swoje modele.
 // Opcjonalne columns/stages/edge pozwalają dodać kolejne etapy wiersza (np. HTTP GET → catchError); domyślnie jeden etap HTTP GET.
-// tiles nadpisuje górne kafelki [id,x,w,nagłówek] (np. klik$ → switchMap → catchError), instances wybiera panel instancji.
+// tiles nadpisuje górne kafelki [id,x,w,nagłówek] (np. klik$ → switchMap → catchError). Domyślnie panel instancji;
+// instances:false przywraca wspólny kafelek z wierszami.
 export function configureHttpWorkPanel(graph,scene,frame,{columns=[{id:'source',label:'HTTP GET',fill:'#8FC9D4',runtime:'#E3F0F3'}],
   stages=i=>[{column:'source',edge:'inner'+i+'-op',progress:true}],edge=i=>'inner'+i+'-op',tiles:customTiles,
-  instances=comparisonSlides.has(scene.id)}={}) {
+  instances=true}={}) {
   const large=scene.format==='4:3',top=large?28:10,defH=large?70:56,rowH=large?74:64;
   const all=scene.operatorName==='concatAll';
   const laneY=top+defH+rowH/2;
@@ -1026,8 +1027,7 @@ export function configureHttpWorkPanel(graph,scene,frame,{columns=[{id:'source',
     duration:job.dur??job.end-job.start,stages:stages(i)}));
   // Kafelek prac stoi pod źródłem i operatorem (lewa krawędź źródła – prawa krawędź operatora), z nagłówkiem
   // i wierszami tej samej wysokości co u góry; porty i kabel wyniku jak w głównym torze.
-  // Porównanie 09–12 i catchError na zewnątrz: każde uruchomione inner to osobna instancja HTTP GET (nagłówek + lane)
-  // z własnym inboxem; trzy sloty. Pozostałe sceny zachowują wspólny kafelek z wierszami.
+  // Każde uruchomione inner to osobna instancja HTTP GET (nagłówek + lane z nazwą #1 · A) z własnym inboxem; trzy sloty.
   const source=graph.nodes.find(n=>n.id==='source'),op=graph.nodes.find(n=>n.id==='op');
   const panel=createInnerWorkPanel({works,height:frame.height,large,headerH:defH,rowH,
     tileLeft:source.x-source.w/2,tileRight:op.x+op.w/2,

@@ -244,55 +244,58 @@ function innerWorkPanel(panel,frame,reduced=false) {
   }
   return svg+'</g>';
 }
-// Prace jako osobne instancje (panel.instances): identyfikator #1 · A na wysokości lane, dla każdego etapu standardowy
-// kafelek (nagłówek definicji + jeden execution lane) i kompaktowy inbox inner subscribera za krótkim kablem.
-// Wartość bez inner (oczekuje, w kolejce, pominięte) ma tylko identyfikator i neutralny placeholder w miejscu lane.
+// Prace jako osobne instancje (panel.instances): dla każdego etapu standardowy kafelek (nagłówek definicji + jeden
+// execution lane) i kompaktowy inbox inner subscribera za krótkim kablem. Lane pierwszego etapu ma pasek koloru pracy
+// i nazwę #1 · A przy lewej krawędzi, jak tory u góry. Wartość bez inner (oczekuje, w kolejce, pominięte) ma tylko
+// pasek z nazwą i neutralny placeholder w miejscu reszty lane.
 function innerInstancesPanel(panel,frame,reduced=false) {
-  const {rowHeight,headerH,identifierW,stagesLeft,stageW,stageGap,inboxX,inboxW,font,tileLeft}=panel;
+  const {rowHeight,headerH,labelW,stageXs,stageWs,inboxX,inboxW,font,tileLeft}=panel;
   const k=frame.textScale||1,count=panel.columns.length,bar=6*k,h=rowHeight-1;
-  const portR=panel.portRadius||8,wireW=panel.wire||4,stageX=i=>stagesLeft+i*(stageW+stageGap);
-  const portX=i=>i<count-1?stageX(i+1):inboxX,placeholderW=stageX(count-1)+stageW-stagesLeft;
+  const portR=panel.portRadius||8,wireW=panel.wire||4,stageX=i=>stageXs[i];
+  const portX=i=>i<count-1?stageX(i+1):inboxX,placeholderX=tileLeft+labelW,placeholderW=stageX(count-1)+stageWs[count-1]-placeholderX;
   const fills={completed:'#DDF1E1',cancelled:'#E7E8E8',errored:'#F7D9D9'},accent={completed:'#26804E',errored:'#C54848'};
   const status={completed:'complete',cancelled:'anulowane',errored:'error',subscribing:'subskrybuje',idle:'oczekuje'};
   const flash=(state,since,x,y,w)=>accent[state]&&!reduced&&since!==undefined&&frame.time-since<.6?
     `<rect data-row-flash="${state}" x="${x}" y="${y}" width="${w}" height="${h}" fill="${accent[state]}" opacity="${(.28*(1-clamp((frame.time-since)/.6))).toFixed(3)}"/>`:'';
   const placeholder=(kind,lane,label,opacity=1,labelOpacity=1)=>`<g data-inner-placeholder="${kind}" opacity="${+opacity.toFixed(3)}">`+
-    `<rect x="${stagesLeft}" y="${lane+6}" width="${placeholderW}" height="${rowHeight-13}" fill="#EEEBE9"${kind==='queued'?' stroke="#BEB4BF" stroke-width="2" stroke-dasharray="8 6"':''}/>`+
-    (label&&labelOpacity>0?text(stagesLeft+placeholderW/2,lane+rowHeight/2,label,label==='?'?font*1.25:font,`style="fill:#746B76;font-weight:${label==='?'?700:600}"${labelOpacity<1?` opacity="${+labelOpacity.toFixed(3)}"`:''}`):'')+'</g>';
+    `<rect x="${tileLeft}" y="${lane}" width="${labelW}" height="${h}" fill="#F4F1EE"/>`+
+    `<rect x="${placeholderX}" y="${lane+6}" width="${placeholderW}" height="${rowHeight-13}" fill="#EEEBE9"${kind==='queued'?' stroke="#BEB4BF" stroke-width="2" stroke-dasharray="8 6"':''}/>`+
+    (label&&labelOpacity>0?text(placeholderX+placeholderW/2,lane+rowHeight/2,label,label==='?'?font*1.25:font,`style="fill:#746B76;font-weight:${label==='?'?700:600}"${labelOpacity<1?` opacity="${+labelOpacity.toFixed(3)}"`:''}`):'')+'</g>';
   let svg=`<g data-inner-work-panel="${esc(panel.id)}" data-inner-layout="instances">`;
   for(const row of panel.rows) {
     const lane=row.y+headerH,cy=lane+rowHeight/2,muted=row.state==='cancelled',identity=muted?'#808890':row.color;
+    // Nazwa lane: pasek koloru pracy i #1 · A przy lewej krawędzi; rysowana nad postępem i nad przejściem placeholdera.
+    const name=`<g data-inner-name="${esc(row.value)}"><rect x="${tileLeft}" y="${lane}" width="${bar}" height="${h}" fill="${identity}"${row.state==='ignored'?' opacity=".45"':''}/>`+
+      text(tileLeft+bar+14,cy,row.id+' · '+row.value,font,`style="text-anchor:start;fill:${identity};font-weight:700"`)+'</g>';
     svg+=`<g data-inner-work="${esc(row.id)}" data-inner-state="${row.state}" data-row-slot="${row.slot}" opacity="${reduced?1:row.opacity}">`;
     svg+=`<title>${esc(row.id+' · '+row.value+' · '+row.state)}</title>`;
-    // Identyfikator wartości: pełny kolor, biały tekst, prostokąt bez zaokrągleń.
-    svg+=`<g data-inner-identifier="${esc(row.value)}"><rect x="${tileLeft}" y="${lane}" width="${identifierW}" height="${h}" fill="${row.color}"/>`+
-      text(tileLeft+identifierW/2,cy,row.id+' · '+row.value,font,'style="fill:#fff;font-weight:700"')+'</g>';
     const queuedLabel=row.queueLabel||'w kolejce';
     if(row.state==='pending') {
-      svg+=placeholder('pending',lane,'?',1,reduced?Math.round(row.question):row.question)+'</g>';continue;
+      svg+=placeholder('pending',lane,'?',1,reduced?Math.round(row.question):row.question)+name+'</g>';continue;
     }
     if(row.state==='queued'||row.state==='ignored') {
       const queued=row.state==='queued',reveal=reduced||row.reveal===undefined?1:row.reveal;
       // Po decyzji „?” ustępuje stanowi wejścia (kolejka albo pominięcie) w tym samym miejscu.
       if(reveal<1)svg+=placeholder('pending',lane,'?',1-reveal);
-      svg+=placeholder(row.state,lane,queued?queuedLabel:'pominięte',reveal)+'</g>';continue;
+      svg+=placeholder(row.state,lane,queued?queuedLabel:'pominięte',reveal)+name+'</g>';continue;
     }
     // Placeholder ustępuje płynnie pełnemu kafelkowi w tym samym slocie; nagłówek pojawia się nad nim.
     if(row.reveal<1&&!reduced)svg+=row.from==='pending'?placeholder('pending',lane,'?',1-row.reveal,row.question||0):
       placeholder('queued',lane,queuedLabel,1-row.reveal);
     svg+=`<g opacity="${reduced?1:row.reveal}">`;
     row.stages.forEach((stage,i)=>{
-      const column=panel.columns[i],sx=stageX(i),fill=fills[stage.state]||column.runtime;
+      const column=panel.columns[i],sx=stageX(i),stageW=stageWs[i],fill=fills[stage.state]||column.runtime;
       const labelSize=clamp((stageW-24)/(Math.max(1,column.label.length)*.55),26*k,26*(frame.labelScale||k));
       svg+=`<g data-inner-stage="${esc(column.id)}" data-stage-state="${stage.state}">`;
       svg+=`<rect data-inner-header="${esc(column.id)}" x="${sx}" y="${row.y}" width="${stageW}" height="${headerH}" fill="${column.fill}"/>`+
         text(sx+stageW/2,row.y+headerH/2,column.label,labelSize,'style="fill:#26323B"');
       svg+=`<rect data-inner-lane="${esc(column.id)}" x="${sx}" y="${lane}" width="${stageW}" height="${h}" fill="${fill}"/>`+flash(stage.state,stage.since,sx,lane,stageW);
       // Postęp jak w kafelku HTTP GET toru: tło całej wysokości lane z czołem w kolorze pracy.
+      // Pierwszy etap: postęp zaczyna się za nazwą lane (jak kolumna etapu w catchError wewnątrz), więc czoło jej nie przecina.
       if(stage.hasProgress&&['active','cancelled'].includes(stage.state)) {
-        const pw=(stageW-bar)*stage.progress;
-        svg+=`<rect data-inner-progress="${stage.progress}" x="${sx+bar}" y="${lane}" width="${pw}" height="${h}" fill="${muted?'#808890':row.color}" opacity="${muted?.18:.25}"/>`;
-        if(stage.state==='active'&&stage.progress>0&&stage.progress<1)svg+=`<rect x="${sx+bar+pw-3*k}" y="${lane}" width="${3*k}" height="${h}" fill="${row.color}"/>`;
+        const px=sx+(i?bar:labelW),pw=(sx+stageW-px)*stage.progress;
+        svg+=`<rect data-inner-progress="${stage.progress}" x="${px}" y="${lane}" width="${pw}" height="${h}" fill="${muted?'#808890':row.color}" opacity="${muted?.18:.25}"/>`;
+        if(stage.state==='active'&&stage.progress>0&&stage.progress<1)svg+=`<rect x="${px+pw-3*k}" y="${lane}" width="${3*k}" height="${h}" fill="${row.color}"/>`;
       }
       svg+=`<rect x="${sx}" y="${lane}" width="${bar}" height="${h}" fill="${identity}"/>`;
       svg+=`<path d="M${sx} ${lane}H${sx+stageW}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/>`;
@@ -314,7 +317,7 @@ function innerInstancesPanel(panel,frame,reduced=false) {
     svg+=inboxIcon(inboxX+bar+(inboxW-bar-iconSize)/2,cy,iconSize)+'</g>';
     for(const wire of row.wires) {
       if(!wire.visible)continue;
-      const sx=stageX(wire.index)+stageW,ex=portX(wire.index);
+      const sx=stageX(wire.index)+stageWs[wire.index],ex=portX(wire.index);
       svg+=`<path data-inner-wire="${esc(row.id)}-${wire.index}" d="M${sx} ${cy}H${ex}" fill="none" stroke="${wire.color}" stroke-width="${wireW}" opacity="${wire.opacity}" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${reduced?0:-(1-wire.subscribe)}"/>`;
       // Teardown inner: szara przebyta część kabla od inboxa i pocisk „×” jadący w lewo do etapu.
       if(wire.cancel)svg+=`<path data-inner-cancel-trail="${esc(row.id)}-${wire.index}" d="M${ex} ${cy}H${ex-(ex-sx)*wire.cancel.at}" fill="none" stroke="#808890" stroke-width="${wireW}"/>`;
@@ -326,10 +329,10 @@ function innerInstancesPanel(panel,frame,reduced=false) {
       }
     }
     for(const t of row.tokens) {
-      const sx=stageX(t.stage)+stageW,ex=portX(t.stage);
+      const sx=stageX(t.stage)+stageWs[t.stage],ex=portX(t.stage);
       svg+=ball(sx+(ex-sx)*t.progress,cy,t.value,t.color,panel.ball?{...panel.ball,textFill:panel.ballText}:{r:Math.min(26,rowHeight*.4),font:font*.92,textFill:panel.ballText},1,'data-inner-next="true"');
     }
-    svg+='</g></g>';
+    svg+='</g>'+name+'</g>';
   }
   return svg+'</g>';
 }

@@ -24,8 +24,11 @@ test('catchError inside: the top pipeline is the MAIN switchMap pipeline with on
   const panel=f.innerWorkPanels[0];
   assert.deepEqual(Array.from(panel.columns,col=>col.label),['HTTP GET','catchError']);
   assert.equal(panel.frameless,true);assert.equal(panel.label,undefined,'bez dużego napisu nad pracami');
-  // Dolny panel zostaje przy wspólnym kafelku z etapami (09–12 mają osobne instancje); podział między górą a nagłówkiem.
-  assert.ok(panel.dividerY>Math.max(...top(f).map(n=>n.y+n.h/2))&&panel.dividerY<panel.rowsTop-panel.headerH,format);
+  // Każde inner to instancja jak w 09–12: HTTP GET → catchError → inbox w jednym rzędzie; podział między górą a pierwszym slotem.
+  assert.equal(panel.instances,true,format);
+  assert.ok(panel.dividerY>Math.max(...top(f).map(n=>n.y+n.h/2))&&panel.dividerY<panel.rowsTop,format);
+  assert.equal(panel.stageXs[1]-(panel.stageXs[0]+panel.stageWs[0]),panel.stageGap);
+  assert.equal(panel.inboxX,panel.stageXs[1]+panel.stageWs[1]+panel.stageGap);
   assert.deepEqual(Array.from(rows(f),r=>r.id+' · '+r.value),['#1 · A','#2 · B']);
  }
 });

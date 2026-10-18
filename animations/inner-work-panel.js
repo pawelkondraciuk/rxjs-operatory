@@ -15,17 +15,20 @@ export function createInnerWorkPanel({works,columns,height,large=false,id='jobs'
 }
 
 // instances (opt-in): każde uruchomione inner to osobny pipeline z własnymi kafelkami etapów (nagłówek definicji
-// i jeden execution lane pod nim) oraz kompaktowym odbiornikiem inbox na wysokości lane. Po lewej identyfikator
-// wartości (#1 · A) na wysokości lane. Slot = nagłówek + lane + odstęp; kolejne etapy (np. catchError) stoją w tym
-// samym rzędzie, oddzielone kablem tej samej długości co kabel do inboxa. Sloty mieszczą się nad dolnym marginesem.
+// i jeden execution lane pod nim) oraz kompaktowym odbiornikiem inbox na wysokości lane. Lane pierwszego etapu
+// zaczyna się przy lewej krawędzi i ma pasek koloru pracy z nazwą (#1 · A), jak tory u góry. Długości jak we wspólnym
+// kafelku catchError wewnątrz: pierwszy etap = miejsce na nazwę (labelW) + kolumna etapu, kolejne etapy (np. catchError)
+// i inbox za kablem stageGap. Slot = nagłówek + lane + odstęp; sloty mieszczą się nad dolnym marginesem.
 function createInstancePanel({works,columns,height,large,id,minRows,tileLeft,x,w,bottom}) {
   const headerH=large?56:44,rowH=large?64:50,gap=large?14:10,slots=Math.max(minRows,works.length);
   const rowsTop=bottom-slots*(headerH+rowH)-(slots-1)*gap,dividerY=Math.round((rowsTop+(large?172:130))/2);
-  const identifierW=large?140:120,identifierGap=large?16:14,stageW=310,stageGap=110,inboxW=large?64:56;
-  const stagesLeft=tileLeft+identifierW+identifierGap,inboxX=stagesLeft+columns.length*(stageW+stageGap);
+  const labelW=large?184:172,stageGap=72,stageW=(705-labelW-stageGap)/2,inboxW=large?64:56;
+  const stageWs=columns.map((_,i)=>i?stageW:labelW+stageW);
+  const stageXs=stageWs.map((_,i)=>tileLeft+stageWs.slice(0,i).reduce((sum,width)=>sum+width+stageGap,0));
+  const inboxX=stageXs.at(-1)+stageWs.at(-1)+stageGap;
   return {id,innerWork:true,instances:true,frameless:true,x,y:dividerY,w,h:bottom-dividerY,
     dividerY,slots:works.length,rowsTop,rowStep:headerH+rowH+gap,rowHeight:rowH,headerH,tileLeft,tileRight:inboxX+inboxW,
-    identifierW,stagesLeft,stageW,stageGap,inboxX,inboxW,font:large?30:25,columns,works};
+    labelW,stagesLeft:tileLeft,stageXs,stageWs,stageW,stageGap,inboxX,inboxW,font:large?30:25,columns,works};
 }
 
 // Widok lokalnego pipeline'u z istniejącego planu. Nie planuje subskrypcji ani nie prowadzi zegara.

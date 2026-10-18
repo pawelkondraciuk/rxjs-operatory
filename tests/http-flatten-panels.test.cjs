@@ -15,8 +15,8 @@ test('the four HTTP slides share S1, frameless rows, palette and one response pe
  for(const format of ['4:3','16:9'])for(const [id,mode]of definitions){
   const s=scene(id,format),c=compile(s),f=c.snapshot(c.duration),panel=f.panels[0],receiver=f.nodes.find(n=>n.id==='observer');
   assert.equal(s.http,true);assert.equal(panel.frameless,true);
-  // 09–12: osobne instancje (nagłówek + lane + odstęp); 08 zachowuje przylegające wiersze wspólnego kafelka.
-  if(mode==='concatAll')assert.equal(panel.rowStep,panel.rowHeight);else assert.ok(panel.instances&&panel.rowStep>panel.headerH+panel.rowHeight,id);
+  // 08–12: osobne instancje (nagłówek + lane + odstęp).
+  assert.ok(panel.instances&&panel.rowStep>panel.headerH+panel.rowHeight,id);
   assert.equal(f.histories.length,1);assert.equal(f.histories[0].anchor,'observer');
   assert.deepEqual(Array.from(f.histories[0].values,v=>v.value),expected[mode]);
   assert.ok(f.edges.filter(e=>e.subscriber).every(e=>e.subscriber==='S1'&&e.points.every(p=>p[1]===e.points[0][1])));
@@ -114,7 +114,8 @@ test('09–12: each started inner is its own HTTP GET tile (header + one lane) w
   // Trzy sloty mieszczą się między górnym pipeline'em a dołem ramki; inbox stoi za kablem, na wysokości lane.
   assert.ok(panel.rowsTop>top.y+top.h/2&&panel.dividerY<panel.rowsTop,id);
   assert.ok(panel.rowsTop+2*panel.rowStep+panel.headerH+panel.rowHeight<=c.snapshot(0).height-8,id);
-  assert.ok(panel.inboxX>panel.stagesLeft+panel.stageW&&panel.inboxX+panel.inboxW<panel.x+panel.w,id);
+  assert.equal(panel.stagesLeft,panel.tileLeft);assert.equal(panel.stageWs[0],panel.labelW+panel.stageW);
+  assert.ok(panel.inboxX>panel.stagesLeft+panel.stageWs[0]&&panel.inboxX+panel.inboxW<panel.x+panel.w,id);
   for(const t of [stopAt(c,'question'),stopAt(c,'answer'),c.duration]){
    const f=c.snapshot(t),svg=render(f),parts=groups(svg),rows=f.innerWorkPanels[0].rows;
    // Kafelek HTTP GET istnieje tylko dla utworzonego inner (projekcja wywołana); subskrypcja może jeszcze trwać.
@@ -122,14 +123,15 @@ test('09–12: each started inner is its own HTTP GET tile (header + one lane) w
    assert.ok(rows.filter(r=>r.stages).length>=f.executionCounts.started,id+' '+t);
    for(const [i,row]of rows.entries()){
     const part=parts[i],lane=row.y+panel.headerH;
-    assert.equal(count(part,/data-inner-identifier=/g),1);
-    assert.match(part,new RegExp(`data-inner-identifier="${row.value}"><rect x="${panel.tileLeft}" y="${lane}"`));
-    assert.match(part,/style="fill:#fff;font-weight:700">#\d · [ABC]</);
+    // Nazwa lane: pasek koloru pracy przy lewej krawędzi i #n · X w tym samym kolorze (bez osobnego kafelka identyfikatora).
+    assert.equal(count(part,/data-inner-name=/g),1);assert.doesNotMatch(part,/data-inner-identifier/);
+    assert.match(part,new RegExp(`data-inner-name="${row.value}"><rect x="${panel.tileLeft}" y="${lane}"`));
+    assert.match(part,/text-anchor:start;fill:#[0-9A-F]{6};font-weight:700">#\d · [ABC]</);
     if(['pending','queued','ignored'].includes(row.state)){
      assert.doesNotMatch(part,/data-inner-header|data-inner-lane|data-inner-inbox|data-inner-port|data-inner-progress|data-inner-wire/,id+' '+row.state);
     }else{
      assert.equal(count(part,/data-inner-header=/g),1);assert.equal(count(part,/data-inner-lane=/g),1);assert.equal(count(part,/data-inner-inbox=/g),1);
-     assert.match(part,new RegExp(`data-inner-header="source" x="${panel.stagesLeft}" y="${row.y}" width="${panel.stageW}" height="${panel.headerH}"`));
+     assert.match(part,new RegExp(`data-inner-header="source" x="${panel.stagesLeft}" y="${row.y}" width="${panel.stageWs[0]}" height="${panel.headerH}"`));
      assert.match(part,new RegExp(`<rect x="${panel.inboxX}" y="${lane}" width="${panel.inboxW}"`));
      assert.doesNotMatch(part,/inner subscriber|>sub</);
     }
