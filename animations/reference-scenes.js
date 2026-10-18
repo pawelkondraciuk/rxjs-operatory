@@ -669,61 +669,78 @@ export function subjectGraph(scene) {
   };
 }
 
-// Subject — ręczna emisja (05-zrodla-5): wprowadzenie przed Subject + HTTP, ten sam wygląd i pola widoku A/B/C.
-// Subject stoi w miejscu kolumny HTTP z następnego slajdu (x/w 177/230; tam przesuwa się na środek, a po lewej
-// pojawia się HTTP GET). READY: pusty kafelek Subject i puste pola. A, B i C kolejno subskrybują Subject (impulsy
-// od pól w lewo, trzy wiersze wykonań), potem jedno subject$.next(user): kulka User pojawia się w Subject (node.emits)
-// i rozdziela na trzy identyczne powiadomienia next, które jednocześnie jadą do pól. Bez complete — Subject zostaje
-// aktywny, a odbiorcy zasubskrybowani. Jawny harmonogram (schedule): czas ilustracji = czas modelu.
-const subjectManualTimes={subscribe:[.6,1.9,3.2],link:1,next:5,hold:1.4,travel:1.4,summary:.65,duration:9.6};
+// Subject — ręczna emisja (05-zrodla-5): trzeci slajd techniczny, zaraz po HTTP (subscribe, next, complete) i interval
+// (wiele next, unsubscribe). Subject<number> z dwoma odbiorcami A/B: ręczne next(1) i next(2), potem error — trzeci
+// rodzaj powiadomienia, terminalny — i próba next(3), która niczego już nie emituje. Wygląd torów jak Subject + HTTP:
+// Subject x/w 177/230 po lewej, kompaktowi odbiorcy 960/436 z kulkami wartości. Kod to stale tylko definicja Subjecta;
+// subscribe, next i error są chwilowymi migawkami nad diagramem. Jawny harmonogram: czas ilustracji = czas modelu.
+const subjectManualTimes={subscribe:[.6,2.6],link:1,next:[4.6,8.2],hold:1.2,travel:1.4,error:11.8,errorDelay:.6,terminal:1.2,
+  late:14.8,lateHold:1.6,summary:16.6,duration:18.2};
+const subjectManualReceivers=[{id:'A',slot:0},{id:'B',slot:1}];
+// Migawki error (czerwień błędu) i next(3) po błędzie (szarość — wywołanie bez skutku); bez własnych torów.
+const subjectErrorCall={color:'#B51E2E',fill:'#F7D9D9',ink:'#8F1622',tint:'#FBE9EA'};
+const subjectIgnoredCall={color:'#808890',fill:'#E7E8E8',ink:'#5B6670',tint:'#EEF0F1'};
 export function configureSubjectManual(scene) {
-  const at=subjectManualTimes,ev=(type,edge,offset=0)=>({type,edge,...(offset?{offset}:{})});
-  const split=at.next+at.hold,delivered=split+at.travel;
+  const at=subjectManualTimes,ev=(type,edge,extra={})=>({type,edge,...extra});
+  const nexts=at.next.map((call,i)=>({value:String(i+1),call,split:call+at.hold,delivered:call+at.hold+at.travel}));
+  const errorAt=at.error+at.errorDelay,errorArrival=errorAt+at.terminal,fill=subjectUpstream.fill;
   const subjectMark={id:'subject',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
-  // Stały kod: wyłącznie definicja Subject; świeci od ręcznego next do wyjścia powiadomień. subject$.next(user)
-  // to chwilowa migawka nad diagramem (graph.callouts), w jednej linii i bez rozwijania obiektu user.
-  const lines=[[{text:'const subject$ = '},{text:'new Subject<User>()',mark:subjectMark,
-    active:[{from:{type:'manual-next'},to:ev('source-next','subject-A')}]},{text:';'}]];
-  const value=E(split,coldUserSymbol,subjectUpstream.fill);
-  Object.assign(scene,{graph:subjectManualGraph,subjectManualTimes:{...at,split,delivered},
+  // Stały kod: wyłącznie definicja Subject; świeci od ręcznego next do wyjścia powiadomień i od error do jego wysłania.
+  // Próba next(3) po błędzie go nie podświetla — Subject jest już zatrzymany.
+  const lines=[[{text:'const subject$ = '},{text:'new Subject<number>()',mark:subjectMark,
+    active:[...nexts.map(n=>({from:{type:'manual-next',value:n.value},to:ev('source-next','subject-A',{value:n.value})})),
+      {from:{type:'manual-error'},to:ev('stream-error','subject-A')}]},{text:';'}]];
+  Object.assign(scene,{graph:subjectManualGraph,subjectManualTimes:{...at,nexts,errorAt,errorArrival},
     playerLayout:'function',duration:at.duration,ink:'#26323B',playerClass:'rx-lanes rx-flat-tiles',
     title:'Subject — ręczna emisja',code:lines[0].map(part=>part.text).join(''),codeLines:lines,codeFrames:[],
-    rows:[R('Subject',[{...value,at:at.next}]),...coldFields.map(f=>R(`Pole ${f.label}`,[value]))],
-    // Odbiorcy rosną z zestawionymi subskrypcjami; wywołania next — jedno, od chwili subject$.next(user).
-    metrics:[{label:'Odbiorcy',value:t=>at.subscribe.filter(start=>t>=start+at.link).length},
-      {label:'Wywołania next',value:t=>t>=at.next?1:0}],
-    captions:[[0,'new Subject<User>(): Subject jeszcze nie ma odbiorców i niczego nie emituje']],
+    rows:[R('Subject',nexts.map(n=>E(n.call,n.value,fill))),
+      ...subjectManualReceivers.map(r=>R('Odbiorca '+r.id,nexts.map(n=>E(n.split,n.value,fill))))],
+    // Odbiorcy: zestawione i jeszcze niezakończone subskrypcje (error kończy obie). Emisje next: tylko te, które
+    // Subject faktycznie rozesłał — next(3) po błędzie licznika nie zmienia.
+    metrics:[{label:'Odbiorcy',value:t=>t>=errorArrival?0:at.subscribe.filter(start=>t>=start+at.link).length},
+      {label:'Emisje next',value:t=>nexts.filter(n=>t>=n.call).length}],
+    captions:[[0,'new Subject<number>(): Subject nie ma jeszcze odbiorców i niczego nie emituje']],
     playback:manual([
-      {id:'subscribed',event:ev('connected','subject-C'),offset:.35,caption:'A, B i C subskrybują ten sam Subject. Pola czekają na wartość'},
-      {id:'next',event:{type:'manual-next'},offset:.6,caption:'subject$.next(user): jedna ręczna emisja obiektu User'},
-      {id:'multicast',event:ev('source-next','subject-A'),offset:at.travel/2,caption:'Subject rozsyła tę samą wartość do A, B i C jednocześnie'},
-      {id:'received',event:ev('deliver-next','subject-C'),offset:.35,caption:'Każdy dostał cały obiekt User i pokazuje tylko swoje pole'},
+      {id:'subscribed-a',event:ev('connected','subject-A'),offset:.35,caption:'A subskrybuje Subject z obsługą next i error'},
+      {id:'subscribed-b',event:ev('connected','subject-B'),offset:.35,caption:'B też subskrybuje. Subject ma dwóch odbiorców'},
+      {id:'next-1',event:ev('deliver-next','subject-B',{value:'1'}),offset:.35,caption:'subject$.next(1): A i B dostają 1'},
+      {id:'next-2',event:ev('deliver-next','subject-B',{value:'2'}),offset:.35,caption:'subject$.next(2): A i B dostają 2'},
+      {id:'error',event:ev('disconnected','subject-B'),offset:.5,caption:'subject$.error(…): A i B dostają error. Obie subskrypcje kończą się błędem'},
+      {id:'next-after-error',event:{type:'manual-next',value:'3'},offset:.8,caption:'subject$.next(3) po error: Subject jest zatrzymany, nic nie płynie'},
     ]),
   });
 }
 
 export function subjectManualGraph(scene) {
-  const tall=scene.format==='4:3',top=tall?178:102,at=scene.subjectManualTimes,fields=viewFields(top);
-  const g={subjectX:177,subjectW:230};
-  const value={value:coldUserSymbol,color:subjectUpstream.fill};
-  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball:viewFieldBall,
-    // U: kolory emisji obiektu User (jak #1 na slajdzie HTTP) dla kulek i migawki next; bez własnego toru.
-    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,C:laneSubscribers.C,U:subjectUpstream},
+  const tall=scene.format==='4:3',top=tall?178:102,at=scene.subjectManualTimes;
+  const g={subjectX:177,subjectW:230,recvX:960,recvW:436},pos=r=>({x:g.recvX,w:g.recvW,y:laneRowY(top,r.slot)});
+  // Kulka liczby jak w Subject + interval; wartości w kolorze emisji Subjecta (fill toru #1 z sąsiednich slajdów).
+  const ball={r:34,font:30},fill=subjectUpstream.fill;
+  // error: osobna, terminalna notyfikacja — czerwony impuls od Subjecta do każdego odbiorcy, bez kulki i bez complete.
+  const error={at:at.errorAt,logicalAt:at.error,kind:'error',duration:at.terminal};
+  const call=(text,subscriber,from,to)=>({...laneCallout(text,subscriber,from,to,{x:620,y:top/2}),size:34,label:''});
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball,
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,U:subjectUpstream,E:subjectErrorCall,X:subjectIgnoredCall},
     nodes:[{id:'subject',x:g.subjectX,w:g.subjectW,label:'Subject',splitBalls:true,splitGuides:false,upstreamStripe:false,hubFan:false,
-        emits:[{...value,at:at.next}],
-        ...laneTile('operator',top,Object.fromEntries(coldFields.map(f=>[f.id,f.slot])),coldFields.length)},
-      ...fields.nodes],
-    edges:coldFields.map((f,i)=>({id:'subject-'+f.id,from:'subject',to:f.id,subscriber:f.id,logicalStart:at.subscribe[i]})),
-    // Trzy powiadomienia jednej emisji: wspólne logicalAt (next), ten sam kolor i wspólny wylot z portów Subject.
-    schedule:Object.fromEntries(coldFields.map((f,i)=>['subject-'+f.id,{start:at.subscribe[i],connectDuration:at.link,
-      events:[{...value,at:at.split,arrival:at.delivered,logicalAt:at.next}]}])),
-    trays:fields.trays,
-    callouts:[...coldFields.map(f=>laneCallout('.subscribe()',f.id,laneEvent('subscribe','subject-'+f.id),laneEvent('connected','subject-'+f.id),{x:960,y:top/2})),
-      // Migawka ręcznej emisji w miejscu migawki http.get(...).subscribe(subject$) z następnego slajdu; bez badge'a toru.
-      {...laneCallout('subject$.next(user)','U',{type:'manual-next'},laneEvent('deliver-next','subject-C'),{x:620,y:top/2}),label:''}],
-    timeline:[{type:'manual-next',at:at.next},
-      {type:'subject-manual-summary',event:{type:'deliver-next',edge:'subject-C'},offset:at.summary,
-        caption:'Jedna emisja, trzech odbiorców. Subject nadal działa — bez complete'}],
+        laneTerminalText:true,emits:at.nexts.map(n=>({value:n.value,color:fill,at:n.call})),
+        ...laneTile('operator',top,Object.fromEntries(subjectManualReceivers.map(r=>[r.id,r.slot])),subjectManualReceivers.length)},
+      ...subjectManualReceivers.map(r=>laneReceiver(r.id,r.id,pos(r),{ready:true,laneTerminalText:true}))],
+    edges:subjectManualReceivers.map((r,i)=>({id:'subject-'+r.id,from:'subject',to:r.id,subscriber:r.id,logicalStart:at.subscribe[i],
+      logicalEnd:{at:at.error,kind:'error'}})),
+    // Dwa powiadomienia każdej emisji: wspólne logicalAt (wywołanie next), ten sam kolor i wspólny wylot z portów Subject.
+    schedule:Object.fromEntries(subjectManualReceivers.map((r,i)=>['subject-'+r.id,{start:at.subscribe[i],connectDuration:at.link,
+      events:at.nexts.map(n=>({value:n.value,color:fill,at:n.split,arrival:n.delivered,logicalAt:n.call})),end:error}])),
+    trays:subjectManualReceivers.map(r=>laneTray(r.id,pos(r),2,ball)),
+    // Migawki w jednym miejscu nad diagramem, kolejno: subscribe z obsługą next i error (litera toru), next(1), next(2)
+    // (bez badge'a), error (czerwień) i next(3) po błędzie (szarość, gaśnie bez żadnej emisji).
+    callouts:[...subjectManualReceivers.map(r=>({...call(`const sub${r.id} = subject$.subscribe({ next, error })`,r.id,
+        laneEvent('subscribe','subject-'+r.id),laneEvent('connected','subject-'+r.id)),label:r.id})),
+      ...at.nexts.map(n=>call(`subject$.next(${n.value})`,'U',{type:'manual-next',value:n.value},{type:'deliver-next',edge:'subject-B',value:n.value})),
+      call("subject$.error(new Error('Boom'))",'E',{type:'manual-error'},laneEvent('disconnected','subject-B',.8)),
+      call('subject$.next(3)','X',{type:'manual-next',value:'3'},{type:'manual-next',value:'3',offset:at.lateHold})],
+    timeline:[...at.nexts.map(n=>({type:'manual-next',value:n.value,at:n.call})),{type:'manual-error',at:at.error},
+      {type:'manual-next',value:'3',at:at.late,ignored:true},
+      {type:'subject-manual-summary',at:at.summary,caption:'A i B: 1, 2, error. Subject zakończył się błędem — next(3) nie dotarło'}],
   };
 }
 

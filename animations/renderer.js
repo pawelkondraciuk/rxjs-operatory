@@ -348,6 +348,14 @@ function inboxIcon(x,y,size) {
   return `<g data-icon="inbox"><path d="M${x} ${mid}L${x+size*.2} ${top}H${right-size*.2}L${right} ${mid}V${bottom}H${x}Z" ${line}/>`+
     `<path d="M${x} ${mid}H${x+size*.3}l${size*.08} ${h*.22}H${right-size*.38}l${size*.08} ${-h*.22}H${right}" ${line}/></g>`;
 }
+// laneTerminalText (opt-in, np. Subject z ręcznym error): zakończenie wiersza opisane tekstem przy prawej krawędzi
+// (× error / ✓ complete), fade-in 0,3 s od zmiany stanu; tło wiersza nadal niesie kolor stanu.
+function laneTerminalLabel(n,lane,k,time,reduced) {
+  if(!n.laneTerminalText||!['error','completed'].includes(lane.state))return '';
+  const error=lane.state==='error',opacity=reduced?1:clamp((time-lane.since)/.3);
+  return text(n.x+n.w/2-14*k,lane.y,error?'× error':'✓ complete',22*k,
+    `data-lane-terminal="${lane.state}" opacity="${opacity.toFixed(3)}" style="font-weight:700;fill:${error?'#9B1C28':'#087438'};text-anchor:end"`);
+}
 // Ikona stanu toru: ✓ complete, × error, przekreślony okrąg = odsubskrybowano. Trwający tor: producent (work, np. HTTP)
 // ma obracający się przerywany okrąg (zegar sceny); operator i odbiorca nieruchomy pierścień — podłączony, czeka na next.
 function laneIcon(x,y,lane,k,time=0) {
@@ -478,6 +486,7 @@ export function renderScene(frame,options={}) {
         }
         // Wiersz operatora: sama litera toru; stan niesie tło wiersza.
         if(lane.label)svg+=text(chipLeft+(hubInputs.length&&n.hubFan!==false?18:6)*k,lane.y,lane.label,24*k,`style="font-weight:700;fill:${lane.labelColor||'#43525b'};text-anchor:start"`);
+        svg+=laneTerminalLabel(n,lane,k,frame.time,reduced);
         // Chwilowy fallback (np. of([]) w catchError): pigułka przy prawej krawędzi wiersza, jak etap catchError w panelu prac.
         if(lane.fallback) {
           const font=20*k,fw=String(lane.fallback.label).length*.6*font+16*k,fx=n.x+n.w/2-12*k-fw;
@@ -509,6 +518,7 @@ export function renderScene(frame,options={}) {
         const size=n.inbox.size,x0=n.x-n.w/2+n.inbox.left;
         svg+=inboxIcon(x0,lane.y,size);
         if(lane.label)svg+=text(x0+size+8*k,lane.y,lane.label,n.inbox.font,`style="font-weight:700;fill:${lane.labelColor||'#43525b'};text-anchor:start"`);
+        svg+=laneTerminalLabel(n,lane,k,frame.time,reduced);
       } else if(!inRow)svg+=laneIcon(n.x+n.w/2-30*k,n.y+n.h/2-30*k,lane,k,frame.time);
       svg+='</g>';
     }

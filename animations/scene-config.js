@@ -2,8 +2,9 @@ import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenP
 
 // Końcowe ID po rozwinięciu wariantów; otwarcie pozostaje w kolejności HTML.
 export const mainOrder = [
-  // Cold → Subject (ręcznie, HTTP) → share HTTP → Subject + interval → share + interval → późny odbiorca share/shareReplay.
-  '05-zrodla-2','05-zrodla','04-operator','04a-dwa-tory','05-zrodla-5','05-zrodla-3','04a-dwa-tory-2','05-zrodla-4','04a-dwa-tory-3',
+  // Trzy pierwsze slajdy techniczne: HTTP (subscribe/next/complete), interval (next, unsubscribe), Subject (ręczne next i error).
+  // Potem operator i historia Cold → Subject + HTTP → share HTTP → Subject + interval → share + interval → późny odbiorca.
+  '05-zrodla-2','05-zrodla','05-zrodla-5','04-operator','04a-dwa-tory','05-zrodla-3','04a-dwa-tory-2','05-zrodla-4','04a-dwa-tory-3',
   // Cztery *Map obok siebie, potem distinctUntilChanged przed switchMap.
   '20-sharereplay','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','11a-distinct-switchmap',
   'b04-catcherror-2','b04-catcherror','16-czas-cztery','25-podsumowanie','pytania',
@@ -58,7 +59,7 @@ export function configureScene(scene) {
   if(id==='05-zrodla'&&scene.sourceExample===2)configureSubject(scene);
   // Subject + interval: odbiorcy odchodzą, connection z interval zostaje (scena na żywo z akcjami).
   if(id==='05-zrodla'&&scene.sourceExample===3)configureSubjectInterval(scene);
-  // Subject — ręczna emisja: jedno subject$.next(user) do tych samych pól A/B/C, przed Subject + HTTP.
+  // Subject — ręczna emisja: next(1), next(2), error do A/B i next(3) bez skutku; trzeci slajd techniczny, po interval.
   if(id==='05-zrodla'&&scene.sourceExample===4)configureSubjectManual(scene);
   scene.group=extraIds.has(scene.id)?'bonus':'main';
   if(trimmedTails.has(id))trimTail(scene);
