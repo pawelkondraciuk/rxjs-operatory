@@ -33,7 +33,8 @@ test('catchError outside: four-tile top pipeline on one port axis and an HTTP GE
   assert.deepEqual(Array.from(panel.columns,col=>col.label),['HTTP GET']);
   assert.deepEqual(Array.from(panel.rows,r=>r.id+' · '+r.value),['#1 · A']);
   const svg=render(f);
-  assert.equal((svg.match(/data-inner-header=/g)||[]).length,1);assert.equal((svg.match(/data-inner-inbox=/g)||[]).length,1);
+  assert.equal((svg.match(/data-inner-header=/g)||[]).length,1);assert.equal((svg.match(/data-inner-receiver=/g)||[]).length,1);
+  assert.match(svg,/>inner #1</);assert.doesNotMatch(svg,/data-inner-name|>#1 · A</);
   assert.doesNotMatch(svg,/data-inner-header="catch"|data-panel-box/);
   assert.equal(c.snapshot(0).innerWorkPanels[0].rows.length,0,'READY: pusty panel prac');
  }

@@ -1040,11 +1040,9 @@ export function flattenGraph(scene) {
 
 // Główny tor S1 nad lokalnymi requestami. Prototypy i dodatki zachowują swoje modele.
 // Opcjonalne columns/stages/edge pozwalają dodać kolejne etapy wiersza (np. HTTP GET → catchError); domyślnie jeden etap HTTP GET.
-// tiles nadpisuje górne kafelki [id,x,w,nagłówek] (np. klik$ → switchMap → catchError). Domyślnie panel instancji;
-// instances:false przywraca wspólny kafelek z wierszami.
+// tiles nadpisuje górne kafelki [id,x,w,nagłówek] (np. klik$ → switchMap → catchError). Dół to panel instancji.
 export function configureHttpWorkPanel(graph,scene,frame,{columns=[{id:'source',label:'HTTP GET',fill:'#8FC9D4',runtime:'#E3F0F3'}],
-  stages=i=>[{column:'source',edge:'inner'+i+'-op',progress:true}],edge=i=>'inner'+i+'-op',tiles:customTiles,
-  instances=true}={}) {
+  stages=i=>[{column:'source',edge:'inner'+i+'-op',progress:true}],edge=i=>'inner'+i+'-op',tiles:customTiles}={}) {
   const large=scene.format==='4:3',top=large?28:10,defH=large?70:56,rowH=large?74:64;
   const all=scene.operatorName==='concatAll';
   const laneY=top+defH+rowH/2;
@@ -1071,19 +1069,15 @@ export function configureHttpWorkPanel(graph,scene,frame,{columns=[{id:'source',
     // Wejście z decide: wiersz pokazuje „?” od dotarcia do operatora aż do reakcji.
     ...(scene.rows[0].events.some(e=>e.value===job.value&&e.decide)?{input:{edge:all?'projection-op':'source-op',value:job.value}}:{}),
     duration:job.dur??job.end-job.start,stages:stages(i)}));
-  // Kafelek prac stoi pod źródłem i operatorem (lewa krawędź źródła – prawa krawędź operatora), z nagłówkiem
-  // i wierszami tej samej wysokości co u góry; porty i kabel wyniku jak w głównym torze.
-  // Każde uruchomione inner to osobna instancja HTTP GET (nagłówek + lane z nazwą #1 · A) z własnym inboxem; trzy sloty.
-  const source=graph.nodes.find(n=>n.id==='source'),op=graph.nodes.find(n=>n.id==='op');
-  const panel=createInnerWorkPanel({works,height:frame.height,large,headerH:defH,rowH,
-    tileLeft:source.x-source.w/2,tileRight:op.x+op.w/2,
-    columns,...(instances?{instances:true,minRows:3}:{})});
-  Object.assign(panel,{ballText:'#fff',portRadius:11,wire:5,ball:instances&&!large?{r:20,font:23}:graph.ball,
-    // Porównanie 09–12: teardown anulowanego inner jako szary impuls × (switchMap).
-    ...(instances?{cancelPulse:true,pace:true}:{})});
+  // Dół: każde uruchomione inner to pełny pipeline (#n → kulka → HTTP GET → … → inner subscriber); trzy sloty
+  // we wspólnych kolumnach panelu, niezależnych od kafelków u góry.
+  const panel=createInnerWorkPanel({works,height:frame.height,large,columns});
+  Object.assign(panel,{ballText:'#fff',portRadius:11,wire:5,ball:large?graph.ball:{r:20,font:23},
+    // Teardown anulowanego inner jako szary impuls × (switchMap); tempo paska do decyzji operatora (09–12).
+    cancelPulse:true,pace:true});
   graph.panels=[panel];
   for(const node of graph.nodes.filter(n=>n.workRow))Object.assign(node,{x:panel.x+panel.w/2,
-    y:panel.rowsTop+node.slot*panel.rowStep+(panel.instances?panel.headerH:0)+panel.rowHeight/2,w:panel.w-32,h:panel.rowHeight});
+    y:panel.rowsTop+node.slot*panel.rowStep+panel.headerH+panel.rowHeight/2,w:panel.w-32,h:panel.rowHeight});
   // Subscribe inner trwa tyle co jeden krok głównego toru (0,8 s), nie cały łańcuch.
   for(const edge of graph.edges.filter(e=>e.internal))Object.assign(edge,{travel:1,connect:.8});
   const byValue=new Map(scene.jobs.flatMap((job,i)=>[[job.value,works[i].color],[job.value+'$',works[i].color]]));
@@ -1382,7 +1376,7 @@ function catchOutsideGraph(scene) {
       {type:'catch-summary',event:{type:'source-unobserved',node:'source'},offset:1.8,
         caption:'Błąd A zastąpił cały strumień: of([]) i complete. Kolejne kliknięcia nie uruchamiają HTTP'}]};
   // Cztery kafelki u góry jak map + concatAll: klik$, switchMap, catchError i S1 na tej samej osi portów.
-  configureHttpWorkPanel(graph,scene,frame,{instances:true,
+  configureHttpWorkPanel(graph,scene,frame,{
     tiles:[['source',145,190,'#8FC9D4'],['op',400,230,'#D8B3E6'],['catch',677.5,235,'#D8B3E6']]});
   // Odłączony klik$ nadal może emitować: B pojawia się w jego wierszu przy porcie wyjścia i gaśnie bez kabla do switchMap.
   const source=nodes[0];
@@ -1501,7 +1495,7 @@ function distinctSwitchGraph(scene) {
         caption:scene.distinctReject(v,runningJob(v.at))})),
       {type:'distinct-summary',event:{type:'deliver-next',edge:'op-observer'},last:true,offset:1.2,caption:scene.distinctSummary}]};
   // Cztery kafelki na wspólnej osi portów; kompaktowy odbiorca S1 mieści jedną kulkę wyniku.
-  configureHttpWorkPanel(graph,scene,frame,{instances:true,
+  configureHttpWorkPanel(graph,scene,frame,{
     tiles:[['source',178,300,'#8FC9D4'],['distinct',568,400,'#D8B3E6'],['op',905.5,195,'#D8B3E6']]});
   const receiver=nodes.find(n=>n.id==='observer');
   Object.assign(receiver,{x:1127.5,w:169});

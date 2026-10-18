@@ -2,6 +2,7 @@ import { compileScene } from './engine.js';
 import { renderScene } from './renderer.js';
 import { esc, clamp } from './primitives.js';
 import { createStageController } from './stage-controller.js';
+import { codeTokens } from './code-syntax.js';
 
 // Jedyny zegar animacji. Semantyka i geometria nie zależą od RAF ani od DOM.
 export function createPlayer(root, scene, controls = {}) {
@@ -39,8 +40,25 @@ function paint(){
  const snapshot=engine.snapshot(Math.min(time,playbackDuration));
  const reducedMotion=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches || false;
  // Kod jest tekstem (esc); <wbr> po „).” pozwala przenieść cały .pipe/.subscribe do nowej linii.
- const codeHtml=code=>esc(code).replace(/\)\./g,')<wbr>.');
+ // codeSyntax (opt-in): kolor tokenów liczony dla całego kodu; fragment dostaje swój zakres (offset), więc kolorowanie
+ // działa także wewnątrz pastelowych wyróżnień i dopisywanych fragmentów.
  const reveal=snapshot.codeReveal;
+ const fullCode=snapshot.codeView?snapshot.codeView.map(line=>line.map(part=>part.text).join('')).join('\n'):reveal?reveal.prefix+reveal.suffix:snapshot.code;
+ const kinds=snapshot.codeSyntax?codeTokens(fullCode):null;
+ let codeOffset=0;
+ const codeHtml=code=>{
+  const offset=codeOffset;codeOffset+=code.length;
+  if(!kinds)return esc(code).replace(/\)\./g,')<wbr>.');
+  let out='',kind=null,buffer='';
+  const flush=()=>{if(buffer)out+=kind?`<span class="rx-tok rx-tok-${kind}">${buffer}</span>`:buffer;buffer='';};
+  for(let j=0;j<code.length;j++) {
+   const i=offset+j,next=kinds[i],wbr=code[j]==='.'&&fullCode[i-1]===')';
+   if(next!==kind||wbr){flush();kind=next;}
+   if(wbr)out+='<wbr>';
+   buffer+=esc(code[j]);
+  }
+  flush();return out;
+ };
  // codeView: fragmenty z kolorowym wyróżnieniem (tło + podkreślenie w kolorze klocka/toru), pojawianiem się i aktywnym podświetleniem.
  const mark=segment=>{
   const opacity=reducedMotion&&segment.opacity>0?1:segment.opacity,text=codeHtml(segment.text);
@@ -48,7 +66,7 @@ function paint(){
   // mark.quiet: fragment bez stałego wyróżnienia — kolor pojawia się tylko w czasie active.
   return `<span class="rx-code-mark${segment.mark.quiet?' rx-code-quiet':''}${segment.active?' rx-code-active':''}" data-mark="${esc(segment.mark.id||'')}" style="--mark-bg:${segment.mark.bg};--mark-line:${segment.mark.line};opacity:${opacity}" aria-hidden="${opacity===0}">${text}</span>`;
  };
- if(snapshot.codeView)el.code.innerHTML=snapshot.codeView.map(line=>line.map(mark).join('')).join('\n');
+ if(snapshot.codeView)el.code.innerHTML=snapshot.codeView.map(line=>{const html=line.map(mark).join('');codeOffset++;return html;}).join('\n');
  else el.code.innerHTML=reveal?codeHtml(reveal.prefix)+`<span data-code-reveal="true" style="opacity:${reducedMotion&&reveal.opacity>0?1:reveal.opacity}" aria-hidden="${reveal.opacity===0}">${codeHtml(reveal.suffix)}</span>`:codeHtml(snapshot.code);
  el.stage.innerHTML=renderScene(snapshot,{reducedMotion});
  el.caption.textContent=snapshot.caption;

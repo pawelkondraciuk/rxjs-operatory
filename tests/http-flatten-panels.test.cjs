@@ -105,56 +105,62 @@ test('only concatMap animates the main subscription; the other three start with 
 const groups=svg=>svg.split('<g data-inner-work="').slice(1).map(part=>part.split('<g data-inner-work="')[0]);
 const count=(text,pattern)=>(text.match(pattern)||[]).length;
 
-test('09–12: each started inner is its own HTTP GET tile (header + one lane) wired to its own inbox; values without inner have no HTTP',async()=>{
+test('09–12: each started inner is a full pipeline — #n, input ball, HTTP GET tile, full inner subscriber; values without inner have no HTTP',async()=>{
  const {scene,compile,render}=await family();
  for(const format of ['4:3','16:9'])for(const [id]of comparison){
   const c=compile(scene(id,format)),panel=c.snapshot(0).panels[0],top=c.snapshot(0).nodes.find(n=>n.id==='source');
   assert.ok(panel.instances,id);assert.deepEqual(Array.from(panel.columns,col=>col.label),['HTTP GET']);
   assert.equal(panel.works.length,3,id);
-  // Trzy sloty mieszczą się między górnym pipeline'em a dołem ramki; inbox stoi za kablem, na wysokości lane.
+  // Trzy sloty mieszczą się między górnym pipeline'em a dołem ramki; subscriber stoi za kablem, na wysokości lane.
   assert.ok(panel.rowsTop>top.y+top.h/2&&panel.dividerY<panel.rowsTop,id);
   assert.ok(panel.rowsTop+2*panel.rowStep+panel.headerH+panel.rowHeight<=c.snapshot(0).height-8,id);
-  assert.equal(panel.stagesLeft,panel.tileLeft);assert.equal(panel.stageWs[0],panel.labelW+panel.stageW);
-  assert.ok(panel.inboxX>panel.stagesLeft+panel.stageWs[0]&&panel.inboxX+panel.inboxW<panel.x+panel.w,id);
+  // Wspólne kolumny: ID od x 50, kulka, HTTP GET od x 180 (300), subscriber pod odbiorcą głównym (840–1210).
+  assert.deepEqual([panel.idX,panel.stagesLeft,panel.stageWs[0],panel.receiverX,panel.receiverW],[50,180,300,840,370]);
+  assert.ok(panel.idX<panel.ballX&&panel.ballX<panel.stagesLeft,id);
   for(const t of [stopAt(c,'question'),stopAt(c,'answer'),c.duration]){
    const f=c.snapshot(t),svg=render(f),parts=groups(svg),rows=f.innerWorkPanels[0].rows;
    // Kafelek HTTP GET istnieje tylko dla utworzonego inner (projekcja wywołana); subskrypcja może jeszcze trwać.
    assert.equal(count(svg,/data-inner-header=/g),rows.filter(r=>r.stages).length,id+' '+t);
    assert.ok(rows.filter(r=>r.stages).length>=f.executionCounts.started,id+' '+t);
    for(const [i,row]of rows.entries()){
-    const part=parts[i],lane=row.y+panel.headerH;
-    // Nazwa lane: pasek koloru pracy przy lewej krawędzi i #n · X w tym samym kolorze (bez osobnego kafelka identyfikatora).
-    assert.equal(count(part,/data-inner-name=/g),1);assert.doesNotMatch(part,/data-inner-identifier/);
-    assert.match(part,new RegExp(`data-inner-name="${row.value}"><rect x="${panel.tileLeft}" y="${lane}"`));
-    assert.match(part,/text-anchor:start;fill:#[0-9A-F]{6};font-weight:700">#\d · [ABC]</);
+    const part=parts[i],lane=row.y+panel.headerH,cy=lane+panel.rowHeight/2;
+    // ID i kulka wejścia osobno (bez napisu „#1 · A”), w stałych kolumnach.
+    assert.equal(count(part,/data-inner-id=/g),1);assert.doesNotMatch(part,/data-inner-name|>#\d · [ABC]</);
+    assert.match(part,new RegExp(`<text x="${panel.idX}" y="${cy}"[^>]*>${row.id}</text>`));
+    assert.match(part,new RegExp(`data-inner-ball="${row.value}"[^>]*><circle cx="${panel.ballX}" cy="${cy}"`));
     if(['pending','queued','ignored'].includes(row.state)){
-     assert.doesNotMatch(part,/data-inner-header|data-inner-lane|data-inner-inbox|data-inner-port|data-inner-progress|data-inner-wire/,id+' '+row.state);
+     assert.doesNotMatch(part,/data-inner-header|data-inner-lane|data-inner-receiver|data-inner-port|data-inner-progress|data-inner-wire/,id+' '+row.state);
+     assert.match(part,new RegExp(`data-inner-placeholder="${row.state}"[^>]*><rect x="${panel.stagesLeft}" y="${lane}" width="${panel.receiverX+panel.receiverW-panel.stagesLeft}" height="${panel.rowHeight-1}"`));
     }else{
-     assert.equal(count(part,/data-inner-header=/g),1);assert.equal(count(part,/data-inner-lane=/g),1);assert.equal(count(part,/data-inner-inbox=/g),1);
+     assert.equal(count(part,/data-inner-header=/g),1);assert.equal(count(part,/data-inner-lane=/g),1);assert.equal(count(part,/data-inner-receiver=/g),1);
      assert.match(part,new RegExp(`data-inner-header="source" x="${panel.stagesLeft}" y="${row.y}" width="${panel.stageWs[0]}" height="${panel.headerH}"`));
-     assert.match(part,new RegExp(`<rect x="${panel.inboxX}" y="${lane}" width="${panel.inboxW}"`));
-     assert.doesNotMatch(part,/inner subscriber|>sub</);
+     assert.match(part,new RegExp(`data-inner-lane="source" x="${panel.stagesLeft}" y="${lane}" width="${panel.stageWs[0]}" height="${panel.rowHeight-1}"`));
+     assert.match(part,new RegExp(`<rect x="${panel.receiverX}" y="${lane}" width="${panel.receiverW}" height="${panel.rowHeight-1}"`));
+     assert.match(part,new RegExp(`>inner ${row.id}</text>`));assert.doesNotMatch(part,/>S1</);
     }
    }
   }
  }
 });
 
-test('the instance layout leaves room for another stage per inner (e.g. catchError) before the inbox',async()=>{
+test('the instance layout keeps HTTP GET and the subscriber columns and fits another stage (catchError) between them',async()=>{
  const {createInnerWorkPanel}=(await modules(['inner-work-panel']))['inner-work-panel'];
  const columns=[{id:'source',label:'HTTP GET'},{id:'catch',label:'catchError'}];
  for(const large of [true,false]){
-  const one=createInnerWorkPanel({works:[],columns:columns.slice(0,1),height:large?612:460,large,tileLeft:50,instances:true,minRows:3});
-  const two=createInnerWorkPanel({works:[],columns,height:large?612:460,large,tileLeft:50,instances:true,minRows:3});
-  assert.equal(two.inboxX-one.inboxX,one.stageW+one.stageGap);assert.equal(two.rowsTop,one.rowsTop);
-  assert.ok(two.inboxX+two.inboxW<two.x+two.w);
+  const one=createInnerWorkPanel({works:[],columns:columns.slice(0,1),height:large?612:460,large,instances:true,minRows:3});
+  const two=createInnerWorkPanel({works:[],columns,height:large?612:460,large,instances:true,minRows:3});
+  assert.deepEqual([two.stageXs[0],two.stageWs[0],two.receiverX,two.receiverW],[one.stageXs[0],one.stageWs[0],one.receiverX,one.receiverW]);
+  assert.equal(two.stageXs[1]-(two.stageXs[0]+two.stageWs[0]),two.stageGap);
+  assert.equal(two.receiverX-(two.stageXs[1]+two.stageWs[1]),two.stageGap);
+  assert.ok(two.stageWs[1]>=200,'catchError czytelny');assert.equal(two.rowsTop,one.rowsTop);
+  assert.ok(two.receiverX+two.receiverW<two.x+two.w);
  }
 });
 
 test('concatMap answer: B in the queue, no projection until A completes',async()=>{
  const {scene,compile,render}=await family(),c=compile(scene('09-concatmap')),t=stopAt(c,'answer');
  assert.deepEqual(Array.from(rows(c,t),r=>r.state),['active','queued']);
- assert.match(render(c.snapshot(t)),/>w kolejce</);
+ assert.match(render(c.snapshot(t)),/>W KOLEJCE</);
  const doneA=find(c,{type:'stream-complete',edge:'inner0-op'}).at,bornB=find(c,{type:'inner-create',node:'inner1'}).at;
  assert.ok(bornB>=doneA);assert.equal(c.snapshot(t).executionCounts.started,1);
  // C przychodzi dopiero po complete B: kolejka pusta, więc HTTP C startuje od razu — i nigdy przed końcem B.
@@ -200,7 +206,7 @@ test('exhaustMap answer: B ignored without inner or queue; C after A starts a ne
  const {scene,compile,render}=await family(),c=compile(scene('12-exhaustmap'));
  const t=stopAt(c,'answer'),ignored=rows(c,t)[1];
  assert.equal(ignored.state,'ignored');assert.equal(ignored.stages,undefined);assert.equal(ignored.wires,undefined);
- assert.match(render(c.snapshot(t)),/>pominięte</);
+ assert.match(render(c.snapshot(t)),/>POMINIĘTE</);
  assert.ok(!c.events.some(e=>e.type==='inner-create'&&e.node==='inner1'));
  assert.ok(find(c,{type:'inner-create',node:'inner2'}).at>find(c,{type:'stream-complete',edge:'inner0-op'}).at);
  assert.deepEqual(Array.from(rows(c,c.duration),r=>r.state),['completed','ignored','completed']);

@@ -18,12 +18,12 @@ test('concatMap: B waits undecided at the question, then queues without inner, p
  assert.deepEqual(Array.from(asked,r=>r.state),['active','pending']);
  assert.equal(asked[1].question,1);assert.equal(asked[1].stages,undefined);assert.equal(asked[1].wires,undefined);
  assert.match(placeholder(stop('question'),asked[1]),/>\?</);
- assert.doesNotMatch(placeholder(stop('question'),asked[1]),/w kolejce|data-inner-port|data-inner-progress|data-inner-wire|data-inner-header|data-inner-inbox/);
+ assert.doesNotMatch(placeholder(stop('question'),asked[1]),/W KOLEJCE|data-inner-port|data-inner-progress|data-inner-wire|data-inner-header|data-inner-receiver/);
  const waiting=rows(c,stop('answer'));
  assert.deepEqual(Array.from(waiting,r=>r.state),['active','queued']);
  assert.equal(waiting[1].stages,undefined);assert.equal(waiting[1].wires,undefined);assert.equal(waiting[1].y,asked[1].y);
- assert.match(placeholder(stop('answer'),waiting[1]),/>w kolejce</);
- assert.doesNotMatch(placeholder(stop('answer'),waiting[1]),/data-inner-port|data-inner-progress|data-inner-wire|data-inner-header|data-inner-inbox/);
+ assert.match(placeholder(stop('answer'),waiting[1]),/>W KOLEJCE</);
+ assert.doesNotMatch(placeholder(stop('answer'),waiting[1]),/data-inner-port|data-inner-progress|data-inner-wire|data-inner-header|data-inner-receiver/);
  assert.ok(event(c,{type:'inner-create',node:'inner1'}).at>stop('answer'));
  const r=c.plan.records.get('inner1-op'),starting=rows(c,r.start+.1);
  assert.equal(starting[0].state,'completed');assert.equal(starting[1].state,'subscribing');

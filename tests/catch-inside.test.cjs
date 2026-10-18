@@ -28,7 +28,8 @@ test('catchError inside: the top pipeline is the MAIN switchMap pipeline with on
   assert.equal(panel.instances,true,format);
   assert.ok(panel.dividerY>Math.max(...top(f).map(n=>n.y+n.h/2))&&panel.dividerY<panel.rowsTop,format);
   assert.equal(panel.stageXs[1]-(panel.stageXs[0]+panel.stageWs[0]),panel.stageGap);
-  assert.equal(panel.inboxX,panel.stageXs[1]+panel.stageWs[1]+panel.stageGap);
+  assert.equal(panel.receiverX,panel.stageXs[1]+panel.stageWs[1]+panel.stageGap,'subscriber za catchError, za tym samym odstępem');
+  assert.equal(panel.stageXs[0],panel.stagesLeft);assert.equal(panel.receiverX+panel.receiverW,1210,'subscriber pod odbiorcą głównym');
   assert.deepEqual(Array.from(rows(f),r=>r.id+' · '+r.value),['#1 · A','#2 · B']);
  }
 });

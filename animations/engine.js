@@ -591,7 +591,7 @@ export function compileScene(scene) {
     });
     const codeIndex=codeFrames.findLastIndex(frame=>frame.at<=time);
     const reveal=codeReveals.find(frame=>frame.index===codeIndex)||codeReveals.find(frame=>frame.index===codeIndex+1);
-    return {id:scene.id,title:scene.title,code:codeFrames.filter(frame=>frame.at<=time).at(-1)?.code??scene.code,
+    return {id:scene.id,title:scene.title,code:codeFrames.filter(frame=>frame.at<=time).at(-1)?.code??scene.code,...(scene.codeSyntax?{codeSyntax:true}:{}),
       ...(reveal?{codeReveal:{prefix:reveal.prefix,suffix:reveal.suffix,opacity:clamp((time-reveal.at)/reveal.duration)}}:{}),
       ...(codeLines.length?{codeView:codeLines.map(line=>line.map(({text,mark,shownAt,activeIntervals})=>({text,mark,
         opacity:shownAt?clamp((time-shownAt)/fadeDuration):1,active:activeIntervals.some(([from,to])=>time>=from&&time<to)})))}:{}),

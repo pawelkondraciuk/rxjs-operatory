@@ -1,34 +1,28 @@
 const clamp = value => Math.max(0,Math.min(1,value));
 
-// Geometria jak w kafelkach głównego toru: nagłówek HTTP GET ma wysokość nagłówka definicji (headerH), wiersz — wysokość
-// toru (rowH), o ile wszystkie sloty mieszczą się nad dolnym marginesem. Linia podziału stoi w połowie odstępu od kafelków;
-// panel nie ma własnego napisu (separator wystarcza, bez dużego nagłówka nad pracami). Kafelek prac zajmuje zakres
-// tileLeft–tileRight, a wynik biegnie od jego prawej krawędzi do granicy panelu.
-export function createInnerWorkPanel({works,columns,height,large=false,id='jobs',minRows=4,headerH=large?70:56,rowH=large?74:64,
-  dividerY=large?203:146,headerTop=large?234:162,tileLeft=44,tileRight=796,instances=false}) {
-  const x=28,w=1184,bottom=height-(large?12:8),rowsTop=headerTop+headerH;
-  if(instances)return createInstancePanel({works,columns,height,large,id,minRows,tileLeft,x,w,bottom});
-  const slots=Math.max(minRows,works.length),rowHeight=Math.min(rowH,(bottom-rowsTop)/slots);
-  return {id,innerWork:true,frameless:true,x,y:dividerY,w,h:bottom-dividerY,dividerY,
-    slots:works.length,rowsTop,rowStep:rowHeight,rowHeight,headerH,tileLeft,tileRight,
-    identifierW:large?184:172,stageGap:72,font:large?30:25,columns,works};
+// Panel prac wewnętrznych: każde utworzone inner to osobny pipeline w swoim slocie (dawny wspólny kafelek z wierszami
+// usunięto — żaden slajd go nie używał). Dół panelu stoi nad dolnym marginesem ramki; bez własnego napisu.
+export function createInnerWorkPanel({works,columns,height,large=false,id='jobs',minRows=3}) {
+  return createInstancePanel({works,columns,height,large,id,minRows,x:28,w:1184,bottom:height-(large?12:8)});
 }
 
-// instances (opt-in): każde uruchomione inner to osobny pipeline z własnymi kafelkami etapów (nagłówek definicji
-// i jeden execution lane pod nim) oraz kompaktowym odbiornikiem inbox na wysokości lane. Lane pierwszego etapu
-// zaczyna się przy lewej krawędzi i ma pasek koloru pracy z nazwą (#1 · A), jak tory u góry. Długości jak we wspólnym
-// kafelku catchError wewnątrz: pierwszy etap = miejsce na nazwę (labelW) + kolumna etapu, kolejne etapy (np. catchError)
-// i inbox za kablem stageGap. Slot = nagłówek + lane + odstęp; sloty mieszczą się nad dolnym marginesem.
-function createInstancePanel({works,columns,height,large,id,minRows,tileLeft,x,w,bottom}) {
+// Każde uruchomione inner to osobny, pełny pipeline w jednym rzędzie:
+// ID wykonania (#1) → kulka wartości wejścia (A, A$) → HTTP GET → opcjonalne operatory (np. catchError) → inner subscriber.
+// Kolumny są wspólne dla wszystkich slajdów i wykonań (te same x niezależnie od kafelków u góry): ID od x 50, kulka,
+// kafelki etapów od x 180 (HTTP GET 300), kolejne etapy dzielą miejsce do subscribera, a subscriber stoi pod odbiorcą
+// głównym (840–1210). Etap = nagłówek definicji + execution lane; subscriber — sam lane na wysokości lane etapów.
+// Slot = nagłówek + lane + odstęp; trzy sloty mieszczą się nad dolnym marginesem.
+export const instanceColumns={idX:50,idW:60,ballW:70,httpW:300,stageGap:60,receiverX:840,receiverW:370};
+function createInstancePanel({works,columns,height,large,id,minRows,x,w,bottom}) {
   const headerH=large?56:44,rowH=large?64:50,gap=large?14:10,slots=Math.max(minRows,works.length);
   const rowsTop=bottom-slots*(headerH+rowH)-(slots-1)*gap,dividerY=Math.round((rowsTop+(large?172:130))/2);
-  const labelW=large?184:172,stageGap=72,stageW=(705-labelW-stageGap)/2,inboxW=large?64:56;
-  const stageWs=columns.map((_,i)=>i?stageW:labelW+stageW);
-  const stageXs=stageWs.map((_,i)=>tileLeft+stageWs.slice(0,i).reduce((sum,width)=>sum+width+stageGap,0));
-  const inboxX=stageXs.at(-1)+stageWs.at(-1)+stageGap;
+  const {idX,idW,ballW,httpW,stageGap,receiverX,receiverW}=instanceColumns,stagesLeft=idX+idW+ballW,rest=columns.length-1;
+  const opW=rest?(receiverX-stagesLeft-httpW-(rest+1)*stageGap)/rest:0;
+  const stageWs=columns.map((_,i)=>i?opW:httpW);
+  const stageXs=stageWs.map((_,i)=>stagesLeft+stageWs.slice(0,i).reduce((sum,width)=>sum+width+stageGap,0));
   return {id,innerWork:true,instances:true,frameless:true,x,y:dividerY,w,h:bottom-dividerY,
-    dividerY,slots:works.length,rowsTop,rowStep:headerH+rowH+gap,rowHeight:rowH,headerH,tileLeft,tileRight:inboxX+inboxW,
-    labelW,stagesLeft:tileLeft,stageXs,stageWs,stageW,stageGap,inboxX,inboxW,font:large?30:25,columns,works};
+    dividerY,slots:works.length,rowsTop,rowStep:headerH+rowH+gap,rowHeight:rowH,headerH,tileLeft:idX,tileRight:receiverX+receiverW,
+    idX,idW,ballX:idX+idW+ballW/2,stagesLeft,stageXs,stageWs,stageGap,receiverX,receiverW,font:large?30:25,columns,works};
 }
 
 // Widok lokalnego pipeline'u z istniejącego planu. Nie planuje subskrypcji ani nie prowadzi zegara.
@@ -68,8 +62,11 @@ export function innerWorkPanelSnapshot(panel, records, births, time, logicalTime
       if (pending && time >= pendingAt) return [{...base,state:'ignored',opacity:1,reveal:opacity,from:'pending'}];
       return time>=ignoredAt&&opacity>0?[{...base,state:'ignored',opacity}]:[];
     }
-    const waitingAt=work.queueObservable?born:queuedAt===undefined?undefined:settledAt(queuedAt);
-    if (time < born || work.queueObservable&&time<output.start) {
+    // concatAll: Observable czeka w kolejce tylko, gdy realnie czeka na poprzednika; pierwszy (subskrybowany od razu,
+    // po krótkim przekazaniu) od razu pokazuje pipeline, bez mignięcia „W KOLEJCE”.
+    const waits=work.queueObservable&&output&&output.start-born>.5;
+    const waitingAt=waits?born:queuedAt===undefined?undefined:settledAt(queuedAt);
+    if (time < born || waits&&time<output.start) {
       if (waitingAt !== undefined && time >= waitingAt) {
         const fade=clamp((time-waitingAt)/.3);
         return [{...base,state:'queued',queueLabel:work.queueLabel,existingObservable:Boolean(work.queueObservable),
@@ -112,7 +109,7 @@ export function innerWorkPanelSnapshot(panel, records, births, time, logicalTime
       return {...stage,index:i,state,hasProgress:Boolean(stage.progress),progress,since,...(fallback?{fallback}:{})};
     });
     const establishing=time<Math.max(connected(output),...work.stages.map(s=>connected(record(s.edge||work.edge))));
-    const state=establishing?'subscribing':stateOf(output), reveal=clamp((time-(work.queueObservable?output.start:born))/.3);
+    const state=establishing?'subscribing':stateOf(output), reveal=clamp((time-(waits?output.start:born))/.3);
     // Kable i wartości pozostają w poziomym wierszu, aż do prawej granicy panelu.
     const wires = work.stages.map((stage,i) => {
       const r = record(stage.edge || work.edge), terminal = r.end;
@@ -132,14 +129,17 @@ export function innerWorkPanelSnapshot(panel, records, births, time, logicalTime
     });
     // Wiersz widoczny wcześniej (kolejka albo nierozstrzygnięte wejście) płynnie odsłania wykonanie w tym samym slocie.
     const shown=waitingAt!==undefined||pending!==null;
-    // instances: inbox inner subscriber na końcu ostatniego etapu. Unsubscribe zaczyna się w nim (od razu szary),
+    // Inner subscriber na końcu ostatniego etapu. Unsubscribe zaczyna się w nim (od razu szary),
     // complete/error widać po dotarciu terminala — jak odbiorca toru u góry.
     const last = record(work.stages.at(-1).edge || work.edge), end = last?.end;
-    const receiver = panel.instances ? (end?.kind === 'unsubscribe' && time >= end.at ? {state:'cancelled', since:end.at} :
-      {state:stateOf(last, true), ...(end ? {since:end.at+end.duration} : {})}) : undefined;
+    // Ostatnia wartość, która dotarła do inner subscribera (kulka w jego lane, fade-in od dotarcia).
+    const got = last?.events.filter(e => e.arrival <= time).at(-1);
+    const receiver = {...(end?.kind === 'unsubscribe' && time >= end.at ? {state:'cancelled', since:end.at} :
+      {state:stateOf(last, true), ...(end ? {since:end.at+end.duration} : {})}),
+      ...(got ? {value:got.value, valueAt:got.arrival} : {})};
     return [{...base,state,queueLabel:work.queueLabel,opacity:shown?1:reveal,reveal:shown?reveal:1,
       ...(shown?{from:waitingAt!==undefined&&born>=waitingAt?'queued':'pending',question:pending?1-pending.decided:0}:{}),stages,wires,tokens,
-      ...(receiver?{receiver}:{})}];
+      receiver}];
   });
   return {...panel, rows};
 }

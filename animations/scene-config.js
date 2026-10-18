@@ -61,6 +61,8 @@ export function configureScene(scene) {
   if(id==='05-zrodla'&&scene.sourceExample===3)configureSubjectInterval(scene);
   // Subject — ręczna emisja: next(1), next(2), error do A/B i next(3) bez skutku; trzeci slajd techniczny, po interval.
   if(id==='05-zrodla'&&scene.sourceExample===4)configureSubjectManual(scene);
+  // Kolorowanie składni kodu na wszystkich slajdach (wspólny renderer kodu w playerze); scena może je wyłączyć (codeSyntax:false).
+  scene.codeSyntax??=true;
   scene.group=extraIds.has(scene.id)?'bonus':'main';
   if(trimmedTails.has(id))trimTail(scene);
   if(id==='20-sharereplay'){

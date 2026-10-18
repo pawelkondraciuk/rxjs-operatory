@@ -91,7 +91,7 @@ function slotPanel(frame,panel) {
   return svg;
 }
 function executionPanel(frame,panel,reduced=false) {
-  if(panel.innerWork)return innerWorkPanel(frame.innerWorkPanels.find(p=>p.id===panel.id),frame,reduced);
+  if(panel.innerWork)return innerInstancesPanel(frame.innerWorkPanels.find(p=>p.id===panel.id),frame,reduced);
   if(panel.slots)return slotPanel(frame,panel);
   const {rows,hidden,focused,executions}=executionPanelRows(frame,panel);
   const header=panel.recipe?66:38,rowHeight=panel.rowHeight||42,gap=4,detailsHeight=panel.detailsHeight||0;
@@ -142,144 +142,47 @@ function executionPanel(frame,panel,reduced=false) {
   return svg;
 }
 
-// Kafelek prac wygląda jak kafelki głównego toru: płaski nagłówek definicji (HTTP GET) o wysokości nagłówka u góry
-// i wiersze wykonań z paskiem koloru pracy, etykietą, postępem w tle i stanem tekstem. Stany i czasy są już w snapshocie.
-function innerWorkPanel(panel,frame,reduced=false) {
-  if(panel.instances)return innerInstancesPanel(panel,frame,reduced);
-  const {x,w,rowsTop,rowHeight,headerH,identifierW,stageGap,font,tileLeft,tileRight}=panel;
-  const k=frame.textScale||1,right=x+w-18,count=panel.columns.length,bar=6*k,titleY=rowsTop-headerH;
-  const portR=panel.portRadius||8,wireW=panel.wire||4;
-  // Jedna kolumna zajmuje cały wiersz (postęp za etykietą, jak w HTTP GET toru); kilka dzieli miejsce za identyfikatorem.
-  const stageW=count===1?tileRight-tileLeft:(tileRight-tileLeft-identifierW-stageGap*(count-1))/count;
-  const stageX=i=>count===1?tileLeft:tileLeft+identifierW+i*(stageW+stageGap);
-  const fills={completed:'#DDF1E1',cancelled:'#E7E8E8',errored:'#F7D9D9'},accent={completed:'#26804E',errored:'#C54848'};
-  const status={completed:'complete',cancelled:'anulowane',errored:'error',subscribing:'subskrybuje',idle:'oczekuje'};
-  const waiting=(row,label,dashed)=>{
-    const px=tileLeft+identifierW,pw=tileRight-px-10;
-    return `<rect data-inner-placeholder="${row.state}" x="${px}" y="${row.y+6}" width="${pw}" height="${rowHeight-13}" fill="#EEEBE9"${dashed?' stroke="#BEB4BF" stroke-width="2" stroke-dasharray="8 6"':''}/>`+
-      text(px+pw/2,row.y+rowHeight/2,label,font,'style="fill:#746B76;font-weight:600"');
-  };
-  // Wejście czeka na decyzję operatora: pusty slot bez przerywanego obrysu, tylko „?” (bez portów, progressu i HTTP).
-  const undecided=(row,question)=>{
-    const px=tileLeft+identifierW,pw=tileRight-px-10;
-    return `<g data-inner-placeholder="pending"><rect x="${px}" y="${row.y+6}" width="${pw}" height="${rowHeight-13}" fill="#EEEBE9"/>`+
-      (question>0?text(px+pw/2,row.y+rowHeight/2,'?',font*1.25,`style="fill:#746B76;font-weight:700" opacity="${+question.toFixed(3)}"`):'')+'</g>';
-  };
-  let svg=`<g data-inner-work-panel="${esc(panel.id)}">`;
-  panel.columns.forEach((column,i)=>{
-    const labelSize=clamp((stageW-24)/(Math.max(1,column.label.length)*.55),26*k,26*(frame.labelScale||k));
-    svg+=`<rect x="${stageX(i)}" y="${titleY}" width="${stageW}" height="${headerH}" fill="${column.fill}"/>`;
-    svg+=text(stageX(i)+stageW/2,titleY+headerH/2,column.label,labelSize,'style="fill:#26323B"');
-  });
-  for(const row of panel.rows) {
-    const cy=row.y+rowHeight/2,h=rowHeight-1,muted=row.state==='cancelled',identity=muted?'#808890':row.color;
-    const idLabel=text(tileLeft+bar+14,cy,row.id+' · '+row.value,font,`style="text-anchor:start;fill:${identity};font-weight:700"`);
-    svg+=`<g data-inner-work="${esc(row.id)}" data-inner-state="${row.state}" data-row-slot="${row.slot}" opacity="${reduced?1:row.opacity}">`;
-    svg+=`<title>${esc(row.id+' · '+row.value+' · '+row.state)}</title>`;
-    svg+=`<rect x="${tileLeft}" y="${row.y}" width="${tileRight-tileLeft}" height="${h}" fill="#F4F1EE"/>`;
-    if(row.state==='pending') {
-      svg+=`<rect x="${tileLeft}" y="${row.y}" width="${bar}" height="${h}" fill="${identity}"/>`+idLabel+undecided(row,reduced?Math.round(row.question):row.question);
-      svg+=`<path d="M${tileLeft} ${row.y}H${tileRight}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/></g>`;continue;
-    }
-    if(row.state==='queued'||row.state==='ignored') {
-      const queued=row.state==='queued',reveal=reduced||row.reveal===undefined?1:row.reveal;
-      svg+=`<rect x="${tileLeft}" y="${row.y}" width="${bar}" height="${h}" fill="${identity}"${queued?'':' opacity=".45"'}/>`+idLabel;
-      // Po decyzji „?” ustępuje stanowi wejścia (kolejka albo pominięcie) w tym samym slocie.
-      if(reveal<1)svg+=`<g opacity="${(1-reveal).toFixed(3)}">${undecided(row,1)}</g>`;
-      const placeholder=waiting(row,queued?row.queueLabel||'W KOLEJCE':'POMINIĘTE',queued);
-      svg+=reveal<1?`<g opacity="${+reveal.toFixed(3)}">${placeholder}</g>`:placeholder;
-      svg+=`<path d="M${tileLeft} ${row.y}H${tileRight}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/></g>`;continue;
-    }
-    // Wpis kolejki ustępuje płynnie miejscu wykonania w tym samym slocie.
-    if(row.reveal<1&&!reduced)svg+=`<g opacity="${1-row.reveal}">${row.from==='pending'?undecided(row,row.question||0):waiting({...row,state:'queued'},row.queueLabel||'W KOLEJCE',true)}</g>`;
-    svg+=`<g opacity="${reduced?1:row.reveal}">`;
-    row.stages.forEach((stage,i)=>{
-      const column=panel.columns[i],sx=stageX(i),fill=fills[stage.state]||column.runtime;
-      const glow=accent[stage.state]&&!reduced&&stage.since!==undefined?.28*(1-clamp((frame.time-stage.since)/.6)):0;
-      svg+=`<g data-inner-stage="${esc(column.id)}" data-stage-state="${stage.state}"><rect x="${sx}" y="${row.y}" width="${stageW}" height="${h}" fill="${fill}"/>`;
-      if(glow>0)svg+=`<rect data-row-flash="${stage.state}" x="${sx}" y="${row.y}" width="${stageW}" height="${h}" fill="${accent[stage.state]}" opacity="${glow.toFixed(3)}"/>`;
-      if(stage.hasProgress&&['active','cancelled'].includes(stage.state)) {
-        const pw=(stageW-bar)*stage.progress;
-        svg+=`<rect data-inner-progress="${stage.progress}" x="${sx+bar}" y="${row.y}" width="${pw}" height="${h}" fill="${muted?'#808890':row.color}" opacity="${muted?.18:.25}"/>`;
-        if(stage.state==='active'&&stage.progress>0&&stage.progress<1)svg+=`<rect x="${sx+bar+pw-3*k}" y="${row.y}" width="${3*k}" height="${h}" fill="${row.color}"/>`;
-      }
-      svg+=`<rect x="${sx}" y="${row.y}" width="${bar}" height="${h}" fill="${identity}"/>`;
-      const label=status[stage.state]||(stage.hasProgress?'w trakcie':'oczekuje');
-      // Chwilowy fallback etapu obsługi błędu (np. of([]) w catchError): pigułka zamiast stanu, bez nowej kolumny.
-      if(stage.fallback) {
-        const fw=(String(stage.fallback.label).length*.6*font)+28,fx=sx+stageW-14-fw;
-        svg+=`<g data-inner-fallback="${esc(stage.fallback.label)}" opacity="${reduced?1:+stage.fallback.opacity.toFixed(3)}"><rect x="${fx}" y="${cy-font*.75}" width="${fw}" height="${font*1.5}" rx="${font*.75}" fill="#F3E6F8" stroke="#B384C6" stroke-width="2"/>`+
-          text(fx+fw/2,cy+1,stage.fallback.label,font,'style="font-family:Consolas,ui-monospace,monospace;font-weight:700;fill:#6B3D80"')+'</g>';
-      }
-      else svg+=text(sx+stageW-18,cy,label,font,`style="text-anchor:end;fill:${stage.state==='completed'?'#26804E':stage.state==='errored'?'#C54848':'#26323B'}"`);
-      svg+='</g>';
-    });
-    svg+=idLabel+`<path d="M${tileLeft} ${row.y}H${tileRight}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/>`;
-    for(const wire of row.wires) {
-      if(!wire.visible)continue;
-      const sx=stageX(wire.index)+stageW,ex=wire.index<count-1?stageX(wire.index+1):right;
-      svg+=`<path data-inner-wire="${esc(row.id)}-${wire.index}" d="M${sx} ${cy}H${ex}" fill="none" stroke="${wire.color}" stroke-width="${wireW}" opacity="${wire.opacity}" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${reduced?0:-(1-wire.subscribe)}"/>`;
-      if(wire.cancel) {
-        // Teardown inner: szara przebyta część kabla od prawej granicy i pocisk „×” jadący w lewo do etapu.
-        const cx=ex-(ex-sx)*wire.cancel.at;
-        svg+=`<path data-inner-cancel-trail="${esc(row.id)}-${wire.index}" d="M${ex} ${cy}H${cx}" fill="none" stroke="#808890" stroke-width="${wireW}"/>`;
-      }
-      if(wire.pulse&&!reduced)svg+=`<path data-inner-pulse="${esc(row.id)}-${wire.index}" d="M${sx} ${cy}H${ex}" fill="none" stroke="${wire.pulse.color}" stroke-width="${wireW*2}" stroke-linecap="round" pathLength="1" stroke-dasharray=".18 2" stroke-dashoffset="${(.18-wire.pulse.at*1.18).toFixed(4)}"/>`;
-      for(const port of [sx,ex])svg+=`<circle data-inner-port="true" cx="${port}" cy="${cy}" r="${portR}" fill="${wire.cancel&&port===ex?'#808890':wire.color}" stroke="#fff" stroke-width="3" opacity="${wire.opacity*wire.subscribe}"/>`;
-      if(wire.cancel&&!reduced) {
-        const cx=ex-(ex-sx)*wire.cancel.at;
-        svg+=`<g data-inner-cancel="${esc(row.id)}-${wire.index}"><circle cx="${cx}" cy="${cy}" r="${wireW*3.6}" fill="#808890" stroke="#fff" stroke-width="3"/>${text(cx,cy+1,'×',wireW*6,'style="fill:#fff;font-weight:700"')}</g>`;
-      }
-    }
-    for(const t of row.tokens) {
-      const sx=stageX(t.stage)+stageW,ex=t.stage<count-1?stageX(t.stage+1):right;
-      const tx=sx+(ex-sx)*t.progress;
-      if(String(t.value).length>3) {
-        const scale=font/25,bubbleW=Math.min(stageW-24,(String(t.value).length*13+20)*scale);
-        svg+=token(Math.min(tx,right-bubbleW/2),cy,t.value,t.color,'data-inner-next="true"',stageW-24,true,scale);
-      }
-      else svg+=ball(tx,cy,t.value,t.color,panel.ball?{...panel.ball,textFill:panel.ballText}:{r:Math.min(26,rowHeight*.4),font:font*.92,textFill:panel.ballText},1,'data-inner-next="true"');
-    }
-    svg+='</g></g>';
-  }
-  return svg+'</g>';
-}
-// Prace jako osobne instancje (panel.instances): dla każdego etapu standardowy kafelek (nagłówek definicji + jeden
-// execution lane) i kompaktowy inbox inner subscribera za krótkim kablem. Lane pierwszego etapu ma pasek koloru pracy
-// i nazwę #1 · A przy lewej krawędzi, jak tory u góry. Wartość bez inner (oczekuje, w kolejce, pominięte) ma tylko
-// pasek z nazwą i neutralny placeholder w miejscu reszty lane.
+// Pipeline wewnętrzny (instances): w każdym rzędzie ID wykonania (#1), kulka wartości wejścia (A / A$), pełne kafelki
+// etapów (HTTP GET, opcjonalnie catchError: nagłówek + execution lane) i pełny inner subscriber pod odbiorcą głównym —
+// lane z ikoną, etykietą „inner #1”, ostatnią odebraną wartością i statusem zakończenia. Wspólne kolumny z panelu
+// (createInstancePanel), więc #1, #2 i #3 mają identyczne x. Wartość bez utworzonego inner (kolejka, pytanie,
+// pominięcie) ma ID, kulkę i neutralny placeholder o wysokości lane w miejscu przyszłej pracy — bez etapów i portów.
 function innerInstancesPanel(panel,frame,reduced=false) {
-  const {rowHeight,headerH,labelW,stageXs,stageWs,inboxX,inboxW,font,tileLeft}=panel;
+  const {rowHeight,headerH,stageXs,stageWs,receiverX,receiverW,font,idX,ballX,stagesLeft}=panel;
   const k=frame.textScale||1,count=panel.columns.length,bar=6*k,h=rowHeight-1;
   const portR=panel.portRadius||8,wireW=panel.wire||4,stageX=i=>stageXs[i];
-  const portX=i=>i<count-1?stageX(i+1):inboxX,placeholderX=tileLeft+labelW,placeholderW=stageX(count-1)+stageWs[count-1]-placeholderX;
+  const portX=i=>i<count-1?stageX(i+1):receiverX,placeholderX=stagesLeft,placeholderW=receiverX+receiverW-placeholderX;
+  const ballSize=panel.ball?{...panel.ball,textFill:panel.ballText}:{r:Math.min(26,rowHeight*.4),font:font*.92,textFill:panel.ballText};
   const fills={completed:'#DDF1E1',cancelled:'#E7E8E8',errored:'#F7D9D9'},accent={completed:'#26804E',errored:'#C54848'};
   const status={completed:'complete',cancelled:'anulowane',errored:'error',subscribing:'subskrybuje',idle:'oczekuje'};
+  // Status inner subscribera — ten sam język co odbiorcy na slajdach wprowadzenia (✓ complete, ! error, × odłączono).
+  const receiverStatus={completed:['✓ complete','#087438'],errored:['! error','#9B1C28'],cancelled:['× odłączono','#5B6670']};
   const flash=(state,since,x,y,w)=>accent[state]&&!reduced&&since!==undefined&&frame.time-since<.6?
     `<rect data-row-flash="${state}" x="${x}" y="${y}" width="${w}" height="${h}" fill="${accent[state]}" opacity="${(.28*(1-clamp((frame.time-since)/.6))).toFixed(3)}"/>`:'';
+  // Neutralny placeholder przyszłej pracy: wysokość lane, od kolumny etapów do prawej krawędzi subscribera.
   const placeholder=(kind,lane,label,opacity=1,labelOpacity=1)=>`<g data-inner-placeholder="${kind}" opacity="${+opacity.toFixed(3)}">`+
-    `<rect x="${tileLeft}" y="${lane}" width="${labelW}" height="${h}" fill="#F4F1EE"/>`+
-    `<rect x="${placeholderX}" y="${lane+6}" width="${placeholderW}" height="${rowHeight-13}" fill="#EEEBE9"${kind==='queued'?' stroke="#BEB4BF" stroke-width="2" stroke-dasharray="8 6"':''}/>`+
-    (label&&labelOpacity>0?text(placeholderX+placeholderW/2,lane+rowHeight/2,label,label==='?'?font*1.25:font,`style="fill:#746B76;font-weight:${label==='?'?700:600}"${labelOpacity<1?` opacity="${+labelOpacity.toFixed(3)}"`:''}`):'')+'</g>';
+    `<rect x="${placeholderX}" y="${lane}" width="${placeholderW}" height="${h}" fill="#EEEBE9"${kind==='queued'?' stroke="#BEB4BF" stroke-width="2" stroke-dasharray="8 6"':''}/>`+
+    (label&&labelOpacity>0?text(placeholderX+placeholderW/2,lane+rowHeight/2,label,label==='?'?font*1.25:font,`style="fill:${kind==='ignored'?'#9A939C':'#746B76'};font-weight:${label==='?'?700:600};letter-spacing:.04em"${labelOpacity<1?` opacity="${+labelOpacity.toFixed(3)}"`:''}`):'')+'</g>';
+  // ID wykonania i kulka wejścia: stałe przez cały cykl życia; anulowane szarzeje, pominięte jest przygaszone.
+  const identity=(row,cy,{muted=false,dim=false}={})=>`<g data-inner-id="${esc(row.id)}"${dim?' opacity=".45"':''}>`+
+    text(idX,cy,row.id,font,`style="text-anchor:start;fill:${muted?'#808890':row.color};font-weight:700"`)+
+    ball(ballX,cy,row.value,row.color,ballSize,1,`data-inner-ball="${esc(row.value)}"${muted?' opacity=".5"':''}`)+'</g>';
   let svg=`<g data-inner-work-panel="${esc(panel.id)}" data-inner-layout="instances">`;
   for(const row of panel.rows) {
-    const lane=row.y+headerH,cy=lane+rowHeight/2,muted=row.state==='cancelled',identity=muted?'#808890':row.color;
-    // Nazwa lane: pasek koloru pracy i #1 · A przy lewej krawędzi; rysowana nad postępem i nad przejściem placeholdera.
-    const name=`<g data-inner-name="${esc(row.value)}"><rect x="${tileLeft}" y="${lane}" width="${bar}" height="${h}" fill="${identity}"${row.state==='ignored'?' opacity=".45"':''}/>`+
-      text(tileLeft+bar+14,cy,row.id+' · '+row.value,font,`style="text-anchor:start;fill:${identity};font-weight:700"`)+'</g>';
+    const lane=row.y+headerH,cy=lane+rowHeight/2,muted=row.state==='cancelled';
     svg+=`<g data-inner-work="${esc(row.id)}" data-inner-state="${row.state}" data-row-slot="${row.slot}" opacity="${reduced?1:row.opacity}">`;
     svg+=`<title>${esc(row.id+' · '+row.value+' · '+row.state)}</title>`;
-    const queuedLabel=row.queueLabel||'w kolejce';
+    const queuedLabel=row.queueLabel||'W KOLEJCE';
     if(row.state==='pending') {
-      svg+=placeholder('pending',lane,'?',1,reduced?Math.round(row.question):row.question)+name+'</g>';continue;
+      svg+=placeholder('pending',lane,'?',1,reduced?Math.round(row.question):row.question)+identity(row,cy)+'</g>';continue;
     }
     if(row.state==='queued'||row.state==='ignored') {
       const queued=row.state==='queued',reveal=reduced||row.reveal===undefined?1:row.reveal;
       // Po decyzji „?” ustępuje stanowi wejścia (kolejka albo pominięcie) w tym samym miejscu.
       if(reveal<1)svg+=placeholder('pending',lane,'?',1-reveal);
-      svg+=placeholder(row.state,lane,queued?queuedLabel:'pominięte',reveal)+name+'</g>';continue;
+      svg+=placeholder(row.state,lane,queued?queuedLabel:'POMINIĘTE',reveal)+identity(row,cy,{dim:!queued})+'</g>';continue;
     }
-    // Placeholder ustępuje płynnie pełnemu kafelkowi w tym samym slocie; nagłówek pojawia się nad nim.
+    // Placeholder ustępuje płynnie pełnemu pipeline'owi w tym samym slocie; ID i kulka zostają na miejscu.
     if(row.reveal<1&&!reduced)svg+=row.from==='pending'?placeholder('pending',lane,'?',1-row.reveal,row.question||0):
       placeholder('queued',lane,queuedLabel,1-row.reveal);
     svg+=`<g opacity="${reduced?1:row.reveal}">`;
@@ -290,14 +193,13 @@ function innerInstancesPanel(panel,frame,reduced=false) {
       svg+=`<rect data-inner-header="${esc(column.id)}" x="${sx}" y="${row.y}" width="${stageW}" height="${headerH}" fill="${column.fill}"/>`+
         text(sx+stageW/2,row.y+headerH/2,column.label,labelSize,'style="fill:#26323B"');
       svg+=`<rect data-inner-lane="${esc(column.id)}" x="${sx}" y="${lane}" width="${stageW}" height="${h}" fill="${fill}"/>`+flash(stage.state,stage.since,sx,lane,stageW);
-      // Postęp jak w kafelku HTTP GET toru: tło całej wysokości lane z czołem w kolorze pracy.
-      // Pierwszy etap: postęp zaczyna się za nazwą lane (jak kolumna etapu w catchError wewnątrz), więc czoło jej nie przecina.
+      // Postęp jak w kafelku HTTP GET toru: tło całego lane (za paskiem koloru pracy) z czołem w kolorze pracy.
       if(stage.hasProgress&&['active','cancelled'].includes(stage.state)) {
-        const px=sx+(i?bar:labelW),pw=(sx+stageW-px)*stage.progress;
+        const px=sx+bar,pw=(sx+stageW-px)*stage.progress;
         svg+=`<rect data-inner-progress="${stage.progress}" x="${px}" y="${lane}" width="${pw}" height="${h}" fill="${muted?'#808890':row.color}" opacity="${muted?.18:.25}"/>`;
         if(stage.state==='active'&&stage.progress>0&&stage.progress<1)svg+=`<rect x="${px+pw-3*k}" y="${lane}" width="${3*k}" height="${h}" fill="${row.color}"/>`;
       }
-      svg+=`<rect x="${sx}" y="${lane}" width="${bar}" height="${h}" fill="${identity}"/>`;
+      svg+=`<rect x="${sx}" y="${lane}" width="${bar}" height="${h}" fill="${muted?'#808890':row.color}"/>`;
       svg+=`<path d="M${sx} ${lane}H${sx+stageW}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/>`;
       const label=status[stage.state]||(stage.hasProgress?'w trakcie':'oczekuje');
       if(stage.fallback) {
@@ -308,18 +210,29 @@ function innerInstancesPanel(panel,frame,reduced=false) {
       else svg+=text(sx+stageW-16,cy,label,font,`style="text-anchor:end;fill:${stage.state==='completed'?'#26804E':stage.state==='errored'?'#C54848':'#26323B'}"`);
       svg+='</g>';
     });
-    // Kompaktowy inbox inner subscribera: pasek koloru pracy i ikona, tło stanu jak u odbiorcy toru.
-    const receiver=row.receiver||{state:'active'},iconSize=panel.inboxSize||25;
-    svg+=`<g data-inner-inbox="${esc(row.id)}" data-receiver-state="${receiver.state}"><title>${esc(row.id+' · '+row.value+' · inbox · '+receiver.state)}</title>`;
-    svg+=`<rect x="${inboxX}" y="${lane}" width="${inboxW}" height="${h}" fill="${fills[receiver.state]||'#EAE6E2'}"/>`+flash(receiver.state,receiver.since,inboxX,lane,inboxW);
-    const unsubscribed=receiver.state==='cancelled';
-    svg+=`<rect x="${inboxX}" y="${lane}" width="${bar}" height="${h}" fill="${unsubscribed?'#808890':row.color}"${unsubscribed?' opacity=".45"':''}/>`;
-    svg+=inboxIcon(inboxX+bar+(inboxW-bar-iconSize)/2,cy,iconSize)+'</g>';
+    // Inner subscriber: pełny lane jak odbiorca główny — pasek koloru pracy, ikona, „inner #n”, odebrana wartość, status.
+    const receiver=row.receiver||{state:'active'},iconSize=panel.inboxSize||25,unsubscribed=receiver.state==='cancelled';
+    const labelSize=font*.75,iconX=receiverX+bar+16,valueX=receiverX+195;
+    svg+=`<g data-inner-receiver="${esc(row.id)}" data-receiver-state="${receiver.state}"><title>${esc('inner '+row.id+' · '+row.value+' · '+receiver.state)}</title>`;
+    svg+=`<rect x="${receiverX}" y="${lane}" width="${receiverW}" height="${h}" fill="${fills[receiver.state]||'#EDE6F8'}"/>`+flash(receiver.state,receiver.since,receiverX,lane,receiverW);
+    svg+=`<rect x="${receiverX}" y="${lane}" width="${bar}" height="${h}" fill="${unsubscribed?'#808890':row.color}"${unsubscribed?' opacity=".45"':''}/>`;
+    svg+=`<path d="M${receiverX} ${lane}H${receiverX+receiverW}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/>`;
+    svg+=inboxIcon(iconX,cy,iconSize)+text(iconX+iconSize+8*k,cy,'inner '+row.id,labelSize,'style="text-anchor:start;font-weight:700;fill:#43525b"');
+    if(receiver.value!==undefined) {
+      const shown=reduced?1:clamp((frame.time-receiver.valueAt)/.3);
+      svg+=ball(valueX,cy,receiver.value,row.color,ballSize,1,`data-inner-received="${esc(receiver.value)}" opacity="${shown.toFixed(3)}"`);
+    }
+    const done=receiverStatus[receiver.state];
+    if(done) {
+      const shown=reduced||receiver.since===undefined?1:clamp((frame.time-receiver.since)/.3);
+      svg+=text(receiverX+receiverW-14,cy,done[0],16*k,`data-lane-terminal="${receiver.state}" opacity="${shown.toFixed(3)}" style="font-weight:700;fill:${done[1]};text-anchor:end"`);
+    }
+    svg+='</g>';
     for(const wire of row.wires) {
       if(!wire.visible)continue;
       const sx=stageX(wire.index)+stageWs[wire.index],ex=portX(wire.index);
       svg+=`<path data-inner-wire="${esc(row.id)}-${wire.index}" d="M${sx} ${cy}H${ex}" fill="none" stroke="${wire.color}" stroke-width="${wireW}" opacity="${wire.opacity}" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${reduced?0:-(1-wire.subscribe)}"/>`;
-      // Teardown inner: szara przebyta część kabla od inboxa i pocisk „×” jadący w lewo do etapu.
+      // Teardown inner: szara przebyta część kabla od subscribera i pocisk „×” jadący w lewo do etapu.
       if(wire.cancel)svg+=`<path data-inner-cancel-trail="${esc(row.id)}-${wire.index}" d="M${ex} ${cy}H${ex-(ex-sx)*wire.cancel.at}" fill="none" stroke="#808890" stroke-width="${wireW}"/>`;
       if(wire.pulse&&!reduced)svg+=`<path data-inner-pulse="${esc(row.id)}-${wire.index}" d="M${sx} ${cy}H${ex}" fill="none" stroke="${wire.pulse.color}" stroke-width="${wireW*2}" stroke-linecap="round" pathLength="1" stroke-dasharray=".18 2" stroke-dashoffset="${(.18-wire.pulse.at*1.18).toFixed(4)}"/>`;
       for(const port of [sx,ex])svg+=`<circle data-inner-port="true" cx="${port}" cy="${cy}" r="${portR}" fill="${wire.cancel&&port===ex?'#808890':wire.color}" stroke="#fff" stroke-width="3" opacity="${wire.opacity*wire.subscribe}"/>`;
@@ -330,9 +243,9 @@ function innerInstancesPanel(panel,frame,reduced=false) {
     }
     for(const t of row.tokens) {
       const sx=stageX(t.stage)+stageWs[t.stage],ex=portX(t.stage);
-      svg+=ball(sx+(ex-sx)*t.progress,cy,t.value,t.color,panel.ball?{...panel.ball,textFill:panel.ballText}:{r:Math.min(26,rowHeight*.4),font:font*.92,textFill:panel.ballText},1,'data-inner-next="true"');
+      svg+=ball(sx+(ex-sx)*t.progress,cy,t.value,t.color,ballSize,1,'data-inner-next="true"');
     }
-    svg+='</g>'+name+'</g>';
+    svg+='</g>'+identity(row,cy,{muted})+'</g>';
   }
   return svg+'</g>';
 }
