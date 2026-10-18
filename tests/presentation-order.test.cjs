@@ -46,12 +46,12 @@ test('MAIN preserves the opening and orders final variants independently, ending
  for(const id of expectedMain.filter(id=>id!=='pytania'))assert.equal(scenes.get(id).group,'main',id);
 });
 
-test('EXTRAS preserves every demo once and starts with the three-slide follow-up',async()=>{
+test('EXTRAS preserves every demo once and starts with shareReplay + interval, then the three-slide follow-up',async()=>{
  const {container,prepared,config}=await presentation({extras:true});
  const ids=container.children.map(s=>s.id);
- assert.equal(ids.length,68);
+ assert.equal(ids.length,69);
  assert.deepEqual(ids.slice(10,mainEnd),expectedMain);
- assert.deepEqual(ids.slice(mainEnd,mainEnd+3),['12a-complete','12a-complete-2','13-limit']);
+ assert.deepEqual(ids.slice(mainEnd,mainEnd+4),['x01-sharereplay-interval','12a-complete','12a-complete-2','13-limit']);
  assert.deepEqual(ids.slice(mainEnd),Array.from(config.extraOrder));
  assert.deepEqual(ids.filter(Boolean).sort(),prepared.map(s=>s.id).filter(Boolean).sort());
  assert.equal(new Set(ids.filter(Boolean)).size,ids.filter(Boolean).length);
@@ -74,7 +74,7 @@ test('MAIN shows distinctUntilChanged once, right after the four *Map, and keeps
 
 test('direct hashes route exact variants, including time operators and the standalone hot extra',async()=>{
  for(const requestedId of ['06a-cold-hot-2','16-czas-cztery-2','16-czas-cztery-3','18-async-2','28-resolver-batch']){
-  const {container,route}=await presentation({requestedId});assert.equal(route.extras,true,requestedId);assert.equal(container.children.length,68);
+  const {container,route}=await presentation({requestedId});assert.equal(route.extras,true,requestedId);assert.equal(container.children.length,69);
  }
  for(const requestedId of ['06a-cold-hot','16-czas-cztery','04-operator','unknown']){
   const {container,route}=await presentation({requestedId});assert.equal(route.extras,false,requestedId);assert.equal(container.children.length,mainEnd);
@@ -83,7 +83,7 @@ test('direct hashes route exact variants, including time operators and the stand
 
 test('print includes every expanded slide once, with main narration before extras',async()=>{
  const {container,prepared}=await presentation({printMode:true});
- assert.equal(container.children.length,68);
+ assert.equal(container.children.length,69);
  assert.deepEqual(container.children.map(s=>s.id).filter(Boolean).sort(),prepared.map(s=>s.id).filter(Boolean).sort());
  assert.deepEqual(container.children.slice(10,mainEnd).map(s=>s.id),expectedMain);
 });

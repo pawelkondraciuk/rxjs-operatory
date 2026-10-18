@@ -299,6 +299,12 @@ export function compileScene(scene) {
     return {label:n.memory.label??'prev',empty:n.memory.empty??'—',chars:Math.max(1,...out.events.map(v=>String(v.value).length)),...(last?{value:last.value,color:last.color,since:last.at}:{}),
       ...(compared.length?{comparedAt:compared.at(-1)}:{}),...(slot!==null?{ball:true,x:slot}:{})};
   }
+  // replayMemory: jedna wspólna pamięć huba (np. shareReplay(1)) — ostatnia wartość wejścia, zapisana, gdy kulka
+  // wejścia dojedzie do slotu (storeMove), niezależnie od liczby odbiorców. Kulka stoi w wierszu wejścia (inputRow).
+  function replayMemoryOf(n,time) {
+    const input=laneRecords.find(r=>r.b.id===n.id),stored=(input?.events||[]).filter(e=>e.arrival+storeMove<=time).at(-1);
+    return {x:memorySlot(n),y:input?laneY(n,input.subscriber):n.y,...(stored?{value:stored.value,color:stored.color||'a',since:stored.arrival+storeMove}:{})};
+  }
   // Środek kulki pamięci: tuż przed portem wyjścia, w odległości jak kulka czekająca przy porcie.
   function memorySlot(n){return n.x+n.w/2-(graph.ball?.r??25)-18;}
   // Ułamek przejazdu transformBalls, w którym kulka mija x: wyjazd od środka do prawej krawędzi w ostatnich 30%
@@ -334,14 +340,19 @@ export function compileScene(scene) {
   // stan toru wypełnia go po dotarciu. Wiersze zostają po zakończeniu, więc kafelek tylko rośnie.
   function laneRowsOf(n,time) {
     const rows=new Map();
-    for(const r of laneRecords) if(r.a.id===n.id&&n.laneSlots?.[r.subscriber]!==undefined) {
-      // Wiersz rozszerza kafelek tuż przed dotarciem subscribe i kończy wzrost razem z nim.
-      const grow=Math.max(r.start,connectedAt(r)-rowGrowth);
+    // inputRow (opt-in, hub z jednym upstreamem, np. shareReplay): wiersz także dla subskrypcji wejścia (np. #1),
+    // rośnie razem z nią; w nim stoi wspólna kulka pamięci huba (replayMemory).
+    for(const r of laneRecords) if((r.a.id===n.id||n.inputRow&&r.b.id===n.id)&&n.laneSlots?.[r.subscriber]!==undefined) {
+      // Wiersz rozszerza kafelek tuż przed dotarciem subscribe i kończy wzrost razem z nim. Wiersz wejścia (inputRow)
+      // rośnie razem z pierwszym wierszem wyjścia — hub subskrybuje upstream w tej samej chwili, co pierwszy odbiorca.
+      const growAt=x=>Math.max(x.start,connectedAt(x)-rowGrowth);
+      const grow=r.b.id===n.id?Math.min(growAt(r),...laneRecords.filter(o=>o.a.id===n.id).map(growAt)):growAt(r);
       const slot=n.laneSlots[r.subscriber],growth=clamp((time-grow)/rowGrowth),eased=growth*growth*(3-2*growth);
       // Hub (np. share): lewy pasek wiersza ma kolor wspólnego upstreamu aktywnego w chwili dołączenia Subscribera.
       // Czas modelu: inicjator dołącza w tej samej chwili, w której share otwiera upstream (w ilustracji subscribe dociera do share wcześniej).
       const upstream=n.splitBalls&&n.upstreamStripe!==false&&laneRecords.find(u=>u.b.id===n.id&&u.subscriber!==r.subscriber&&u.logicalStart<=r.logicalStart&&(!u.end||(u.end.logicalAt??u.end.at)>r.logicalStart));
       if(eased>(rows.get(slot)?.growth??0))rows.set(slot,{slot,subscriber:r.subscriber,color:subscriberColor(r.subscriber),growth:eased,
+        ...(r.b.id===n.id?{input:true,label:graph.subscribers?.[r.subscriber]?.label??r.subscriber}:{}),
         ...(upstream?{stripe:subscriberColor(upstream.subscriber)}:{}),...(n.rowTint?{tint:graph.subscribers?.[r.subscriber]?.tint}:{})});
     }
     return [...rows.values()].filter(row=>row.growth>0).sort((a,b)=>a.slot-b.slot)
@@ -472,10 +483,20 @@ export function compileScene(scene) {
     }
     // laneTimer.ball (opt-in, np. debounceTime/auditTime): wejście wjeżdża przez wiersz do kulki pamięci przy prawej
     // krawędzi (storeMove) i tam staje się zapamiętaną wartością; wyjście rusza z portu przy emisji timera.
-    for(const n of nodes) if(n.laneTimer?.ball) for(const input of laneRecords.filter(r=>r.b.id===n.id)) for(const e of input.events) {
+    for(const n of nodes) if(n.laneTimer?.ball||n.replayMemory) for(const input of laneRecords.filter(r=>r.b.id===n.id)) for(const e of input.events) {
       if(time<e.arrival||time>=e.arrival+storeMove)continue;
       const left=n.x-n.w/2,u=(time-e.arrival)/storeMove,ease=u*u*(3-2*u);
       tokens.push({x:left+(memorySlot(n)-left)*ease,y:laneY(n,input.subscriber),value:e.value,color:e.color||'a',edge:input.id,phase:'store'});
+    }
+    // replayMemory (opt-in, hub np. shareReplay): każde powiadomienie wyjścia rusza z kulki pamięci do portu wyjścia
+    // w ostatnich storeMove s przed wylotem — także odtworzenie ostatniej wartości dla późnego odbiorcy.
+    for(const n of nodes) if(n.replayMemory) {
+      const memory=replayMemoryOf(n,time);
+      for(const out of laneRecords.filter(r=>r.a.id===n.id)) for(const e of out.events) {
+        if(time<e.at-storeMove||time>=e.at)continue;
+        const u=(time-(e.at-storeMove))/storeMove,ease=u*u*(3-2*u),y=laneY(n,out.subscriber),x1=n.x+n.w/2;
+        tokens.push({x:memory.x+(x1-memory.x)*ease,y:memory.y+(y-memory.y)*ease,value:e.value,color:e.color||'a',edge:out.id,phase:'replay'});
+      }
     }
     // dropBalls (hub, np. Subject bez odbiorców): wartość, której nikt nie odbiera, kurczy się i gaśnie na porcie wejścia.
     for(const n of nodes) if(n.dropBalls) for(const input of laneRecords.filter(r=>r.b.id===n.id)) for(const e of input.events) {
@@ -570,7 +591,7 @@ export function compileScene(scene) {
         ...(laneRecords.length?{socketDots:socketsOf(n,time),laneStates:laneStatesOf(n,time),...growingTile(n,time),
           ...(n.subscriber?{laneColor:subscriberColor(n.subscriber),...(n.rowTint?{laneTint:graph.subscribers?.[n.subscriber]?.tint}:{})}:{}),
           ...(n.splitBalls?{splitGuides:n.splitGuides===false?[]:splitGuides(n,time)}:{}),
-          ...(n.buffer?{bufferPocket:bufferOf(n,time)}:{})}:{})};
+          ...(n.buffer?{bufferPocket:bufferOf(n,time)}:{}),...(n.replayMemory?{memoryBall:replayMemoryOf(n,time)}:{})}:{})};
     });
     const histories=trays.map(q=>{
       const values=records.filter(e=>e.b.id===q.anchor).flatMap(e=>e.events.filter(v=>v.arrival<=time));

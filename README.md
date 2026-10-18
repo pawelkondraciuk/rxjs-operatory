@@ -35,7 +35,7 @@ Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorz
 
 Pełne otwarcie pozostaje bez zmian: społeczność, historia meet.js, fotografie, autor, tytuł i pytania o operatory. Budżet **30–35 minut dotyczy tylko części właściwej**; otwarcie, pytania i dogrywka są dodatkowo.
 
-MAIN ma **32 slajdy (21 animowanych)**. EXTRAS zawiera **36 wariantów**. Całość obejmuje 49 bazowych slajdów HTML, 68 po rozwinięciu, 57 animowanych. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
+MAIN ma **32 slajdy (21 animowanych)**. EXTRAS zawiera **37 wariantów**. Całość obejmuje 50 bazowych slajdów HTML, 69 po rozwinięciu, 58 animowanych. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
 
 Kolejność po otwarciu:
 
@@ -57,7 +57,7 @@ Kolejność po otwarciu:
 
 Na map + concatAll i przejście do concatMap przewidziano około 3 minut z bloku flatteningu. Czasy są planem prelegenta, nie pomiarem odtwarzacza.
 
-**EXTRAS to przygotowana dogrywka przy braku pytań**, a także materiał do odpowiedzi na konkretne pytanie. Domyślne wejście prowadzi kolejno przez `12a-complete`, `12a-complete-2` i `13-limit`: complete outer, dalsza praca inner oraz limit współbieżności. Trzy slajdy zajmują około 4–6 minut i przechodzą zwykłym pilotem. Po limicie można wrócić do menu albo wybrać następny blok. Zaraz za nimi stoi `14-distinct` — drugi profil distinctUntilChanged (42/43, bez anulowań), wyłączony z MAIN jako duplikat `11a-distinct-switchmap`.
+**EXTRAS to przygotowana dogrywka przy braku pytań**, a także materiał do odpowiedzi na konkretne pytanie. Domyślne wejście zaczyna od `x01-sharereplay-interval` (shareReplay z refCount: false na interval), potem prowadzi kolejno przez `12a-complete`, `12a-complete-2` i `13-limit`: complete outer, dalsza praca inner oraz limit współbieżności. Trzy slajdy zajmują około 4–6 minut i przechodzą zwykłym pilotem. Po limicie można wrócić do menu albo wybrać następny blok. Zaraz za nimi stoi `14-distinct` — drugi profil distinctUntilChanged (42/43, bez anulowań), wyłączony z MAIN jako duplikat `11a-distinct-switchmap`.
 
 Pozostałe bloki obejmują pozycję share/refCount, dodatkowe porównania subskrypcji, cztery operatory czasu, operatory kombinacyjne, Angular/React i resolver. Hot pozostaje w EXTRAS pod ID `06a-cold-hot-2`; refCount i resolver również pozostają dostępne. Menu otwiera `?extras#/id`, a stare bezpośrednie hashe dodatków również włączają EXTRAS. Powrót zachowuje format. Dodatki nigdy nie uruchamiają się automatycznie wskutek braku pytań — wybiera je prelegent.
 
@@ -806,9 +806,38 @@ Modele są symulacją dydaktyczną, nie usługą produkcyjną. Testy sprawdzają
 
 **Temat:** zakończenie głównej części i wybór dodatków.
 
-**Na ekranie:** koniec MAIN i pogrupowane menu EXTRAS. Wyróżnione wejście do dogrywki otwiera complete outer, potem drugi wariant i limit współbieżności. Pilot nie przechodzi automatycznie z MAIN do dodatków. Każdy dodatek ma link powrotny „Dodatkowe przykłady”.
+**Na ekranie:** koniec MAIN i pogrupowane menu EXTRAS. Wyróżnione wejście do dodatków otwiera najpierw shareReplay z refCount: false na interval (`x01-sharereplay-interval`), potem complete outer, potem drugi wariant i limit współbieżności. Pilot nie przechodzi automatycznie z MAIN do dodatków. Każdy dodatek ma link powrotny „Dodatkowe przykłady”.
 
 **Speaker notes:** Zaproś do pytań. Jeśli ich nie ma: „Zobaczmy jeszcze kilka sytuacji”. Otwórz dogrywkę i prowadź trzy kolejne przykłady pilotem. Po limicie współbieżności jest naturalny punkt zakończenia; można wrócić do menu albo wybrać następny temat.
+
+### shareReplay — kto zatrzyma interval? — `x01-sharereplay-interval`
+
+**EXTRAS — pierwszy dodatek, zaraz po „Pytania?”** (link „Dodatkowe przykłady — zacznij tutaj” i pozycja „shareReplay i interval” w grupie Współdzielenie). Rozwinięcie share/shareReplay z MAIN. Cel: 60–90 s.
+
+**Kod:** `const shared$ = interval(1000).pipe(` / `  shareReplay({ bufferSize: 1, refCount: false }));` — marka na `shareReplay` i osobna na `refCount: false` (czerwonawa, świeci od etapu „zero odbiorców” do subskrypcji B).
+
+**Na bloczkach:** interval(1000) (niebieski, jeden wiersz `#1`) → shareReplay(1) (fioletowy: wiersz `#1` z kulką pamięci ostatniej wartości — bez prostokąta „bufor” — oraz wiersze A i B) → odbiorcy A (fioletowy) i B (pomarańczowy), pełne kafelki torów, wszystkie połączenia poziome. Bez dolnej sekcji inner. Liczniki: Odbiorcy i Upstream.
+
+Scena na żywo (interval emituje co sekundę także na postojach, kontroler etapów jak Subject + interval):
+
+| Etap | Na ekranie | Odbiorcy / Upstream |
+| --- | --- | --- |
+| READY | Same definicje, interval nie działa, pamięć pusta (`refCount: false` nie uruchamia źródła przed subscribe). | 0 / 0 |
+| dalej: A subskrybuje | Migawka `const subA = shared$.subscribe(…)`; impuls od A przez shareReplay do interval, jedno upstream `#1`. Liczby 0, 1, 2… wpadają do kulki pamięci i dalej do A. | 1 / 1 |
+| `unsub-a` | `subA.unsubscribe()`: szary × od A kończy się na shareReplay, wiersz A szary, przy A ×. Upstream aktywny. Pytanie: czy interval się zatrzymał? | 0 / 1 |
+| `zero` | Zero odbiorców: interval nadal emituje, kulka pamięci się podmienia (3, 4, 5… — tyle, ile faktycznie minie), nic nie płynie dalej; wyróżnione `refCount: false`. | 0 / 1 |
+| `sub-b` | `const subB = shared$.subscribe(…)`: impuls kończy się na shareReplay (bez drugiego interval). B od razu dostaje wartość zapamiętaną w chwili subskrypcji — tylko ostatnią — potem kolejne emisje na żywo. | 1 / 1 |
+| `summary` | A odłączony, B aktywny, to samo wykonanie interval, pamięć z ostatnią wartością. Bez complete i bez unsubscribe B. | 1 / 1 |
+
+Prawo po podsumowaniu przechodzi dalej; lewo cofa ostatnią akcję; wyjście ze slajdu sprząta wykonanie (powrót od READY). Druk i podgląd Notes używają umownych chwil akcji (A dostaje 0, 1, 2).
+
+| Nr | Checkpoint | Notatka prelegenta |
+| --- | --- | --- |
+| 0 | READY / A subskrybuje | Na MAIN widzieliśmy, że shareReplay potrafi zapamiętać wynik HTTP. Ale HTTP samo się kończy. Co się stanie, jeśli współdzielimy źródło, które nigdy się nie kończy? — Pierwszy subskrybent uruchamia interval. ShareReplay zapamiętuje ostatnią wyemitowaną wartość. |
+| 1 | unsub-a | A się odłącza. Nie mamy już odbiorców. Czy to oznacza, że interval też przestał działać? |
+| 2 | zero | Nie. Przy refCount ustawionym na false shareReplay utrzymuje połączenie upstream. Interval dalej emituje, a bufor nadal się aktualizuje. |
+| 3 | sub-b | Nowy odbiorca natychmiast dostaje ostatnią zapamiętaną wartość. Potem otrzymuje kolejne emisje na żywo. Nie powstaje nowa subskrypcja interval. |
+| 4 | summary | To potencjalna pułapka: nie mamy już odbiorców, ale źródło nadal może zużywać zasoby. A co zmieniłoby refCount: true? |
 
 ### defer — `b01-defer`
 

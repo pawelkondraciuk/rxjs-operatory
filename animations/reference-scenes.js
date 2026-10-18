@@ -909,6 +909,111 @@ export function subjectIntervalGraph(scene) {
   };
 }
 
+// shareReplay z refCount: false (pierwszy EXTRAS, x01-sharereplay-interval): interval(1000) → shareReplay(1) → A/B.
+// READY: same definicje — interval nie działa, pamięć pusta (refCount: false nie uruchamia źródła przed subscribe).
+// Pierwsze „dalej”: A subskrybuje (impuls przez shareReplay do interval), jedno upstream #1, emisje co sekundę
+// trafiają do pamięci huba (jedna kulka) i dalej do A. Akcje na żywo (scene.live.actions):
+//   unsub-a — subA.unsubscribe(): × od A kończy się na shareReplay, upstream #1 pracuje dalej;
+//   zero    — zero odbiorców: interval nadal emituje, kulka pamięci się podmienia (wyróżnienie refCount: false);
+//   sub-b   — B subskrybuje tylko shareReplay (bez nowego interval) i od razu dostaje ostatnią zapamiętaną wartość
+//             (odczytaną w chwili zestawienia subskrypcji, nie założoną z góry), potem kolejne emisje na żywo;
+//   summary — stan końcowy (A odłączony, B aktywny, to samo wykonanie interval). Bez complete i bez unsubscribe B.
+// Emisje trwają także podczas postojów; sprzątanie przy wyjściu ze slajdu robi main.js (reset sceny na żywo).
+const shareReplayIntervalTiming={born:.3,link:.8,period:1,travel:.8,store:.4,cancel:.8,calloutHold:.4,window:30,keep:5,margin:2,
+  actionGap:2,settle:1.6};
+const shareReplayIntervalActions=['unsub-a','zero','sub-b','summary'];
+export function configureShareReplayInterval(scene) {
+  // Umowne chwile akcji (druk, hash, podgląd Notes): A dostaje 0, 1, 2; na żywo chwile wybiera prowadzący.
+  const t=shareReplayIntervalTiming,defaults=[7.2,11,14.5,19];
+  const settled=[defaults[0]+2,defaults[1]+.5,defaults[2]+2.6,defaults[3]+.5];
+  Object.assign(scene,{graph:shareReplayIntervalGraph,playerLayout:'function',ink:'#26323B',playerClass:'rx-lanes rx-flat-tiles rx-two-lines',
+    title:'shareReplay — kto zatrzyma interval?',
+    rows:[R('interval(1000)'),R('shareReplay(1)'),R('Odbiorca A'),R('Odbiorca B')],
+    live:{start:0,window:t.window,keep:t.keep,margin:t.margin,defaultClose:22,actions:shareReplayIntervalActions,defaults,
+      actionGap:t.actionGap,settle:t.settle,autoplay:false,variant:shareReplayIntervalVariant},
+    playback:{entry:'manual',finish:'hold',live:true,stops:shareReplayIntervalActions.map((id,i)=>({id,time:settled[i]}))},
+  });
+  Object.assign(scene,shareReplayIntervalVariant(scene,{from:0,to:t.window,closedAt:null,actions:[]}));
+}
+
+// Wariant dla okna [from, to], wykonanych akcji (czasy ilustracji) i opcjonalnego zamrożenia closedAt (druk, „pokaż
+// wynik”: brak nowych emisji, bez complete). Czas ilustracji = czas modelu.
+function shareReplayIntervalVariant(scene,{from,to,closedAt,actions=[]}) {
+  const t=shareReplayIntervalTiming,closed=closedAt!==null&&closedAt!==undefined,end=closed?closedAt:to;
+  const subscribeA=t.born,hubA=subscribeA+t.link,upstream=hubA+t.link,first=upstream+t.period;
+  const emitAt=k=>first+t.period*k,arrival=k=>emitAt(k)+t.travel,stored=k=>arrival(k)+t.store,departure=k=>stored(k)+t.store;
+  const kAt=time=>Math.floor((time-first)/t.period),kTo=kAt(end);
+  const kFrom=Math.max(0,kAt(from)-4);
+  const [unsubCall,zeroAt,subBCall,summaryAt]=actions;
+  // A: wartości, które wyszły z pamięci przed rezygnacją; × rusza po dotarciu ostatniej z nich i kończy się na shareReplay.
+  const aLast=unsubCall===undefined?kTo:Math.min(kTo,kAt(unsubCall-2*t.store-t.travel));
+  const aUnsub=unsubCall===undefined?null:Math.max(unsubCall,aLast>=0?departure(aLast)+t.travel:unsubCall);
+  // B: zestawienie subskrypcji z shareReplay; odtworzenie ostatniej wartości zapisanej do tej chwili, potem emisje na żywo.
+  const bStart=subBCall===undefined?null:subBCall+t.born,bConnected=bStart===null?null:bStart+t.link;
+  const replayK=bConnected===null?null:kAt(bConnected-t.travel-t.store);
+  const replay=replayK!==null&&replayK>=0&&replayK<=kTo?{k:replayK,departure:bConnected+t.store}:null;
+  const range=(a,b)=>Array.from({length:Math.max(0,b-a+1)},(_,i)=>a+i);
+  const plan={end,subscribeA,hubA,upstream,emitAt,arrival,departure,kFrom,kTo,aLast,aUnsub,unsubCall,zeroAt,subBCall,bStart,bConnected,replay,
+    bFrom:bConnected===null?null:range(0,kTo).find(k=>stored(k)>bConnected)??kTo+1};
+  const receiversAt=time=>(time>=hubA&&(aUnsub===null||time<aUnsub)?1:0)+(bConnected!==null&&time>=bConnected?1:0);
+  const busy=[aUnsub===null?undefined:aUnsub+t.cancel+t.calloutHold,zeroAt,replay?replay.departure+t.travel+.3:bConnected,summaryAt];
+  const shareMark={id:'share',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
+  const refMark={id:'refcount',bg:'rgba(197,72,72,.14)',line:'#C54848',quiet:true};
+  const lines=[[{text:'const shared$ = interval(1000).pipe('}],
+    [{text:'  '},{text:'shareReplay',mark:shareMark},{text:'({ bufferSize: 1, '},{text:'refCount: false',mark:refMark,
+      active:zeroAt===undefined?[]:[{from:{type:'refcount-focus'},to:{type:'refcount-focus-end'}}]},{text:' }));'}]];
+  const captions=[[0,'Definicja: interval(1000).pipe(shareReplay(…)). Nic jeszcze nie działa, pamięć jest pusta'],
+    [subscribeA,'A subskrybuje: impuls przez shareReplay uruchamia jedno wykonanie interval'],
+    [first,'interval emituje co sekundę. shareReplay zapamiętuje ostatnią wartość i przekazuje ją A'],
+    ...(unsubCall===undefined?[]:[[unsubCall,'subA.unsubscribe(): × kończy się na shareReplay. Czy interval się zatrzymał?']]),
+    ...(zeroAt===undefined?[]:[[zeroAt,'Zero odbiorców, a interval nadal emituje: refCount: false utrzymuje upstream']]),
+    ...(subBCall===undefined?[]:[[subBCall,'B subskrybuje shareReplay. Bez nowego wykonania interval'],
+      ...(replay?[[replay.departure,`B od razu dostaje ostatnią zapamiętaną wartość (${replay.k}), potem kolejne na żywo`]]:[])]),
+    ...(summaryAt===undefined?[]:[[summaryAt,'A odłączony, B aktywny, to samo wykonanie interval. Źródło pracuje także bez odbiorców']])];
+  return {...scene,shareReplayPlan:plan,duration:closed?closedAt:to,
+    liveBusyUntil:busy,
+    code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
+    metrics:[{label:'Odbiorcy',value:receiversAt},{label:'Upstream',value:time=>time>=upstream?1:0}],
+    captions};
+}
+
+export function shareReplayIntervalGraph(scene) {
+  const tall=scene.format==='4:3',top=tall?178:102,t=shareReplayIntervalTiming,p=scene.shareReplayPlan;
+  // Kolumny: interval(1000) mieści etykietę w jednej linii, shareReplay(1) z wierszem #1 (upstream i kulka pamięci)
+  // oraz wierszami A/B, odbiorcy pod wierszami A/B. Wszystkie połączenia poziome.
+  const g={sourceX:205,sourceW:310,hubX:600,hubW:330,recvX:1020,recvW:350};
+  // B istnieje dopiero od akcji sub-b (bez pustego kafelka wcześniej).
+  const receivers=[{id:'A',slot:1},...(p.bStart===null?[]:[{id:'B',slot:2}])],pos=r=>({x:g.recvX,w:g.recvW,y:laneRowY(top,r.slot)});
+  const fill=subjectUpstream.fill,value=(k,at,arrival)=>({value:String(k),color:fill,at,arrival,logicalAt:p.emitAt(k)});
+  const range=(a,b)=>Array.from({length:Math.max(0,b-a+1)},(_,i)=>a+i);
+  const aEvents=range(Math.max(p.kFrom,Math.max(0,p.aLast-3)),p.aLast).map(k=>value(k,p.departure(k),p.departure(k)+t.travel));
+  const bEvents=p.bConnected===null?[]:[...(p.replay?[{...value(p.replay.k,p.replay.departure,p.replay.departure+t.travel),logicalAt:p.bConnected}]:[]),
+    ...range(Math.max(p.bFrom,p.kFrom),p.kTo).map(k=>value(k,p.departure(k),p.departure(k)+t.travel))];
+  const callout=(text,subscriber,from,to,label)=>({...laneCallout(text,subscriber,from,to,{x:620,y:top/2}),size:34,...(label===undefined?{}:{label})});
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,U:subjectUpstream},
+    nodes:[{id:'interval',x:g.sourceX,w:g.sourceW,label:'interval(1000)',...laneTile('source',top,{U:0},1)},
+      {id:'share',x:g.hubX,w:g.hubW,label:'shareReplay(1)',color:'op',inputRow:true,replayMemory:true,hubFan:false,
+        ...laneTile('operator',top,{U:0,A:1,B:2},3)},
+      ...receivers.map(r=>laneReceiver(r.id,r.id,pos(r),{ready:false,born:r.id==='A'?0:p.subBCall,laneTerminalText:{cancelled:'×'}}))],
+    edges:[{id:'interval-share',from:'interval',to:'share',subscriber:'U',logicalStart:p.hubA,fixedStart:true},
+      {id:'share-A',from:'share',to:'A',subscriber:'A',logicalStart:p.subscribeA,cancelPulse:true},
+      ...(p.bStart===null?[]:[{id:'share-B',from:'share',to:'B',subscriber:'B',logicalStart:p.bStart,fixedStart:true}])],
+    schedule:{
+      'interval-share':{start:p.hubA,connectDuration:t.link,events:range(p.kFrom,p.kTo).map(k=>value(k,p.emitAt(k),p.arrival(k)))},
+      'share-A':{start:p.subscribeA,connectDuration:t.link,events:aEvents,
+        ...(p.aUnsub===null?{}:{end:{at:p.aUnsub,logicalAt:p.aUnsub,kind:'unsubscribe',duration:t.cancel}})},
+      ...(p.bStart===null?{}:{'share-B':{start:p.bStart,connectDuration:t.link,events:bEvents}})},
+    trays:receivers.map(r=>laneTray(r.id,pos(r),3)),
+    callouts:[callout('const subA = shared$.subscribe(…)','A',laneEvent('subscribe','share-A'),laneEvent('connected','interval-share')),
+      ...(p.aUnsub===null?[]:[callout('subA.unsubscribe()','A',{type:'unsubscribe-call',edge:'share-A'},laneEvent('disconnected','share-A',t.calloutHold))]),
+      ...(p.bStart===null?[]:[callout('const subB = shared$.subscribe(…)','B',{type:'subscribe-call',edge:'share-B'},laneEvent('connected','share-B',.4))])],
+    timeline:[...(p.unsubCall===undefined?[]:[{type:'unsubscribe-call',edge:'share-A',at:p.unsubCall}]),
+      ...(p.subBCall===undefined?[]:[{type:'subscribe-call',edge:'share-B',at:p.subBCall}]),
+      ...(p.zeroAt===undefined?[]:[{type:'refcount-focus',at:p.zeroAt},{type:'refcount-focus-end',at:p.subBCall??p.end+1}])],
+  };
+}
+
 function buildFlattenGraph(scene) {
   const all=scene.operatorName==='concatAll',sourceY=50,operatorX=all?780:720;
   const nodes=[

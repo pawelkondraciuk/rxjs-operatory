@@ -1,4 +1,4 @@
-import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureDebounceAudit } from './reference-scenes.js';
+import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureDebounceAudit, configureShareReplayInterval } from './reference-scenes.js';
 
 // Końcowe ID po rozwinięciu wariantów; otwarcie pozostaje w kolejności HTML.
 export const mainOrder = [
@@ -10,6 +10,8 @@ export const mainOrder = [
   'b04-catcherror-2','b04-catcherror','16-czas-cztery','25-podsumowanie','pytania',
 ];
 export const extraOrder = [
+  // Pierwszy EXTRAS zaraz po „Pytania?”: shareReplay z refCount: false — interval pracuje bez odbiorców.
+  'x01-sharereplay-interval',
   // Dogrywka przy braku pytań: trzy slajdy, około 4–6 minut.
   '12a-complete','12a-complete-2','13-limit',
   // Drugi profil distinctUntilChanged (42/43, bez anulowań) — duplikat 11a w MAIN, zachowany jako materiał do pytań.
@@ -22,7 +24,7 @@ export const extraOrder = [
   '23-angular-alias','24-signals','26-resolver-problem','27-resolver-microtask','28-resolver-batch',
 ];
 export const extraIds = new Set(extraOrder);
-const stagedIds = new Set(['04-operator','04a-dwa-tory-3','05-zrodla','05-zrodla-2','05-zrodla-3','05-zrodla-4','05-zrodla-5','20-sharereplay','20-sharereplay-2']);
+const stagedIds = new Set(['x01-sharereplay-interval','04-operator','04a-dwa-tory-3','05-zrodla','05-zrodla-2','05-zrodla-3','05-zrodla-4','05-zrodla-5','20-sharereplay','20-sharereplay-2']);
 
 // Sceny z finish:hold kończą się ok. 2 s po ostatnim zdarzeniu modelu, żeby AUTO nie stało długo
 // przed FINISHED (każde „dalej” w bezruchu tylko kończy animację). 22-refcount celowo pokazuje ciszę.
@@ -61,6 +63,8 @@ export function configureScene(scene) {
   if(id==='05-zrodla'&&scene.sourceExample===3)configureSubjectInterval(scene);
   // Subject — ręczna emisja: next(1), next(2), error do A/B i next(3) bez skutku; trzeci slajd techniczny, po interval.
   if(id==='05-zrodla'&&scene.sourceExample===4)configureSubjectManual(scene);
+  // shareReplay({ bufferSize: 1, refCount: false }) na interval: upstream działa także przy zerze odbiorców (EXTRAS).
+  if(id==='x01-sharereplay-interval')configureShareReplayInterval(scene);
   // Kolorowanie składni kodu na wszystkich slajdach (wspólny renderer kodu w playerze); scena może je wyłączyć (codeSyntax:false).
   scene.codeSyntax??=true;
   scene.group=extraIds.has(scene.id)?'bonus':'main';

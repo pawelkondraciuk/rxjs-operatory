@@ -374,7 +374,10 @@ export function renderScene(frame,options={}) {
       // Pasek po lewej: kolor toru, a w hubie kolor wspólnego upstreamu (row.stripe); anulowany wiersz w hubie szarzeje.
       const stripe=row.stripe&&state==='cancelled'?'#808890':row.stripe||row.color;
       svg+=`<rect x="${left+1}" y="${row.top}" width="${6*k}" height="${h}" fill="${stripe}"${state==='cancelled'&&!row.stripe?' opacity=".45"':''}/>`;
-      svg+=`<path d="M${left} ${row.top}H${left+n.w}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/></g>`;
+      svg+=`<path d="M${left} ${row.top}H${left+n.w}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/>`;
+      // Wiersz subskrypcji wejścia huba (inputRow, np. #1 w shareReplay): sama etykieta, stan niesie upstream.
+      if(row.input&&row.label)svg+=text(left+22*k,row.top+h/2,row.label,24*k,'style="font-weight:700;fill:#43525b;text-anchor:start"');
+      svg+='</g>';
     }
     // Tory subskrybentów: stan wykonania jako mały element w kafelku definicji, gniazda na krawędziach.
     // Hub (np. share): wspólne wejście bez własnego wiersza rozwidla się do wierszy wyjść, przesuniętych w prawo.
@@ -465,6 +468,12 @@ export function renderScene(frame,options={}) {
       // Zapisana kulka pojawia się dokładnie tam, gdzie dojechał token zapisu, więc bez fade-in.
       for(const v of b.values)svg+=ball(b.ball.x,b.ball.y,v.value,v.color,size,1,'data-token="buffered"');
       svg+='</g>';
+    }
+    // Wspólna kulka pamięci huba (replayMemory, np. shareReplay(1)): wygląd jak pamięć distinctUntilChanged; pusta — nic,
+    // przy zapisie nowej wartości krótki puls skali.
+    if(n.memoryBall?.value!==undefined) {
+      const m=n.memoryBall,pulse=reduced?0:clamp(1-(frame.time-m.since)/.3);
+      svg+=ball(m.x,m.y,m.value,m.color,frame.ball||{r:25,font:29,textFill:'#fff'},1+.15*pulse,`data-lane-memory="${esc(String(m.value))}" data-token="memory"`);
     }
     for(const dot of n.socketDots||[])
       svg+=`<circle data-socket="${dot.side}" data-subscriber="${esc(dot.subscriber)}" cx="${dot.side==='out'?n.x+n.w/2:n.x-n.w/2}" cy="${dot.y}" r="${dot.r??13*k}" fill="${dot.color}" stroke="#fff" stroke-width="3" opacity="${dot.opacity}"/>`;

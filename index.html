@@ -747,7 +747,7 @@
 
 					<section id="pytania" class="extras-slide">
 						<h2>Pytania?</h2>
-						<p class="extras-start"><a href="?extras#/12a-complete">Dodatkowe przykłady — zacznij tutaj</a></p>
+						<p class="extras-start"><a href="?extras#/x01-sharereplay-interval">Dodatkowe przykłady — zacznij tutaj</a></p>
                         <nav class="extras-links" aria-label="Dodatkowe animacje">
                           <div class="extras-group"><h3>Praca i zakończenie</h3>
                             <a href="?extras#/12a-complete">complete outer → limit 3</a>
@@ -757,6 +757,7 @@
                             <a href="?extras#/b05-finalize">finalize</a>
                           </div>
                           <div class="extras-group"><h3>Współdzielenie</h3>
+                            <a href="?extras#/x01-sharereplay-interval">shareReplay i interval</a>
                             <a href="?extras#/06a-cold-hot-2">Hot: późny odbiorca</a>
                             <a href="?extras#/19-share">share</a>
                             <a href="?extras#/18-async">Dwie subskrypcje</a>
@@ -780,8 +781,25 @@
                             <a href="?extras#/26-resolver-problem">Resolver: trzy kroki</a>
                           </div>
                         </nav>
-						<aside class="notes">Koniec części właściwej (30–35 minut poza pełnym otwarciem). Jeśli nie ma pytań: „Zobaczmy jeszcze kilka sytuacji”. Wybierz wyróżniony link, potem pilot prowadzi przez complete outer w concatMap, complete outer w switchMap i limit współbieżności. Ta dogrywka zajmuje około 4–6 minut. Po limicie można zakończyć albo wybrać następny temat. Menu pozwala też odpowiedzieć konkretnym przykładem na pytanie z sali; link „Dodatkowe przykłady” wraca tutaj.</aside>
+						<aside class="notes">Koniec części właściwej (30–35 minut poza pełnym otwarciem). Jeśli nie ma pytań: „Zobaczmy jeszcze kilka sytuacji”. Wybierz wyróżniony link: najpierw shareReplay z refCount: false na interval, potem pilot prowadzi przez complete outer w concatMap, complete outer w switchMap i limit współbieżności. Ta dogrywka zajmuje około 4–6 minut. Po limicie można zakończyć albo wybrać następny temat. Menu pozwala też odpowiedzieć konkretnym przykładem na pytanie z sali; link „Dodatkowe przykłady” wraca tutaj.</aside>
 					</section>
+
+				<section id="x01-sharereplay-interval" class="animation-slide" data-extras data-animation="x01-sharereplay-interval">
+					<h2>shareReplay — kto zatrzyma interval?</h2>
+					<div class="rx-player" aria-label="shareReplay — kto zatrzyma interval?"></div>
+					<aside class="notes">
+                        <p><strong>Pierwszy EXTRAS:</strong> interval(1000).pipe(shareReplay({ bufferSize: 1, refCount: false })) → odbiorcy A/B. Scena na żywo: interval emituje co sekundę także na postojach. Pierwsze prawo: A subskrybuje; kolejne: subA.unsubscribe(), zero odbiorców, subB, podsumowanie. Lewo cofa ostatnią akcję; po wyjściu ze slajdu wykonanie jest sprzątane i po powrocie zaczyna od READY.</p>
+                        <p><strong>Notatki per checkpoint:</strong> szablon poniżej (ready, unsub-a, zero, sub-b, summary, finished).</p>
+                    </aside>
+					<template data-checkpoint-notes="x01-sharereplay-interval">
+                        <div data-checkpoint="ready"><p><strong>0 — Definicja, potem A subskrybuje</strong></p><p>Na MAIN widzieliśmy, że shareReplay potrafi zapamiętać wynik HTTP. Ale HTTP samo się kończy. Co się stanie, jeśli współdzielimy źródło, które nigdy się nie kończy?</p><p>Na ekranie: kod i nagłówki interval(1000) → shareReplay(1). Bez odbiorców, interval nie działa, pamięć pusta — refCount: false nie uruchamia źródła przed pierwszym subscribe. Cel: 60–90 s.</p><p>Prawo: A subskrybuje. Pierwszy subskrybent uruchamia interval. ShareReplay zapamiętuje ostatnią wyemitowaną wartość.</p><p>Migawka const subA = shared$.subscribe(…); impuls biegnie od A przez shareReplay do interval: jedno upstream #1 (Upstream: 1). Liczby lecą co sekundę: do kulki pamięci w wierszu #1 shareReplay i dalej do A. Poczekaj na 0, 1, 2.</p></div>
+                        <div data-checkpoint="unsub-a"><p><strong>1 — A odchodzi</strong></p><p>A się odłącza. Nie mamy już odbiorców. Czy to oznacza, że interval też przestał działać?</p><p>Migawka subA.unsubscribe(); szary impuls × biegnie od A i zatrzymuje się na shareReplay — nie dociera do interval. Wiersz A szarzeje, przy A pojawia się ×. Odbiorcy: 0, Upstream: 1. Nie podpowiadaj — liczby nadal lecą.</p></div>
+                        <div data-checkpoint="zero"><p><strong>2 — Zero odbiorców, źródło nadal działa</strong></p><p>Nie. Przy refCount ustawionym na false shareReplay utrzymuje połączenie upstream. Interval dalej emituje, a bufor nadal się aktualizuje.</p><p>W kodzie wyróżnione refCount: false. Kolejne liczby wpadają do kulki pamięci w shareReplay i nigdzie dalej nie płyną. Odbiorcy: 0, Upstream: 1. Możesz poczekać dowolnie długo — B dostanie wartość, która akurat będzie w pamięci.</p></div>
+                        <div data-checkpoint="sub-b"><p><strong>3 — B subskrybuje</strong></p><p>Nowy odbiorca natychmiast dostaje ostatnią zapamiętaną wartość. Potem otrzymuje kolejne emisje na żywo. Nie powstaje nowa subskrypcja interval.</p><p>Migawka const subB = shared$.subscribe(…); impuls kończy się na shareReplay. Kulka z pamięci jedzie od razu do B (tylko ostatnia wartość, nie cała historia), potem kolejne liczby z tego samego interval. Odbiorcy: 1, Upstream: 1.</p></div>
+                        <div data-checkpoint="summary"><p><strong>4 — Podsumowanie</strong></p><p>To potencjalna pułapka: nie mamy już odbiorców, ale źródło nadal może zużywać zasoby.</p><p>A co zmieniłoby refCount: true?</p><p>Stan: A odłączony, B aktywny, interval to ciągle to samo wykonanie (#1), shareReplay trzyma ostatnią wartość. Bez complete i bez unsubscribe B — sprzątanie przy wyjściu ze slajdu dzieje się poza wizualizacją.</p></div>
+                        <div data-checkpoint="finished"><p><strong>Stan końcowy (druk)</strong></p><p>To potencjalna pułapka: nie mamy już odbiorców, ale źródło nadal może zużywać zasoby. A co zmieniłoby refCount: true?</p><p>A odłączony, B aktywny, jedno wykonanie interval; shareReplay przechowuje ostatnią wartość.</p></div>
+                    </template>
+				</section>
 
 				<section id="19-share" class="animation-slide" data-extras data-animation="19-share">
 					<h2>share — wspólne wykonanie</h2>
