@@ -631,32 +631,47 @@ export function httpGraph(scene) {
 
 // Subject (05-zrodla-3): kontynuacja Cold — te same pola widoku A/B/C, ale jeden HTTP zasila je przez Subject.
 // READY: A/B/C są już subskrybentami Subject (subskrypcje zestawione przed t = 0, bez powtarzania animacji).
-// Osobne http.get(...).subscribe(subject$) (tor U, #1) uruchamia jedyny request; subskrypcje A/B/C nim nie zarządzają.
+// Kod rośnie etapami: najpierw sam Subject, potem definicja http$ (nagłówek HTTP GET bez wykonania), na końcu osobna
+// linia http$.subscribe(subject$) — subskrybujemy HTTP, przekazując Subject jako Observer (tor U, #1); dopiero ona
+// uruchamia jedyny request. Subskrypcje A/B/C nim nie zarządzają.
 // Jedno next z HTTP → trzy powiadomienia Subject w tym samym kolorze emisji; jedno complete kończy Subject i odbiorców.
 // Jawny harmonogram ilustracji (schedule) zamiast planFlow: tylko on pozwala zacząć od już zestawionych subskrypcji.
 const subjectUpstream={color:'#238F83',fill:'#b4e0d9',progress:'#abdbd3',label:'#1',ink:'#17695f',tint:'#e6f4f1'};
-const subjectTimes={born:.2,connect:.5,subscribe:1,link:.8,next:6,travel:1,hold:1.2,complete:10.2,terminal:.8,duration:14};
+// born — definicja http$ (nagłówek HTTP GET i druga linia kodu), connect — linia http$.subscribe(subject$), subscribe —
+// impuls od Subjecta do HTTP po fade-in tej linii.
+const subjectTimes={born:.3,defined:.6,connect:1,subscribe:1.3,link:.8,next:6.3,travel:1,hold:1.2,complete:10.5,terminal:.8,duration:14.3};
 export function configureSubject(scene) {
   const at=subjectTimes,ev=(type,edge,offset=0)=>({type,edge,...(offset?{offset}:{})});
   const connected=at.subscribe+at.link,arrival=at.next+at.travel,split=arrival+at.hold,delivered=split+at.travel;
   const upstreamEnd=at.complete+at.terminal,downstreamEnd=upstreamEnd+at.terminal;
-  const subjectMark={id:'subject',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
-  // Stały kod: wyłącznie definicja Subject. Fragment świeci, gdy Subject rozsyła next i complete.
+  // Wyróżnienia jak na share(): Subject (operator) fioletowo, http.get turkusowo; .subscribe(subject$) bez stałego tła,
+  // chwilowo w kolorze toru U — od pojawienia się linii do chwili po zestawieniu subskrypcji HTTP (widoczne na postoju).
+  const subjectMark={id:'subject',bg:'rgba(216,179,230,.45)',line:'#b384c6'},httpMark={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'};
+  const subscribeMark={id:'subscribe',bg:'rgba(35,143,131,.16)',line:subjectUpstream.color,quiet:true};
+  const defined={type:'node-create',node:'http'},connect={type:'manual-connect',edge:'http-subject'};
+  // Miejsce na wszystkie linie jest zarezerwowane od READY (show: fade-in 0,3 s); pusta linia oddziela definicje od wywołania.
   const lines=[[{text:'const subject$ = '},{text:'new Subject<User>()',mark:subjectMark,
-    active:[{from:ev('deliver-next','http-subject'),to:ev('source-next','subject-A')},{from:ev('disconnected','http-subject'),to:ev('disconnected','subject-A')}]},{text:';'}]];
+      active:[{from:ev('deliver-next','http-subject'),to:ev('source-next','subject-A')},{from:ev('disconnected','http-subject'),to:ev('disconnected','subject-A')}]},{text:';'}],
+    [{text:'const http$ = ',show:defined},{text:"http.get<User>('/api/users/42')",mark:httpMark,show:defined,
+      active:[{from:ev('source-next','http-subject'),to:ev('deliver-next','http-subject')}]},{text:';',show:defined}],
+    [],
+    [{text:'http$',show:connect},{text:'.subscribe(subject$)',mark:subscribeMark,show:connect,
+      active:[{from:connect,to:ev('connected','http-subject',1)}]},{text:';',show:connect}]];
   const value=E(at.next,coldUserSymbol,subjectUpstream.fill);
   Object.assign(scene,{graph:subjectGraph,subjectTimes:{...at,connected,arrival,split,delivered,upstreamEnd,downstreamEnd},
-    playerLayout:'function',duration:at.duration,ink:'#26323B',playerClass:'rx-lanes rx-flat-tiles',
-    title:'Subject: ręczny multicast HTTP',code:lines[0].map(part=>part.text).join(''),codeLines:lines,codeFrames:[],
+    playerLayout:'function',duration:at.duration,ink:'#26323B',playerClass:'rx-lanes rx-flat-tiles rx-code-steps',
+    title:'Subject: ręczny multicast HTTP',code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
     rows:[R('HTTP GET',[value],[B(at.subscribe,at.next,'request')],{completeAt:at.complete}),
       ...coldFields.map(f=>R(`Pole ${f.label}`,[{...value,at:split}],[],{completeAt:upstreamEnd}))],
     metrics:[{label:'Odbiorcy',value:()=>coldFields.length},{label:'Requesty HTTP',count:'started'}],
-    captions:[[0,'Ci sami trzej odbiorcy subskrybują Subject. HTTP jeszcze nie jest podłączony']],
+    captions:[[0,'Ci sami trzej odbiorcy subskrybują Subject. HTTP jeszcze nie jest podłączony'],
+      [at.born,'const http$ = http.get(...) to tylko definicja. Request jeszcze nie istnieje'],
+      [at.connect,'http$.subscribe(subject$): subskrybujemy HTTP, a Subject jest Observerem']],
     playback:manual([
-      {id:'connect-http',event:ev('connected','http-subject'),offset:.35,caption:'Subject jest Observerem: http.get(...).subscribe(subject$) podłącza HTTP'},
+      {id:'defined',event:defined,offset:at.defined,caption:'Definicja http$: nagłówek HTTP GET bez wykonania. Request jeszcze nie istnieje'},
+      {id:'connect-http',event:ev('connected','http-subject'),offset:.35,caption:'Subject jest Observerem: http$.subscribe(subject$) podłącza HTTP'},
       {id:'request',event:ev('connected','http-subject'),offset:2,caption:'Jeden request HTTP. A, B i C nadal czekają na wartość'},
-      {id:'received',event:ev('deliver-next','http-subject'),offset:.35,caption:'HTTP emituje jeden obiekt User do Subjecta'},
-      {id:'multicast',event:ev('deliver-next','subject-C'),offset:.35,caption:'Subject rozsyła tę samą wartość do A, B i C. Każde pole pokazuje swoją właściwość'},
+      {id:'multicast',event:ev('deliver-next','subject-C'),offset:.35,caption:'HTTP emituje jeden obiekt User. Subject rozsyła go do A, B i C'},
       {id:'complete',event:ev('disconnected','subject-C'),offset:.8,caption:'HTTP zakończone. Subject przekazał complete wszystkim odbiorcom'},
     ]),
   });
@@ -672,7 +687,8 @@ export function subjectGraph(scene) {
   const preconnected={start:-2,connectDuration:.8};
   return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball:viewFieldBall,
     subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,C:laneSubscribers.C,U:subjectUpstream},
-    // HTTP GET pojawia się dopiero w etapie connect-http. Wejście upstreamu trafia w wiersz A Subject (prosty kabel
+    // HTTP GET pojawia się razem z definicją http$ (sam nagłówek; wiersz wykonania rośnie dopiero z subskrypcją).
+    // Wejście upstreamu trafia w wiersz A Subject (prosty kabel
     // z wiersza #1 HTTP); splitAt:0 — kulka rozdziela się na porcie wejściowym, nie stoi w wierszu A.
     nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,progressUntilNext:true,
       ...laneTile('source',top,{U:0},1),ready:false,born:at.born},
@@ -686,10 +702,7 @@ export function subjectGraph(scene) {
         events:[{...value,at:at.split,arrival:at.delivered,logicalAt:at.next}],end:complete(at.upstreamEnd)}]))},
     executions:[{id:'request',node:'http',edge:'http-subject',duration:at.next-at.subscribe}],
     trays:fields.trays,
-    // Migawka prawdziwej składni nad diagramem, z identyfikatorem wykonania #1: od ręcznego podłączenia do chwili
-    // po zestawieniu subskrypcji HTTP (zostaje na postoju connect-http, znika w drodze do request).
-    callouts:[{...laneCallout("http.get<User>('/api/users/42').subscribe(subject$)",'U',{type:'manual-connect',edge:'http-subject'},
-      {type:'connected',edge:'http-subject',offset:.6},{x:620,y:top/2}),size:34,label:'#1'}],
+    // manual-connect: chwila pojawienia się linii http$.subscribe(subject$) w kodzie (bez migawki nad diagramem).
     timeline:[{type:'manual-connect',edge:'http-subject',event:{type:'subscribe',edge:'http-subject'},offset:at.connect-at.subscribe},
       {type:'subject-summary',event:{type:'disconnected',edge:'subject-C'},offset:1.1,
         caption:'Ten sam widok co na Cold, ale jeden request zamiast trzech. Upstream podłączyliśmy ręcznie'}],

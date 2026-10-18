@@ -5,9 +5,14 @@ const values=(frame,id)=>Array.from(frame.histories.find(h=>h.anchor===id).value
 const node=(frame,id)=>frame.nodes.find(n=>n.id===id);
 const lanes=(frame,id)=>Array.from(node(frame,id).laneStates,l=>`${l.role}:${l.subscriber}:${l.state}`);
 const fieldOf=(svg,id)=>svg.slice(svg.indexOf(`data-field="${id}"`),svg.indexOf('</g>',svg.indexOf(`data-field="${id}"`)));
-const stopIds=['connect-http','request','received','multicast','complete'];
+const stopIds=['defined','connect-http','request','multicast','complete'];
 const fields=[['A','user.firstName','Paweł'],['B','user.lastName','Kondraciuk'],['C','user.city','Białystok']];
-const snapshotText="http.get<User>('/api/users/42').subscribe(subject$)";
+const codeText=['const subject$ = new Subject<User>();',"const http$ = http.get<User>('/api/users/42');",'','http$.subscribe(subject$);'];
+// Krycie i aktywność fragmentów kodu w klatce: linia → [opacity…].
+const codeOpacity=frame=>frame.codeView.map(line=>line.map(part=>part.opacity));
+const lineShown=(frame,i)=>frame.codeView[i].every(part=>part.opacity===1);
+const lineHidden=(frame,i)=>frame.codeView[i].every(part=>part.opacity===0);
+const markOf=(frame,id)=>frame.codeView.flat().find(part=>part.mark?.id===id);
 async function subject(format='4:3'){
  const m=await modules(['catalog','scene-config','engine','renderer']);
  const scene=m['scene-config'].configureScene({...m.catalog.scenes.find(s=>s.id==='05-zrodla'),
@@ -19,11 +24,13 @@ async function subject(format='4:3'){
 
 test('READY: A/B/C already subscribe to Subject, fields are empty, HTTP is not connected; code shows only the Subject',async()=>{
  const {scene,c,ev,render}=await subject(),ready=c.snapshot(0);
- assert.equal(scene.code,'const subject$ = new Subject<User>();');
- assert.doesNotMatch(scene.code,/subscribe|http|map|share/);
+ assert.equal(scene.code,codeText.join('\n'),'kod rośnie do trzech instrukcji (miejsce zarezerwowane od READY)');
+ assert.deepEqual(Array.from(ready.codeView,line=>line.map(part=>part.text).join('')),codeText);
+ assert.ok(lineShown(ready,0)&&lineHidden(ready,1)&&lineHidden(ready,3),'w READY widać tylko definicję Subjecta');
+ assert.match(scene.playerClass,/rx-code-steps/);
  assert.deepEqual(Array.from(c.stops,s=>s.id),stopIds);
  assert.equal(node(ready,'subject').visible,true);
- assert.equal(node(ready,'http').opacity,0,'HTTP GET pojawia się dopiero w etapie connect-http');
+ assert.equal(node(ready,'http').opacity,0,'HTTP GET pojawia się dopiero z definicją http$');
  assert.deepEqual(lanes(ready,'subject'),['operator:A:running','operator:B:running','operator:C:running']);
  assert.ok(node(ready,'subject').laneStates.every(l=>l.opacity===1),'wiersze Subject w pełni widoczne od READY');
  assert.ok(node(ready,'subject').laneRows.every(r=>r.growth===1));
@@ -46,16 +53,42 @@ test('READY: A/B/C already subscribe to Subject, fields are empty, HTTP is not c
  assert.equal(c.events.filter(e=>e.type==='subscribe'&&e.at>=0).length,1,'jedyne subscribe w slajdzie to HTTP');
 });
 
-test('connect-http: the HTTP header appears, the real-syntax snapshot shows and the subscribe impulse runs from Subject to HTTP',async()=>{
+test('defined: the http$ line and the HTTP GET header appear without an execution, request or value',async()=>{
+ const {c,at,render}=await subject(),f=c.snapshot(at('defined'));
+ const born=c.events.find(e=>e.type==='node-create'&&e.node==='http').at;
+ assert.ok(born>0&&born<at('defined'));
+ assert.ok(lineShown(f,0)&&lineShown(f,1)&&lineHidden(f,3),'druga linia (definicja http$) widoczna, subscribe jeszcze nie');
+ assert.equal(markOf(f,'http').text,"http.get<User>('/api/users/42')");
+ assert.equal(node(f,'http').opacity,1,'nagłówek HTTP GET w pełni widoczny');
+ assert.equal(node(f,'http').laneRows.length,0,'bez wiersza wykonania HTTP');
+ assert.equal(node(f,'http').laneStates.length,0);
+ assert.equal(f.edges.find(e=>e.id==='http-subject').visible,false,'HTTP nie jest podłączony');
+ assert.equal(f.executionCounts.started,0);assert.equal(f.metrics.find(m=>m.label==='Requesty HTTP').value,0);
+ assert.ok(c.events.filter(e=>e.type==='subscribe'&&e.at>=0).every(e=>e.at>at('defined')),'sama definicja nie subskrybuje');
+ assert.equal(f.tokens.length,0);assert.ok(f.histories.every(h=>!h.values.length),'A/B/C nadal czekają');
+ assert.deepEqual(lanes(f,'subject'),['operator:A:running','operator:B:running','operator:C:running']);
+ const ready=c.snapshot(0);
+ for(const n of f.nodes)if(n.id!=='http'){const r=node(ready,n.id);for(const key of ['x','y','w','h'])assert.equal(n[key],r[key],`${n.id}.${key} bez przesunięcia`);}
+ assert.doesNotMatch(render(f),/data-callout|NaN|Infinity/);
+});
+
+test('connect-http: the http$.subscribe(subject$) line appears, then the subscribe impulse runs from Subject to HTTP; no big snapshot',async()=>{
  const {c,ev,at,render}=await subject();
- const born=c.events.find(e=>e.type==='node-create'&&e.node==='http').at,start=ev('subscribe','http-subject'),connected=ev('connected','http-subject');
- assert.ok(born>0&&node(c.snapshot(start),'http').opacity===1,'nagłówek HTTP wchodzi przed impulsem');
- const shown=t=>Array.from(c.snapshot(t).callouts||[],x=>x.text+' '+x.label);
- assert.deepEqual(shown((start+connected)/2),[snapshotText+' #1']);
+ const shownAt=c.events.find(e=>e.type==='manual-connect').at,start=ev('subscribe','http-subject'),connected=ev('connected','http-subject');
+ assert.ok(at('defined')<shownAt&&shownAt+.3<=start,'linia subscribe pojawia się po postoju defined, przed impulsem');
+ assert.ok(lineHidden(c.snapshot(shownAt),3)&&lineShown(c.snapshot(shownAt+.3),3));
+ assert.equal(c.snapshot(start-1e-6).executionCounts.started,0,'request dopiero po subscribe');
+ for(const t of [0,at('defined'),(start+connected)/2,...c.stops.map(s=>s.time),c.duration])
+  assert.equal((c.snapshot(t).callouts||[]).length,0,'bez migawki nad diagramem — instrukcja jest tylko w kodzie');
  const stop=c.snapshot(at('connect-http'));
- assert.deepEqual(shown(at('connect-http')),[snapshotText+' #1'],'migawka widoczna na postoju');
- assert.equal(stop.callouts[0].opacity,1);
- assert.deepEqual(shown(at('request')),[],'migawka znika w drodze do request');
+ assert.ok(lineShown(stop,3));
+ const accent=markOf(stop,'subscribe');
+ assert.equal(accent.text,'.subscribe(subject$)');assert.equal(accent.mark.quiet,true);assert.equal(accent.mark.line,'#238F83','kolor impulsu subskrypcji (tor U)');
+ assert.equal(accent.active,true,'akcent subscribe widoczny na postoju');
+ assert.equal(markOf(c.snapshot(start-.1),'subscribe').active,true,'akcent od pojawienia się linii');
+ assert.equal(markOf(c.snapshot(at('request')),'subscribe').active,false,'akcent chwilowy');
+ assert.equal(markOf(c.snapshot(at('request')),'subscribe').opacity,1,'linia zostaje na stałe');
+ assert.doesNotMatch(render(stop),/data-callout/);
  const cable=c.snapshot((start+connected)/2).edges.find(e=>e.id==='http-subject');
  assert.ok(cable.visible&&cable.progress>0&&cable.progress<1&&cable.offset<0,'kabel rośnie od Subjecta w lewo');
  assert.deepEqual(lanes(stop,'http'),['work:U:running'],'jeden tor HTTP');
@@ -63,11 +96,18 @@ test('connect-http: the HTTP header appears, the real-syntax snapshot shows and 
  assert.equal(node(stop,'http').laneStates[0].label,'#1');
  assert.equal(stop.metrics.find(m=>m.label==='Requesty HTTP').value,1);
  assert.equal(c.snapshot(connected-1e-6).executionCounts.started,0,'licznik rośnie po zestawieniu subskrypcji HTTP');
- const svg=render(stop);
- assert.match(svg,/data-callout="http\.get&lt;User&gt;\(&#39;\/api\/users\/42&#39;\)\.subscribe\(subject\$\)"|data-callout="http\.get&lt;User&gt;\('\/api\/users\/42'\)\.subscribe\(subject\$\)"/);
- const callout=stop.callouts[0],width=(Array.from(callout.text).length*.6+.32+1.15+.9)*callout.size;
- assert.ok(callout.x-width/2>=0&&callout.x+width/2<=stop.width,'migawka mieści się w szerokości diagramu');
- assert.ok(callout.y+callout.size*.78<node(stop,'subject').y-node(stop,'subject').h/2,'migawka nad diagramem');
+ assert.ok(node(c.snapshot(start),'http').laneRows.every(r=>r.growth<1),'wiersz wykonania powstaje dopiero z subskrypcją');
+});
+
+test('code marks match share(): Subject purple, http.get turquoise; subscribe has no permanent mark',async()=>{
+ const {c,ev}=await subject(),end=c.snapshot(c.duration);
+ assert.deepEqual({...markOf(end,'subject').mark},{id:'subject',bg:'rgba(216,179,230,.45)',line:'#b384c6'});
+ assert.deepEqual({...markOf(end,'http').mark},{id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'});
+ assert.equal(markOf(end,'subject').text,'new Subject<User>()');
+ assert.ok(markOf(c.snapshot(ev('source-next','http-subject')+.1),'http').active,'http.get świeci podczas odpowiedzi');
+ assert.equal(markOf(end,'http').active,false);
+ assert.equal(markOf(end,'subscribe').active,false);
+ assert.equal(JSON.stringify(codeOpacity(end)),'[[1,1,1],[1,1,1],[],[1,1,1]]');
 });
 
 test('request: one HTTP execution makes progress while A/B/C wait',async()=>{
@@ -87,7 +127,7 @@ test('one User from HTTP reaches Subject, then splits into three identical next 
  const outs=['A','B','C'].map(id=>c.plan.records.get('subject-'+id).events[0]);
  assert.ok(outs.every(o=>o.at===outs[0].at&&o.arrival===outs[0].arrival),'trzy powiadomienia jednocześnie');
  assert.ok(outs.every(o=>o.value==='{…}'&&o.color===input.color),'kulki tej samej emisji mają wspólny kolor');
- const received=c.snapshot(at('received'));
+ const received=c.snapshot(input.arrival+.35);
  assert.equal(received.tokens.length,1);assert.equal(received.tokens[0].phase,'split-in');assert.equal(received.tokens[0].value,'{…}');
  const hub=node(received,'subject');assert.ok(received.tokens[0].x<=hub.x-hub.w/2+1e-6,'kulka na porcie wejściowym Subject');
  assert.equal(received.tokens[0].y,hub.laneStates.find(l=>l.subscriber==='A').y,'wejście upstreamu na wysokości wiersza A');
@@ -183,10 +223,11 @@ test('Subject checkpoint notes follow the stops and end with the question about 
  const notes=Object.fromEntries([...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)].map(([,id,text])=>[id,text]));
  assert.deepEqual(Object.keys(notes),['ready',...Array.from(c.stops,s=>s.id),'finished']);
  assert.match(notes.ready,/Wracamy do Subjecta[\s\S]*nie wywołujemy next ręcznie — obiekt użytkownika pobierzemy z HTTP[\s\S]*trzy identyczne requesty[\s\S]*ci sami trzej odbiorcy/);
- assert.match(notes['connect-http'],/Jest również Observerem/);
+ assert.match(notes.defined,/const http\$ = http\.get[\s\S]*tylko definicja: nie ma wykonania ani requestu/);
+ assert.match(notes['connect-http'],/Jest również Observerem[\s\S]*http\$\.subscribe\(subject\$\)[\s\S]*Subject jest Observerem/);
+ assert.doesNotMatch(notes['connect-http'],/Migawka/);
  assert.match(notes.request,/jeden request, niezależnie od liczby odbiorców Subjecta/);
- assert.match(notes.received,/HTTP emituje go do Subjecta/);
- assert.match(notes.multicast,/wyświetla tylko potrzebne pole/);
+ assert.match(notes.multicast,/HTTP emituje go do Subjecta[\s\S]*wyświetla tylko potrzebne pole/);
  assert.match(notes.complete,/Subject przekazuje complete wszystkim odbiorcom/);
  assert.match(notes.finished,/zamiast trzech requestów mamy jeden[\s\S]*Czy RxJS może zrobić to za nas\?/);
 });

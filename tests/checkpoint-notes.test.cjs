@@ -1,6 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules}=require('./v2-harness.cjs');
-const ids=['ready','connect-http','request','received','multicast','complete','finished'];
+const ids=['ready','defined','connect-http','request','multicast','complete','finished'];
 function slide(id='05-zrodla-3'){
  const html=fs.readFileSync('index.html','utf8');
  const source=html.match(/<template data-checkpoint-notes="05-zrodla-3">([\s\S]*?)<\/template>/)[1];
@@ -35,7 +35,7 @@ test('checkpoint notes leave other variants untouched and print uses the final e
 });
 test('missing checkpoint notes fail explicitly instead of retaining a stale explanation',async()=>{
  const {['checkpoint-notes']:m}=await modules(['checkpoint-notes']);const s=slide();
- s.entries.splice(2,1);assert.throws(()=>m.prepareCheckpointNotes(s),/brak notatki checkpointu request/);
+ s.entries.splice(3,1);assert.throws(()=>m.prepareCheckpointNotes(s),/brak notatki checkpointu request/);
 });
 
 test('Notes receiver restores the requested frame only for a matching template and trusted parent',async()=>{
