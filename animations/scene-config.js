@@ -1,4 +1,4 @@
-import { configureFlatten, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureDebounceAudit, configureShareReplayInterval, configureCombineLatestWithLatestFrom, configureRetryBackoff } from './reference-scenes.js';
+import { configureFlatten, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureDebounceAudit, configureShareReplayInterval, configureCombineLatestWithLatestFrom, configureRetryBackoff, configureDefer } from './reference-scenes.js';
 
 // Końcowe ID po rozwinięciu wariantów; otwarcie pozostaje w kolejności HTML.
 export const mainOrder = [
@@ -13,9 +13,10 @@ export const extraOrder = [
   'x01-sharereplay-interval',
   'x02-combinelatest-withlatestfrom',
   'x03-retry-backoff',
+  'x04-defer',
 ];
 export const extraIds = new Set(extraOrder);
-const stagedIds = new Set(['x01-sharereplay-interval','x02-combinelatest-withlatestfrom','x03-retry-backoff','04-operator','04a-dwa-tory-3','05-zrodla','05-zrodla-2','05-zrodla-3','05-zrodla-4','05-zrodla-5','20-sharereplay','20-sharereplay-2']);
+const stagedIds = new Set(['x01-sharereplay-interval','x02-combinelatest-withlatestfrom','x03-retry-backoff','x04-defer','04-operator','04a-dwa-tory-2','04a-dwa-tory-3','05-zrodla','05-zrodla-2','05-zrodla-3','05-zrodla-4','05-zrodla-5','20-sharereplay','20-sharereplay-2']);
 
 // Sceny z finish:hold kończą się ok. 2 s po ostatnim zdarzeniu modelu, żeby AUTO nie stało długo.
 const trimmedTails = new Set(['20-sharereplay']);
@@ -51,6 +52,8 @@ export function configureScene(scene) {
   if(id==='x02-combinelatest-withlatestfrom')configureCombineLatestWithLatestFrom(scene);
   // retry({ count, delay }) z trzema ponowieniami i exponential backoff 1/2/4 s (EXTRAS).
   if(id==='x03-retry-backoff')configureRetryBackoff(scene);
+  // defer: from(loadUser()) wywołuje funkcję od razu, defer(() => loadUser()) — przy każdej subskrypcji (EXTRAS).
+  if(id==='x04-defer')configureDefer(scene);
   // Kolorowanie składni kodu na wszystkich slajdach (wspólny renderer kodu w playerze); scena może je wyłączyć (codeSyntax:false).
   scene.codeSyntax??=true;
   scene.group=extraIds.has(scene.id)?'bonus':'main';

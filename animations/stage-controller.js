@@ -17,12 +17,17 @@ export function createStageController(player,options={}) {
   }
   player.subscribe?.(changed);
   function cancelResume(){resumeIntent=false;}
+  // autoPause (opt-in): postój, na którym zatrzymuje się także AUTO (np. przejście między fazami sceny).
+  function run(){
+    const hold=player.stops.find(stop=>stop.autoPause&&stop.time>player.time+epsilon);
+    if(hold)player.playTo(hold.time);else player.playContinuously();
+  }
   function start(){
     if(suspensions.size||player.state==='finished')return;
     target=nextCheckpoint();
     const lastQuestion=player.stops.at(-1)?.time??0;
     if(mode==='manual'&&player.time>=lastQuestion-epsilon)mode='auto';
-    if(mode==='auto')player.playContinuously();else player.playTo(target);
+    if(mode==='auto')run();else player.playTo(target);
     changed();
   }
   // Scena na żywo: READY → dalej: subscribe i emisje bez końca → dalej: unsubscribe → dalej: następny slajd.
@@ -80,7 +85,7 @@ export function createStageController(player,options={}) {
     cancelResume();mode=value;
     if(player.live){if(value==='auto'&&!suspensions.size&&player.state!=='finished'&&!player.isPlaying)player.playContinuously();}
     else if(value==='manual'){target=null;player.seek(checkpoints()[Math.max(0,reachedIndex())]);}
-    else if(!suspensions.size&&player.state!=='finished'){target=nextCheckpoint();player.playContinuously();}
+    else if(!suspensions.size&&player.state!=='finished'){target=nextCheckpoint();run();}
     changed();
   }
   function seek(time){cancelResume();target=null;player.seek(time);changed();}

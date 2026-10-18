@@ -182,11 +182,13 @@ test('every variant has deterministic READY, question, FINISHED and fixed geomet
   const {scenes,engine:{compileScene}}=await harness();
   for(const scene of scenes.values()) {
     const engine=compileScene(scene),initial=engine.snapshot(0);
+    // Scena z fazami (scene.phases) zastępuje cały diagram przy przejściu: geometria stała w obrębie fazy.
+    const initialOf=frame=>frame.phase===undefined?initial:engine.snapshot(engine.plan.phases.find(p=>p.name===frame.phase).offset);
     // Rosnący kafelek torów (laneSlots) zachowuje górę, x i szerokość; wysokość rośnie z wierszami wykonań.
     const shape=f=>JSON.stringify(f.nodes.map(n=>n.laneSlots?[n.id,n.x,n.y-n.h/2,n.w,'rows']:[n.id,n.x,n.y,n.w,n.h]));
     for(const time of [0,...engine.stops.map(s=>s.time),engine.duration]) {
       const frame=engine.snapshot(time);
-      assert.equal(shape(frame),shape(initial),scene.id);
+      assert.equal(shape(frame),shape(initialOf(frame)),scene.id);
       const copy=JSON.stringify(frame);engine.snapshot(engine.duration);engine.snapshot(0);
       assert.equal(JSON.stringify(engine.snapshot(time)),copy,scene.id);
       for(const node of frame.nodes) {

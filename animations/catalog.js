@@ -16,6 +16,7 @@ add("04a-dwa-tory","Cold: jedna definicja, trzy wykonania","",1,[],[],"");
 add("x01-sharereplay-interval","shareReplay — kto zatrzyma interval?","",1,[],[],"",{group:"bonus"});
 add("x02-combinelatest-withlatestfrom","combineLatest — ostatnie wartości z wielu źródeł","",1,[],[],"",{group:"bonus"});
 add("x03-retry-backoff","retry — nie udało się? Spróbuj później","",1,[],[],"",{group:"bonus"});
+add("x04-defer","defer — nie wywołuj mnie jeszcze","",1,[],[],"",{group:"bonus"});
 add("05-zrodla","Skąd płyną wartości?","timer · HTTP · Subject",20,[
  R("timer",[E(2,"0","source"),E(6,"1","source"),E(10,"2","source"),E(14,"3","source")]),
  R("HTTP",[E(7,"dane","http")],[B(1,7,"request")],{completeAt:7}),

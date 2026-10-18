@@ -21,6 +21,7 @@ const workSpans=row=>(row.spans||[]).filter(p=>!['queue','state','window','subsc
 // Kompilacja wykonuje się raz. Cały graf (także niewidoczne inner) rezerwuje miejsca.
 // rows i jawny graf kończą w tym samym planie; RAF nie uczestniczy w semantyce.
 export function compileScene(scene) {
+  if(scene.phases)return compilePhases(scene);
   const source=scene.graph ? (typeof scene.graph==='function'?scene.graph(scene):scene.graph) :
     scene.kind==='cards'?{nodes:[],edges:[],trays:[],width:1240,height:340}:null;
   if(!source)throw new Error(`${scene.id}: brak grafu sceny`);
@@ -144,8 +145,9 @@ export function compileScene(scene) {
     return {...frame,at:match.at+(frame.offset||0)};
   }).sort((a,b)=>a.at-b.at);
   // codeLines (opcjonalne): kod jako linie fragmentów. Fragment może mieć mark (kolor klocka/toru), show (zdarzenie
-  // pojawienia się, fade-in 0,3 s; miejsce jest zarezerwowane od READY) i active ([{from,to}] — selektory zdarzeń,
-  // w których fragment świeci mocniej). Selektory działają jak w postojach; nierozwiązany jest błędem.
+  // pojawienia się, fade-in 0,3 s; miejsce jest zarezerwowane od READY), hide (zdarzenie zniknięcia, fade-out 0,3 s;
+  // miejsce zostaje — np. średnik końca linii, gdy dopisujemy dalszy ciąg wywołania) i active ([{from,to}] — selektory
+  // zdarzeń, w których fragment świeci mocniej). Selektory działają jak w postojach; nierozwiązany jest błędem.
   const eventTime=(selector,label)=>{
     const {offset=0,last=false,...match}=selector;
     const matches=events.filter(e=>Object.entries(match).every(([key,value])=>e[key]===value)),found=last?matches.at(-1):matches[0];
@@ -156,6 +158,7 @@ export function compileScene(scene) {
     {from:eventTime(n.laneFallback.from,'fallback'),to:eventTime(n.laneFallback.to,'fallback')}]));
   const codeLines=(scene.codeLines||[]).map(line=>line.map(segment=>({...segment,
     shownAt:segment.show?eventTime(segment.show,'fragment kodu'):0,
+    ...(segment.hide?{hiddenAt:eventTime(segment.hide,'ukrycie fragmentu kodu')}:{}),
     activeIntervals:(segment.active||[]).map(({from,to})=>[eventTime(from,'start wyróżnienia kodu'),eventTime(to,'koniec wyróżnienia kodu')])})));
   // graph.callouts: chwilowy napis zdarzenia (np. .subscribe() / .unsubscribe() z identyfikatorem toru) w przedziale
   // od zdarzenia from do zdarzenia to (selektory jak w postojach); fade-in 0,25 s, fade-out 0,3 s po końcu przedziału.
@@ -390,8 +393,22 @@ export function compileScene(scene) {
   function growingTile(n,time) {
     // growRows: kafelek rośnie z wierszami; bez flagi (odbiorca) ma stałą wysokość i jeden wiersz pod nagłówkiem defH.
     if(!n.laneSlots||!n.growRows)return {};
-    const rows=laneRowsOf(n,time),h=n.defH+rows.reduce((sum,row)=>sum+row.growth*n.rowH,0);
-    return {y:n.top+h/2,h,labelOffset:-h/2+n.defH/2,laneRows:rows,defH:n.defH};
+    const rows=laneRowsOf(n,time),own=ownExecutionsOf(n,time);
+    const h=n.defH+[...rows,...own].reduce((sum,row)=>sum+row.growth*n.rowH,0);
+    return {y:n.top+h/2,h,labelOffset:-h/2+n.defH/2,laneRows:rows,defH:n.defH,...(own.length?{executionRows:own}:{})};
+  }
+  // ownExecutions (opt-in, np. from(promise)): wykonanie rozpoczęte jawnie, bez subskrypcji — operacja ruszyła już
+  // przy tworzeniu Observable. Wiersz w stałym slocie (jak tory), postęp do settle, potem stan end.kind. Bez kabla,
+  // portów i odbiorcy; rysuje go ten sam wiersz wykonania co executionStack, z opcjonalnymi tekstami stanów (status).
+  function ownExecutionsOf(n,time) {
+    const smooth=value=>value*value*(3-2*value);
+    return (n.ownExecutions||[]).filter(x=>time>=x.start).map(x=>{
+      const growth=smooth(clamp((time-x.start)/rowGrowth)),ended=x.end&&time>=x.end.at;
+      const state=!ended?'running':x.end.kind==='complete'?'completed':x.end.kind==='error'?'error':'cancelled';
+      const settle=x.settle??x.end?.at??plan.duration;
+      return {id:x.id,rank:0,top:n.top+n.defH+x.slot*n.rowH,h:n.rowH*growth,growth,state,color:x.color,since:ended?x.end.at:x.start,
+        progress:ended?1:clamp((time-x.start)/Math.max(1e-9,settle-x.start)),...(x.status?.[state]?{status:x.status[state]}:{})};
+    });
   }
 
   // executionStack: kolejne wykonania jednego cold źródła pod wspólnym nagłówkiem. Najnowszy rekord zajmuje
@@ -437,7 +454,9 @@ export function compileScene(scene) {
       const logicalAt=e.logicalAt??e.at;
       const outputs=laneRecords.filter(r=>r.a.id===n.id).flatMap(out=>out.events.filter(v=>v.logicalAt===logicalAt&&v.at>=e.at)
         .map(v=>({value:v.value,color:v.color||'a',y:laneY(n,out.subscriber),at:v.at})));
-      const y=outputs.length?(Math.min(...outputs.map(o=>o.y))+Math.max(...outputs.map(o=>o.y)))/2:0;
+      // slot (opt-in): emisja startuje z konkretnego wiersza kafelka (np. wiersza wykonania), nie ze środka odbiorców.
+      const y=e.slot!==undefined?n.top+n.defH+(e.slot+.5)*n.rowH:
+        outputs.length?(Math.min(...outputs.map(o=>o.y))+Math.max(...outputs.map(o=>o.y)))/2:0;
       return outputs.length?{arrival:e.at,departure:Math.min(...outputs.map(o=>o.at)),value:e.value,color:e.color||'a',
         y,left,right,x:n.x,outputs,emitted:true}:null;
     });
@@ -676,8 +695,8 @@ export function compileScene(scene) {
     const reveal=codeReveals.find(frame=>frame.index===codeIndex)||codeReveals.find(frame=>frame.index===codeIndex+1);
     return {id:scene.id,title:scene.title,code:codeFrames.filter(frame=>frame.at<=time).at(-1)?.code??scene.code,...(scene.codeSyntax?{codeSyntax:true}:{}),
       ...(reveal?{codeReveal:{prefix:reveal.prefix,suffix:reveal.suffix,opacity:clamp((time-reveal.at)/reveal.duration)}}:{}),
-      ...(codeLines.length?{codeView:codeLines.map(line=>line.map(({text,mark,shownAt,activeIntervals})=>({text,mark,
-        opacity:shownAt?clamp((time-shownAt)/fadeDuration):1,active:activeIntervals.some(([from,to])=>time>=from&&time<to)})))}:{}),
+      ...(codeLines.length?{codeView:codeLines.map(line=>line.map(({text,mark,shownAt,hiddenAt,activeIntervals})=>({text,mark,
+        opacity:Math.min(shownAt?clamp((time-shownAt)/fadeDuration):1,hiddenAt===undefined?1:1-clamp((time-hiddenAt)/fadeDuration)),active:activeIntervals.some(([from,to])=>time>=from&&time<to)})))}:{}),
       width,height,textScale:graph.textScale??textScaleFor(scene),labelScale:graph.labelScale??labelScaleFor(scene),time,logicalTime,nodes:nodeStates,edges:edgeStates,tokens,histories,
       panels:(graph.panels||[]).map((panel,i)=>panelShownAt[i]===undefined?panel:{...panel,shownAt:panelShownAt[i],visible:time>=panelShownAt[i]}),cards:scene.kind==='cards'?scene.items:[],caption:captionAt(captions,time),
       ...(graph.ball?{ball:graph.ball}:{}),
@@ -694,6 +713,35 @@ export function compileScene(scene) {
       queue:graph.queue?evaluate(graph.queue,logicalTime):null};
   }
   return {duration:plan.duration,stops,checkpoints,events,plan,snapshot};
+}
+
+// scene.phases (opt-in): kolejne, niezależne stany jednego diagramu (np. from → defer) na wspólnej osi czasu.
+// Każda faza jest pełną sceną (graph, code, rows, captions, metrics, duration) kompilowaną osobno; postoje sceny
+// wskazują fazę (stop.scenePhase). Snapshot wybiera wyłącznie aktywną fazę, więc po przejściu nie zostaje żaden stan
+// poprzedniej: tory, wykonania, historie i liczniki zaczynają od zera. snapshot.time pozostaje czasem fazy.
+function compilePhases(scene) {
+  const stops=scene.playback?.stops||[];
+  for(const stop of stops)if(!scene.phases.some(phase=>phase.name===stop.scenePhase))throw new Error(`${scene.id}: postój ${stop.id} bez fazy`);
+  let offset=0;
+  const parts=scene.phases.map(({name,...phase})=>{
+    const compiled=compileScene({...scene,...phase,id:scene.id,phases:undefined,checkpoints:phase.checkpoints||[],
+      playback:{...scene.playback,stops:stops.filter(stop=>stop.scenePhase===name)}});
+    const part={name,offset,compiled};offset=+(offset+compiled.duration).toFixed(6);return part;
+  });
+  const partAt=time=>parts.findLast(part=>time>=part.offset)||parts[0];
+  const shift=(part,time)=>time+part.offset;
+  const records=new Map(parts.flatMap(part=>[...part.compiled.plan.records].map(([id,r])=>[id,{...r,phase:part.name}])));
+  return {duration:offset,
+    stops:parts.flatMap(part=>part.compiled.stops.map(stop=>({...stop,time:shift(part,stop.time)}))),
+    checkpoints:[...new Set(parts.flatMap(part=>[part.offset,...part.compiled.checkpoints.map(t=>shift(part,t))]).concat(offset))]
+      .filter(t=>t>=0&&t<=offset).sort((a,b)=>a-b),
+    events:parts.flatMap(part=>part.compiled.events.map(e=>({...e,id:`${part.name}:${e.id}`,at:shift(part,e.at),phase:part.name}))),
+    plan:{duration:offset,records,phases:parts.map(part=>({name:part.name,offset:part.offset,duration:part.compiled.duration,plan:part.compiled.plan}))},
+    snapshot(time){
+      time=clamp(time,0,offset);
+      const part=partAt(time);
+      return {...part.compiled.snapshot(time-part.offset),phase:part.name,sceneTime:time};
+    }};
 }
 
 // Jawne tempo ilustracji jest danymi, przydatnymi np. w synchronicznej transformacji.

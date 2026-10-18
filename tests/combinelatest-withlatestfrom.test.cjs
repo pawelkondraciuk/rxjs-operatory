@@ -122,7 +122,7 @@ test('manual/auto rewind, notes, order and return link remain correct',async()=>
  controller.reset();player.playContinuously();h.advance(30000);
  assert.equal(player.state,'finished');assert.deepEqual(values(player.snapshot,'s1'),['[42, PL]','[42, EN]','[43, EN]']);
  const sc=await modules(['scene-config']),order=Array.from(sc['scene-config'].extraOrder);
- assert.deepEqual(order,['x01-sharereplay-interval',id,'x03-retry-backoff']);assert.ok(!sc['scene-config'].mainOrder.includes(id));
+ assert.deepEqual(order,['x01-sharereplay-interval',id,'x03-retry-backoff','x04-defer']);assert.ok(!sc['scene-config'].mainOrder.includes(id));
  const html=fs.readFileSync('index.html','utf8');
  assert.ok(html.indexOf(`<section id="${id}"`)>html.indexOf('<section id="x01-sharereplay-interval"'));
  const template=html.match(new RegExp(`<template data-checkpoint-notes="${id}">([\\s\\S]*?)</template>`))[1];

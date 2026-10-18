@@ -293,13 +293,14 @@ function laneTerminalLabel(n,lane,k,frame,reduced) {
   const status=[n.laneTerminalText[lane.state]??base[0],base[1]];
   const at=lane.statusAt??lane.since,opacity=reduced?1:clamp((frame.time-at)/.3);
   if(opacity<=0)return '';
-  // Szacunek szerokości dla Arial (pogrubiony): ~0,56 em na znak statusu, ~0,52 em na znak wartości pola.
+  // Szacunek szerokości dla Arial (pogrubiony): ~0,56 em na znak statusu, ~0,58 em na znak wartości pola (z zapasem —
+  // „Kondraciuk” ma ~5,5 em i przenosi status do linii etykiety, „Białystok” zostaje w linii wartości).
   const size=16*k,right=n.x+n.w/2-14*k,width=Array.from(status[0]).length*.56*size;
   const field=frame.histories?.find(h=>h.anchor===n.id&&h.field);
   let y=lane.y;
   if(field) {
     const shown=field.values?.length?field.field.value:field.failed?field.field.error:'';
-    y=field.x+Array.from(String(shown)).length*.52*22*k+12*k<=right-width?field.y+14*k:field.y-16*k;
+    y=field.x+Array.from(String(shown)).length*.58*22*k+12*k<=right-width?field.y+14*k:field.y-16*k;
   }
   return text(right,y,status[0],size,
     `data-lane-terminal="${lane.state}" opacity="${opacity.toFixed(3)}" style="font-weight:700;fill:${status[1]};text-anchor:end"`);
@@ -404,7 +405,7 @@ export function renderScene(frame,options={}) {
     // a zakończone próby pozostają poniżej jako historia. Pozycje i wzrost pochodzą z deterministycznego snapshotu.
     for(const row of n.executionRows||[]) {
       const left=n.x-n.w/2,h=Math.max(0,row.h-1),stateFill={completed:'#DDF1E1',error:'#F7D9D9',cancelled:'#E7E8E8'}[row.state]||n.runtimeFill||'#fff';
-      const status={subscribing:'subskrybuje',running:'w trakcie',completed:'✓ complete',error:'! error',cancelled:'× odłączono'}[row.state];
+      const status=row.status??{subscribing:'subskrybuje',running:'w trakcie',completed:'✓ complete',error:'! error',cancelled:'× odłączono'}[row.state];
       const ink={completed:'#087438',error:'#9B1C28',cancelled:'#5B6670'}[row.state]||'#26323B';
       svg+=`<g data-execution-row="${esc(row.id)}" data-row-rank="${row.rank.toFixed(4)}" data-row-state="${row.state}" opacity="${row.growth.toFixed(3)}">`;
       svg+=`<rect x="${left+1}" y="${row.top}" width="${n.w-2}" height="${h}" fill="${stateFill}"/>`;

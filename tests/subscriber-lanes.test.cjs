@@ -1,5 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
-const {modules}=require('./v2-harness.cjs');
+const {modules,playbackHarness}=require('./v2-harness.cjs');
 
 // mode: wymuszony lanesMode na kopii sceny (share-unsub — share za map z unsubscribe A; nie jest już slajdem MAIN,
 // ale ścieżka lanesGraph nadal obsługuje scenariusze shareScenario).
@@ -15,7 +15,7 @@ async function lanes(format='4:3',id='04a-dwa-tory',mode){
  let scene=m.presentation.prepareSlides(m.catalog.scenes,{format}).get(id);
  if(mode){scene={...scene,lanesMode:mode};m['reference-scenes'].configureLanes(scene);}
  const c=m.engine.compileScene(scene);
- return {c,render:m.renderer.renderScene,at:id=>c.stops.find(s=>s.id===id).time};
+ return {c,scene,render:m.renderer.renderScene,at:id=>c.stops.find(s=>s.id===id).time};
 }
 const node=(frame,id)=>frame.nodes.find(n=>n.id===id);
 const dots=(frame,id)=>Array.from(node(frame,id).socketDots,d=>d.side+d.subscriber).sort();
@@ -180,32 +180,64 @@ test('callouts also support a manual .unsubscribe() during the cancel animation 
  assert.equal(c.snapshot(ev('stream-complete','share-B')+.1).callouts?.length||0,0,'complete B bez napisu');
 });
 
-test('share(): HTTP GET → share() → A/B/C — A starts the only request, B and C join at share(), one User reaches all three',async()=>{
+const shareStops=['share-added','subscribed-a','joined-b','joined-c','multicast','complete'];
+test('share(): READY has HTTP GET and three empty fields; the first step reveals share() and .pipe(share()) without a request',async()=>{
+ for(const format of ['4:3','16:9']){
+  const {c,at,render}=await lanes(format,'04a-dwa-tory-2');
+  assert.deepEqual(Array.from(c.stops,s=>s.id),shareStops);
+  const ready=c.snapshot(0);
+  assert.deepEqual(Array.from(ready.nodes.filter(n=>n.opacity>0),n=>n.id),['http','A','B','C'],'READY: HTTP GET i trzy pola, bez share()');
+  assert.ok(!ready.nodes.some(n=>n.id==='map'),'bez map');
+  assert.equal(node(ready,'share').opacity,0);
+  assert.ok(ready.nodes.every(n=>!(n.laneRows||[]).length||n.id==='A'||n.id==='B'||n.id==='C'),'bez execution lanes');
+  assert.equal(node(ready,'http').laneRows.length,0);assert.equal(node(ready,'share').laneRows.length,0);
+  assert.ok(ready.edges.every(e=>!e.visible),'bez połączeń');assert.equal(ready.tokens.length,0);
+  assert.equal(ready.metrics.find(m=>m.label==='Requesty HTTP').value,0);assert.equal(ready.metrics.find(m=>m.label==='Odbiorcy').value,0);
+  const svg=render(ready);
+  for(const [id,label] of [['A','user.firstName'],['B','user.lastName'],['C','user.city']]){
+   assert.match(fieldOf(svg,id),/data-field-state="empty"/);assert.match(fieldOf(svg,id),new RegExp(`>${label.replace('.','\\.')}</text>`));
+  }
+  const added=c.snapshot(at('share-added'));
+  assert.equal(node(added,'share').opacity,1,'share() pojawia się w pierwszym kroku');
+  assert.equal(node(added,'share').laneRows.length,0);assert.equal(node(added,'http').laneRows.length,0);
+  assert.ok(added.edges.every(e=>!e.visible),'nadal bez subskrypcji');
+  assert.equal(added.executionCounts.started,0);
+  assert.ok(c.events.filter(e=>e.type==='subscribe').every(e=>e.at>at('share-added')),'definicja nie subskrybuje');
+  for(const n of added.nodes){const r=node(ready,n.id);for(const key of ['x','top','w'])assert.equal(n[key],r[key],`${format} ${n.id}.${key} stały`);}
+ }
+});
+
+test('share(): A starts the only request #1, B joins the running share() (manual pause), C joins later; one User and complete reach all three',async()=>{
  for(const format of ['4:3','16:9']){
   const {c,at,render}=await lanes(format,'04a-dwa-tory-2');
   const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge)?.at;
-  assert.deepEqual(Array.from(c.stops,s=>s.id),['subscribed-a','joined','multicast','complete']);
-  const ready=c.snapshot(0);
-  assert.deepEqual(Array.from(ready.nodes.filter(n=>n.opacity>0),n=>n.id),['http','share'],'READY: same nagłówki definicji');
-  assert.ok(!ready.nodes.some(n=>n.id==='map'),'bez map');
-  assert.equal(node(ready,'http').laneRows.length,0);assert.equal(ready.metrics.find(m=>m.label==='Requesty HTTP').value,0);
   const a=c.snapshot(at('subscribed-a'));
   assert.deepEqual(lanesOf(a,'http'),['work:U1:running']);assert.deepEqual(lanesOf(a,'share'),['operator:A:running']);
-  assert.ok(ev('subscribe','share-A')<ev('subscribe','http-share'),'impuls A biegnie przez share() do HTTP');
+  assert.equal(node(a,'http').laneStates[0].label,'#1');
+  assert.ok(ev('connected','share-A')<=ev('subscribe','http-share'),'impuls A biegnie przez share() do HTTP');
   assert.equal(a.metrics.find(m=>m.label==='Requesty HTTP').value,1);
-  const j=c.snapshot(at('joined')),progressA=node(a,'http').laneStates[0].progress,progressJ=node(j,'http').laneStates[0].progress;
-  assert.deepEqual(lanesOf(j,'http'),['work:U1:running'],'B i C nie dodają wiersza HTTP');
-  assert.ok(progressJ>progressA&&progressJ<1,'ten sam request trwa dalej, bez resetu postępu');
+  // Najważniejszy kadr: A i B aktywni, C nie, HTTP #1 nadal pracuje — jedno wykonanie upstream.
+  const b=c.snapshot(at('joined-b')),progress=f=>node(f,'http').laneStates[0].progress;
+  assert.deepEqual(lanesOf(b,'share'),['operator:A:running','operator:B:running']);
+  assert.deepEqual(lanesOf(b,'http'),['work:U1:running'],'B nie dodaje wiersza HTTP');
+  assert.ok(progress(b)>progress(a)&&progress(b)<.7,'ten sam request trwa, postęp widoczny');
+  assert.equal(b.edges.find(e=>e.id==='share-C').visible,false,'C jeszcze nie subskrybuje');
+  assert.deepEqual(dots(b,'share'),['inU1','outA','outB']);
+  assert.equal(b.executionCounts.started,1);assert.equal(b.executionCounts.active,1);
+  assert.equal(b.metrics.find(m=>m.label==='Odbiorcy').value,2);
+  assert.ok(ev('connected','share-B')<at('joined-b')&&at('joined-b')<ev('subscribe','share-C'),'postój po dotarciu B, przed subscribe C');
+  assert.equal(c.events.filter(e=>e.type==='subscribe'&&e.edge==='http-share').length,1,'B i C nie subskrybują HTTP');
+  const j=c.snapshot(at('joined-c'));
+  assert.deepEqual(lanesOf(j,'http'),['work:U1:running']);assert.ok(progress(j)>progress(b)&&progress(j)<1);
   assert.deepEqual(lanesOf(j,'share'),['operator:A:running','operator:B:running','operator:C:running']);
   assert.deepEqual(Array.from(node(j,'share').laneRows,r=>r.subscriber+':'+r.stripe),['A:#7457D9','B:#7457D9','C:#7457D9'],'lewy pasek = kolor wspólnego upstreamu');
   assert.deepEqual(dots(j,'share'),['inU1','outA','outB','outC'],'jedno wejście, osobne wyjścia');
-  assert.equal(c.events.filter(e=>e.type==='subscribe'&&e.edge==='http-share').length,1,'B i C nie subskrybują HTTP');
   assert.ok(ev('connected','share-C')<ev('source-next','http-share'),'C dołącza przed emisją HTTP');
   assert.equal(j.metrics.find(m=>m.label==='Requesty HTTP').value,1);assert.equal(j.metrics.find(m=>m.label==='Odbiorcy').value,3);
-  // Porty share() nie przesuwają się po dołączeniu B i C.
   const port=(f,side,id)=>node(f,'share').socketDots.find(d=>d.side===side&&d.subscriber===id).y;
-  assert.equal(port(j,'in','U1'),port(a,'in','U1'));assert.equal(port(j,'out','A'),port(a,'out','A'));
+  assert.equal(port(j,'in','U1'),port(a,'in','U1'));assert.equal(port(j,'out','A'),port(a,'out','A'));assert.equal(port(j,'out','B'),port(b,'out','B'));
   // Jedna kulka User wchodzi do share(), trzy identyczne wychodzą jednocześnie.
+  assert.equal(c.events.filter(e=>e.type==='source-next'&&e.node==='http').length,1,'jedna emisja HTTP');
   assert.equal(ev('source-next','share-A'),ev('source-next','share-C'),'wspólny wylot');
   const mid=ev('source-next','share-A')+.3,balls=c.snapshot(mid).tokens.filter(t=>t.value==='{…}');
   assert.equal(balls.length,3);assert.equal(new Set(balls.map(t=>t.color)).size,1,'ten sam kolor');
@@ -218,6 +250,9 @@ test('share(): HTTP GET → share() → A/B/C — A starts the only request, B a
   for(const id of ['http','share','A','B','C'])assert.ok(node(done,id).laneStates.every(l=>l.state==='completed'),id+': completed');
   assert.ok(['http-share','share-A','share-B','share-C'].every(e=>ev('stream-complete',e)!==undefined),'complete dociera do A, B i C');
   assert.equal(c.events.filter(e=>e.type==='inner-unsubscribe').length,0,'bez unsubscribe');
+  const doneSvg=render(done);
+  assert.equal((doneSvg.match(/data-lane-terminal="completed"[^>]*>✓ complete</g)||[]).length,3,'✓ complete przy A, B i C');
+  assert.doesNotMatch(render(c.snapshot(ev('disconnected','share-A')-.01)),/data-lane-terminal/,'status po dotarciu impulsu');
   const end=c.snapshot(c.duration);
   assert.equal(end.metrics.find(m=>m.label==='Requesty HTTP').value,1);assert.equal(node(end,'http').laneRows.length,1);
   assert.ok(end.nodes.every(n=>n.y+n.h/2<=end.height),format+': mieści się w ramce');
@@ -225,17 +260,48 @@ test('share(): HTTP GET → share() → A/B/C — A starts the only request, B a
   // Te same pola i ta sama geometria co Cold i Subject + HTTP.
   const cold=(await lanes(format)).c.snapshot(0);
   for(const id of ['A','B','C']){assert.equal(node(end,id).x,node(cold,id).x);assert.equal(node(end,id).y,node(cold,id).y);}
-  // Cofanie: wcześniejszy kadr jest deterministyczny i nie zna przyszłości.
-  const back=c.snapshot(at('joined'));
-  assert.deepEqual(Array.from(back.histories,h=>h.values.length),[0,0,0]);assert.deepEqual(lanesOf(back,'share'),lanesOf(j,'share'));
+  // Cofanie: wcześniejszy kadr jest deterministyczny, nie zna przyszłości i nigdy nie ma drugiego requestu.
+  for(const time of [0,...c.stops.map(s=>s.time),c.duration]){
+   const expected=JSON.stringify(c.snapshot(time));c.snapshot(c.duration);c.snapshot(0);assert.equal(JSON.stringify(c.snapshot(time)),expected);
+   assert.ok(c.snapshot(time).executionCounts.started<=1);
+  }
+  const back=c.snapshot(at('joined-b'));
+  assert.deepEqual(Array.from(back.histories,h=>h.values.length),[0,0,0]);assert.deepEqual(lanesOf(back,'share'),lanesOf(b,'share'));
  }
 });
 
-test('share(): code is only user$ = http.get<User>(...).pipe(share()) with marks; transient .subscribe() A to HTTP, B and C only to share()',async()=>{
- const {c,at}=await lanes('4:3','04a-dwa-tory-2');
- const code=Array.from(c.snapshot(0).codeView,line=>Array.from(line,p=>p.text).join('')).join('\n');
- assert.equal(code,"const user$ = http.get<User>('/api/users/42')\n  .pipe(share());");
- assert.deepEqual(Array.from(c.snapshot(0).codeView).flat().filter(p=>p.mark).map(p=>p.mark.id),['http','share']);
+test('share(): MANUAL holds joined-b indefinitely without finishing HTTP; AUTO keeps A → B → C → User → complete; reset returns to READY',async()=>{
+ const {scene,c}=await lanes('4:3','04a-dwa-tory-2');
+ const h=await playbackHarness(),{player,controller}=h.create({scene});
+ const order=[];
+ for(const stop of player.stops){controller.next();h.advance(30000);assert.equal(player.time,stop.time);assert.equal(player.isPlaying,false);order.push(stop.id);
+  if(stop.id==='joined-b'){
+   const frame=JSON.stringify(player.snapshot);h.advance(120000);
+   assert.equal(JSON.stringify(player.snapshot),frame,'długa pauza nie zmienia kadru');
+   assert.equal(player.snapshot.nodes.find(n=>n.id==='http').laneStates[0].state,'running','HTTP #1 nadal trwa');
+  }}
+ assert.deepEqual(order,shareStops);
+ controller.next();h.advance(30000);assert.equal(player.state,'finished');assert.equal(h.frames.size,0);
+ controller.previous();assert.equal(player.time,player.stops.at(-1).time);
+ controller.reset();assert.equal(player.time,0);assert.equal(player.snapshot.executionCounts.started,0);
+ controller.setMode('manual');controller.setMode('auto');h.advance(30000);assert.equal(player.state,'finished');
+ assert.equal(player.snapshot.executionCounts.started,1,'AUTO: nadal jeden request');
+ const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at;
+ assert.ok(ev('connected','share-A')<ev('connected','share-B')&&ev('connected','share-B')<ev('connected','share-C')
+  &&ev('connected','share-C')<ev('source-next','http-share')&&ev('deliver-next','share-C')<ev('stream-complete','http-share'));
+});
+
+test('share(): code grows from user$ = http.get<User>(...) to .pipe(share()) with marks; transient .subscribe() A to HTTP, B and C only to share()',async()=>{
+ const {c,at,scene}=await lanes('4:3','04a-dwa-tory-2');
+ const text=(frame,visible)=>Array.from(frame.codeView,line=>Array.from(line).filter(p=>!visible||p.opacity>0).map(p=>p.text).join('')).join('\n');
+ assert.equal(text(c.snapshot(0)),"const user$ = http.get<User>('/api/users/42');\n  .pipe(share());",'miejsce na obie linie od READY');
+ assert.equal(text(c.snapshot(0),true),"const user$ = http.get<User>('/api/users/42');\n",'READY: sama definicja user$');
+ assert.equal(text(c.snapshot(at('share-added')),true),"const user$ = http.get<User>('/api/users/42')\n  .pipe(share());",'średnik gaśnie, dochodzi .pipe(share())');
+ assert.match(scene.playerClass,/rx-code-steps/,'układ kodu jak w Subject + HTTP');
+ const marks=Array.from(c.snapshot(0).codeView).flat().filter(p=>p.mark);
+ assert.deepEqual(marks.map(p=>p.mark.id),['http','share']);
+ assert.deepEqual({...marks[0].mark},{id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'});
+ assert.deepEqual({...marks[1].mark},{id:'share',bg:'rgba(216,179,230,.45)',line:'#b384c6'});
  const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at,shown=t=>Array.from(c.snapshot(t).callouts||[],x=>x.text+' '+x.label);
  const active=t=>Array.from(c.snapshot(t).codeView).flat().filter(p=>p.active).map(p=>p.mark.id);
  assert.deepEqual(active((ev('source-next','http-share')+ev('deliver-next','http-share'))/2),['http']);
@@ -244,7 +310,7 @@ test('share(): code is only user$ = http.get<User>(...).pipe(share()) with marks
  assert.deepEqual(shown((ev('subscribe','share-B')+ev('connected','share-B'))/2),['.subscribe() B']);
  assert.deepEqual(shown((ev('subscribe','share-C')+ev('connected','share-C'))/2),['.subscribe() C']);
  for(let t=0;t<c.duration;t+=.05)assert.ok(shown(t).length<=1,'napisy subscribe nie nakładają się');
- for(const id of ['subscribed-a','joined','multicast','complete'])assert.deepEqual(shown(at(id)),[]);
+ for(const id of shareStops)assert.deepEqual(shown(at(id)),[]);
 });
 
 test('share(): checkpoint notes for READY, every manual stop and the handoff',async()=>{
@@ -254,8 +320,10 @@ test('share(): checkpoint notes for READY, every manual stop and the handoff',as
  const notes=Object.fromEntries([...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)].map(([,id,text])=>[id,text]));
  assert.deepEqual(Object.keys(notes),['ready',...Array.from(c.stops,s=>s.id),'finished']);
  assert.match(notes.ready,/Ten sam przykład co w Cold/);
+ assert.match(notes['share-added'],/\.pipe\(share\(\)\)[\s\S]*nadal tylko definicja/);
  assert.match(notes['subscribed-a'],/Share automatycznie subskrybuje HTTP i uruchamia request/);
- assert.match(notes.joined,/ich subskrypcje kończą się na share\. HTTP nadal wykonuje się tylko raz/);
+ assert.match(notes['joined-b'],/B dołącza do istniejącego share\. Nie subskrybujemy ponownie HTTP\. Obaj odbiorcy korzystają z tego samego wykonania/);
+ assert.match(notes['joined-c'],/wszystkie trzy subskrypcje kończą się na share\. HTTP nadal wykonuje się tylko raz/);
  assert.match(notes.multicast,/ten sam obiekt do wszystkich trzech odbiorców, dokładnie tak jak wcześniej Subject/);
  assert.match(notes.complete,/Jeden request zamiast trzech/);
  assert.match(notes.finished,/Share współdzieli request automatycznie\. Ale współdzielenie to nie wszystko\. Co dzieje się ze źródłem, gdy odbiorcy rezygnują\?/);

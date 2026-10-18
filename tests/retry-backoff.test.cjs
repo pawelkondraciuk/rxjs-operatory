@@ -110,7 +110,7 @@ test('MANUAL: next during a countdown finishes the stage; rewind/reset are deter
  const auto=await playbackHarness(),autoRun=auto.create({scene});
  autoRun.controller.setMode('auto');auto.advance(27000);
  assert.equal(autoRun.player.state,'finished');assert.equal(autoRun.player.snapshot.executionCounts.started,4);
- assert.equal(Array.from(m['scene-config'].extraOrder).at(-1),id);
+ assert.deepEqual(Array.from(m['scene-config'].extraOrder).slice(-2),[id,'x04-defer']);
  const html=fs.readFileSync('index.html','utf8');
  for(const checkpoint of ['ready','request-1','error-1','request-2','error-2','request-3','error-3','request-4','success','summary','finished'])
   assert.match(html,new RegExp(`data-checkpoint="${checkpoint}"`));

@@ -302,39 +302,49 @@ export function configureLanes(scene) {
   if(scene.shareScenario)Object.assign(scene,{captions:[],playback:{entry:'auto',finish:'hold'}});
 }
 
-// share() (04a-dwa-tory-2): kontynuacja Cold → Subject. Ten sam wygląd co Subject + HTTP (kolumny 177/517, pola
-// widoku A/B/C z Cold), ale bez ręcznego podłączania: pierwszy Subscriber A przez share() uruchamia jedyne HTTP (tor #1
-// w kolorze A — wykonanie zainicjowane przez A, zarządzane przez share), B i C dołączają w trakcie requestu i ich
-// subskrypcje kończą się na share(). Jedna kulka User rozdziela się na porcie share() na trzy identyczne powiadomienia
-// next (kolor wspólnego wykonania), jedno complete trafia do A, B i C. Bez map, unsubscribe i ponownego requestu.
-const shareFieldTimes={a:1,b:2.6,c:3.2,response:5,complete:6};
+// share() (04a-dwa-tory-2): kontynuacja Cold → Subject. Ten sam wygląd i narracja co Subject + HTTP (kolumny 177/517,
+// pola widoku A/B/C z Cold), ale bez ręcznego podłączania. READY: definicja user$ (nagłówek HTTP GET) i trzy puste pola;
+// pierwszy krok dopisuje .pipe(share()) i ujawnia kafelek share(). Pierwszy Subscriber A przez share() uruchamia jedyne
+// HTTP (tor #1 w kolorze A — wykonanie zainicjowane przez A, zarządzane przez share); B, a potem C dołączają w trakcie
+// requestu i ich subskrypcje kończą się na share(). Jedna kulka User rozdziela się na porcie share() na trzy identyczne
+// powiadomienia next (kolor wspólnego wykonania), jedno complete trafia do A, B i C. Bez map, unsubscribe i ponownego
+// requestu. Jawny harmonogram (czas ilustracji = czas modelu), jak w Subject + HTTP.
+const shareFieldTimes={born:.3,defined:.6,a:1.3,b:3.6,c:5.1,link:.8,response:7.6,travel:1,hold:1.2,complete:11.8,terminal:.8};
 const shareFields=coldFields.map(f=>({...f,edge:'share-'+f.id,start:shareFieldTimes[f.id.toLowerCase()]}));
 function configureShareFields(scene) {
-  const at=shareFieldTimes,ev=(type,edge)=>({type,edge}),during=(from,to)=>({from,to});
+  const t=shareFieldTimes,ev=(type,edge)=>({type,edge}),during=(from,to)=>({from,to});
+  const upstreamStart=t.a+t.link,arrival=t.response+t.travel,split=arrival+t.hold,delivered=split+t.travel;
+  const upstreamEnd=t.complete+t.terminal,downstreamEnd=upstreamEnd+t.terminal;
+  const at={...t,upstreamStart,arrival,split,delivered,upstreamEnd,downstreamEnd,duration:downstreamEnd+2.2};
   const http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},share={id:'share',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
-  const value=E(at.response,coldUserSymbol,laneSubscribers.A.fill);
-  // Kod łamany przed .pipe; http.get świeci podczas odpowiedzi, share() — przy rozesłaniu next i complete (jak Subject).
+  const value=E(at.response,coldUserSymbol,laneSubscribers.A.fill),defined={type:'node-create',node:'share'};
+  // Kod rośnie jak w Subject + HTTP: READY — sama definicja user$ ze średnikiem; z kafelkiem share() średnik gaśnie,
+  // a w zarezerwowanej drugiej linii pojawia się .pipe(share()). http.get świeci podczas odpowiedzi, share() — przy
+  // rozesłaniu next i complete (jak Subject).
   const lines=[[{text:'const user$ = '},{text:"http.get<User>('/api/users/42')",mark:http,
-      active:[during(ev('source-next','http-share'),ev('deliver-next','http-share'))]}],
-    [{text:'  .pipe('},{text:'share()',mark:share,active:[during(ev('deliver-next','http-share'),ev('source-next','share-A')),
-      during(ev('disconnected','http-share'),ev('disconnected','share-A'))]},{text:');'}]];
-  Object.assign(scene,{graph:shareFieldsGraph,shareFieldTimes:at,playerLayout:'function',duration:at.complete+2,ink:'#26323B',
-    title:'share(): jedno HTTP, trzech odbiorców',playerClass:'rx-lanes rx-flat-tiles',
+      active:[during(ev('source-next','http-share'),ev('deliver-next','http-share'))]},{text:';',hide:defined}],
+    [{text:'  .pipe(',show:defined},{text:'share()',mark:share,show:defined,active:[during(ev('deliver-next','http-share'),ev('source-next','share-A')),
+      during(ev('disconnected','http-share'),ev('disconnected','share-A'))]},{text:');',show:defined}]];
+  Object.assign(scene,{graph:shareFieldsGraph,shareFieldTimes:at,playerLayout:'function',duration:at.duration,ink:'#26323B',
+    title:'share(): jedno HTTP, trzech odbiorców',playerClass:'rx-lanes rx-flat-tiles rx-code-steps',
     code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
-    // Dwa przeskoki subscribe A (share → HTTP), B i C tylko jeden (do share).
-    timing:{subscribe:1.6,travel:1,transform:1.4,terminal:.8,gap:.5},
-    rows:[R('HTTP #1',[value],[B(at.a,at.response,'request')],{completeAt:at.complete}),
-      ...shareFields.map(f=>R(`Pole ${f.label}`,[value],[],{completeAt:at.complete}))],
-    captions:[[0,'user$ = http.get(...).pipe(share()): jedna definicja. Nic jeszcze nie działa'],
+    rows:[R('HTTP #1',[value],[B(upstreamStart,at.response,'request')],{completeAt:at.complete}),
+      ...shareFields.map(f=>R(`Pole ${f.label}`,[{...value,at:split}],[],{completeAt:upstreamEnd}))],
+    captions:[[0,'user$ = http.get(...): jedna definicja. Trzy pola czekają. Nic jeszcze nie działa'],
+      [at.born,'.pipe(share()) dodaje operator. Nadal nic nie działa'],
       [at.a,'A subskrybuje. share() sam podłącza się do HTTP i uruchamia jeden request'],
       [at.b,'B dołącza do share(). HTTP nadal wykonuje jeden request'],
       [at.c,'C też dołącza do share(). Nadal jeden request'],
       [at.response,'HTTP emituje jeden obiekt User. share() rozsyła go do A, B i C'],
       [at.complete,'complete przechodzi przez share() do A, B i C']],
-    metrics:[{label:'Odbiorcy',value:t=>shareFields.filter(f=>t>=f.start).length},{label:'Requesty HTTP',count:'started'}],
+    // Odbiorcy share(): subskrypcje zestawione (dotarły do share()).
+    metrics:[{label:'Odbiorcy',value:time=>shareFields.filter(f=>time>=f.start+at.link).length},{label:'Requesty HTTP',count:'started'}],
     playback:manual([
-      {id:'subscribed-a',event:ev('connected','http-share'),offset:.35,caption:'A subskrybuje. share() podłącza się do HTTP i uruchamia request'},
-      {id:'joined',event:ev('connected','share-C'),offset:.35,caption:'B i C dołączają. Ich subskrypcje kończą się na share(). HTTP nadal ma jeden request'},
+      {id:'share-added',event:defined,offset:at.defined,caption:'.pipe(share()): operator stoi między HTTP a polami. Nadal brak subskrypcji i requestu'},
+      {id:'subscribed-a',event:ev('connected','http-share'),offset:.35,caption:'A subskrybuje. share() podłącza się do HTTP i uruchamia request #1'},
+      // Najważniejszy kadr: A i B aktywni, C jeszcze nie, HTTP #1 nadal pracuje — jedno wykonanie upstream.
+      {id:'joined-b',event:ev('connected','share-B'),offset:.35,caption:'B dołącza do istniejącego share(). HTTP #1 trwa dalej — bez nowego requestu'},
+      {id:'joined-c',event:ev('connected','share-C'),offset:.35,caption:'C też dołącza do share(). Trzech odbiorców, nadal jeden request'},
       {id:'multicast',event:ev('deliver-next','share-C'),offset:.35,caption:'HTTP emituje jeden obiekt User. share() rozsyła go do A, B i C'},
       {id:'complete',event:ev('disconnected','share-C'),offset:.8,caption:'complete dociera przez share() do A, B i C. Jeden request, trzech odbiorców'},
     ]),
@@ -344,25 +354,35 @@ function configureShareFields(scene) {
 export function shareFieldsGraph(scene) {
   const tall=scene.format==='4:3',top=tall?178:102,at=scene.shareFieldTimes;
   // Kolumny jak w Subject + HTTP: HTTP GET 177/230, share() 517/230 (w miejscu Subject), pola A/B/C 960/436.
-  // Pola pojawiają się dopiero z subscribe (ready:false), wiersze rosną, gdy subskrypcja dociera do kafelka.
-  const g={httpX:177,httpW:230,shareX:517,shareW:230},fields=viewFields(top,{ready:false},shareFields);
-  const complete=end=>({at:end,kind:'complete'}),events=scene.rows[0].events;
+  // Pola istnieją od READY (puste, jak na Cold); wiersze share() rosną, gdy subskrypcja dociera do kafelka.
+  const g={httpX:177,httpW:230,shareX:517,shareW:230},fields=viewFields(top,{},shareFields);
+  const complete=(end,logicalAt=end)=>({at:end,logicalAt,kind:'complete',duration:at.terminal});
+  const value={value:coldUserSymbol,color:laneSubscribers.A.fill};
   return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball:viewFieldBall,
     // U1: wspólne wykonanie HTTP w kolorze A, który je uruchomił (konwencja share); B ma w share() lewy pasek tego koloru.
     subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,C:laneSubscribers.C,U1:{...laneSubscribers.A,label:'#1'}},
     nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,progressUntilNext:true,...laneTile('source',top,{U1:0},1)},
+      // share() pojawia się w pierwszym kroku (razem z .pipe(share())); geometria zarezerwowana od READY.
       // Wejście upstreamu na wysokości wiersza A (prosty kabel z #1); splitAt:0 — kulka rozdziela się na porcie wejściowym.
       {id:'share',x:g.shareX,w:g.shareW,label:'share()',color:'op',splitBalls:true,splitAt:0,splitGuides:false,hubFan:false,
-        ...laneTile('operator',top,{U1:0,...Object.fromEntries(shareFields.map(f=>[f.id,f.slot]))},shareFields.length)},
-      ...fields.nodes],
-    edges:[{id:'http-share',from:'http',to:'share',subscriber:'U1',logicalStart:at.a,logicalEnd:complete(at.complete),events},
-      // Trzy powiadomienia jednej emisji: wspólny czas modelu i kolor, ten sam hold — wychodzą z share() jednocześnie.
-      ...shareFields.map(f=>({id:f.edge,from:'share',to:f.id,subscriber:f.id,logicalStart:f.start,logicalEnd:complete(at.complete),hold:1.2,events}))],
-    executions:[{id:'http-1',node:'http',edge:'http-share',duration:at.response-at.a}],
+        ...laneTile('operator',top,{U1:0,...Object.fromEntries(shareFields.map(f=>[f.id,f.slot]))},shareFields.length),ready:false,born:at.born},
+      // Status ✓ complete przy polach po dotarciu zielonego impulsu (jak na Cold).
+      ...fields.nodes.map(n=>({...n,laneTerminalText:true}))],
+    // logicalStart upstreamu = chwila subscribe A: inicjator dołącza wtedy, gdy share() otwiera wykonanie #1 (lewy pasek
+    // wiersza A w kolorze upstreamu, jak B i C); harmonogram ilustracji startuje po dotarciu A do share().
+    edges:[{id:'http-share',from:'http',to:'share',subscriber:'U1',logicalStart:at.a,fixedStart:true,logicalEnd:complete(at.complete)},
+      ...shareFields.map(f=>({id:f.edge,from:'share',to:f.id,subscriber:f.id,logicalStart:f.start,fixedStart:true,logicalEnd:complete(at.upstreamEnd)}))],
+    // A: subscribe do share(), po zestawieniu share() subskrybuje HTTP (jedyne wykonanie). B i C kończą się na share().
+    // Trzy powiadomienia jednej emisji: wspólny czas i kolor — wychodzą z share() jednocześnie.
+    schedule:{'http-share':{start:at.upstreamStart,connectDuration:at.link,events:[{...value,at:at.response,arrival:at.arrival}],end:complete(at.complete)},
+      ...Object.fromEntries(shareFields.map(f=>[f.edge,{start:f.start,connectDuration:at.link,
+        events:[{...value,at:at.split,arrival:at.delivered,logicalAt:at.response}],end:complete(at.upstreamEnd)}]))},
+    executions:[{id:'http-1',node:'http',edge:'http-share',duration:at.response-at.upstreamStart}],
     trays:fields.trays,
-    // .subscribe() A trwa do dotarcia impulsu do HTTP, B i C — tylko do share() (upstream już działa).
-    callouts:[subscribeCallout('A','share-A','http-share',{x:960,y:top/2}),
-      ...shareFields.slice(1).map(f=>subscribeCallout(f.id,f.edge,f.edge,{x:960,y:top/2}))],
+    // .subscribe() A trwa do dotarcia impulsu do HTTP, B i C — tylko do share() (upstream już działa). Pola są widoczne
+    // od READY, więc napis startuje razem z subscribe (jak na Cold).
+    callouts:[laneCallout('.subscribe()','A',laneEvent('subscribe','share-A'),laneEvent('connected','http-share'),{x:960,y:top/2}),
+      ...shareFields.slice(1).map(f=>laneCallout('.subscribe()',f.id,laneEvent('subscribe',f.edge),laneEvent('connected',f.edge),{x:960,y:top/2}))],
     timeline:[{type:'share-summary',event:{type:'disconnected',edge:'share-C'},offset:1,
       caption:'Jeden request, trzech odbiorców. Bez ręcznego podłączania Subjecta do HTTP'}],
   };
@@ -1718,6 +1738,121 @@ function retryBackoffGraph(scene) {
     nodes,edges,schedule,trays:[laneTray('observer',receiver,1,ball)],subscribers:{A:laneSubscribers.A},
     executions:attempts.map((attempt,i)=>({id:`http-${i+1}`,node:'source',edge:`source-retry-${i+1}`,
       value:`#${i+1}`,label:`HTTP #${i+1}`,duration:attempt.end-attempt.start}))};
+}
+
+// defer (czwarty EXTRAS): kiedy naprawdę wywołuje się funkcja? Jeden diagram w dwóch fazach (scene.phases).
+// from(loadUser()): loadUser() wykonuje się przy tworzeniu Observable — HTTP #1 trwa już w READY (ownExecutions,
+// bez subskrypcji), A i B obserwują ten sam Promise i dostają ten sam User. defer(() => loadUser()): definicja nic
+// nie uruchamia; każda subskrypcja wywołuje fabrykę, więc A i B mają własne Promise i równoległe HTTP #1/#2.
+// Faza defer zaczyna od pustego diagramu: żadne wykonanie ani licznik nie przechodzi z fazy from.
+const deferPromise={color:'#2C8A9C',fill:'#bfe2e9',progress:'#bfe2e9',ink:'#1d6573',tint:'#e6f3f6',label:'#1'};
+const deferFields=coldFields.slice(0,2);
+const deferTimes={
+  from:{call:-.6,httpStart:-1,subscribe:{A:1,B:3.5},resolve:7.4,hold:1,travel:1.4,complete:10.4,duration:12.2},
+  defer:{born:.1,subscribe:{A:1.5,B:3.9},response:{A:7.5,B:11.4},travel:1.4,completeDelay:.6,summary:15,duration:15.6},
+  link:.8,terminal:.8,reveal:.3,callout:1.6,
+};
+export function configureDefer(scene) {
+  const t=deferTimes,f=t.from,d=t.defer,ev=(type,edge,offset)=>({type,edge,...(offset?{offset}:{})}),during=(from,to)=>({from,to});
+  const http={id:'load-user',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},defer={id:'defer',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
+  const settled=f.resolve+f.hold,delivered=settled+f.travel,fromDone=f.complete+t.link;
+  const done=id=>d.response[id]+d.travel+d.completeDelay,connected=id=>d.subscribe[id]+t.link;
+  const fromLines=[[{text:'const user$ = from('},{text:'loadUser()',mark:http,active:[during({type:'load-user-call'},{type:'promise-settled'})]},{text:');'}]];
+  const shown={type:'node-create',node:'defer'};
+  const deferLines=[[{text:'const user$ = ',show:shown},{text:'defer',mark:defer,show:shown,
+      active:['A','B'].map(id=>during(ev('connected','defer-'+id),ev('connected','defer-'+id,t.callout)))},
+    {text:'(() => ',show:shown},{text:'loadUser()',mark:http,show:shown,active:['A','B'].map(id=>during(ev('connected','defer-'+id),ev('source-next','defer-'+id)))},
+    {text:');',show:shown}]];
+  const text=lines=>lines.map(line=>line.map(part=>part.text).join('')).join('\n');
+  const user=(at,color)=>E(at,coldUserSymbol,color);
+  Object.assign(scene,{title:'defer — nie wywołuj mnie jeszcze',playerLayout:'function',playerClass:'rx-lanes rx-flat-tiles',ink:'#26323B',
+    deferTimes:{...t,fromDone,settled,delivered},duration:f.duration+d.duration,checkpoints:[],
+    code:text(fromLines),codeLines:fromLines,codeFrames:[],
+    rows:[R('HTTP #1 · from',[user(f.resolve,deferPromise.fill)],[B(f.httpStart,f.resolve,'request')],{completeAt:f.resolve}),
+      ...['A','B'].map(id=>R(`HTTP · defer ${id}`,[user(d.response[id],laneSubscribers[id].fill)],[B(connected(id),d.response[id],'request')],{completeAt:done(id)}))],
+    phases:[
+      {name:'from',duration:f.duration,graph:deferFromGraph,code:text(fromLines),codeLines:fromLines,codeFrames:[],
+        rows:[R('HTTP #1',[user(f.resolve,deferPromise.fill)],[B(f.httpStart,f.resolve,'request')],{completeAt:f.resolve}),
+          ...['A','B'].map(id=>R('Odbiorca '+id,[user(settled,deferPromise.fill)],[],{completeAt:f.complete}))],
+        captions:[[0,'from(loadUser()): loadUser() już się wykonało. HTTP #1 trwa, choć nikt nie subskrybuje'],
+          [f.subscribe.A,'A subskrybuje i obserwuje istniejący Promise. Bez nowego requestu'],
+          [f.subscribe.B,'B subskrybuje ten sam Observable — i ten sam Promise'],
+          [f.resolve,'Promise rozwiązany: from emituje ten sam User do A i B']],
+        metrics:[{label:'Wywołania loadUser()',value:()=>1},{label:'Requesty HTTP',value:()=>1}]},
+      {name:'defer',duration:d.duration,graph:deferFactoryGraph,code:text(deferLines),codeLines:deferLines,codeFrames:[],
+        rows:['A','B'].map(id=>R(`HTTP · ${id}`,[user(d.response[id],laneSubscribers[id].fill)],[B(connected(id),d.response[id],'request')],{completeAt:done(id)})),
+        captions:[[0,'defer(() => loadUser()): sama definicja. Funkcja nie została wywołana'],
+          [d.subscribe.A,'A subskrybuje: dopiero teraz defer wywołuje loadUser() — Promise A i HTTP #1'],
+          [d.subscribe.B,'B subskrybuje: defer wywołuje loadUser() drugi raz — Promise B i HTTP #2'],
+          [d.response.A,'HTTP #1 kończy się: A dostaje User i complete. HTTP #2 nadal trwa'],
+          [d.response.B,'HTTP #2 kończy się: B dostaje User i complete']],
+        metrics:[{label:'Wywołania loadUser()',value:time=>['A','B'].filter(id=>time>=connected(id)).length},{label:'Requesty HTTP',count:'started'}]},
+    ],
+    playback:{entry:'manual',finish:'hold',afterLastManualStop:'start-auto',controller:'stages',resetOnExit:true,stops:[
+      {id:'from-a',scenePhase:'from',event:ev('connected','from-A'),offset:.35,caption:'A subskrybuje istniejący Promise. Nadal jeden request HTTP'},
+      {id:'from-b',scenePhase:'from',event:ev('connected','from-B'),offset:.35,caption:'B subskrybuje ten sam Observable. loadUser() nie wykonuje się ponownie'},
+      // AUTO też tu staje: wynik from, zanim diagram przejdzie do defer.
+      {id:'from-complete',scenePhase:'from',event:ev('disconnected','from-B'),offset:.5,autoPause:true,
+        caption:'A i B: ten sam User i complete. loadUser() — 1 wywołanie, HTTP — 1 request'},
+      {id:'defer-definition',scenePhase:'defer',event:shown,offset:.6,autoPause:true,
+        caption:'defer(() => loadUser()): tylko definicja. Brak Promise, HTTP i odbiorców'},
+      {id:'defer-a',scenePhase:'defer',event:ev('connected','defer-A'),offset:.6,caption:'A subskrybuje: defer wywołuje loadUser(). Powstaje Promise A i HTTP #1'},
+      {id:'defer-b',scenePhase:'defer',event:ev('connected','defer-B'),offset:.6,caption:'B subskrybuje: drugie wywołanie loadUser(). HTTP #1 i HTTP #2 trwają równolegle'},
+      {id:'defer-a-complete',scenePhase:'defer',event:ev('disconnected','defer-A'),offset:.35,caption:'HTTP #1 rozwiązuje Promise A: A dostaje User i complete. B nadal czeka'},
+      {id:'defer-b-complete',scenePhase:'defer',event:ev('disconnected','defer-B'),offset:.35,caption:'HTTP #2 rozwiązuje Promise B: B dostaje User i complete'},
+      {id:'summary',scenePhase:'defer',event:{type:'defer-summary'},caption:'from: 1 wywołanie, 1 HTTP · defer: 2 wywołania, 2 HTTP — po jednym na subskrypcję'},
+    ]},
+  });
+}
+
+// Wspólny wygląd obu faz: kafelek źródła 302/500 (miejsce na etykietę defer(() => loadUser()) i wiersz wykonania),
+// pełnowymiarowe pola A/B 960/436 jak na Cold. Odbiorca pojawia się tuż przed swoim subscribe.
+function deferLayout(scene,slots) {
+  const tall=scene.format==='4:3',top=tall?178:102,fields=deferFields.map(f=>({...f,slot:slots[f.id]}));
+  const view=viewFields(top,{ready:false,laneTerminalText:true},fields);
+  return {top,tile:{x:302,w:500},view,
+    base:{layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball:viewFieldBall}};
+}
+function deferFromGraph(scene) {
+  const t=scene.deferTimes,f=t.from,{top,tile,view,base}=deferLayout(scene,{A:1,B:2});
+  const value={value:coldUserSymbol,color:deferPromise.fill,logicalAt:f.resolve};
+  const complete={at:f.complete,logicalAt:f.complete,kind:'complete',duration:t.link};
+  const ids=['A','B'];
+  return {...base,subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,P:deferPromise},
+    // HTTP #1 to wiersz wykonania rozpoczętego przy tworzeniu Observable (bez kabla i subskrypcji); A i B to wiersze
+    // subskrypcji, które tylko obserwują Promise. Rozwiązanie Promise: jedna kulka z wiersza #1 do portów A i B.
+    nodes:[{id:'source',...tile,label:'from(loadUser())',splitBalls:true,splitGuides:false,upstreamStripe:false,hubFan:false,
+        ownExecutions:[{id:'HTTP #1',slot:0,color:deferPromise.color,start:f.httpStart,settle:f.resolve,end:{at:f.resolve,kind:'complete'},
+          status:{running:'pending',completed:'✓ resolved'}}],
+        emits:[{at:f.resolve,value:coldUserSymbol,color:deferPromise.fill,slot:0}],
+        ...laneTile('source',top,{A:1,B:2},3)},
+      ...view.nodes.map(n=>({...n,born:f.subscribe[n.id]-t.reveal}))],
+    edges:ids.map(id=>({id:'from-'+id,from:'source',to:id,subscriber:id,logicalStart:f.subscribe[id],fixedStart:true,logicalEnd:{at:f.complete,kind:'complete'}})),
+    schedule:Object.fromEntries(ids.map(id=>['from-'+id,{start:f.subscribe[id],connectDuration:t.link,
+      events:[{...value,at:t.settled,arrival:t.delivered}],end:complete}])),
+    trays:view.trays,
+    callouts:[{...laneCallout('loadUser()','P',{type:'load-user-call'},laneEvent('subscribe','from-A',-.3),{x:tile.x,y:top/2}),label:'#1'},
+      ...ids.map(id=>laneCallout('.subscribe()',id,laneEvent('subscribe','from-'+id),laneEvent('connected','from-'+id),{x:960,y:top/2}))],
+    timeline:[{type:'load-user-call',at:f.call},{type:'promise-settled',at:f.resolve}],
+  };
+}
+function deferFactoryGraph(scene) {
+  const t=scene.deferTimes,d=t.defer,{top,tile,view,base}=deferLayout(scene,{A:0,B:1}),ids=['A','B'];
+  const complete=id=>{const at=d.response[id]+d.travel+d.completeDelay;return {at,logicalAt:at,kind:'complete',duration:t.link};};
+  return {...base,subscribers:{A:laneSubscribers.A,B:laneSubscribers.B},
+    // Każda subskrypcja wywołuje fabrykę: wiersz A/B to własne wykonanie HTTP (#1/#2), postęp od zestawienia do odpowiedzi.
+    nodes:[{id:'defer',...tile,label:'defer(() => loadUser())',workLanes:true,progressUntilNext:true,
+        ...laneTile('source',top,{A:0,B:1},2),ready:false,born:d.born},
+      ...view.nodes.map(n=>({...n,born:d.subscribe[n.id]-t.reveal}))],
+    edges:ids.map(id=>({id:'defer-'+id,from:'defer',to:id,subscriber:id,logicalStart:d.subscribe[id],fixedStart:true,logicalEnd:complete(id)})),
+    schedule:Object.fromEntries(ids.map(id=>['defer-'+id,{start:d.subscribe[id],connectDuration:t.link,
+      events:[{value:coldUserSymbol,color:laneSubscribers[id].fill,at:d.response[id],arrival:d.response[id]+d.travel}],end:complete(id)}])),
+    executions:ids.map((id,i)=>({id:`http-${i+1}`,node:'defer',edge:'defer-'+id,duration:d.response[id]-d.subscribe[id]})),
+    trays:view.trays,
+    callouts:ids.flatMap((id,i)=>[laneCallout('.subscribe()',id,laneEvent('subscribe','defer-'+id),laneEvent('connected','defer-'+id),{x:960,y:top/2}),
+      {...laneCallout('loadUser()',id,laneEvent('connected','defer-'+id),laneEvent('connected','defer-'+id,t.callout),{x:tile.x,y:top/2}),label:`#${i+1}`}]),
+    timeline:[{type:'defer-summary',at:d.summary,caption:'from(loadUser()): 1 wywołanie, 1 HTTP · defer(() => loadUser()): 2 wywołania, 2 HTTP'}],
+  };
 }
 
 // combineLatest (drugi EXTRAS): dwa kontrolowane źródła i lokalny stan jednego wykonania operatora.
