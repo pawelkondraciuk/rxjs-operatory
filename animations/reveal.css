@@ -23,13 +23,13 @@
 .rx-player .rx-stage svg { display:block; width:100%; height:100%; font-family:Arial,Helvetica,sans-serif; overflow:visible; }
 .rx-player svg text { fill:var(--ink); font-weight:500; }
 .rx-player [hidden] { display:none !important; }
-.rx-player .rx-summary { display:flex; gap:30px; align-items:center; border-top:2px solid #cabfaa; padding-top:12px; }
+.rx-player .rx-summary { display:flex; gap:30px; align-items:center; border-top:2px solid #cabfaa; padding-top:12px; padding-right:var(--rx-controls-reserve,0px); }
 .rx-player .rx-caption { flex:1; font-size:28px; line-height:1.25; }
 .rx-player .rx-metrics { display:flex; gap:24px; }
 .rx-player .rx-metrics:empty { display:none; }
 .rx-player .rx-metric { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; max-width:180px; font-size:22px; color:var(--muted); text-align:center; }
 .rx-player .rx-metric b { font-size:36px; color:var(--ink); font-variant-numeric:tabular-nums; }
-.rx-player .rx-toolbar { position:absolute; z-index:5; left:0; right:0; bottom:-84px; height:74px; display:flex; align-items:center; gap:12px; padding:10px 14px; background:#f5f0e7; border:2px solid #958875; box-shadow:0 2px 12px #16232b22; }
+.rx-player .rx-toolbar { position:absolute; z-index:5; left:0; right:var(--rx-controls-reserve,0px); bottom:-84px; height:74px; display:flex; align-items:center; gap:12px; padding:10px 14px; background:#f5f0e7; border:2px solid #958875; box-shadow:0 2px 12px #16232b22; }
 /* Format 16:9: dotychczasowa siatka 60/330/90 i 60/480/72 oraz rozmiary tekstu. */
 [data-ratio="16-9"] .rx-player { grid-template-rows:60px 330px 90px; height:480px; }
 [data-ratio="16-9"] .rx-player.rx-expanded, [data-ratio="16-9"] .rx-player.rx-function { grid-template-rows:60px 480px 72px; height:612px; }

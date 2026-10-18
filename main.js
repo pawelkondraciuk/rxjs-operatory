@@ -337,4 +337,14 @@ if (printMode) {
     playerFor(slide).finish();
   });
 }
-deck.initialize().then(() => { activate(deck.getCurrentSlide()); stageReveal.refresh(); });
+// Strzałki Reveal mają stały rozmiar w pikselach ekranu i nachodzą na prawy dół skalowanego slajdu (liczniki animacji).
+// Stopka odtwarzacza dostaje prawy margines równy tej części slajdu, którą zasłaniają; bez strzałek (druk, podgląd Notes) — 0.
+function reserveControls() {
+  const slides = document.querySelector('.reveal .slides').getBoundingClientRect();
+  const arrows = [...document.querySelectorAll('.reveal .controls :is(.navigate-left, .navigate-right)')]
+    .filter(button => button.offsetParent && getComputedStyle(button).display !== 'none').map(button => button.getBoundingClientRect().left);
+  const scale = slides.width / FORMATS[format].width, overlap = arrows.length ? slides.right - Math.min(...arrows) : 0;
+  document.documentElement.style.setProperty('--rx-controls-reserve', `${overlap > 0 ? Math.ceil(overlap / scale + 12) : 0}px`);
+}
+deck.on('resize', reserveControls);
+deck.initialize().then(() => { activate(deck.getCurrentSlide()); stageReveal.refresh(); reserveControls(); });
