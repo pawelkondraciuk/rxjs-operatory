@@ -11,7 +11,7 @@ async function family(){
  const m=await modules(['catalog','presentation','engine','renderer','prototype-scenes'],{document:{querySelectorAll:()=>slides}});
  return {scenes:m.presentation.prepareSlides(m.catalog.scenes),compile:m.engine.compileScene,render:m.renderer.renderScene,prototypes:m['prototype-scenes'].prototypeScenes};
 }
-const ids=['08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12a-complete','12a-complete-2','13-limit'];
+const ids=['08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap'];
 const history=(f,id)=>Array.from(f.histories.find(h=>h.anchor===id).values,e=>e.value);
 test('HTTP slides share the accepted panel and retain native Reveal playback',async()=>{
  const {scenes,compile,prototypes}=await family();
@@ -56,19 +56,6 @@ test('real mergeMap demonstrates chronological reception: B overlaps A and retur
  assert.match(c.snapshot(delivery.at).caption,/B wróciło przed A/);
  assert.ok(terminal('B')<terminal('A'));assert.equal(f.histories.find(h=>h.anchor==='observer').max,4);
 });
-test('complete outer waits for remaining work; concurrency limit never exceeds three subscriptions',async()=>{
- const {scenes,compile}=await family();
- for(const id of ['12a-complete','12a-complete-2']){
-  const c=compile(scenes.get(id)),source=c.events.find(e=>e.type==='stream-complete'&&e.edge==='source-op');
-  const f=c.snapshot(source.at+.81);
-  assert.equal(f.nodes.find(n=>n.id==='source').notification,'complete');assert.equal(f.nodes.find(n=>n.id==='observer').notification,null);
-  assert.ok(f.executionCounts.active>0);assert.equal(f.histories.find(h=>h.anchor==='source').columns,1);
- }
- const c=compile(scenes.get('13-limit'));let peak=0;
- for(const event of c.events){const f=c.snapshot(event.at+.001);peak=Math.max(peak,f.executionCounts.active);assert.ok(f.executionCounts.active<=3);}
- assert.equal(peak,3);assert.equal(c.snapshot(c.duration).executionCounts.started,5);
- assert.equal(c.snapshot(0).panels.find(p=>p.id==='jobs').slots,5);
-});
 test('migrated work bars continue during travel and snapshots survive reversing every transition',async()=>{
  const {scenes,compile}=await family();
  for(const id of ids){
@@ -100,11 +87,6 @@ test('source and flattening operator turn green at their own complete, not toget
    }else{assert.equal(ended.fill,'#087438');assert.equal(final.nodes.find(n=>n.id===nodeId).fill,'#087438');}
   }
  }
- const c=compile(scenes.get('12a-complete')),source=c.events.find(e=>e.type==='stream-complete'&&e.edge==='source-op');
- const f=c.snapshot(source.at);
- assert.equal(f.nodes.find(n=>n.id==='source').fill,'#087438');
- assert.notEqual(f.nodes.find(n=>n.id==='op').fill,'#087438');
- assert.ok(f.executionCounts.active>0);
 });
 
 test('unhandled error and cancellation cannot turn source or operator green',async()=>{

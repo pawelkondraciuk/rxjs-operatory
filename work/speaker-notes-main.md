@@ -2,7 +2,7 @@
 
 Pełny eksport notatek z `index.html` do weryfikacji. Zakres: **21 slajdów technicznych aktualnej ścieżki MAIN**, od pierwszego slajdu po „A share?” — „HTTP: od definicji do wykonania” — do „Cztery pytania przed kolejnym pipe”, przed „Pytania?”.
 
-Kolejność pochodzi z `mainOrder` w [animations/scene-config.js](../animations/scene-config.js). Tytuły pobrano z końcowych konfiguracji scen po rozwinięciu wariantów przez `prepareSlides`. Przykład `14-distinct` jest obecnie w EXTRAS i nie należy do tego eksportu.
+Kolejność pochodzi z `mainOrder` w [animations/scene-config.js](../animations/scene-config.js). Tytuły pobrano z końcowych konfiguracji scen po rozwinięciu wariantów przez `prepareSlides`.
 
 Eksport zachowuje oryginalne brzmienie wszystkich akapitów, w tym instrukcje prelegenta i opisy diagramów; zmieniono tylko format HTML na Markdown oraz białe znaki. Dla slajdów z szablonem checkpointów podano wszystkie etapy oraz osobno pełne bazowe notatki sekcji. W prezentacji notatki checkpointów zastępują bazowe. Dla pozostałych slajdów podano pełne wspólne notatki, także gdy opisują kilka wariantów.
 

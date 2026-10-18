@@ -511,23 +511,6 @@
                     </template>
 				</section>
 
-				<section id="06-subskrypcja" class="animation-slide" data-animation="06-subskrypcja">
-					<h2>Co uruchamia pracę?</h2>
-					<div class="rx-player" aria-label="Co uruchamia pracę?"></div>
-					<aside class="notes">
-						<p>Przykład dotyczy zimnego Observable z Angular HttpClient. Nie generalizuj leniwości na już uruchomiony Promise.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-
-				<section id="06a-cold-hot-2" class="animation-slide" data-extras data-animation="06a-cold-hot-2">
-					<h2>Hot: dołączasz do działającego źródła</h2>
-					<div class="rx-player" aria-label="Hot: dołączasz do działającego źródła"></div>
-					<aside class="notes">
-                        <p><strong>Hot — EXTRAS:</strong> Jeden timer działa niezależnie od odbiorców i nadaje przez zwykły Subject. B dołącza w 6 s i odbiera 2 w 7 s. Nie dostaje wcześniejszych wartości; hot nie oznacza replay.</p>
-                    </aside>
-				</section>
-
 				<section id="08-map-strumienie" class="animation-slide" data-animation="08-map-strumienie">
 					<h2>A jeśli wartością jest Observable?</h2>
 					<div class="rx-player" aria-label="A jeśli wartością jest Observable?"></div>
@@ -601,48 +584,6 @@
                     </template>
 				</section>
 
-
-
-
-
-				<section id="14-distinct" class="animation-slide" data-animation="14-distinct">
-					<h2>To samo ID — kolejny request?</h2>
-					<div class="rx-player" aria-label="To samo ID — kolejny request?"></div>
-					<aside class="notes"><p>Jeden potok id$ → distinctUntilChanged → switchMap → S1; emisje 42, 42, 43, 43, 42. distinctUntilChanged porównuje z ostatnią przepuszczoną wartością (domyślnie ===), osobno dla każdej subskrypcji. Powtórzenie gaśnie w operatorze — to nie jest error, complete ani unsubscribe. Nie powstaje inner, nie ma HTTP ani anulowania. 5 emisji, 3 requesty. To nie jest globalne usuwanie duplikatów.</p><p><strong>EXTRAS:</strong> drugi profil tego samego mechanizmu (bez anulowań, z animacją subscribe) — materiał do pytań. W MAIN distinctUntilChanged pokazuje 11a-distinct-switchmap po exhaustMap.</p></aside>
-					<template data-checkpoint-notes="14-distinct">
-                        <div data-checkpoint="ready"><p><strong>0 — Start</strong></p><p>Wiemy już, jak switchMap zarządza requestami. Ale co, jeśli dostanie kilka razy to samo ID?</p></div>
-                        <div data-checkpoint="subscribe"><p><strong>1 — subscribe()</strong></p><p>Powstaje lane S1. distinctUntilChanged nie ma jeszcze żadnej wartości — miejsce pamięci w jego lane jest puste.</p></div>
-                        <div data-checkpoint="first"><p><strong>2 — Pierwsze 42</strong></p><p>Nowa wartość przechodzi i uruchamia HTTP. Kulka 42 zostaje w lane operatora — to ostatnia przepuszczona wartość.</p></div>
-                        <div data-checkpoint="duplicate"><p><strong>3 — Drugie 42</strong></p><p>Wartość się nie zmieniła, więc distinctUntilChanged ją zatrzymuje. SwitchMap niczego nie anuluje.</p></div>
-                        <div data-checkpoint="second"><p><strong>4 — 43</strong></p><p>Nowe ID przechodzi i uruchamia kolejny request.</p></div>
-                        <div data-checkpoint="duplicate-2"><p><strong>5 — Drugie 43</strong></p><p>Znów odrzucamy duplikat.</p></div>
-                        <div data-checkpoint="again"><p><strong>6 — Powrót do 42</strong></p><p>Operator nie pamięta wszystkich historycznych wartości. Porównuje z ostatnią przepuszczoną — 43 — więc 42 przechodzi.</p></div>
-                        <div data-checkpoint="finished"><p><strong>7 — Koniec</strong></p><p>Pięć emisji, trzy requesty. Filtrujemy zbędną pracę, zanim w ogóle dotrze do switchMap.</p></div>
-                    </template>
-				</section>
-
-				<section id="15-debounce-audit" class="animation-slide" data-animation="15-debounce-audit">
-					<h2>Czekać na ciszę czy aktualizować w trakcie?</h2>
-					<div class="rx-player" aria-label="Czekać na ciszę czy aktualizować w trakcie?"></div>
-					<aside class="notes">
-						<p>Przykład trwającego źródła, bez complete i error podczas pokazu. W aplikacji czasy często będą krótsze. Audit otwiera okno zdarzeniem, a debounce czeka na ciszę. Throttle przepuszcza pierwszą wartość i pomija kolejne przez 3,5 s (domyślnie leading: true, trailing: false). Sample odlicza takty od subskrypcji i emituje tylko wtedy, gdy od poprzedniego taktu przyszła nowa wartość. Pomijamy zdarzenia dokładnie na granicach okien.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-
-
-
-
-
-				<section id="18-async" class="animation-slide" data-animation="18-async">
-					<h2>Jeden user$. Dwie subskrypcje.</h2>
-					<div class="rx-player" aria-label="Jeden user$. Dwie subskrypcje."></div>
-					<aside class="notes">
-						<p>Najpierw pokaż dwie zwykłe subskrypcje A i B. http$ oznacza zimne Observable HTTP, np. ajax.getJSON z rxjs/ajax. Obie subskrypcje zaczynają się przed odpowiedzią. share stosujemy raz do wspólnej instancji user$. Dopiero po porównaniu odnieś odbiorców do Angular async pipe albo subscribe w React useEffect ze sprzątaniem przez unsubscribe. W React zachowaj stabilną instancję user$ poza komponentami; nie twórz osobnego share w każdym efekcie. AsyncPipe zarządza własną subskrypcją, ale nie dodaje współdzielenia. share nie jest trwałym cache.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-
 				<section id="20-sharereplay" class="animation-slide" data-animation="20-sharereplay">
 					<h2>B przychodzi po odpowiedzi. Co dostanie?</h2>
 					<div class="rx-player" aria-label="B przychodzi po odpowiedzi. Co dostanie?"></div>
@@ -703,34 +644,24 @@
                         <div data-checkpoint="finished"><p><strong>7 — Sukces B</strong></p><p>I proszę — drugi request działa normalnie. Obsłużyliśmy błąd lokalnie, nie kończąc zewnętrznego Observable.</p></div>
                     </template>
 				</section>
-<section id="22-refcount" class="animation-slide" data-animation="22-refcount">
-					<h2>Widok zniknął. Dlaczego timer nadal działa?</h2>
-					<div class="rx-player" aria-label="Widok zniknął. Dlaczego timer nadal działa?"></div>
-					<aside class="notes">
-						<p>Przykład interval, które nie kończy się samo, z poprawnym teardown. A znika w 7 s, B w 10 s; oba async odsubskrybowują. Przy refCount:false shareReplay nadal utrzymuje subskrypcję źródła, więc timer pracuje bez odbiorców. To ryzyko niechcianego zatrzymania zasobów i wycieku, a nie dowód liniowego wzrostu pamięci: bufferSize wynosi 1. Przy true ostatnie unsubscribe rozłącza źródło. Skończone HTTP i jego cache to inna sytuacja.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
+<section id="16-czas-cztery" class="animation-slide" data-animation="16-czas-cztery">
+					<h2>Cztery sposoby ograniczania emisji</h2>
+					<div class="rx-player" aria-label="Cztery sposoby ograniczania emisji"></div>
+<aside class="notes">
+                        <p>Dwa potoki jeden pod drugim: zdarzenia$ → debounceTime(3500) → S1 i zdarzenia$ → auditTime(3500) → S2; zdarzenia A 0 s, B 1 s, C 2 s, D 4 s, E 5 s. auditTime: C (3,5 s) i E (7,5 s); debounceTime: E (8,5 s). <strong>debounceTime:</strong> wyszukiwanie po zakończeniu pisania; w aplikacji zwykle znacznie krótszy okres.</p>
+                    </aside>
+					<template data-checkpoint-notes="16-czas-cztery">
+                        <div data-checkpoint="ready"><p><strong>0 — Start</strong></p><p>Mamy dwa operatory, które na pierwszy rzut oka robią podobną rzecz. Oba ograniczają liczbę emisji, ale inaczej traktują czas.</p></div>
+                        <div data-checkpoint="a"><p><strong>1 — A</strong></p><p>Przychodzi A. Debounce zaczyna czekać na ciszę, a audit otwiera okno czasowe.</p></div>
+                        <div data-checkpoint="b"><p><strong>2 — B</strong></p><p>Przychodzi B. Debounce zaczyna odliczanie od nowa. Audit jedynie zapamiętuje B — jego okno nadal trwa.</p></div>
+                        <div data-checkpoint="c"><p><strong>3 — C (pytanie)</strong></p><p>Przychodzi C. Debounce znowu resetuje licznik. Audit zapamiętuje C, ale nie przesuwa końca okna. Jak myślicie, który operator pierwszy coś wyemituje?</p></div>
+                        <div data-checkpoint="audit-c"><p><strong>4 — Pierwsze okno audit</strong></p><p>Minęło 3,5 sekundy od początku okna auditTime. Emitujemy ostatnią zapamiętaną wartość, czyli C. Debounce nadal czeka.</p></div>
+                        <div data-checkpoint="d"><p><strong>5 — D</strong></p><p>Przychodzą kolejne wartości. Debounce za każdym razem zaczyna liczyć ciszę od nowa. Audit otwiera drugie okno przy D, a E tylko aktualizuje zapamiętaną wartość.</p></div>
+                        <div data-checkpoint="e"><p><strong>6 — E</strong></p><p>E: debounce znowu liczy ciszę od nowa, audit tylko aktualizuje zapamiętaną wartość — jego okno nadal kończy się w 7,5 s.</p></div>
+                        <div data-checkpoint="audit-e"><p><strong>7 — Drugie okno audit</strong></p><p>Audit emituje E po zakończeniu drugiego okna, mimo że od ostatniej wartości minęło mniej niż 3,5 sekundy.</p></div>
+                        <div data-checkpoint="finished"><p><strong>8 — Finał</strong></p><p>Dopiero gdy przez pełne 3,5 sekundy nie przyjdzie nic nowego, debounce emituje E. Czyli debounce czeka na ciszę, a audit wypuszcza ostatnią wartość na końcu okna.</p></div>
+                    </template>
 				</section>
-
-
-
-
-
-				<section id="26-resolver-problem" class="animation-slide" data-animation="26-resolver-problem">
-<h2>100 elementów. Skąd wziąć ownerFullName?</h2>
-<div class="rx-player" aria-label="100 elementów. Skąd wziąć ownerFullName?"></div>
-<aside class="notes"><p>GET /api/items zwraca 100 elementów z ownerId, bez ownerFullName. Nazwy pochodzą z innego serwisu. Synchroniczne items.forEach(getOrEnqueue) korzysta z cache albo dopisuje brakujące ID do pending. To enrichment danych w store, a nie async pipe w każdym wierszu.</p></aside>
-</section>
-<section id="27-resolver-microtask" class="animation-slide" data-animation="27-resolver-microtask">
-<h2>Jedna pętla, jeden microtask</h2>
-<div class="rx-player" aria-label="Jedna pętla, jeden microtask"></div>
-<aside class="notes"><p>Pierwszy cache miss planuje jeden Promise.resolve().then(flushQueue). Następne ID są dopisywane synchronicznie. Zapytaj: kiedy ruszy flush? Dopiero po zakończeniu bieżącego kodu synchronicznego. Microtask nie czeka na całe późniejsze renderowanie Angulara. Nie ma ręcznego flush po pętli ani setTimeout(100). Set usuwa duplikaty przed resolveMany. Czasy na tym slajdzie oznaczają fazy ilustracji tego samego obrotu event loop.</p></aside>
-</section>
-<section id="28-resolver-batch" class="animation-slide" data-animation="28-resolver-batch">
-<h2>Wspólna kolejka HTTP, własny komplet wyników</h2>
-<div class="rx-player" aria-label="Wspólna kolejka HTTP, własny komplet wyników"></div>
-<aside class="notes"><p>Dwa resolveMany([A,B,C]) i resolveMany([C,D,E]) korzystają z resolve(id): cache, mapa in-flight albo requestSubject. Wspólne C deduplikuje mapa in-flight, nie bufferTime. Długowieczna subskrypcja requestSubject.pipe(bufferTime(250, null, maxBatchSize, asyncScheduler), filter(xs =&gt; xs.length > 0), map(dedupe), mergeMap(batch =&gt; httpFetch(batch)), takeUntilDestroyed()) wykonuje fizyczny HTTP. W pokazie maxBatchSize=10, pięć unikalnych ID mieści się w jednym oknie. Limit rozmiaru może zamknąć paczkę wcześniej; okno 250 ms zaczyna się przy otwarciu bufora, nie przy pierwszym ID. To osobna warstwa względem microtaska. mergeMap bez concurrency nie ogranicza równoległości ani rate limitu. Odpowiedzi są rozdzielane do oczekujących resolve(id), które emitują i kończą się. Każdy forkJoin dostaje komplet własnych wyników jako Map; enrichment scala je w store i widoki reagują. Kontrakt przykładu: resolveMany([]) zwraca of(new Map()); samo forkJoin([]) kończy bez next. Błąd fizycznej paczki jest przekazywany wszystkim czekającym na jej ID, kończy zależny forkJoin, usuwa in-flight i nie zapisuje sukcesu do cache/store. Niezależne paczki mogą działać dalej; niszczenie kontekstu sprząta subskrypcję i oczekujące żądania.</p></aside>
-</section>
 <section id="25-podsumowanie" class="animation-slide" data-animation="25-podsumowanie">
 					<h2>Cztery pytania przed kolejnym pipe</h2>
 					<div class="rx-player" aria-label="Cztery pytania przed kolejnym pipe"></div>
@@ -747,41 +678,8 @@
 
 					<section id="pytania" class="extras-slide">
 						<h2>Pytania?</h2>
-						<p class="extras-start"><a href="?extras#/x01-sharereplay-interval">Dodatkowe przykłady — zacznij tutaj</a></p>
-                        <nav class="extras-links" aria-label="Dodatkowe animacje">
-                          <div class="extras-group"><h3>Praca i zakończenie</h3>
-                            <a href="?extras#/12a-complete">complete outer → limit 3</a>
-                            <a href="?extras#/06-subskrypcja">Co uruchamia HTTP?</a>
-                            <a href="?extras#/b01-defer">defer</a>
-                            <a href="?extras#/b02-first-take">first / take</a>
-                            <a href="?extras#/b05-finalize">finalize</a>
-                          </div>
-                          <div class="extras-group"><h3>Współdzielenie</h3>
-                            <a href="?extras#/x01-sharereplay-interval">shareReplay i interval</a>
-                            <a href="?extras#/06a-cold-hot-2">Hot: późny odbiorca</a>
-                            <a href="?extras#/19-share">share</a>
-                            <a href="?extras#/18-async">Dwie subskrypcje</a>
-                            <a href="?extras#/21-share-miejsce">Kosztowny map</a>
-                            <a href="?extras#/21a-share-pozycja">Pozycja share</a>
-                            <a href="?extras#/22-refcount">refCount</a>
-                          </div>
-                          <div class="extras-group"><h3>Emisje i łączenie</h3>
-                            <a href="?extras#/15-debounce-audit">Cztery operatory czasu</a>
-                            <a href="?extras#/16-czas-cztery-3">throttle / sample</a>
-                            <a href="?extras#/b03-buffertime">bufferTime</a>
-                            <a href="?extras#/17-latest">withLatest / combineLatest</a>
-                            <a href="?extras#/b06-forkjoin">forkJoin</a>
-                            <a href="?extras#/b07-zip">zip</a>
-                            <a href="?extras#/b08-merge">merge</a>
-                            <a href="?extras#/b09-pairwise">pairwise</a>
-                          </div>
-                          <div class="extras-group"><h3>Praktyka</h3>
-                            <a href="?extras#/23-angular-alias">async z aliasem</a>
-                            <a href="?extras#/24-signals">toSignal</a>
-                            <a href="?extras#/26-resolver-problem">Resolver: trzy kroki</a>
-                          </div>
-                        </nav>
-						<aside class="notes">Koniec części właściwej (30–35 minut poza pełnym otwarciem). Jeśli nie ma pytań: „Zobaczmy jeszcze kilka sytuacji”. Wybierz wyróżniony link: najpierw shareReplay z refCount: false na interval, potem pilot prowadzi przez complete outer w concatMap, complete outer w switchMap i limit współbieżności. Ta dogrywka zajmuje około 4–6 minut. Po limicie można zakończyć albo wybrać następny temat. Menu pozwala też odpowiedzieć konkretnym przykładem na pytanie z sali; link „Dodatkowe przykłady” wraca tutaj.</aside>
+						<p class="extras-start"><a href="?extras#/x01-sharereplay-interval">shareReplay — kto zatrzyma interval?</a></p>
+						<aside class="notes">Koniec części właściwej. Po pytaniach można przejść do jednego dodatkowego przykładu: shareReplay z refCount: false na interval. Link powrotny prowadzi z powrotem do tego slajdu.</aside>
 					</section>
 
 				<section id="x01-sharereplay-interval" class="animation-slide" data-extras data-animation="x01-sharereplay-interval">
@@ -801,176 +699,6 @@
                     </template>
 				</section>
 
-				<section id="19-share" class="animation-slide" data-extras data-animation="19-share">
-					<h2>share — wspólne wykonanie</h2>
-					<div class="rx-player" aria-label="share — wspólne wykonanie"></div>
-					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-					<aside class="notes">
-						<p>A i B mają nakładające się subskrypcje. share() nie gwarantuje jednego wykonania na zawsze ani cache dla późniejszych odbiorców.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-
-				<section id="12a-complete" class="animation-slide" data-extras data-animation="12a-complete">
-					<h2>source$: complete. Czy wynik też kończy? </h2>
-					<div class="rx-player" aria-label="source$: complete. Czy wynik też kończy? "></div>
-					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-<aside class="notes"><ul><li><strong>Pytanie:</strong> Źródło robi complete — czy wynik też już kończy?</li><li><strong>concatMap:</strong> Dokańcza aktywny inner i całą kolejkę.</li><li><strong>switchMap:</strong> Czeka na aktualny inner; jego complete kończy wynik.</li><li><strong>Pułapka:</strong> Complete źródła ≠ unsubscribe; inner bez końca może blokować complete wyniku.</li></ul></aside>
-				</section>
-<section id="13-limit" class="animation-slide" data-extras data-animation="13-limit">
-					<h2>100 zadań. Ile naraz?</h2>
-					<div class="rx-player" aria-label="100 zadań. Ile naraz?"></div>
-					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-<aside class="notes"><ul><li><strong>Pytanie:</strong> Pięć wejść, limit 3 — ile prac działa naraz?</li><li><strong>Start:</strong> A/B/C aktywne; D/E czekają jako wartości.</li><li><strong>Moment:</strong> Complete jednej pracy zwalnia miejsce następnej.</li><li><strong>Wniosek:</strong> Limit współbieżności ≠ limit requestów/s; kolejka nadal może rosnąć.</li><li><strong>Koniec dogrywki:</strong> To naturalny punkt zakończenia po trzech dodatkowych slajdach. Link „Dodatkowe przykłady” wraca do pytań; dalsze tematy są opcjonalne.</li></ul></aside>
-				</section>
-<section id="16-czas-cztery" class="animation-slide" data-extras data-animation="16-czas-cztery">
-					<h2>Cztery sposoby ograniczania emisji</h2>
-					<div class="rx-player" aria-label="Cztery sposoby ograniczania emisji"></div>
-					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-<aside class="notes">
-                        <p><strong>MAIN (16-czas-cztery) — własne notatki per checkpoint w szablonie poniżej.</strong> Dwa potoki jeden pod drugim: zdarzenia$ → debounceTime(3500) → S1 i zdarzenia$ → auditTime(3500) → S2; zdarzenia A 0 s, B 1 s, C 2 s, D 4 s, E 5 s. auditTime: C (3,5 s) i E (7,5 s); debounceTime: E (8,5 s). <strong>debounceTime:</strong> wyszukiwanie po zakończeniu pisania; w aplikacji zwykle znacznie krótszy okres.</p>
-                        <p><strong>EXTRAS (-2 auditTime, -3 throttleTime, -4 sampleTime) — inna sekwencja niż MAIN:</strong> wejście A 1 s, B 2 s, C 3 s, D 4 s, E 6 s, F 7,2 s, G 8,3 s, H 12 s, I 13 s, J 18 s, okres 3,5 s.</p>
-                        <p><strong>auditTime (-2):</strong> aktualizacja układu podczas resize. Pierwsze wejście otwiera okno; kolejne aktualizują zapamiętaną wartość, bez przesuwania końca okna. W tej sekwencji na pierwszym końcu okna (4,5 s) odbiorca dostaje D, potem G (9,5 s), I (15,5 s) i J (21,5 s). Audit pozwala aktualizować w trakcie ciągłego ruchu, debounce czeka na przerwę (pierwsze G dopiero w 11,8 s).</p>
-                        <p><strong>throttleTime i sampleTime (-3, -4):</strong> Throttle domyślnie przepuszcza pierwszą wartość okna (leading:true, trailing:false): A, E, H, J. Sample ma stały rytm od subskrypcji i pomija takt bez nowych wejść: C, E, G, I, J. Wszystkie źródła pozostają aktywne; nie porównujemy zdarzeń dokładnie na granicy okna.</p>
-                    </aside>
-					<template data-checkpoint-notes="16-czas-cztery">
-                        <div data-checkpoint="ready"><p><strong>0 — Start</strong></p><p>Mamy dwa operatory, które na pierwszy rzut oka robią podobną rzecz. Oba ograniczają liczbę emisji, ale inaczej traktują czas.</p></div>
-                        <div data-checkpoint="a"><p><strong>1 — A</strong></p><p>Przychodzi A. Debounce zaczyna czekać na ciszę, a audit otwiera okno czasowe.</p></div>
-                        <div data-checkpoint="b"><p><strong>2 — B</strong></p><p>Przychodzi B. Debounce zaczyna odliczanie od nowa. Audit jedynie zapamiętuje B — jego okno nadal trwa.</p></div>
-                        <div data-checkpoint="c"><p><strong>3 — C (pytanie)</strong></p><p>Przychodzi C. Debounce znowu resetuje licznik. Audit zapamiętuje C, ale nie przesuwa końca okna. Jak myślicie, który operator pierwszy coś wyemituje?</p></div>
-                        <div data-checkpoint="audit-c"><p><strong>4 — Pierwsze okno audit</strong></p><p>Minęło 3,5 sekundy od początku okna auditTime. Emitujemy ostatnią zapamiętaną wartość, czyli C. Debounce nadal czeka.</p></div>
-                        <div data-checkpoint="d"><p><strong>5 — D</strong></p><p>Przychodzą kolejne wartości. Debounce za każdym razem zaczyna liczyć ciszę od nowa. Audit otwiera drugie okno przy D, a E tylko aktualizuje zapamiętaną wartość.</p></div>
-                        <div data-checkpoint="e"><p><strong>6 — E</strong></p><p>E: debounce znowu liczy ciszę od nowa, audit tylko aktualizuje zapamiętaną wartość — jego okno nadal kończy się w 7,5 s.</p></div>
-                        <div data-checkpoint="audit-e"><p><strong>7 — Drugie okno audit</strong></p><p>Audit emituje E po zakończeniu drugiego okna, mimo że od ostatniej wartości minęło mniej niż 3,5 sekundy.</p></div>
-                        <div data-checkpoint="finished"><p><strong>8 — Finał</strong></p><p>Dopiero gdy przez pełne 3,5 sekundy nie przyjdzie nic nowego, debounce emituje E. Czyli debounce czeka na ciszę, a audit wypuszcza ostatnią wartość na końcu okna.</p></div>
-                    </template>
-				</section>
-<section id="17-latest" class="animation-slide" data-extras data-animation="17-latest">
-					<h2>Kto ma prawo uruchomić pracę?</h2>
-					<div class="rx-player" aria-label="Kto ma prawo uruchomić pracę?"></div>
-					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-<aside class="notes">
-						<p>Oba warianty potrzebują pierwszych wartości odpowiednich źródeł. withLatestFrom subskrybuje także źródła pomocnicze; nie odkłada ich subskrypcji do kliknięcia.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-<section id="21-share-miejsce" class="animation-slide" data-extras data-animation="21-share-miejsce">
-					<h2>map(expensive) — raz czy dla każdego?</h2>
-					<div class="rx-player" aria-label="map(expensive) — raz czy dla każdego?"></div>
-					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-<aside class="notes">
-						<p>Źródłem jest jeden Subject. Dwóch odbiorców subskrybuje przed pierwszą emisją. Bez share mają dwa wykonania map(expensive) na każde next. share umieszczone za map współdzieli także kosztowne obliczenie i przekazuje ten sam wynik obu odbiorcom. Podświetlenie przez 0,9 s symbolizuje koszt, nie opóźnienie map. Callback map pozostaje synchroniczny.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-<section id="21a-share-pozycja" class="animation-slide" data-extras data-animation="21a-share-pozycja">
-					<h2>Czy expensive jest przed share?</h2>
-					<div class="rx-player" aria-label="Czy expensive jest przed share?"></div>
-					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-<aside class="notes">
-						<p>Paski czasu przy map są ilustracją kosztu, nie asynchroniczną zmianą semantyki map. Obaj odbiorcy subskrybują przed pierwszą emisją.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-<section id="23-angular-alias" class="animation-slide" data-extras data-animation="23-angular-alias">
-					<h2>Jeden wynik w kilku miejscach widoku</h2>
-					<div class="rx-player" aria-label="Jeden wynik w kilku miejscach widoku"></div>
-					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-<aside class="notes">
-						<p>To alternatywa dla wielu async w jednym zakresie szablonu. Dla niezależnych odbiorców nadal może być potrzebne współdzielenie. user jest w przykładzie obiektem.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-<section id="24-signals" class="animation-slide" data-extras data-animation="24-signals">
-					<h2>A co z signals?</h2>
-					<div class="rx-player" aria-label="A co z signals?"></div>
-					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-<aside class="notes">
-						<p>Twórz toSignal raz i używaj wyniku. Przykład bez initialValue, więc przed pierwszą emisją jest undefined. Domyślne sprzątanie subskrypcji wiąże się z kontekstem zniszczenia.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-<section id="b01-defer" class="animation-slide" data-extras data-animation="b01-defer">
-					<h2>Kiedy odczytujesz wartość?</h2>
-					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-					<div class="rx-player" aria-label="Kiedy odczytujesz wartość?"></div>
-					<aside class="notes">
-						<p>defer jest funkcją tworzącą Observable. Każda subskrypcja wywołuje fabrykę. Przykład izoluje czas odczytu zmiennej, nie czas odpowiedzi HTTP.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-
-				<section id="b02-first-take" class="animation-slide" data-extras data-animation="b02-first-take">
-					<h2>first() i take(1) — to samo?</h2>
-					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-					<div class="rx-player" aria-label="first() i take(1) — to samo?"></div>
-					<aside class="notes">
-						<p>first bez wartości domyślnej. Gdy źródło milczy i nie kończy się, oba czekają. null jest wartością. Wiersze są niezależnymi przykładami.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-
-				<section id="b03-buffertime" class="animation-slide" data-extras data-animation="b03-buffertime">
-					<h2>Potrzebuję wszystkich zdarzeń — w paczkach</h2>
-					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-					<div class="rx-player" aria-label="Potrzebuję wszystkich zdarzeń — w paczkach"></div>
-					<aside class="notes">
-						<p>Zwykłe nienakładające się okna bufferTime. Odfiltruj puste paczki. Potrzebny jest endpoint obsługujący paczki; trzeba osobno zaprojektować błędy i powtórki.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-
-
-
-				<section id="b05-finalize" class="animation-slide" data-extras data-animation="b05-finalize">
-					<h2>Sprzątanie także po odsubskrybowaniu</h2>
-					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-					<div class="rx-player" aria-label="Sprzątanie także po odsubskrybowaniu"></div>
-					<aside class="notes">
-						<p>finalize sprząta dany zakres subskrypcji. Przy wielu równoległych requestach jedna wspólna flaga loading może wymagać licznika.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-
-				<section id="b06-forkjoin" class="animation-slide" data-extras data-animation="b06-forkjoin">
-					<h2>Czekam na komplet zakończonych żądań</h2>
-					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-					<div class="rx-player" aria-label="Czekam na komplet zakończonych żądań"></div>
-					<aside class="notes">
-						<p>Każde wejście musi wyemitować co najmniej raz i poprawnie się zakończyć. W RxJS 7.8.2 wejście kończące się bez wartości daje zakończenie bez wyniku. Błąd przerywa całość.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-
-				<section id="b07-zip" class="animation-slide" data-extras data-animation="b07-zip">
-					<h2>Pierwsze z pierwszym. Drugie z drugim.</h2>
-					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-					<div class="rx-player" aria-label="Pierwsze z pierwszym. Drugie z drugim."></div>
-					<aside class="notes">
-						<p>Przy nierównym tempie źródeł bufor może rosnąć. Źródła są tu skończonymi przykładami zdarzeń, a ich complete pominięto dla czytelności.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-
-				<section id="b08-merge" class="animation-slide" data-extras data-animation="b08-merge">
-					<h2>Kilka powodów do odświeżenia</h2>
-					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-					<div class="rx-player" aria-label="Kilka powodów do odświeżenia"></div>
-					<aside class="notes">
-						<p>merge łączy emisje istniejących strumieni. mergeMap dodatkowo mapuje wartości na strumienie wewnętrzne. W przykładzie źródła nie kończą się podczas animacji.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-
-				<section id="b09-pairwise" class="animation-slide" data-extras data-animation="b09-pairwise">
-					<h2>Co zmieniło się od poprzedniej wartości?</h2>
-					<a class="extras-back" href="./#/pytania">Dodatkowe przykłady</a>
-					<div class="rx-player" aria-label="Co zmieniło się od poprzedniej wartości?"></div>
-					<aside class="notes">
-						<p>pairwise emituje nakładające się pary kolejnych wartości. Przy obiektach mutowanych w miejscu nadal trzeba uważać na współdzielone referencje.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
 
 			</div>
 		</div>

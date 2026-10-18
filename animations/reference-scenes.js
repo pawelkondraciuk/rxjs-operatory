@@ -1325,27 +1325,6 @@ export function configureReferences(scenes) {
   configureOperator(scenes.find(s=>s.id==='04-operator'));
   configureFlatten(scenes.find(s=>s.id==='08-map-strumienie'),'concatAll');
   configureFlatten(scenes.find(s=>s.id==='11-switchmap'),'switchMap');
-  const share=scenes.find(s=>s.id==='19-share');
-  share.graph=s=>({layout:'fixed',width:1240,height:340,
-    nodes:[{id:'http',x:170,y:140,label:'HTTP',ri:2,work:true,ready:true},{id:'share',x:590,y:140,label:'share()',color:'op',ready:true},
-      {id:'a',x:1070,y:75,label:'Odbiorca A',ri:0,ready:true},{id:'b',x:1070,y:235,label:'Odbiorca B',ri:1,ready:true}],
-    edges:[{from:'http',to:'share',events:s.rows[2].events},{from:'share',to:'a',events:s.rows[0].events.filter(e=>e.value==='dane')},{from:'share',to:'b',events:s.rows[1].events.filter(e=>e.value==='dane')}],
-    trays:[{anchor:'a',x:1070,y:155,w:230},{anchor:'b',x:1070,y:315,w:230}]});
-  share.duration=9;
-  share.playback=manual([{id:'first',modelTime:1,caption:'A uruchamia jedno HTTP.'},{id:'question',modelTime:3,caption:'B dołączył, gdy HTTP nadal trwa. Czy potrzebny jest drugi request?'}]);
-}
-
-export function configureConcurrency(scene) {
-  const jobs=scene.rows.map(r=>{
-    const work=r.spans.find(p=>p.kind==='work');
-    return {value:r.label,at:Math.min(...r.spans.map(p=>p.start)),start:work.start,end:work.end,dur:work.end-work.start};
-  });
-  const end=Math.max(...jobs.map(j=>j.end)),result=scene.rows.flatMap(r=>r.events).sort((a,b)=>a.at-b.at);
-  scene.rows=[R('source$',jobs.map(j=>E(j.at,j.value)),[],{completeAt:5}),
-    ...scene.rows.map((r,i)=>({...r,completeAt:jobs[i].end})),R('wynik',result,[],{completeAt:end})];
-  Object.assign(scene,{jobs,operatorName:'mergeMap · limit 3',outerCompleteAt:5,graph:flattenGraph});
-  configureFlattenPlayback(scene);
-  scene.metrics=[{label:'aktywne / 3',count:'active'},{label:'w kolejce',value:t=>jobs.filter(j=>j.at<=t&&t<j.start).length}];
 }
 
 // catchError wewnątrz (b04-catcherror-2) w wyglądzie MAIN switchMap: góra klik$ → switchMap → S1, w dolnej części
@@ -1496,10 +1475,7 @@ function catchOutsideGraph(scene) {
 // z instancjami HTTP GET → inbox jak w 09–12. distinctUntilChanged pamięta ostatnią przepuszczoną wartość (memory.ball: sama
 // kulka w wierszu, jak pamięć debounceTime/auditTime),
 // powtórzenie wjeżdża do wiersza, czeka (decide) i gaśnie — bez kabla dalej, bez nowego HTTP i bez anulowania.
-// Dwa profile tego samego modelu:
 // 11a-distinct-switchmap — S1 zestawione przed READY, A, A, B, B, A: B i drugie A anulują trwające HTTP (switchMap).
-// 14-distinct — subscribe w animacji, 42, 42, 43, 43, 42: każde HTTP kończy się przed kolejnym nowym ID, więc
-// jedyne, co mogłoby je przerwać, to powtórzenie; distinctUntilChanged zatrzymuje je, zanim dotrze do switchMap.
 const distinctProfiles={
   '11a-distinct-switchmap':{
     input:[{at:.6,value:'A'},{at:3,value:'A',dup:true},{at:4.2,value:'B'},{at:5.4,value:'B',dup:true},{at:6.6,value:'A'}],
@@ -1519,27 +1495,6 @@ const distinctProfiles={
       {id:'again-a',event:ev('inner-subscribe',{edge:'inner2-op'}),offset:.3,caption:'A ≠ B — przechodzi. HTTP B anulowany, startuje HTTP #3 · A'}],
     reject:v=>`${v.value} === ${v.value} — odrzucone. HTTP ${v.value} pracuje dalej`,
     summary:'5 wejść, 3 requesty: A, B, A. distinctUntilChanged odrzuca tylko kolejne powtórzenia'},
-  '14-distinct':{
-    input:[{at:1,value:'42'},{at:2.6,value:'42',dup:true},{at:5.4,value:'43'},{at:7,value:'43',dup:true},{at:9.8,value:'42'}],
-    // Dłuższe decide: powtórzenie wyraźnie stoi w wierszu distinctUntilChanged, zanim zgaśnie.
-    colors:{42:'#6D4CD3',43:'#B85D05'},decide:1.6,durations:[3.6,3.6,2],preconnected:false,subscribeAt:.3,
-    source:'id$',url:'`/api/users/${id}`',title:'To samo ID — kolejny request?',inputsLabel:'emisje ID',
-    captions:jobs=>[[0,'distinctUntilChanged porówna każde ID z ostatnią przepuszczoną wartością'],
-      [jobs[0].at,'42: brak poprzedniej wartości — przechodzi. switchMap uruchamia HTTP #1'],
-      [jobs[0].end,'HTTP #1 zwraca wynik do S1 i kończy się complete'],
-      [jobs[1].at,'43 ≠ 42 — przechodzi i zastępuje 42 w pamięci. switchMap uruchamia HTTP #2'],
-      [jobs[1].end,'HTTP #2 zwraca wynik do S1 i kończy się complete'],
-      [jobs[2].at,'42 ≠ 43 — przechodzi. Porównanie z ostatnią przepuszczoną wartością, nie z historią'],
-      [jobs[2].end,'HTTP #3 zwraca wynik do S1 i kończy się complete']],
-    stops:({ev,arrived,dups,decide})=>[
-      {id:'subscribe',event:ev('connected',{edge:'source-distinct'}),offset:.35,caption:'subscribe(): powstał lane S1. distinctUntilChanged nie ma jeszcze zapamiętanej wartości'},
-      {id:'first',event:ev('inner-subscribe',{edge:'inner0-op'}),offset:.3,caption:'42 przeszło i zostało w pamięci operatora. switchMap uruchomił HTTP #1'},
-      {id:'duplicate',event:arrived(dups[0].at),offset:decide+.6,caption:'42 === 42 — zatrzymane w distinctUntilChanged. HTTP #1 pracuje dalej, bez anulowania'},
-      {id:'second',event:ev('inner-subscribe',{edge:'inner1-op'}),offset:.3,caption:'43 ≠ 42 — przechodzi, w pamięci jest teraz 43. switchMap uruchomił HTTP #2'},
-      {id:'duplicate-2',event:arrived(dups[1].at),offset:decide+.6,caption:'43 === 43 — odrzucone. HTTP #2 trwa dalej'},
-      {id:'again',event:ev('inner-subscribe',{edge:'inner2-op'}),offset:.3,caption:'42 ≠ 43 — przechodzi. Startuje HTTP #3'}],
-    reject:(v,job)=>`${v.value} === ${v.value} — odrzucone. HTTP ${job} pracuje dalej`,
-    summary:'5 emisji ID, 3 requesty HTTP. Powtórzenia zatrzymał distinctUntilChanged, zanim dotarły do switchMap'},
 };
 export function configureDistinctSwitch(scene,profileId=scene.id) {
   const profile=distinctProfiles[profileId],distinctInput=profile.input,colors=profile.colors,decide=profile.decide;

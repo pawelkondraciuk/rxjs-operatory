@@ -1,4 +1,3 @@
-import { catalogGraph } from './graph-presets.js';
 import { prepareExecutions, executionSnapshot } from './execution-state.js';
 import { innerWorkPanelSnapshot } from './inner-work-panel.js';
 import { layoutDiagram, stretchGraph, terminal, connectionState, palette, transitionDuration } from './lifecycle.js';
@@ -21,7 +20,8 @@ const workSpans=row=>(row.spans||[]).filter(p=>!['queue','state','window','subsc
 // rows i jawny graf kończą w tym samym planie; RAF nie uczestniczy w semantyce.
 export function compileScene(scene) {
   const source=scene.graph ? (typeof scene.graph==='function'?scene.graph(scene):scene.graph) :
-    scene.kind==='cards'?{nodes:[],edges:[],trays:[],width:1240,height:340}:catalogGraph(scene);
+    scene.kind==='cards'?{nodes:[],edges:[],trays:[],width:1240,height:340}:null;
+  if(!source)throw new Error(`${scene.id}: brak grafu sceny`);
   // Format 4:3 daje wyższy diagram. Grafy z własnym profilem (formatAware) już go mają;
   // stałe układy rosną proporcjonalnie, automatyczne dostają wyższy obszar w layoutDiagram.
   const target=graphHeightFor(scene),fixed=source.layout==='fixed';

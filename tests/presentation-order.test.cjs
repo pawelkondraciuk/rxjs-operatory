@@ -46,12 +46,12 @@ test('MAIN preserves the opening and orders final variants independently, ending
  for(const id of expectedMain.filter(id=>id!=='pytania'))assert.equal(scenes.get(id).group,'main',id);
 });
 
-test('EXTRAS preserves every demo once and starts with shareReplay + interval, then the three-slide follow-up',async()=>{
+test('EXTRAS contains only shareReplay + interval',async()=>{
  const {container,prepared,config}=await presentation({extras:true});
  const ids=container.children.map(s=>s.id);
- assert.equal(ids.length,69);
+ assert.equal(ids.length,mainEnd+1);
  assert.deepEqual(ids.slice(10,mainEnd),expectedMain);
- assert.deepEqual(ids.slice(mainEnd,mainEnd+4),['x01-sharereplay-interval','12a-complete','12a-complete-2','13-limit']);
+ assert.deepEqual(ids.slice(mainEnd),['x01-sharereplay-interval']);
  assert.deepEqual(ids.slice(mainEnd),Array.from(config.extraOrder));
  assert.deepEqual(ids.filter(Boolean).sort(),prepared.map(s=>s.id).filter(Boolean).sort());
  assert.equal(new Set(ids.filter(Boolean)).size,ids.filter(Boolean).length);
@@ -61,10 +61,10 @@ test('EXTRAS preserves every demo once and starts with shareReplay + interval, t
 test('MAIN shows distinctUntilChanged once, right after the four *Map, and keeps Subject/share comparisons adjacent',async()=>{
  const {container,scenes}=await presentation(),ids=container.children.slice(10).map(s=>s.id);
  assert.deepEqual(ids.filter(id=>/distinct/.test(id)),['11a-distinct-switchmap']);
- assert.equal(scenes.get('14-distinct').group,'bonus');
+ assert.equal(scenes.has('14-distinct'),false);
  const at=id=>ids.indexOf(id);
  assert.deepEqual(['09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','11a-distinct-switchmap'].map(at),[0,1,2,3,4].map(i=>at('09-concatmap')+i));
- // Pierwsze trzy slajdy techniczne: HTTP, interval, Subject (ręczne next i error), zaraz po nich operator.
+ // Pierwsze trzy slajdy techniczne: HTTP, interval, Subject (ręczne next i complete), zaraz po nich operator.
  const opening=['05-zrodla-2','05-zrodla','05-zrodla-5','04-operator'];
  assert.deepEqual(opening.map(at),opening.map((_,i)=>at(opening[0])+i));
  // Cold → Subject + HTTP → share + HTTP → Subject + interval → share + interval → share/shareReplay późny odbiorca.
@@ -72,24 +72,24 @@ test('MAIN shows distinctUntilChanged once, right after the four *Map, and keeps
  assert.deepEqual(story.map(at),story.map((_,i)=>at(story[0])+i));
 });
 
-test('direct hashes route exact variants, including time operators and the standalone hot extra',async()=>{
- for(const requestedId of ['06a-cold-hot-2','16-czas-cztery-2','16-czas-cztery-3','18-async-2','28-resolver-batch']){
-  const {container,route}=await presentation({requestedId});assert.equal(route.extras,true,requestedId);assert.equal(container.children.length,69);
- }
- for(const requestedId of ['06a-cold-hot','16-czas-cztery','04-operator','unknown']){
+test('only the remaining extra hash enables the EXTRAS route',async()=>{
+ const extra=await presentation({requestedId:'x01-sharereplay-interval'});
+ assert.equal(extra.route.extras,true);
+ assert.equal(extra.container.children.length,mainEnd+1);
+ for(const requestedId of ['06a-cold-hot-2','16-czas-cztery-2','18-async-2','28-resolver-batch','16-czas-cztery','04-operator','unknown']){
   const {container,route}=await presentation({requestedId});assert.equal(route.extras,false,requestedId);assert.equal(container.children.length,mainEnd);
  }
 });
 
 test('print includes every expanded slide once, with main narration before extras',async()=>{
  const {container,prepared}=await presentation({printMode:true});
- assert.equal(container.children.length,69);
+ assert.equal(container.children.length,mainEnd+1);
  assert.deepEqual(container.children.map(s=>s.id).filter(Boolean).sort(),prepared.map(s=>s.id).filter(Boolean).sort());
  assert.deepEqual(container.children.slice(10,mainEnd).map(s=>s.id),expectedMain);
 });
 
-test('removed comparisons stay absent from MAIN, EXTRAS, print and direct hashes',async()=>{
- const removed=['06a-cold-hot','07-hot-cold','07-hot-cold-2'];
+test('removed extras stay absent from MAIN, EXTRAS, print and direct hashes',async()=>{
+ const removed=['06a-cold-hot','06a-cold-hot-2','07-hot-cold','07-hot-cold-2','12a-complete','13-limit','14-distinct','18-async','28-resolver-batch'];
  for(const options of [{},{extras:true},{printMode:true},...removed.map(requestedId=>({requestedId}))]){
   const {container,scenes,prepared,compile}=await presentation(options);
   for(const id of removed){
@@ -103,17 +103,12 @@ test('removed comparisons stay absent from MAIN, EXTRAS, print and direct hashes
    assert.equal(c.snapshot(c.duration).executionCounts.started,id.endsWith('-2')?1:2,id);
   }
  }
- const {scenes,compile}=await presentation({requestedId:'06a-cold-hot-2'});
- const hot=scenes.get('06a-cold-hot-2'),c=compile(hot),end=c.snapshot(c.duration);
- assert.equal(hot.comparisonMode,'shared');assert.equal(hot.group,'bonus');
- assert.deepEqual(Array.from(end.histories.find(h=>h.anchor==='receiver1').values,e=>e.value),['2','3','4','5','6']);
 });
 
-test('combined time operators: MAIN debounce/audit is manual, its throttle/sample/audit variants stay extras',async()=>{
+test('combined time operators stay in MAIN without generated extra variants',async()=>{
  const {scenes}=await presentation(),scene=scenes.get('16-czas-cztery');
  assert.equal(scene.playback.entry,'manual');assert.equal(scene.playback.finish,'hold');
- // Szczegóły dwóch potoków i timerów: tests/debounce-audit.test.cjs.
- assert.equal(scenes.get('16-czas-cztery-2').group,'bonus');
- for(const id of ['08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12a-complete','13-limit'])assert.notEqual(scenes.get(id).playback.controller,'stages',id);
+ assert.equal(scenes.has('16-czas-cztery-2'),false);
+ for(const id of ['08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap'])assert.notEqual(scenes.get(id).playback.controller,'stages',id);
  for(const id of ['04-operator','04a-dwa-tory-3','05-zrodla','05-zrodla-2','05-zrodla-3','05-zrodla-4','05-zrodla-5','20-sharereplay','20-sharereplay-2'])assert.equal(scenes.get(id).playback.controller,'stages',id);
 });

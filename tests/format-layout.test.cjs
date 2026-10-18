@@ -16,7 +16,7 @@ async function deck(format){
 
 test('4:3 diagrams fill the taller stage and keep every block inside the viewBox',async()=>{
  const {scenes,compile,render}=await deck('4:3');
- assert.ok(scenes.length>=54,String(scenes.length));
+ assert.equal(scenes.length,22);
  for(const scene of scenes){
   const c=compile(scene);
   for(const time of [0,...c.stops.map(s=>s.time),c.duration]){
@@ -48,11 +48,10 @@ test('16:9 keeps the previous geometry and SVG of every variant',async()=>{
 
 test('4:3 slot rows grow and stay inside the jobs panel',async()=>{
  const {scenes,compile}=await deck('4:3');
- for(const id of ['09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','13-limit']){
+ for(const id of ['09-concatmap','10-mergemap','11-switchmap','12-exhaustmap']){
   const jobs=compile(scenes.find(s=>s.id===id)).snapshot(0).panels.find(p=>p.id==='jobs');
   assert.ok(jobs.rowHeight>=60,id);
-  // 09–12: trzy sloty instancji (nagłówek + lane); 13-limit: siatka czterech slotów.
-  assert.ok(jobs.rowsTop+(Math.max(jobs.instances?3:4,jobs.slots)-1)*jobs.rowStep+(jobs.instances?jobs.headerH:0)+jobs.rowHeight<=jobs.y+jobs.h,id);
+  assert.ok(jobs.rowsTop+(Math.max(3,jobs.slots)-1)*jobs.rowStep+jobs.headerH+jobs.rowHeight<=jobs.y+jobs.h,id);
  }
 });
 
@@ -80,7 +79,6 @@ test('4:3 tile labels grow to 1.3× when they fit and keep 1.15× for long names
  };
  assert.equal(label('09-concatmap','source'),41.6); // Powiększony nagłówek tylko concatMap.
  assert.equal(label('12-exhaustmap','source'),41.6); // Odbiorca jest teraz wierszem bez nagłówka.
- assert.equal(label('23-angular-alias','async'),29.9); // „async · alias user” nie mieści się w 1,3×.
 });
 
 test('04-operator in 4:3 is a centred lane pipeline and the receiver field shows the full name',async()=>{

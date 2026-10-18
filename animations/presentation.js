@@ -4,11 +4,7 @@ import { configureScene, mainOrder, extraOrder, extraIds } from './scene-config.
 export function prepareSlides(scenes, { format = '4:3' } = {}) {
   const byId = new Map(scenes.map(scene => [scene.id, scene]));
   const titles = {
-    '12a-complete': ['concatMap: complete czeka na kolejkę', 'switchMap: complete czeka na ostatni inner'],
-    '18-async': ['Dwie subskrypcje: dwa wykonania HTTP', 'Dwie subskrypcje z share: jedno HTTP'],
     '20-sharereplay': ['share: późny odbiorca uruchamia HTTP', 'shareReplay: późny odbiorca dostaje wynik'],
-    '21-share-miejsce': ['Bez share: obliczenia dla każdego odbiorcy', 'map przed share: jedno wspólne obliczenie'],
-    '22-refcount': ['refCount: false — timer działa po odejściu', 'refCount: true — ostatni odbiorca odłącza źródło'],
   };
   for (const slide of [...document.querySelectorAll('[data-animation]')]) {
     const original = byId.get(slide.dataset.animation);
@@ -27,13 +23,6 @@ export function prepareSlides(scenes, { format = '4:3' } = {}) {
         code:['interval(1000)','http.get(\'/api/data\')','subject$.subscribe(observer)','',''][i],
         captions:[[],[],[[0,'Subject może emitować bez odbiorcy.'],[4,'A bez subskrypcji.'],[8,'Odbiorca subskrybuje.'],[12,'Dostaje B.'],[16,'Dostaje C. Trzy emisje, dwa odbiory.']],[],[]][i],
       }));
-    } else if (original.id === '21a-share-pozycja') {
-      variants = [false,true].map(after => ({ ...original, mapAfterShare:after,
-        title:after?'map za share: osobne obliczenia':'map przed share: wspólne obliczenie',
-        code:after?'subject$.pipe(share(), map(expensive))':'subject$.pipe(map(expensive), share())',
-        captions:[[0,'Dwóch odbiorców subskrybuje przed pierwszą emisją.'],[2,after?'Każdy odbiorca wykonuje własne map(expensive).':'Wynik jednego map(expensive) trafia do obu odbiorców.']],
-        metrics:[original.metrics[after?1:0]],
-      }));
     } else if (original.id === '04a-dwa-tory') {
       // Tory wykonania: cold (trzy pola widoku, trzy requesty user$), share() (HTTP GET → share() → A/B/C, jeden request)
       // i share + interval (odpowiednik Subject + interval: ostatni odbiorca odłącza źródło).
@@ -42,38 +31,6 @@ export function prepareSlides(scenes, { format = '4:3' } = {}) {
           'share-interval': 'share() — kto odłączy źródło?' }[mode] }));
     } else if (original.id === 'b04-catcherror') {
       variants = [false,true].map(inside => ({ ...original, catchInside:inside }));
-    } else if (original.id === '16-czas-cztery') {
-      variants = [1, 2, 3, 4].map(i => ({ ...original, seriesIndices: [i],
-        title: ['','debounceTime: czekamy na ciszę','auditTime: ostatnia wartość okna','throttleTime: pierwsza wartość okna','sampleTime: odczyt w stałym rytmie'][i],
-        code: `${original.rows[i].label}(3500)`,
-        captions: [[0, ['','Każde zdarzenie odlicza 3,5 s od nowa.','Pierwsze zdarzenie otwiera okno 3,5 s.','Pierwsza wartość przechodzi. Następne w oknie pomijamy.','Co 3,5 s pobieramy najnowszą wartość, jeśli pojawiła się nowa.'][i]], [12, ['','Emisja następuje dopiero po 3,5 s ciszy.','Na końcu okna emitujemy ostatnią otrzymaną wartość.','Domyślnie: leading = true, trailing = false.','Brak nowych zdarzeń oznacza brak kolejnej emisji.'][i]]],
-      }));
-      Object.assign(variants[0],{seriesIndices:[1,2],title:'debounceTime i auditTime: cisza czy okno?',
-        code:'debounceTime(3500) / auditTime(3500)',
-        captions:[[0,'Jedno wejście, dwa operatory. Porównujemy ten sam okres 3,5 s'],
-          [4.5,'auditTime emituje D na końcu okna. debounceTime nadal czeka na ciszę'],
-          [11.8,'Po 3,5 s ciszy debounceTime emituje G'],
-          [21.5,'debounceTime: po ciszy. auditTime: ostatnia wartość na końcu okna']],
-      });
-    } else if (original.id === 'b02-first-take') {
-      variants = [[0, 1], [2, 3]].map((indices, i) => ({ ...original, duration:8, rows: indices.map(j => {
-        const r=original.rows[j],shift=i?8:0;
-        return {...r,completeAt:r.completeAt===undefined?undefined:r.completeAt-shift,events:r.events.map(e=>({...e,at:e.at-shift}))};
-      }),
-        title: i ? 'Puste źródło: take(1) kończy, first() zgłasza błąd' : 'Pierwsza wartość: take(1) i first()',
-        code: i ? 'EMPTY.pipe(take(1)) / EMPTY.pipe(first())' : "of('A').pipe(take(1)) / of('A').pipe(first())",
-        captions: i ? [[0,'Źródło kończy się bez żadnej wartości.'],[3,'take(1): complete. first(): EmptyError.']] : [[0,'Źródło wyemituje A.'],[3,'Oba operatory przekazują A, a następnie complete.']],
-      }));
-    } else if (original.id === 'b05-finalize') {
-      variants = original.rows.map(r => {
-        const shift=r.spans[0].start-1;
-        return { ...original, duration:10,
-          rows:[{...r,events:[],completeAt:r.completeAt===undefined?undefined:r.completeAt-shift,spans:r.spans.map(p=>({...p,start:p.start-shift,end:p.end-shift}))}],
-          title:`finalize po ${r.label}`,
-          captions:[[0,`Zakończenie przez ${r.label}.`],[6,'Sprzątanie uruchamia się również w tym przypadku.']],
-          metrics:[{label:'finalize',value:t=>t>=6?'cleanup()':'czeka'}],
-        };
-      });
     } else variants = [original];
 
     let previous = slide;
@@ -110,7 +67,7 @@ export function arrangeSlides(sceneById, { extras = false, printMode = false, re
         const link = document.createElement('a');
         link.className = 'extras-back';
         link.href = './#/pytania';
-        link.textContent = 'Dodatkowe przykłady';
+        link.textContent = 'Powrót do pytań';
         slide.append(link);
       }
     } else {

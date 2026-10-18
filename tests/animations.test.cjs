@@ -28,7 +28,7 @@ async function harness() {
   }
   // Ładowanie po kolei (jak v2-harness): równoległe link() współdzielonych zależności bywa niedeterministyczne.
   const modules=[];
-  for(const name of ['catalog','presentation','player','lifecycle','flow','engine','resolver'])modules.push(await load(`animations/${name}.js`));
+  for(const name of ['catalog','presentation','player','lifecycle','flow','engine'])modules.push(await load(`animations/${name}.js`));
   for(const m of modules)await m.evaluate();
   const scenes=modules[1].namespace.prepareSlides(modules[0].namespace.scenes);
   function player(id,controls) {
@@ -39,7 +39,7 @@ async function harness() {
     }};
     return {api:modules[2].namespace.createPlayer(root,scenes.get(id),controls),elements};
   }
-  return {scenes,player,lifecycle:modules[3].namespace,flow:modules[4].namespace,engine:modules[5].namespace,resolver:modules[6].namespace,callbacks};
+  return {scenes,player,lifecycle:modules[3].namespace,flow:modules[4].namespace,engine:modules[5].namespace,callbacks};
 }
 
 test('all slide variants render through every event and termination without invalid geometry',async()=>{
@@ -60,35 +60,8 @@ test('all slide variants render through every event and termination without inva
       frames++;
     }
   }
-  assert.ok(frames>1000);
+  assert.ok(frames>300);
   assert.equal(scenes.get('20-sharereplay-2').comparisonMode,'shared');
-  assert.equal(scenes.get('16-czas-cztery-4').seriesIndices[0],4);
-});
-
-test('four time operators keep distinct emission times and receiver histories',async()=>{
-  const {scenes,engine}=await harness();
-  const scene=scenes.get('15-debounce-audit');
-  const expected=[
-    [[11.8,'G'],[16.5,'I'],[21.5,'J']],
-    [[4.5,'D'],[9.5,'G'],[15.5,'I'],[21.5,'J']],
-    [[1,'A'],[6,'E'],[12,'H'],[18,'J']],
-    [[3.5,'C'],[7,'E'],[10.5,'G'],[14,'I'],[21,'J']],
-  ];
-  assert.equal(scene.rows.length,5);
-  scene.rows.slice(1).forEach((row,i)=>{
-    assert.deepEqual(Array.from(row.events,e=>[e.at,e.value]),expected[i],row.label);
-    assert.equal(row.completeAt,undefined,'ongoing source does not complete');
-  });
-  const compiled=engine.compileScene(scene);
-  const received=frame=>Array.from(frame.histories,h=>Array.from(h.values,e=>e.value));
-  assert.deepEqual(received(compiled.snapshot(0)),[[],[],[],[]]);
-  assert.deepEqual(received(compiled.snapshot(compiled.stops[0].time)),[[],['D'],['A'],['C']]);
-  const final=compiled.snapshot(compiled.duration);
-  assert.deepEqual(received(final),expected.map(events=>events.map(e=>e[1])));
-  for(const history of final.histories){
-    const sink=final.nodes.find(n=>n.id===history.anchor);
-    assert.ok(history.y-23>sink.y-sink.h/2 && history.y+23<sink.y+sink.h/2);
-  }
 });
 
 test('legend directions, terminal colors and final value delivery',async()=>{
@@ -102,34 +75,21 @@ test('legend directions, terminal colors and final value delivery',async()=>{
   assert.equal(connectionState(6,0,{at:3,kind:'complete'}).done,true);
 });
 
-test('only receiver changes terminal color; refCount removes the correct subscriptions',async()=>{
-  const {player}=await harness();
-  let svg;
-  for(const [id,alive] of [['22-refcount',true],['22-refcount-2',false]]){
-    const p=player(id);p.api.finish();svg=p.elements.get('.rx-stage').innerHTML;
-    assert.equal(svg.includes('data-connection="timer-hub"'),alive);
-    assert.doesNotMatch(svg,/data-connection="hub-view/);
-  }
-  const error=player('b05-finalize-2');error.api.finish();
-  assert.match(error.elements.get('.rx-stage').innerHTML,/data-node="sink0"[^]*?fill="#b51e2e"/);
-});
-
-test('playback loops, pause cancels frames, restart resets, controls can be hidden',async()=>{
-  const {player,callbacks}=await harness();const {api,elements}=player('b09-pairwise');
+test('playback pause cancels frames, restart resets, controls can be hidden',async()=>{
+  const {player,callbacks}=await harness();const {api,elements}=player('09-concatmap');
   assert.equal(elements.get('.rx-toolbar').hidden,true);
   api.toggleControls();assert.equal(elements.get('.rx-toolbar').hidden,false);
   api.hideControls();assert.equal(elements.get('.rx-toolbar').hidden,true);
-  api.restart();
-  for(let now=0;now<=(api.duration+3)*1000;now+=250){const pending=[...callbacks.values()];callbacks.clear();pending.forEach(fn=>fn(now));}
-  assert.ok(Number(elements.get('input').value)<3);
-  assert.equal(elements.get('.rx-play').textContent,'Pauza');
+  api.playContinuously();
+  for(let now=0;now<1000;now+=250){const pending=[...callbacks.values()];callbacks.clear();pending.forEach(fn=>fn(now));}
+  assert.equal(api.isPlaying,true);
   api.pause();assert.equal(callbacks.size,0);
   api.restart();assert.equal(elements.get('input').value,'0');
 });
 
 test('manual stops deliver only after travel; snapshots survive seeking backwards',async()=>{
   const {player,callbacks}=await harness();
-  for(const id of ['04-operator','08-map-strumienie','11-switchmap','19-share']) {
+  for(const id of ['04-operator','08-map-strumienie','11-switchmap']) {
     const {api}=player(id);
     const initial=JSON.stringify(api.snapshot);
     let now=0;
@@ -264,28 +224,6 @@ test('concatAll queues a reference only after it leaves map and arrives at conca
     assert.ok(mapped.at<arrival.at,value);
     assert.equal(model.snapshot(arrival.at-.01).nodes.find(n=>n.id==='inner'+i).visible,false,value);
   }
-});
-
-test('microtask collects synchronous IDs once; buffer windows and in-flight deduplication are independent',async()=>{
-  const {resolver:{planEnrichment,planResolver}}=await harness();
-  const micro=planEnrichment();
-  assert.deepEqual(Array.from(micro.ids),['A','B','C']);assert.equal(micro.microtasks,1);
-  assert.ok(micro.events.findIndex(e=>e.type==='microtask-flush')>micro.events.findIndex(e=>e.type==='sync-end'));
-  assert.equal(planEnrichment(['X'],['X']).microtasks,0);
-  const plan=planResolver();
-  assert.equal(plan.batches.length,1);assert.equal(plan.batches[0].at,.25);
-  assert.deepEqual(Array.from(plan.batches[0].ids),['A','B','C','D','E']);
-  assert.equal(plan.events.filter(e=>e.type==='queue-add'&&e.value==='C').length,1);
-  assert.deepEqual(Array.from(plan.results,r=>Array.from(r.ids)),[['A','B','C'],['C','D','E']]);
-  assert.ok(plan.results.every(r=>r.at===.65));
-  const limited=planResolver({maxBatchSize:3});
-  assert.equal(limited.batches.length,2);assert.equal(limited.batches[0].reason,'size');assert.equal(limited.batches[0].at,.05);
-  assert.equal(limited.batches[1].at,.30); // restart bufora po wcześniejszym flush
-  const late=planResolver({calls:[{at:.3,ids:['A']}],destroyAt:1.2});
-  assert.equal(late.batches[0].at,.5); // okno od subskrypcji, nie .3 + .25
-  const failure=planResolver({errorIds:['C']});assert.equal(failure.results.length,0);
-  assert.equal(failure.events.filter(e=>e.type==='resolve-error').length,2);
-  assert.equal(planResolver({calls:[{at:0,ids:[]}]}).results.length,1);
 });
 
 test('simultaneous values remain ordered and do not overlap on one edge',async()=>{

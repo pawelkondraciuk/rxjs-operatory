@@ -59,7 +59,7 @@ test('debounce restarts its lane timer on every value, audit keeps the window; c
  assert.ok(t(f.c,'aud').progress>t(f.b,'aud').progress+.2,'audit nie resetuje okna');
  assert.ok(t(f.d,'aud').progress<.2,'D otwiera drugie okno');assert.ok(t(f.e,'aud').progress>.25);
  for(const id of ['a','b','c','d','e'])for(const op of ['deb','aud'])assert.equal(mem(f[id],op),id.toUpperCase(),op+' pamięta '+id);
- // Pamięć to jedna zwykła kulka przed portem wyjścia (jak w 14-distinct), bez prostokąta i etykiety pamięć.
+  // Pamięć to jedna zwykła kulka przed portem wyjścia, bez prostokąta i etykiety pamięć.
  for(const id of ['a','b','c','d','e']){
   const svg=render(f[id]),kept=[...svg.matchAll(/<g data-lane-memory="([^"]*)" data-token="memory"><circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)];
   assert.deepEqual(kept.map(m=>m[1]),[id.toUpperCase(),id.toUpperCase()]);assert.doesNotMatch(svg,/pamięć|bufor/);
