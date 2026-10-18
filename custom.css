@@ -417,9 +417,13 @@
   margin: 0 0 18px !important;
 }
 
+/* Wysokość obszaru pod nagłówkiem; wspólna z osią czasu, żeby Reveal
+   wyśrodkował oba slajdy identycznie i nagłówki stały w miejscu. */
+:root { --trivia-stage-height: 780px; }
+
 .trivia-stack-container {
   width: 1240px;
-  height: 780px;
+  height: var(--trivia-stage-height);
   margin: 0 auto;
 }
 
@@ -453,33 +457,30 @@
   overflow: hidden;
 }
 
-/* W 4:3 wyrównaj nagłówek do sąsiedniego slajdu społeczności. */
-html[data-ratio="4-3"]:not(.print-pdf) .reveal .slides section.timeline-slide {
-  margin-top: -32px;
-}
-
+/* Tytuł i podtytuł mają klasy .trivia-answer-title i .trivia-date
+   (jak JavaScript Białystok #1); tu tylko kolor i krój podtytułu. */
 .timeline-header {
   text-align: center;
-  margin-bottom: 10px;
   flex-shrink: 0;
 }
 
-.timeline-header h2 {
-  font-size: 1.5em !important;
-  font-weight: 700 !important;
-  color: #111111 !important;
-  margin: 0 0 4px 0 !important;
-  text-transform: none !important;
-  letter-spacing: -0.015em;
-}
-
-.timeline-subtitle {
-  font-size: 0.5em !important;
+.timeline-header .timeline-subtitle {
   font-weight: 600;
   color: #666666;
-  margin: 0 !important;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+/* Oś czasu i legenda w obszarze o wysokości stosu zdjęć wzorca;
+   padding-top ustala tylko pionową pozycję osi czasu pod podtytułem. */
+.timeline-stage {
+  width: 100%;
+  height: var(--trivia-stage-height);
+  padding-top: 24px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 /* Wrapper — pełna szerokość, bez scrollbara na prezentacji */
@@ -487,7 +488,7 @@ html[data-ratio="4-3"]:not(.print-pdf) .reveal .slides section.timeline-slide {
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  flex: 1;
+  flex: none;
   display: flex;
   align-items: flex-start;
 }
@@ -654,7 +655,8 @@ html[data-ratio="4-3"]:not(.print-pdf) .reveal .slides section.timeline-slide {
 [data-ratio="16-9"] .photo-stack-container { height: 510px; }
 [data-ratio="16-9"] .reveal .photo-box-hero-with-title img,
 [data-ratio="16-9"] .reveal .trivia-photo-frame img { max-width: 954px !important; max-height: 480px !important; }
-[data-ratio="16-9"] .trivia-stack-container { width: 1120px; height: 540px; }
+[data-ratio="16-9"] { --trivia-stage-height: 540px; }
+[data-ratio="16-9"] .trivia-stack-container { width: 1120px; }
 [data-ratio="16-9"] .talk-image-wrapper { height: 330px; }
 [data-ratio="16-9"] .known-operators-list { margin-top: 48px; }
 [data-ratio="16-9"] .speaker-intro-card { margin-top: 50px; }
