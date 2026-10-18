@@ -24,99 +24,118 @@ const lanesOf=(frame,id)=>Array.from(node(frame,id).laneStates,l=>`${l.role}:${l
 const shareUnsub=(format='4:3')=>lanes(format,'04a-dwa-tory-2','share-unsub');
 const fieldOf=(svg,id)=>svg.slice(svg.indexOf(`data-field="${id}"`),svg.indexOf('</g>',svg.indexOf(`data-field="${id}"`)));
 
-test('cold: one user$ definition, three view fields subscribe and start three simultaneous HTTP requests',async()=>{
- const {c,at,render}=await lanes();
- const ready=c.snapshot(0);
+test('cold READY is unchanged: one HTTP GET header, three empty fields, no lanes, ports or receivers marks',async()=>{
+ const {c,render}=await lanes();
+ const ready=c.snapshot(0),svg0=render(ready);
  assert.deepEqual(dots(ready,'http'),[]);assert.equal(node(ready,'http').laneStates.length,0);
+ assert.equal(node(ready,'http').h,node(ready,'http').defH,'sam nagłówek HTTP GET');
  assert.deepEqual(Array.from(ready.nodes,n=>n.id),['http','A','B','C'],'bez map ani osobnych Observable pól');
- for(const id of ['A','B','C'])assert.equal(node(ready,id).visible,true,id+': pole widoku istnieje od READY');
- const svg0=render(ready);
+ for(const id of ['A','B','C']){
+  assert.equal(node(ready,id).visible,true,id+': pole widoku istnieje od READY');
+  assert.deepEqual(dots(ready,id),[],id+': bez portu');assert.equal(node(ready,id).laneStates.length,0,id+': bez litery toru');
+ }
  for(const [id,label] of [['A','user.firstName'],['B','user.lastName'],['C','user.city']]){
   assert.match(fieldOf(svg0,id),new RegExp(`data-field-state="empty"[\\s\\S]*>${label.replace('.','\\.')}</text>`),id+': etykieta pola');
   assert.match(fieldOf(svg0,id),/data-field-slot="empty"/,id+': puste miejsce na wartość');
  }
- assert.equal(ready.metrics.find(m=>m.label==='Requesty HTTP').value,0);
+ assert.ok(ready.edges.every(e=>!e.visible));
+ assert.deepEqual(Array.from(ready.metrics,m=>m.label+' '+m.value),['Observable 1','Requesty HTTP 0']);
+});
+
+test('cold: A, B and C subscribe one after another and start three parallel HTTP requests',async()=>{
+ const {c,at}=await lanes();
  const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge);
- // A, B i C subskrybują po kolei (B 0,4 s po A, C 0,2 s po B); każde subscribe uruchamia osobne HTTP.
- assert.deepEqual(['A','B','C'].map(id=>ev('subscribe','http-'+id).logicalAt),[1,1.4,1.6]);
- // Postój first: A zestawione i widoczne w HTTP, B jeszcze nie subskrybuje.
- const first=c.snapshot(at('first'));
- assert.ok(at('first')<ev('subscribe','http-B').at,'postój przed subscribe B');
- assert.deepEqual(lanesOf(first,'http'),['work:A:running']);
- assert.equal(node(first,'http').laneStates[0].opacity,1,'wiersz A w pełni widoczny');
- assert.equal((first.callouts||[]).length,0,'bez napisów A ani B na postoju');
- assert.equal(first.metrics.find(m=>m.label==='Requesty HTTP').value,1);
- assert.ok(ev('subscribe','http-B').at>ev('connected','http-A').at&&ev('subscribe','http-C').at>ev('connected','http-B').at);
+ // Subskrypcje kolejno, co 0,25 s czasu modelu; każde subscribe uruchamia osobne HTTP.
+ assert.deepEqual(['A','B','C'].map(id=>ev('subscribe','http-'+id).logicalAt),[1,1.25,1.5]);
+ assert.ok(ev('subscribe','http-B').at>ev('subscribe','http-A').at&&ev('subscribe','http-C').at>ev('subscribe','http-B').at,'nie jednocześnie');
+ const firstConnected=ev('connected','http-A').at;
+ assert.equal(c.snapshot(firstConnected+.05).metrics.find(m=>m.label==='Requesty HTTP').value,1,'licznik rośnie po zestawieniu subskrypcji');
+ assert.deepEqual(lanesOf(c.snapshot(firstConnected+.05),'http'),['work:A:running'],'wiersz powstaje dopiero z subskrypcją');
  const requests=c.snapshot(at('requests'));
+ assert.equal(c.stops[0].id,'requests');
  assert.deepEqual(lanesOf(requests,'http'),['work:A:running','work:B:running','work:C:running'],'trzy requesty jednocześnie');
  assert.deepEqual(dots(requests,'http'),['outA','outB','outC']);
  const [a,b,cc]=node(requests,'http').laneStates;
  assert.ok(a.progress>b.progress&&b.progress>cc.progress&&cc.progress>0,'osobne wykonania mają osobny postęp');
  assert.equal(requests.metrics.find(m=>m.label==='Requesty HTTP').value,3);
- const firstConnected=ev('connected','http-A').at;
- assert.equal(c.snapshot(firstConnected+.05).metrics.find(m=>m.label==='Requesty HTTP').value,1,'licznik rośnie po zestawieniu subskrypcji');
- assert.ok(at('requests')<ev('source-next','http-A').at,'postój przed pierwszą odpowiedzią');
+ assert.ok(at('requests')<ev('stream-error','http-B').at,'postój przed błędem B');
 });
 
-test('every HTTP execution emits the whole User object once; each field shows only its own property',async()=>{
+test('cold: HTTP B fails with error only (no User, no complete) while A and C are still running',async()=>{
  const {c,at,render}=await lanes();
- for(const r of c.plan.records.values())assert.deepEqual(Array.from(r.events,e=>e.value),['{…}'],r.id+': cały obiekt, jedno next');
- assert.equal(c.events.filter(e=>e.type==='source-next').length,3,'trzy odpowiedzi, po jednej na wykonanie');
+ const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge)?.at;
+ assert.deepEqual(Array.from(c.plan.records.get('http-B').events),[],'B nie emituje User');
+ assert.equal(ev('stream-complete','http-B'),undefined,'B bez complete');
+ const sent=ev('stream-error','http-B'),arrived=ev('disconnected','http-B');
+ assert.ok(sent>ev('connected','http-C')&&sent<ev('source-next','http-A')&&sent<ev('source-next','http-C'),'błąd B przed odpowiedziami A i C');
+ const flying=c.snapshot((sent+arrived)/2);
+ assert.equal(flying.edges.find(e=>e.id==='http-B').pulse.color,'#C54848','czerwony impuls error');
+ assert.equal(node(flying,'http').laneStates[1].state,'error','wykonanie B kończy się w chwili wysłania błędu');
+ assert.deepEqual(lanesOf(flying,'B'),['receiver:B:running'],'pole B dowiaduje się po dotarciu');
+ const stop=c.snapshot(at('error')),svg=render(stop);
+ assert.deepEqual(lanesOf(stop,'http'),['work:A:running','work:B:error','work:C:running'],'A i C nadal pracują');
+ assert.deepEqual(lanesOf(stop,'B'),['receiver:B:error']);
+ const [a,b,cc]=node(stop,'http').laneStates;
+ assert.ok(a.progress<1&&cc.progress<1&&b.progress<1&&b.progress>0,'postęp B stanął, A i C jeszcze nie skończyły');
+ assert.match(fieldOf(svg,'B'),/data-field-state="error"[\s\S]*data-field-error="Błąd" opacity="1.000"/,'pole B: Błąd');
+ assert.doesNotMatch(fieldOf(svg,'B'),/data-field-slot="empty"/,'komunikat zastępuje placeholder');
+ for(const id of ['A','C'])assert.match(fieldOf(svg,id),/data-field-state="empty"/);
+ assert.match(svg,/data-lane-row="B" data-row-state="error"/);
+ assert.equal(stop.metrics.find(m=>m.label==='Requesty HTTP').value,3);
+ assert.match(c.stops.find(s=>s.id==='error').caption,/Czy pozostałe requesty też się zatrzymają\?/);
+ assert.match(fieldOf(render(c.snapshot(arrived+.15)),'B'),/data-field-error="Błąd" opacity="0.500"/,'komunikat wchodzi fade-in 0,3 s');
+ assert.match(fieldOf(render(c.snapshot(arrived-.01)),'B'),/data-field-state="empty"/,'przed dotarciem błędu pole puste');
+});
+
+test('cold: A and C each emit the whole User and complete; fields show Paweł and Białystok, B keeps Błąd',async()=>{
+ const {c,at,render}=await lanes();
  const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at;
- const fly=(ev('source-next','http-B')+ev('deliver-next','http-B'))/2;
- assert.deepEqual(Array.from(c.snapshot(fly).tokens,t=>t.value+':'+t.edge),['{…}:http-B'],'kulka niesie symbol obiektu');
- assert.match(fieldOf(render(c.snapshot(fly)),'B'),/data-field-state="empty"/,'pole puste, dopóki obiekt nie dotrze');
- const received=c.snapshot(at('received')),svg=render(received);
- for(const [id,value] of [['A','Paweł'],['B','Kondraciuk'],['C','Białystok']]){
-  const field=fieldOf(svg,id);
-  assert.match(field,new RegExp(`data-field-value="${value}" opacity="1.000"`),id+': '+value);
-  assert.doesNotMatch(field,/>\{…\}</,'pole nie pokazuje całego obiektu');
- }
- assert.deepEqual(Array.from(received.histories,h=>Array.from(h.values,v=>v.value+':'+v.color)),
-  [['{…}:#cbbff2'],['{…}:#f3d09d'],['{…}:#bcd6f5']],'odbiorca dostał obiekt w kolorze swojego wykonania');
- assert.deepEqual(lanesOf(received,'http'),['work:A:running','work:B:running','work:C:running'],'complete przychodzi osobno, po odbiorze');
- assert.ok(node(received,'http').laneStates.every(l=>l.progress===1),'postęp HTTP kończy się z odpowiedzią');
- assert.equal(render(received),render(c.snapshot(at('received'))),'deterministyczna klatka');
+ for(const id of ['A','C'])assert.deepEqual(Array.from(c.plan.records.get('http-'+id).events,e=>e.value),['{…}'],id+': cały obiekt, jedno next');
+ assert.equal(c.events.filter(e=>e.type==='source-next').length,2,'dwie odpowiedzi: A i C');
+ const fly=(ev('source-next','http-C')+ev('deliver-next','http-C'))/2;
+ assert.deepEqual(Array.from(c.snapshot(fly).tokens,t=>t.value+':'+t.edge),['{…}:http-C'],'kulka niesie symbol obiektu');
+ const sent=ev('stream-complete','http-A');
+ assert.equal(c.snapshot(sent+.3).edges.find(e=>e.id==='http-A').pulse.color,'#26804E','complete przebiega zielonym impulsem');
+ const answer=c.snapshot(at('answer')),svg=render(answer);
+ assert.deepEqual(lanesOf(answer,'http'),['work:A:completed','work:B:error','work:C:completed']);
+ for(const [id,state] of [['A','completed'],['B','error'],['C','completed']])assert.deepEqual(lanesOf(answer,id),[`receiver:${id}:${state}`]);
+ assert.match(fieldOf(svg,'A'),/data-field-value="Paweł"/);assert.match(fieldOf(svg,'C'),/data-field-value="Białystok"/);
+ assert.match(fieldOf(svg,'B'),/data-field-error="Błąd"/);assert.doesNotMatch(fieldOf(svg,'B'),/data-field-value/);
+ assert.deepEqual(Array.from(answer.histories,h=>Array.from(h.values,v=>v.value+':'+v.color)),
+  [['{…}:#cbbff2'],[],['{…}:#bcd6f5']],'obiekt w kolorze swojego wykonania');
  const arrival=ev('deliver-next','http-A');
  assert.match(fieldOf(render(c.snapshot(arrival+.15)),'A'),/data-field-value="Paweł" opacity="0.500"/,'wartość wchodzi fade-in 0,3 s');
 });
 
-test('each execution completes on its own: green pulse, completed rows, dimmed cables, counter ends at 3',async()=>{
+test('cold final state: three lanes under one header, A/C complete, B error, counter 3 started requests',async()=>{
  const {c,render}=await lanes();
- const edge=(f,id)=>f.edges.find(e=>e.id===id),end=c.snapshot(c.duration);
- const sent=c.events.find(e=>e.type==='stream-complete'&&e.edge==='http-A').at;
- assert.equal(edge(c.snapshot(sent+.3),'http-A').pulse.color,'#26804E','complete przebiega zielonym impulsem');
- assert.equal(node(c.snapshot(sent+.3),'B').laneStates[0].state,'running','B kończy się osobno');
- assert.match(render(c.snapshot(sent+.2)),/data-row-flash="completed"/,'complete podkreśla krótki rozbłysk');
- assert.deepEqual(lanesOf(end,'http'),['work:A:completed','work:B:completed','work:C:completed']);
+ const edge=(f,id)=>f.edges.find(e=>e.id===id),end=c.snapshot(c.duration),svg=render(end);
+ assert.deepEqual(lanesOf(end,'http'),['work:A:completed','work:B:error','work:C:completed']);
+ assert.equal(node(end,'http').laneRows.length,3);
  for(const id of ['A','B','C']){
-  assert.deepEqual(lanesOf(end,id),[`receiver:${id}:completed`]);
   assert.equal(node(end,id).fill,node(c.snapshot(0),id).fill,'kafelek pola nie zmienia koloru');
   assert.ok(edge(end,'http-'+id).opacity<=.35&&!edge(end,'http-'+id).pulse,'kabel zostaje jako przygaszona historia');
  }
  assert.equal(node(end,'http').fill,node(c.snapshot(0),'http').fill,'nagłówek definicji bez zmian');
- assert.ok(['http','A','B','C'].every(id=>node(end,id).socketDots.every(d=>Math.abs(d.opacity-.35)<1e-9)),'gniazda przygaszone');
- assert.equal(end.metrics.find(m=>m.label==='Requesty HTTP').value,3,'licznik kończy na 3');
- assert.equal(end.caption,'Trzy pola wyglądają poprawnie, ale backend dostał trzy identyczne requesty');
- const svg=render(end);
- for(const [id,value] of [['A','Paweł'],['B','Kondraciuk'],['C','Białystok']])assert.match(fieldOf(svg,id),new RegExp(`data-field-value="${value}"`));
- assert.match(svg,/<title>A · ✓ complete<\/title>/,'stan toru ma tekst');
- assert.match(svg,/data-connection="http-A" data-phase="complete"[^>]*opacity="0.35"/);
+ assert.equal(end.metrics.find(m=>m.label==='Requesty HTTP').value,3,'uruchomione, nie udane');
+ assert.match(end.caption,/trzy wykonania/);
+ assert.match(svg,/<title>A · ✓ complete<\/title>/);assert.match(svg,/<title>B · × error<\/title>/);
+ assert.match(svg,/data-connection="http-B" data-phase="error"/);
+ assert.equal(c.events.filter(e=>e.type==='stream-error').length,1,'tylko B');
+ assert.ok(c.events.filter(e=>e.type==='stream-complete').every(e=>e.edge!=='http-B'));
 });
 
 test('code shows only the user$ definition, without subscribe or field operators',async()=>{
  const {c,at}=await lanes();
  const view=t=>Array.from(c.snapshot(t).codeView,line=>Array.from(line,part=>({...part})));
- for(const t of [0,at('requests'),at('received'),c.duration])
+ for(const t of [0,...c.stops.map(s=>s.time),c.duration])
   assert.equal(view(t).map(line=>line.map(p=>p.text).join('')).join('\n'),"const user$ = http.get<User>('/api/users/42');");
  assert.deepEqual(view(0).flat().filter(p=>p.mark).map(p=>p.mark.id),['http']);
- assert.doesNotMatch(c.snapshot(0).code,/map|pluck|subscribe/);
+ assert.doesNotMatch(c.snapshot(0).code,/map|pluck|subscribe|catchError/);
  const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at;
  const http=t=>view(t).flat().find(p=>p.mark?.id==='http').active;
- assert.equal(http(at('requests')),false);
+ assert.equal(http(at('requests')),false);assert.equal(http(at('error')),false);
  assert.equal(http((ev('source-next','http-C')+ev('deliver-next','http-C'))/2),true,'http.get świeci, gdy odpowiedź wylatuje');
- assert.deepEqual(Array.from(c.snapshot(0).metrics,m=>m.label),['Observable','Requesty HTTP']);
- assert.equal(c.snapshot(0).metrics[0].value,1);
 });
 
 test('cold: a transient .subscribe() overlay per field, from the receiver subscribing until the impulse reaches HTTP',async()=>{
@@ -127,16 +146,21 @@ test('cold: a transient .subscribe() overlay per field, from the receiver subscr
  for(const id of ['A','B','C']){
   const start=ev('subscribe','http-'+id),arrived=ev('connected','http-'+id);
   assert.deepEqual(shown((start+arrived)/2),['.subscribe() '+id],'napis podczas impulsu '+id);
-  assert.ok(arrived-start>=1.2-1e-9,'napis widoczny przez cały impuls subskrypcji');
-  assert.ok(!shown(arrived+.31).includes('.subscribe() '+id),'znika po dotarciu impulsu do HTTP, nie czeka na request');
+  assert.ok(!shown(arrived+.31).includes('.subscribe() '+id),'znika po dotarciu impulsu do HTTP');
  }
- for(const id of ['first','requests','received'])assert.deepEqual(shown(at(id)),[]);
- for(let t=0;t<=c.duration;t+=.05)assert.ok(!shown(t).some(x=>x.startsWith('.unsubscribe')),'complete nie pokazuje unsubscribe');
+ for(const s of c.stops)assert.deepEqual(shown(s.time),[],s.id);
  const mid=(ev('subscribe','http-C')+ev('connected','http-C'))/2,callout=c.snapshot(mid).callouts[0];
  assert.equal(callout.color,'#2F7ED8');
  assert.match(render(c.snapshot(mid)),/data-callout="\.subscribe\(\)" data-callout-lane="C"/);
- const http=c.snapshot(mid).nodes.find(n=>n.id==='http');
- assert.ok(callout.y+45*.78<http.y-http.h/2,'napis nad diagramem, niczego nie zasłania');
+});
+
+test('cold: rewinding checkpoints removes and restores executions deterministically',async()=>{
+ const {c,at,render}=await lanes();
+ const times=[0,...c.stops.map(s=>s.time),c.duration];
+ for(const time of times){const expected=render(c.snapshot(time));c.snapshot(c.duration);c.snapshot(0);assert.equal(render(c.snapshot(time)),expected);}
+ assert.deepEqual(lanesOf(c.snapshot(at('requests')),'B'),['receiver:B:running'],'cofnięcie przed błąd przywraca B');
+ assert.match(fieldOf(render(c.snapshot(at('requests'))),'B'),/data-field-state="empty"/);
+ assert.equal(node(c.snapshot(0),'http').laneStates.length,0,'READY bez wykonań');
 });
 
 test('callouts also support a manual .unsubscribe() during the cancel animation (mechanism check on a copy of the share scene)',async()=>{
@@ -242,7 +266,7 @@ test('tiles grow: a fixed definition part, then one execution row per subscripti
  const tile=(t,id)=>node(c.snapshot(t),id),http0=tile(0,'http');
  assert.equal(http0.h,http0.defH,'READY: sama definicja');assert.equal(http0.laneRows.length,0);
  const top=http0.y-http0.h/2;
- for(const id of ['requests','received']){
+ for(const id of ['requests','error','answer']){
   const http=tile(at(id),'http');
   assert.ok(Math.abs(http.y-http.h/2-top)<1e-9,'góra kafelka stoi');
  }
@@ -344,7 +368,7 @@ test('cold: compact field receivers on the lanes in both formats; map transform 
    assert.ok(end.edges.find(e=>e.id==='http-'+id).points.every(p=>p[1]===laneY),'połączenie poziome');
   });
   assert.ok(end.nodes.every(n=>n.y+n.h/2<=end.height),format+': mieści się w ramce');
-  const svg=render(c.snapshot(at('received')));
+  const svg=render(c.snapshot(at('answer')));
   assert.match(svg,/data-icon="inbox"/);
   assert.doesNotMatch(svg,/data-token="received"/,'pole pokazuje właściwość, nie kulkę');
   const sent=c.events.find(e=>e.type==='source-next'&&e.edge==='http-A').at;
@@ -396,15 +420,43 @@ test('share slides use the cold look: pipeline code, transient subscribe/unsubsc
  assert.equal((c.snapshot(ev('stream-complete','share-B')+.1).callouts||[]).length,0,'complete bez napisu');
 });
 
-test('cold has checkpoint notes for READY, each manual stop and the handoff to the Subject question',async()=>{
+test('cold has checkpoint notes for READY, each manual stop and the handoff to Subject + HTTP',async()=>{
  const {c}=await lanes();
  const html=fs.readFileSync('index.html','utf8');
  const source=html.match(/<template data-checkpoint-notes="04a-dwa-tory">([\s\S]*?)<\/template>/)[1];
  const notes=Object.fromEntries([...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)].map(([,id,text])=>[id,text]));
  assert.deepEqual(Object.keys(notes),['ready',...Array.from(c.stops,s=>s.id),'finished']);
- assert.match(notes.ready,/trzy niezależne komponenty potrzebują danych tego samego użytkownika/);
- assert.match(notes.first,/Każdy z nich subskrybuje ten sam Observable\. Pierwszy uruchamia HTTP\./);
- assert.match(notes.requests,/Drugi też uruchamia HTTP, a trzeci robi dokładnie to samo/);
- assert.match(notes.received,/Każdy request zwraca cały obiekt użytkownika/);
- assert.match(notes.finished,/Trzy miejsca w widoku potrzebują tych samych danych\. Wszystko działa, ale backend dostaje trzy identyczne requesty\. Spróbujmy wykonać tylko jeden\./);
+ assert.match(notes.ready,/Wyobraźmy sobie widok aplikacji\. W jednym miejscu wyświetlamy imię użytkownika, w drugim nazwisko, a w trzecim miasto\./);
+ assert.match(notes.requests,/Mamy jedną definicję user\$\. Ale każde z tych miejsc niezależnie ją subskrybuje\. I co się dzieje\? Powstają trzy osobne requesty\./);
+ assert.match(notes.error,/Drugi request się nie udał\. Czy to oznacza, że pozostałe również się zatrzymają\?/);
+ assert.doesNotMatch(notes.error,/kończą się poprawnie/,'pytanie bez odpowiedzi');
+ assert.match(notes.answer,/Nie\. To trzy niezależne wykonania tego samego cold Observable\. B kończy się błędem, ale A i C nadal pracują i kończą się poprawnie\./);
+ assert.match(notes.finished,/Czy naprawdę musimy wykonywać trzy requesty\?[\s\S]*Prawo: Subject \+ HTTP/);
+ assert.doesNotMatch(source,/catchError|Angular|async pipe/);
+});
+
+test('cold statuses at the fields: A and C ✓ complete, B ! error (no complete), each only after its terminal pulse',async()=>{
+ for(const format of ['4:3','16:9']){
+  const {c,at,render}=await lanes(format);
+  const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at;
+  // Fragment SVG kafelka odbiorcy: od jego <g data-node> do następnego kafelka albo pól widoku.
+  const nodeSvg=(svg,id)=>{const from=svg.indexOf(`data-node="${id}"`),rest=svg.slice(from+1),next=rest.search(/data-node="|data-field="/);return svg.slice(from,from+1+next);};
+  const statusOf=(svg,id)=>nodeSvg(svg,id).match(/data-lane-terminal="(\w+)"[^>]*>([^<]*)</);
+  const end=render(c.snapshot(c.duration));
+  assert.deepEqual(['A','B','C'].map(id=>statusOf(end,id)?.slice(1,3).join(':')),['completed:✓ complete','error:! error','completed:✓ complete']);
+  const httpSvg=end.slice(end.indexOf('data-node="http"'),end.indexOf('data-node="A"'));
+  assert.doesNotMatch(httpSvg,/data-lane-terminal/,'HTTP GET bez tekstu statusu');
+  assert.equal((end.match(/data-lane-terminal/g)||[]).length,3);
+  assert.doesNotMatch(render(c.snapshot(ev('disconnected','http-B')-.01)),/data-lane-terminal/,'błąd B: status po dotarciu impulsu');
+  const errorStop=render(c.snapshot(at('error')));
+  assert.equal(statusOf(errorStop,'B')[2],'! error');assert.equal(statusOf(errorStop,'A'),null);assert.equal(statusOf(errorStop,'C'),null);
+  assert.equal(statusOf(render(c.snapshot(ev('disconnected','http-A')-.01)),'A'),null);
+  // Status w linii wartości, po prawej od niej (bez nachodzenia).
+  for(const [id,value] of [['A','Paweł'],['B','Błąd'],['C','Białystok']]){
+   const field=c.snapshot(c.duration).histories.find(h=>h.anchor===id);
+   const tag=nodeSvg(end,id).match(/<text x="([\d.]+)" y="([\d.]+)" font-size="([\d.]+)"[^>]*data-lane-terminal/);
+   assert.ok(Math.abs(Number(tag[2])-(field.y+14*1.42))<1e-6,format+' '+id+': linia wartości');
+   assert.ok(field.x+value.length*.52*22*1.42<Number(tag[1])-10*.56*Number(tag[3]),format+' '+id+': status za wartością');
+  }
+ }
 });

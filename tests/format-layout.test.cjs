@@ -83,7 +83,7 @@ test('4:3 tile labels grow to 1.3× when they fit and keep 1.15× for long names
  assert.equal(label('23-angular-alias','async'),29.9); // „async · alias user” nie mieści się w 1,3×.
 });
 
-test('04-operator in 4:3 is a centred lane pipeline and the receiver row shows 2, 4, 6',async()=>{
+test('04-operator in 4:3 is a centred lane pipeline and the receiver field shows the full name',async()=>{
  const {scenes,compile,render}=await deck('4:3');
  const c=compile(scenes.find(s=>s.id==='04-operator')),end=c.snapshot(c.duration);
  assert.equal(end.textScale,1.42);
@@ -92,8 +92,8 @@ test('04-operator in 4:3 is a centred lane pipeline and the receiver row shows 2
  assert.ok(Math.abs((top+bottom)/2-end.height/2)<2,'wyśrodkowane w pionie');
  const left=Math.min(...tiles.map(n=>n.x-n.w/2)),right=Math.max(...tiles.map(n=>n.x+n.w/2));
  assert.ok(Math.abs((left+right)/2-end.width/2)<2,'wyśrodkowane w poziomie');
- const svg=render(end),received=[...svg.matchAll(/data-token="received"[^>]*>.*?<text[^>]*>([^<]*)<\/text>/g)].map(m=>m[1]);
- assert.deepEqual(received,['2','4','6']);
+ const svg=render(end);
+ assert.match(svg,/data-field-value="Paweł Kondraciuk"/);
  const label=Number(svg.match(/<g data-node="source"[^>]*>.*?<text[^>]*font-size="([^"]+)"/)[1]);
  assert.ok(label>=40,String(label));
 });

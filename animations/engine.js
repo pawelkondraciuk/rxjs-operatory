@@ -246,10 +246,12 @@ export function compileScene(scene) {
       if(!role)return [];
       const from=role==='receiver'?input.start:connectedAt(out);
       if(time<from)return [];
-      let state='running',stoppedAt,since=from;
+      let state='running',stoppedAt,since=from,statusAt;
       if(role==='receiver') {
         const end=input.end,arrival=end&&(end.kind==='unsubscribe'?end.at:end.at+(end.duration||transitionDuration));
-        if(end&&time>=arrival){state=end.kind==='complete'?'completed':end.kind==='error'?'error':'cancelled';since=arrival;}
+        if(end&&time>=arrival){state=end.kind==='complete'?'completed':end.kind==='error'?'error':'cancelled';since=arrival;
+          // Status tekstowy odbiorcy (laneTerminalText): po unsubscribe dopiero, gdy × dotrze do źródła.
+          if(end.kind==='unsubscribe')statusAt=end.at+(end.duration||transitionDuration);}
       } else if(out.end&&time>=out.end.at+(out.end.kind==='unsubscribe'?out.end.duration||transitionDuration:0)) {
         // complete/error zmienia stan w chwili wysłania w dół; unsubscribe — po dotarciu od odbiorcy.
         since=out.end.at+(out.end.kind==='unsubscribe'?out.end.duration||transitionDuration:0);
@@ -263,7 +265,7 @@ export function compileScene(scene) {
       }
       const lane={role,subscriber,label:graph.subscribers?.[subscriber]?.label??subscriber,y:laneY(n,subscriber),color:subscriberColor(subscriber),fill:graph.subscribers?.[subscriber]?.fill,
         progressFill:graph.subscribers?.[subscriber]?.progress??graph.subscribers?.[subscriber]?.fill,
-        state,since,status:laneStatus[state==='running'&&role!=='work'?'waiting':state],opacity:clamp((time-from)/fadeDuration),
+        state,since,...(statusAt===undefined?{}:{statusAt}),status:laneStatus[state==='running'&&role!=='work'?'waiting':state],opacity:clamp((time-from)/fadeDuration),
         ...(n.rowTint?{labelColor:graph.subscribers?.[subscriber]?.ink}:{})};
       // laneFallback (opt-in, np. catchError → of([])): chwilowa pigułka w wierszu operatora, fade-in i fade-out 0,3 s.
       const shown=fallbackTimes.get(n.id);
@@ -366,12 +368,13 @@ export function compileScene(scene) {
   }
   // node.emits (opt-in, np. subject$.next(user)): wartość bez kabla wejścia pojawia się (fade-in) w środku wierszy kafelka
   // w chwili at i stamtąd rozdziela się na wyjścia z tym samym logicalAt — jedna emisja, kilka powiadomień next.
+  // Kulka czeka na wysokości wierszy odbiorców tej emisji (środek ich torów): przy jednym odbiorcy — w jego wierszu.
   function emitsOf(n,left,right) {
-    const slots=Object.values(n.laneSlots||{}),y=n.top+n.defH+(slots.length?Math.max(...slots)+1:1)*n.rowH/2;
     return (n.emits||[]).map(e=>{
       const logicalAt=e.logicalAt??e.at;
       const outputs=laneRecords.filter(r=>r.a.id===n.id).flatMap(out=>out.events.filter(v=>v.logicalAt===logicalAt&&v.at>=e.at)
         .map(v=>({value:v.value,color:v.color||'a',y:laneY(n,out.subscriber),at:v.at})));
+      const y=outputs.length?(Math.min(...outputs.map(o=>o.y))+Math.max(...outputs.map(o=>o.y)))/2:0;
       return outputs.length?{arrival:e.at,departure:Math.min(...outputs.map(o=>o.at)),value:e.value,color:e.color||'a',
         y,left,right,x:n.x,outputs,emitted:true}:null;
     });
@@ -581,7 +584,10 @@ export function compileScene(scene) {
       const valuesToShow=q.deduplicate?[...new Map(delivered.map(v=>[v.value,v])).values()]:delivered;
       const ordered=valuesToShow.sort((a,b)=>a.arrival-b.arrival);
       // Kulki: tylko max widocznych i jedna wypadająca — snapshot nie rośnie z liczbą emisji.
-      return {...q,values:q.balls&&q.max?ordered.slice(-(q.max+1)):ordered};
+      // field.error (opt-in): pole widoku po dotarciu error do swojego odbiorcy pokazuje komunikat błędu zamiast wartości.
+      const failedAt=q.field?.error===undefined?undefined:Math.min(...records.filter(e=>e.b.id===q.anchor&&e.end?.kind==='error')
+        .map(e=>e.end.at+(e.end.duration||transitionDuration)));
+      return {...q,values:q.balls&&q.max?ordered.slice(-(q.max+1)):ordered,...(time>=failedAt?{failed:{shownAt:failedAt}}:{})};
     });
     const codeIndex=codeFrames.findLastIndex(frame=>frame.at<=time);
     const reveal=codeReveals.find(frame=>frame.index===codeIndex)||codeReveals.find(frame=>frame.index===codeIndex+1);

@@ -146,11 +146,11 @@ test('manual stops deliver only after travel; snapshots survive seeking backward
   }
 });
 
-test('operator function delivers three doubled values and complete without work or source history',async()=>{
+test('operator function delivers one mapped User string and complete without source history',async()=>{
   const {player}=await harness();const {api}=player('04-operator');
-  api.seek(api.stops.at(-1).time);
-  assert.deepEqual(Array.from(api.snapshot.histories[0].values,v=>v.value),['2']);
-  api.finish();assert.deepEqual(Array.from(api.snapshot.histories[0].values,v=>v.value),['2','4','6']);
+  api.seek(api.stops.find(s=>s.id==='received').time);
+  assert.deepEqual(Array.from(api.snapshot.histories[0].values,v=>v.value),['"…"']);
+  api.finish();assert.deepEqual(Array.from(api.snapshot.histories[0].values,v=>v.value),['"…"']);
   assert.ok(api.snapshot.edges.every(e=>e.done));
   assert.ok(api.snapshot.nodes.every(n=>!n.showProgress));
   assert.equal(api.snapshot.nodes.find(n=>n.id==='observer').notification,'complete');

@@ -39,8 +39,8 @@ MAIN ma **32 slajdy (21 animowanych)**. EXTRAS zawiera **36 wariantów**. Cało�
 
 Kolejność po otwarciu:
 
-1. Trzy pierwsze slajdy techniczne pokazują komplet podstawowych zachowań Observable: HTTP — subscribe, next, complete (`05-zrodla-2`) → interval na żywo — wielokrotne next, unsubscribe (`05-zrodla`) → Subject — ręczne next i error (`05-zrodla-5`). Zaraz po nich map, pipe i wykonanie (`04-operator`).
-2. Jedna historia Cold → Subject → share, w parach Subject/share na tych samych przykładach: cold — trzy subskrypcje, trzy HTTP (`04a-dwa-tory`) → Subject + HTTP: jeden HTTP, trzech odbiorców (`05-zrodla-3`) → share + HTTP: jeden HTTP, trzech odbiorców (`04a-dwa-tory-2`) → Subject + interval: odbiorcy odchodzą, źródło nadal działa (`05-zrodla-4`) → share + interval: ostatni odbiorca odłącza źródło (`04a-dwa-tory-3`) → share + HTTP: późny odbiorca uruchamia nowy request (`20-sharereplay`) → shareReplay + HTTP: późny odbiorca dostaje wynik z bufora (`20-sharereplay-2`). Powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
+1. Trzy pierwsze slajdy techniczne pokazują komplet podstawowych zachowań Observable: HTTP — subscribe, next, complete (`05-zrodla-2`) → interval na żywo — wielokrotne next, unsubscribe (`05-zrodla`) → Subject — ręczne next, późny subskrybent bez historii i complete (`05-zrodla-5`). Zaraz po nich HTTP GET + map: obiekt User → „Paweł Kondraciuk” (`04-operator`), wstęp do Cold.
+2. Jedna historia Cold → Subject → share, w parach Subject/share na tych samych przykładach: cold — trzy subskrypcje, trzy HTTP, B kończy się błędem (`04a-dwa-tory`) → Subject + HTTP: jeden HTTP, trzech odbiorców (`05-zrodla-3`) → share + HTTP: jeden HTTP, trzech odbiorców (`04a-dwa-tory-2`) → Subject + interval: odbiorcy odchodzą, źródło nadal działa (`05-zrodla-4`) → share + interval: ostatni odbiorca odłącza źródło (`04a-dwa-tory-3`) → share + HTTP: późny odbiorca uruchamia nowy request (`20-sharereplay`) → shareReplay + HTTP: późny odbiorca dostaje wynik z bufora (`20-sharereplay-2`). Powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
 3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap (cztery *Map obok siebie) → distinctUntilChanged przed switchMap (`11a-distinct-switchmap`, jedyny distinctUntilChanged w MAIN).
 4. catchError wewnątrz/na zewnątrz → wspólne porównanie debounceTime i auditTime (`16-czas-cztery`).
 5. Cztery pytania podsumowania → „Pytania?” → rozmowa z salą albo dodatkowe przykłady.
@@ -74,6 +74,17 @@ Pozostałe bloki obejmują pozycję share/refCount, dodatkowe porównania subskr
 | Kółka/kapsułki z liczbą lub tekstem | Emitowane wartości next i historia odebranych wartości. |
 
 Kolory wartości rozróżniają też gałęzie A/B/C. Unsubscribe nie oznacza complete producenta i nie wywołuje callbacku complete odbiorcy.
+
+**Wspólny język zakończeń** (HTTP `05-zrodla-2`, interval `05-zrodla`, Subject `05-zrodla-5`, operator `04-operator`, Cold `04a-dwa-tory`):
+
+| Zdarzenie | Animacja | Wiersze wykonania | Status przy odbiorcy |
+| --- | --- | --- | --- |
+| next | kolorowa kulka od źródła do odbiorcy | bez zmian | odbiorca zachowuje wartość (kulka lub pole widoku) |
+| complete | zielony impuls downstream | jasnozielone na całej ścieżce | `✓ complete` (zielony) |
+| error | czerwony impuls downstream | jasnoczerwone w błędnym wykonaniu | `! error` (czerwony), nigdy complete po error |
+| unsubscribe | szary impuls `×` upstream, od odbiorcy do źródła | szare | szary `×` (na interval sam znak, bo wiersz mieści trzy kulki), nigdy checkmark |
+
+Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawej od otrzymanych danych; pojawia się dopiero po dotarciu impulsu (unsubscribe — po dotarciu `×` do źródła). Kafelki pośrednie (HTTP GET, map, Subject) nie powtarzają napisu — pokazują tylko kolor tła wiersza. Przy polu widoku z długą wartością („Paweł Kondraciuk”) status stoi w linii etykiety pola.
 
 ## Otwarcie i społeczność
 
@@ -189,15 +200,29 @@ Brak notatek w HTML.
 
 ### Operator to funkcja — `04-operator`
 
-**MAIN — po HTTP, interval i Subject — ręcznej emisji.** Wygląd torów jak w `04a-dwa-tory`: nagłówek kafelka to definicja, wiersz pod nim — wykonanie A. READY pokazuje kod `of(1, 2, 3)` i sam nagłówek `of(1, 2, 3)`. Źródło emituje kolejno trzy osobne liczby: 1, 2, 3.
+**MAIN — po HTTP, interval i Subject — ręcznej emisji; przed Cold.** Jedna historia o danych użytkownika: ten sam obiekt `User` (`{ firstName: 'Paweł', lastName: 'Kondraciuk', city: 'Białystok' }`) wraca na Cold. Kod:
 
-Pierwsze prawo odsłania jednocześnie `.pipe(map(x => x * 2))` w drugiej linii kodu oraz nagłówek map. Oba pojawiają się łagodnym fade-in przez 0,3 s, bez przesuwania układu. Pipe składa definicję, nie uruchamia źródła. Następny etap: pojawia się odbiorca A (wiersz z inboxem) i chwilowy napis `.subscribe()` A nad pipeline'em, potem subskrypcja biegnie od niego ku źródłu, a pod nagłówkami map i of rosną wiersze A; napis znika, gdy subskrypcja dotrze do of.
+```ts
+http.get<User>('/api/users/42')
+.pipe(map(user => `${user.firstName} ${user.lastName}`))
+```
 
-Pierwsza wartość przechodzi ręcznie: kulka 1 wjeżdża do wiersza map, zatrzymuje się, zmienia w 2 i jedzie do odbiorcy. Jeden RxJS map podwaja każdą z trzech kolejnych emisji, bez zagnieżdżonego map. Następny krok włącza AUTO dla 2 → 4, 3 → 6 i complete (impuls na kablach); w wierszu odbiorcy zostają kulki 2/4/6. Zielone wiersze oznaczają zakończenie tego wykonania, nie trwałe zamknięcie definicji Observable — nagłówki pozostają pastelowe.
+`http.get<User>()` to nasz klient HTTP zwracający Observable, nie funkcja RxJS: po subskrypcji uruchamia request, przy sukcesie emituje sparsowany obiekt `User`, potem complete. Kod ma dwie linie (36/24 px, klasa `rx-two-lines`), semantycznie jak zapis z `.pipe(` w osobnej linii. Diagram poziomy w wyglądzie torów: HTTP GET (niebieski nagłówek, x/w 170/260, postęp requestu w wierszu) → map (fioletowy, 510/240) → A (kompaktowy odbiorca 960/480 z polem `fullName`); jeden tor A (`#7457D9`, jak na HTTP i interval; S1 zostaje tylko w rodzinie flatteningu), bez dolnej sekcji inner subscriptions. Licznik: Requesty HTTP (kończy na 1).
 
-**Speaker notes:** Najpierw źródło trzech osobnych wartości, potem składanie definicji przez pipe i uruchomienie przez subscribe. Operator dostaje Observable i zwraca Observable; map(project) tworzy funkcję przekazaną do pipe. Projekcja x => x * 2 przekształca pojedynczą liczbę. of, projekcja i odbiór są synchroniczne; postoje i przeloty dotyczą ilustracji.
+| Nr | Checkpoint | Na ekranie |
+| --- | --- | --- |
+| 0 | READY | Kod `http.get<User>('/api/users/42')` i sam nagłówek HTTP GET. Brak wykonania i requestu. |
+| 1 | pipeline | Fade-in 0,3 s: druga linia `.pipe(map(...))` i kafelek map. Pipe składa definicję, nie uruchamia HTTP (Requesty 0). |
+| 2 | subscribed | Odbiorca A i chwilowe `.subscribe()` A; subskrypcja biegnie przez map do HTTP, rosną wiersze A, rusza postęp requestu (Requesty 1). |
+| 3 | response | HTTP kończy pobieranie i emituje jedną kulkę „{…}” (cały User, bez JSON-a) — postój w połowie drogi do map. |
+| 4 | mapped | Kulka stoi w środku wiersza map i zmienia się w „"…"” (string); ta sama subskrypcja, bez nowej pracy. |
+| 5 | received | Wynik dociera do A; pole `fullName` pokazuje pełne „Paweł Kondraciuk”. |
+| 6 | complete | Zielony impuls z HTTP przez map do A; wiersze HTTP GET, map i A zielenieją, a przy A (nad długim wynikiem, w linii etykiety pola) pojawia się `✓ complete` — bez napisu w HTTP GET i map. Map nie zatrzymuje complete i nie wywołuje drugiego requestu. |
+| — | FINISHED | Podpis „Jeden request, jeden User, jeden string. complete zakończył wykonanie”. |
 
-Kontroler `stages`: → zaczyna lub kończy etap, ← cofa checkpoint także w AUTO, Spacja pauzuje/wznawia, M zmienia tryb, R przywraca zatrzymany READY w wybranym trybie. Fade-in cofa się i resetuje razem z kodem i diagramem. Tempo ilustracji: etap pipe 0,65 s, pojawienie odbiorcy 0,3 s, subscribe 3,2 s, przelot 1,2 s, transformacja 1,4 s, zatrzymanie odbioru 0,5 s, terminal 1,2 s, cisza 0,8 s przed FINISHED (rozbłysk wierszy wygasa).
+**Speaker notes** (`template[data-checkpoint-notes="04-operator"]`): „Załóżmy, że pobieramy dane użytkownika z HTTP. Dostajemy cały obiekt, ale nasz widok potrzebuje tylko pełnego imienia i nazwiska” → pipe nie uruchamia HTTP → subscribe uruchamia jeden request → „Operator map dostaje pojedynczą wartość i synchronicznie ją przekształca. Tutaj z obiektu User tworzymy string” (map działa dla każdej kolejnej emisji, nasze HTTP emituje jedną) → „HTTP wykonał jeden request i wyemitował jeden obiekt. Map przekształcił go w jeden string. To nadal jedno wykonanie Observable” → „Map nie zmienia sposobu zakończenia — complete przechodzi dalej do odbiorcy” → przejście do Cold: „Na razie mamy jeden widok, który wyświetla pełne imię i nazwisko. Ale aplikacja się rozrasta. Co jeśli trzy niezależne elementy interfejsu będą potrzebowały różnych pól tego samego użytkownika?”. Cold wraca do surowego `user$ = http.get<User>('/api/users/42')`, bez map.
+
+Kontroler `stages`: → zaczyna lub kończy etap, ← cofa checkpoint także w AUTO, Spacja pauzuje/wznawia, M zmienia tryb, R przywraca zatrzymany READY. Tempo ilustracji: etap pipe 0,65 s, pojawienie odbiorcy 0,3 s, subscribe 3,2 s, request 2,6 s, przelot 1,4 s, projekcja 2 s, zatrzymanie odbioru 0,5 s, terminal 1,6 s, cisza 1 s przed FINISHED.
 
 ### Tory wykonania: cold, share() + HTTP i share() + interval — `04a-dwa-tory`, `-2`, `-3`
 
@@ -209,7 +234,17 @@ Kontroler `stages`: → zaczyna lub kończy etap, ← cofa checkpoint także w A
 
 **Połączenia.** Każdy tor ma własny kabel (~3 px w skali makiety) i porty w kolorze subskrypcji. complete/error: krótki impuls w kolorze akcentu biegnie po kablu do następnego kafelka, tam wiersz zmienia stan, a kabel wraca do koloru toru z mniejszym kryciem jako historia. unsubscribe: bez impulsu, kabel i porty szarzeją i gasną; stan kafelka wyżej zmienia się po dotarciu unsubscribe.
 
-**Cold (`04a-dwa-tory`) — trzy pola widoku.** Realistyczny problem: trzy niezależne miejsca widoku potrzebują danych tego samego użytkownika. Kod pokazuje jedną definicję `const user$ = http.get<User>('/api/users/42');` (marka HTTP świeci, gdy któraś odpowiedź wylatuje); bez `map()`, `pluck()`, osobnych Observable pól i bez linii subscribe. Diagram ma dwie kolumny: kafelek HTTP GET (x/w 272/420) i trzy kompaktowe pola widoku (x/w 960/436) w kolorach A/B/C (`#7457D9`, `#D8840F`, `#2F7ED8`): pasek toru, port, inbox, litera, etykieta właściwości w monospace (`user.firstName`, `user.lastName`, `user.city`) i miejsce na wartość (przerywany slot). Pola istnieją od READY (puste); litera i inbox wykonania pojawiają się z subscribe. A subskrybuje w 1 s, B w 1,4 s, C w 1,6 s czasu modelu (B odsunięte o 0,4 s, żeby postój po A wypadł przed subscribe B; C 200 ms po B) — każde subscribe uruchamia własne HTTP (#1, #2, #3), wszystkie trzy trwają jednocześnie (postęp jako tło wierszy A/B/C w HTTP GET). Każde wykonanie emituje jeden raz cały obiekt `{ firstName: 'Paweł', lastName: 'Kondraciuk', city: 'Białystok' }`, pokazany jako kulka „{…}” (symbol obiektu; r 34, font 26) w kolorze wykonania; HTTP nie emituje pól osobno. Po dotarciu kulki pole pokazuje tylko swoją właściwość: Paweł, Kondraciuk, Białystok (fade-in 0,3 s). complete każdego HTTP przychodzi 1 s modelu po next (osobny etap, zielony impuls). Chwilowe napisy `.subscribe()` A/B/C nad kolumną pól, od subscribe (bez wyprzedzenia — pola są widoczne od READY) do dotarcia impulsu do HTTP. Liczniki: „Observable 1” i „Requesty HTTP” (executionCounts.started, rośnie po zestawieniu subskrypcji, kończy na 3). Postoje: first (A zestawione, wiersz A w HTTP GET, licznik 1, przed subscribe B), requests (trzy requesty aktywne), received (trzy pola wypełnione, przed complete), potem AUTO z complete i końcowym podpisem „Trzy pola wyglądają poprawnie, ale backend dostał trzy identyczne requesty”. Notatki per checkpoint (`template[data-checkpoint-notes="04a-dwa-tory"]`: ready, first, requests, received, finished) kończą się pytaniem, czy da się wykonać HTTP raz dla wszystkich — przejście do Subject. Warianty `-2` i `-3` mają własne szablony notatek; ostatnia notatka Cold prowadzi do Subject + HTTP (`05-zrodla-3`).
+**Cold (`04a-dwa-tory`) — trzy niezależne subskrypcje, jeden błąd.** Realistyczny problem: trzy niezależne miejsca widoku potrzebują danych tego samego użytkownika. Kod pokazuje jedną definicję `const user$ = http.get<User>('/api/users/42');` (marka HTTP świeci, gdy któraś odpowiedź wylatuje); bez `map()`, `pluck()`, `catchError`, osobnych Observable pól, linii subscribe i składni frameworka — zakładamy, że każde pole samo subskrybuje `user$` i obsługuje wynik albo błąd. Diagram ma dwie kolumny: kafelek HTTP GET (x/w 272/420) i trzy kompaktowe pola widoku (x/w 960/436) w kolorach A/B/C (`#7457D9`, `#D8840F`, `#2F7ED8`): pasek toru, port, inbox, litera, etykieta właściwości w monospace (`user.firstName`, `user.lastName`, `user.city`) i miejsce na wartość (przerywany slot).
+
+READY (bez zmian względem poprzedniej wersji): sam nagłówek HTTP GET, trzy puste pola, bez liter A/B/C, portów i połączeń; liczniki Observable 1, Requesty HTTP 0. Pierwsze „dalej”: A (1 s czasu modelu), B (1,25 s) i C (1,5 s) subskrybują kolejno — chwilowe `.subscribe()` z literą toru nad kolumną pól, impuls biegnie od pola do HTTP, w HTTP GET rośnie wiersz wykonania i startuje osobny request. Wszystkie trzy trwają równolegle (postęp jako tło wierszy). Drugie „dalej”: HTTP B kończy się błędem (2,8 s), gdy A i C nadal pracują — postęp B staje, czerwony impuls error biegnie do pola B, wiersz B robi się czerwony, a w miejscu placeholdera `user.lastName` pojawia się „Błąd” (fade-in 0,3 s); B nie emituje User ani complete. Trzecie „dalej”: A i C kończą request, emitują cały obiekt User (kulka „{…}”) i complete (zielony impuls); pola pokazują Paweł i Białystok. Ostatnie „dalej”: AUTO do FINISHED z podpisem „Jedna definicja, trzy wykonania i trzy identyczne requesty — każde z własnym zakończeniem”. Stan końcowy: A — Paweł, complete; B — Błąd, error; C — Białystok, complete; Requesty HTTP 3 (uruchomione, nie udane).
+
+| Nr | Checkpoint | Notatka prelegenta |
+| --- | --- | --- |
+| 0 | READY | Wyobraźmy sobie widok aplikacji. W jednym miejscu wyświetlamy imię użytkownika, w drugim nazwisko, a w trzecim miasto. Wszystkie potrzebują danych tego samego użytkownika. |
+| 1 | requests | Mamy jedną definicję user$. Ale każde z tych miejsc niezależnie ją subskrybuje. I co się dzieje? Powstają trzy osobne requesty. |
+| 2 | error | Drugi request się nie udał. Czy to oznacza, że pozostałe również się zatrzymają? |
+| 3 | answer | Nie. To trzy niezależne wykonania tego samego cold Observable. B kończy się błędem, ale A i C nadal pracują i kończą się poprawnie. |
+| 4 | FINISHED | Mamy jedną definicję Observable, ale trzy wykonania. Każde ma własną subskrypcję i własny cykl życia. Wszystkie pytają backend o dokładnie tego samego użytkownika. Czy naprawdę musimy wykonywać trzy requesty? Prawo: Subject + HTTP. |
 
 **share(): jedno HTTP, trzech odbiorców (`-2`).** Po Subject + HTTP, ten sam przykład co Cold: `const user$ = http.get<User>('/api/users/42')` / `  .pipe(share());` (marka HTTP świeci podczas odpowiedzi, share() przy rozesłaniu next i complete), bez `map()`. Wygląd Subject + HTTP (`05-zrodla-3`): HTTP GET x/w 177/230, share() 517/230 w miejscu Subject, pola widoku A (`user.firstName`), B (`user.lastName`) i C (`user.city`) z Cold (960/436), top 178/102, viewBox 1240×612/460. READY: tylko nagłówki HTTP GET i share(), Requesty HTTP 0. A subskrybuje w 1 s: chwilowe `.subscribe()` A trwa do dotarcia impulsu przez share() do HTTP; powstaje jeden wiersz `#1` w HTTP GET (wspólne wykonanie w kolorze A — uruchomił je A, zarządza nim share) i wiersz A w share(), request startuje. B (2,6 s) i C (3,2 s) subskrybują tę samą instancję user$ przed odpowiedzią; ich `.subscribe()` biegnie tylko do share(), w share() pojawiają się wiersze B i C z lewym paskiem w kolorze wspólnego upstreamu, HTTP nadal ma jeden wiersz i ten sam postęp, porty się nie przesuwają. W 5 s HTTP emituje jedną kulkę „{…}”, która rozdziela się na porcie share() na trzy identyczne kulki; pola pokazują Paweł, Kondraciuk, Białystok. complete w 6 s: zielony impuls przez share() do A, B i C. Liczniki: Odbiorcy (3) i Requesty HTTP (kończy na 1 — jeden request zamiast trzech). Postoje: subscribed-a, joined (B i C dołączyli), multicast, complete, potem AUTO do FINISHED z podpisem „Jeden request, trzech odbiorców. Bez ręcznego podłączania Subjecta do HTTP”. Notatki per checkpoint w `template[data-checkpoint-notes="04a-dwa-tory-2"]` (ready, cztery postoje, finished; 45–60 s); finished: „Share współdzieli request automatycznie. Ale współdzielenie to nie wszystko. Co dzieje się ze źródłem, gdy odbiorcy rezygnują?”.
 
@@ -223,13 +258,13 @@ Kontroler `stages`: → zaczyna lub kończy etap, ← cofa checkpoint także w A
 
 ### Źródła — rodzina `05-zrodla`
 
-Warianty zachowują ID, lecz zajmują oddzielne miejsca narracji: **HTTP otwiera część właściwą**, interval jest drugi, a Subject — ręczna emisja (next i error) trzeci, przed „Operator to funkcja”. Dwa pozostałe Subjecty stoją między Cold i share: **Cold → ręczny multicast HTTP przez Subject → automatyczny multicast przez share() → ręczne połączenie, którego nikt nie odłącza → share() odłącza źródło sam**.
+Warianty zachowują ID, lecz zajmują oddzielne miejsca narracji: **HTTP otwiera część właściwą**, interval jest drugi, a Subject — ręczna emisja (next i complete) trzeci, przed „Operator to funkcja”. Dwa pozostałe Subjecty stoją między Cold i share: **Cold → ręczny multicast HTTP przez Subject → automatyczny multicast przez share() → ręczne połączenie, którego nikt nie odłącza → share() odłącza źródło sam**.
 
 | ID | Kod i zachowanie |
 | --- | --- |
 | 05-zrodla-2 | `http.get('/api/data')`; pierwsze „dalej” dopisuje `.subscribe(render)` (fade-in razem z odbiorcą A). READY ma tylko nagłówek HTTP GET; subscribe odsłania odbiorcę i wiersz A. Postój request pokazuje pracę po podłączeniu, postój first odebrane dane przed complete. |
 | 05-zrodla | `interval(1000)` na żywo. Pierwsze „dalej” robi `.subscribe()`, potem emisje 0, 1, 2, 3… co sekundę bez końca; drugie „dalej” robi `.unsubscribe()` (bez complete); trzecie przechodzi dalej. |
-| 05-zrodla-5 | Stale tylko `const subject$ = new Subject<number>();`. A i B kolejno subskrybują pusty Subject (migawki `const subA/subB = subject$.subscribe({ next, error })`); migawki `subject$.next(1)` i `subject$.next(2)` — kulka w Subject rozdziela się na dwa identyczne powiadomienia; `subject$.error(new Error('Boom'))` — czerwony impuls do A i B, wiersze w stanie × error; `subject$.next(3)` po błędzie gaśnie bez emisji. Bez complete i unsubscribe. |
+| 05-zrodla-5 | Stale tylko `const subject$ = new Subject<number>();`. A subskrybuje i dostaje `subject$.next(1)`; dopiero potem pojawia się B (`subject$.subscribe(observerB)`) i nie dostaje wcześniejszej 1; `subject$.next(2)` trafia do A i B; `subject$.complete()` — zielony impuls do obu, wiersze ✓ complete, historie zostają (A: 1, 2; B: 2). Bez error, unsubscribe i upstreamu. |
 | 05-zrodla-3 | Stale tylko `const subject$ = new Subject<User>();`. A/B/C (pola widoku z Cold) subskrybują Subject od READY; migawka `http.get<User>('/api/users/42').subscribe(subject$)` podłącza jedno HTTP, które przez Subject rozsyła obiekt User i complete do trzech pól. |
 | 05-zrodla-4 | `const subject$ = new Subject<number>();` i `const connection = interval(1000).subscribe(subject$);`. Start już działający: interval → Subject → A/B/C; kolejne „dalej” to `subA/subB/subC.unsubscribe()`, a interval emituje dalej do Subjecta bez odbiorców; ostatnie „dalej” wywołuje `connection.unsubscribe()` i zatrzymuje interval (Subject bez complete). |
 
@@ -237,32 +272,43 @@ Cała rodzina ma wygląd torów jak w `04a-dwa-tory` (nagłówek = definicja, wi
 
 interval to jeden rząd: `interval(1000)` → odbiorca A. Slajd jest wyjątkiem od postojów: po `.subscribe()` emisje trwają tak długo, jak prelegent chce (licznik „emisje” rośnie bez ograniczeń, w wierszu odbiorcy zostają 3 ostatnie kulki, starsza płynnie wypada). Kolejne „dalej” wywołuje `.unsubscribe()` na istniejącym wykonaniu: wartość już wysłana dociera, potem szary pocisk „×” jedzie od odbiorcy w lewo do interval, przebyty kabel i wiersze szarzeją, emisje ustają; nie ma zielonego complete. AUTO ani pauza nie wywołują unsubscribe same. Lewo cofa etap (z anulowanego do emisji od zera, z emisji do READY); wyjście ze slajdu sprząta wykonanie, a powrót startuje od READY. Druk pokazuje anulowany kadr po wartościach 0, 1, 2.
 
-**Subject — ręczna emisja (`05-zrodla-5`) — 60–75 sekund.** Trzeci slajd techniczny, zaraz po interval i bezpośrednio przed „Operator to funkcja” (bez slajdu przejściowego). Domyka komplet podstawowych zachowań Observable z trzech pierwszych slajdów: HTTP — subscribe, next, complete; interval — wielokrotne next i unsubscribe; Subject — ręczne next oraz error, trzeci rodzaj powiadomienia. To proste wprowadzenie do error, nie lekcja obsługi błędów (catchError później).
+**Subject — ręczna emisja (`05-zrodla-5`) — 45–60 sekund.** Trzeci slajd techniczny, zaraz po interval i bezpośrednio przed „Operator to funkcja”. Pokazuje, że Subject można subskrybować, samodzielnie emitować do niego wartości i ręcznie go zakończyć — oraz że Subject jest hot: późny subskrybent nie otrzymuje wcześniejszych wartości. Subject nie jest podłączony do zewnętrznego źródła (bez connection i upstreamu). Error pojawi się dopiero na Cold z trzema requestami.
 
-Kod przez cały slajd: `const subject$ = new Subject<number>();` (fragment `new Subject<number>()` świeci od każdego ręcznego next do wyjścia powiadomień i od error do jego wysłania; przy next(3) już nie świeci). Pełny kod odbiorców jest tylko w notatkach — obaj mają funkcję error, więc rzeczywiste `error()` nie daje nieobsłużonego wyjątku:
+Kod demonstracji (na slajdzie stale tylko pierwsza linia; pozostałe wywołania to chwilowe migawki nad diagramem, x 620, y top/2, size 34):
 
 ```ts
-const subA = subject$.subscribe({
-  next: value => console.log('A', value),
-  error: err => console.error('A', err)
-});
-// subB analogicznie
+const subject$ = new Subject<number>();
+
+subject$.subscribe(observerA);
+subject$.next(1);
+subject$.subscribe(observerB);
+subject$.next(2);
+subject$.complete();
 ```
 
-Na slajdzie wywołania są chwilowymi migawkami w jednym miejscu nad diagramem (x 620, y top/2, size 34): `const subA = subject$.subscribe({ next, error })` i `const subB = …` z literą toru, `subject$.next(1)`, `subject$.next(2)` (bez badge'a, kolor emisji Subjecta), `subject$.error(new Error('Boom'))` (czerwona) i `subject$.next(3)` (szara, gaśnie bez skutku). Diagram Subject → A/B w wyglądzie torów: Subject x/w 177/230 z wierszami A/B, kompaktowi odbiorcy A/B 960/436 (inbox, litera, do dwóch kulek r 34/font 30), top 178/102, viewBox 1240×612/460, płaskie kafelki, liczniki rx-lanes. Bez HTTP, legendy, nowych paneli i obszaru „PRACE WEWNĘTRZNE”.
+Fragment `new Subject<number>()` świeci od każdego ręcznego next do wyjścia powiadomień i od complete() do jego wysłania. Diagram Subject → A/B w wyglądzie torów: kafelek `Subject<number>` x/w 217/340 (wiersze rosną z subskrypcjami), kompaktowi odbiorcy A/B 960/466 (inbox, litera, do dwóch kulek r 34/font 30), top 178/102, viewBox 1240×612/460, płaskie kafelki, liczniki rx-lanes (Odbiorcy, Emisje next). Odbiorca pojawia się dopiero tuż przed swoim subscribe; w READY nie ma pustych prostokątów A/B. Bez HTTP, innych operatorów, legendy i dodatkowych paneli.
 
-READY: pusty kafelek Subject (sam nagłówek) i dwaj odbiorcy bez subskrypcji; liczniki Odbiorcy 0 i Emisje next 0. Kolejne „dalej”: A subskrybuje (kabel rośnie od A do Subjecta w 1 s, w Subject powstaje wiersz A) → B subskrybuje → next(1): kulka 1 pojawia się (fade-in) w środku Subject, rozdziela się na dwa powiadomienia i dociera do A i B → next(2): tak samo, odbiorcy mają 1, 2 → error: czerwony błysk w wierszach Subject (stan error w chwili wysłania), czerwone impulsy biegną po obu kablach, po dotarciu wiersze A i B przechodzą w stan błędu (czerwone tło i tekst „× error” przy prawej krawędzi — także w wierszach Subject); bez kulki, zielonego complete i szarego unsubscribe; Odbiorcy 0 → next(3): szara migawka, żadnej kulki, impulsu, nowych wierszy ani subskrypcji; Emisje next zostają na 2. Ostatnie „dalej” odtwarza AUTO do FINISHED z podpisem „A i B: 1, 2, error. Subject zakończył się błędem — next(3) nie dotarło”. Harmonogram (czas ilustracji = czas modelu): subscribe A/B 0,6/2,6 s (zestawienie 1 s), next(1) 4,6 s (rozesłanie 5,8, dotarcie 7,2), next(2) 8,2 s (9,4 → 10,8), error 11,8 s (wysłanie 12,4, dotarcie 13,6), next(3) 14,8 s, podsumowanie 16,6 s, koniec 18,2 s. Postoje: subscribed-a, subscribed-b, next-1, next-2, error, next-after-error.
+| Nr | Checkpoint | Na ekranie |
+| --- | --- | --- |
+| 0 | READY | Tylko kafelek `Subject<number>`; Odbiorcy 0, Emisje next 0. |
+| 1 | subscribed-a | Pojawia się A; migawka `subject$.subscribe(observerA)`, kabel rośnie od A do Subjecta, w Subject powstaje wiersz A. A czeka. |
+| 2 | next-1 | Migawka `subject$.next(1)`; kulka 1 w wierszu A Subjecta jedzie do A. A ma 1, B jeszcze nie istnieje. |
+| 3 | subscribed-b | Pojawia się B; migawka `subject$.subscribe(observerB)`, wiersz B w Subject. B ma pusty inbox, A zachowuje 1 — pytanie do sali, czy B dostanie 1. |
+| 4 | next-2 | Migawka `subject$.next(2)`; kulka rozdziela się na dwa powiadomienia. A: 1, 2; B: 2. |
+| 5 | complete | Zielona migawka `subject$.complete()`; zielony impuls do A i B, wiersze Subject, A i B przechodzą w ✓ complete (tło i tekst), historie zostają, Odbiorcy 0. Bez unsubscribe i error. |
+| 6 | FINISHED | Podpis „A: 1, 2, complete. B: 2, complete. Subject jest hot — późny odbiorca nie dostaje historii”. |
+
+Harmonogram (czas ilustracji = czas modelu): A pojawia się 0,3 s, subscribe 0,6 s (zestawienie 1 s), next(1) 2,6 s (rozesłanie 3,8, dotarcie 5,2), B pojawia się 5,9 s, subscribe 6,2 s, next(2) 8,6 s (9,8 → 11,2), complete 12,2 s (wysłanie 12,8, dotarcie 14,0), podsumowanie 14,8 s, koniec 15,8 s. Cofanie przed subscribe B usuwa odbiorcę B razem z jego wierszem; historia B nigdy nie pojawia się przed subskrypcją.
 
 | Nr | Checkpoint | Notatka prelegenta |
 | --- | --- | --- |
-| 0 | READY | Do tej pory poznaliśmy Observable, które same dostarczały nam wartości: HTTP i interval. Ale co, jeśli chcemy samodzielnie decydować, kiedy pojawi się nowa wartość? Możemy wykorzystać Subject. |
-| 1 | subscribed-a | Pierwszy odbiorca subskrybuje Subject. Przekazuje dwie funkcje: jedną dla kolejnych wartości, drugą na wypadek błędu. |
-| 2 | subscribed-b | B robi dokładnie to samo. Subject ma teraz dwóch odbiorców, ale sam jeszcze niczego nie wysłał. |
-| 3 | next-1 | Teraz sami wywołujemy next i przekazujemy jedynkę. Subject rozsyła ją wszystkim aktualnym odbiorcom — A i B dostają tę samą wartość. |
-| 4 | next-2 | I jeszcze raz: next(2). Next może wystąpić dowolnie wiele razy — tak jak w interval. |
-| 5 | error | Do tej pory pokazywaliśmy zwykłe wartości. Ale Observable może też zakończyć się błędem. Subject pozwala nam ręcznie wywołać error, podobnie jak wcześniej next. Zwróćcie uwagę: obaj odbiorcy dostają informację o błędzie i ich subskrypcje się kończą. |
-| 6 | next-after-error | Spróbujmy jeszcze wysłać trójkę. Nic się nie dzieje. Error zakończył tego Subjecta — nie możemy już kontynuować jego emisji. |
-| 7 | FINISHED / podsumowanie | Mamy więc trzy rodzaje powiadomień: next, complete i error. Next może wystąpić wielokrotnie, ale complete i error kończą strumień. Wcześniej widzieliśmy też unsubscribe, które jest rezygnacją z subskrypcji, a nie kolejnym powiadomieniem. Później zobaczymy, co zrobić, żeby błąd pojedynczego requestu nie zakończył całego nasłuchiwania. Prawo: Operator to funkcja. |
+| 0 | READY | Interval sam produkował kolejne liczby. A co, jeśli chcielibyśmy sami decydować, kiedy pojawi się następna wartość? |
+| 1 | subscribed-a | Subject jest jednocześnie Observable, które można subskrybować, i Observerem, któremu możemy przekazywać wartości. Najpierw korzystamy z pierwszej roli: A subskrybuje. |
+| 2 | next-1 | Teraz druga rola Subjecta: sami wywołujemy next(1). Subject rozsyła wartość do aktualnych odbiorców — na razie jest tylko A. |
+| 3 | subscribed-b | Teraz pojawia się drugi odbiorca. Jak myślicie, czy dostanie jedynkę, którą Subject wyemitował wcześniej? |
+| 4 | next-2 | Nie. Subject nie odtwarza wcześniejszych wartości. B dostaje dopiero dwójkę, podczas gdy A otrzymał zarówno jedynkę, jak i dwójkę. |
+| 5 | complete | Teraz ręcznie kończymy Subject. Complete trafia do wszystkich odbiorców i zamyka ich subskrypcje. Nie musimy już osobno wywoływać unsubscribe. |
+| 6 | FINISHED / podsumowanie | Subject jest przykładem hot Observable — rozsyła emisje do aktualnych subskrybentów. Nowy odbiorca nie dostaje historii. Do różnicy między hot i cold jeszcze wrócimy. Wiemy już, skąd pochodzą wartości: z HTTP, z interval albo z ręcznego next. A co, jeśli chcielibyśmy je po drodze przekształcić? Prawo: Operator to funkcja. |
 
 **Subject: ręczny multicast HTTP — 60–75 sekund.** Bezpośrednio po Cold i odpowiedź na jego problem; Subject znamy już z ręcznej emisji. Te same pola widoku A/B/C (`user.firstName` → Paweł, `user.lastName` → Kondraciuk, `user.city` → Białystok; ten sam wygląd, rozmiar, kolory i kulka `{…}`), ale jeden request zasila je przez Subject. Stały kod to tylko `const subject$ = new Subject<User>();` (fragment `new Subject<User>()` świeci, gdy Subject rozsyła next i complete). Subject jest Observable dla A/B/C i Observerem dla HTTP.
 

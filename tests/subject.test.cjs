@@ -155,7 +155,8 @@ test('Subject keeps lane colours, horizontal receiver connections and the Cold f
    const lane=node(end,'subject').laneStates.find(l=>l.subscriber===id),field=node(end,id),coldField=node(coldEnd,id);
    assert.equal(field.laneStates[0].y,lane.y);
    for(const key of ['x','y','w','h','fill'])assert.equal(field[key],coldField[key],`${format} ${id}.${key} jak na Cold`);
-   const tray=f=>JSON.stringify({...f.histories.find(h=>h.anchor===id),values:[]});
+   // Geometria i opis pola jak na Cold; stan błędu B (field.error, failed) należy tylko do scenariusza Cold.
+   const tray=f=>{const {field:{error,...field},failed,...h}=f.histories.find(h=>h.anchor===id);return JSON.stringify({...h,field,values:[]});};
    assert.equal(tray(end),tray(coldEnd),id+': pole jak na Cold');
   }
   assert.equal(JSON.stringify(end.ball),JSON.stringify(coldEnd.ball));

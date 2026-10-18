@@ -136,7 +136,34 @@ test('lane look in both formats: one row interval(1000) → A, balls inside the 
   h.advance(6000);
   const g=player.snapshot,h0=g.histories[0];
   assert.equal(h0.y,lane(g,'observer').y);assert.equal(lane(g,'interval').y,h0.y);
+  assert.equal(h0.max,3);
   assert.ok(h0.x+2*(2*g.ball.r+h0.gap)+g.ball.r<receiver.x+receiver.w/2,'trzy kulki mieszczą się w wierszu');
   assert.equal(g.panels.length,0);assert.doesNotMatch(svg(),/NaN|Infinity|timer/);
+ }
+});
+
+test('unsubscribe status: a short × at A only after × reaches interval, never ✓ complete; counter keeps the emitted count',async()=>{
+ for(const format of ['4:3','16:9']){
+  const {player,controller,h,svg,render}=await live(format);
+  controller.next();h.advance(5400);
+  const count=player.snapshot.metrics[0].value;
+  assert.ok(count>=4);
+  controller.next();
+  h.advance(400);
+  assert.doesNotMatch(svg(),/data-lane-terminal/,'brak statusu, zanim × dotrze do źródła');
+  h.advance(3000);
+  const end=player.snapshot,out=render(end);
+  assert.equal(player.state,'finished');
+  assert.equal((out.match(/data-lane-terminal="cancelled"[^>]*>×</g)||[]).length,1,'jeden status × przy odbiorcy');
+  assert.equal((out.match(/data-token="received"/g)||[]).length,3,'trzy ostatnie kulki zostają');
+  assert.ok(out.indexOf('data-lane-terminal')>out.indexOf('data-node="observer"'),'status w wierszu A, nie w interval');
+  assert.doesNotMatch(out,/✓ complete|! error/);
+  assert.equal(end.metrics[0].value,count,'licznik zatrzymany na ostatniej emisji, nie wraca do zera');
+  // Status nie zachodzi na kulki odebranych wartości (szacunek szerokości tekstu jak w rendererze).
+  const tag=out.match(/<text x="([\d.]+)"[^>]*font-size="([\d.]+)"[^>]*data-lane-terminal/),right=Number(tag[1]),size=Number(tag[2]);
+  const balls=[...out.matchAll(/data-token="received"[^>]*><circle cx="([\d.]+)"[^>]*r="([\d.]+)"/g)].map(x=>Number(x[1])+Number(x[2]));
+  assert.ok(Math.max(...balls)<right-Array.from('×').length*.56*size,format+': status obok kulek');
+  controller.finish();assert.equal(player.snapshot.metrics[0].value,count);
+  controller.reset();assert.equal(player.snapshot.metrics[0].value,0,'zero dopiero po resecie slajdu');
  }
 });

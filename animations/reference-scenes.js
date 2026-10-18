@@ -5,82 +5,94 @@ const R=(label,events=[],spans=[],extra={})=>({label,events,spans,...extra});
 const B=(start,end,label,kind='work',extra={})=>({start,end,label,kind,...extra});
 const manual=stops=>({entry:'manual',stops,afterLastManualStop:'start-auto',finish:'hold'});
 
-// Wszystkie next i complete mają logicalAt: 0: of emituje synchronicznie.
-// Poniższe czasy wyłącznie rozciągają ilustrację, bez wykonywania kodu przykładu.
+// Operator to funkcja (04-operator): http.get<User>('/api/users/42').pipe(map(user => `${…} ${…}`)). http.get to nasz
+// klient HTTP (nie RxJS): po subskrypcji uruchamia jeden request, emituje jeden obiekt User i complete. map synchronicznie
+// zamienia User w string „Paweł Kondraciuk” — wejście i wynik projekcji mają wspólne logicalAt. Czasy (schedule)
+// wyłącznie rozciągają ilustrację; ten sam obiekt User wraca na następnym slajdzie Cold.
 function mapSequence(scene) {
-  const timing={pipeline:.65,handoff:.05,subscribe:3.2,travel:1.2,transform:1.4,receivedHold:.5,gap:.7,terminal:1.2,settle:.8,reveal:.3,laneReveal:.35,...scene.timing};
+  const timing={pipeline:.65,handoff:.05,subscribe:3.2,request:2.6,travel:1.4,transform:2,receivedHold:.5,gap:.3,terminal:1.6,settle:1,
+    reveal:.3,laneReveal:.35,...scene.timing};
   for(const [key,value] of Object.entries(timing)) {
     if(!Number.isFinite(value)||value<=0)throw new Error(`${scene.id}: nieprawidłowy czas ilustracji ${key}`);
   }
   const seconds=value=>Math.round(value*1e9)/1e9;
   // Odbiorca (wiersz wykonania) pojawia się po etapie pipeline; subscribe rusza, gdy jest w pełni widoczny.
   const born=seconds(timing.pipeline+timing.handoff),subscribe=seconds(born+timing.reveal),connected=seconds(subscribe+timing.subscribe);
-  // laneReveal: wiersz źródła (litera, port) wchodzi po zestawieniu subskrypcji; postój subscribed czeka na niego.
+  // laneReveal: wiersz HTTP (litera, port, początek postępu) wchodzi po zestawieniu subskrypcji; postój subscribed czeka na niego.
   const subscribed=seconds(connected+timing.laneReveal);
-  let departure=seconds(subscribed+timing.handoff);
-  const values=[1,2,3].map(value=>{
-    const arrival=seconds(departure+timing.travel),output=seconds(arrival+timing.transform);
-    const received=seconds(output+timing.travel),held=seconds(received+timing.receivedHold);
-    const item={value:String(value),result:String(value*2),departure,arrival,output,received,held};
-    departure=seconds(held+timing.gap);
-    return item;
-  });
+  // Request trwa od zestawienia subskrypcji do odpowiedzi; jedna wartość User, potem complete.
+  const response=seconds(subscribed+timing.request),arrival=seconds(response+timing.travel),output=seconds(arrival+timing.transform);
+  const received=seconds(output+timing.travel),held=seconds(received+timing.receivedHold);
   // settle: cisza po dotarciu complete, żeby rozbłysk wierszy wygasł przed FINISHED.
-  const complete=values.at(-1).held,finished=seconds(complete+timing.terminal),duration=seconds(finished+timing.settle);
-  return {timing,seconds,pipeline:timing.pipeline,born,subscribe,connected,subscribed,values,complete,finished,duration};
+  const complete=seconds(held+timing.gap),finished=seconds(complete+timing.terminal),duration=seconds(finished+timing.settle);
+  return {timing,seconds,pipeline:timing.pipeline,born,subscribe,connected,subscribed,
+    value:{response,arrival,output,received,held},complete,finished,duration};
 }
+// Kulki: „{…}” — cały obiekt User (jak na Cold), „"…"” — string po projekcji; pełny wynik pokazuje pole odbiorcy.
+const operatorBalls={user:'{…}',text:'"…"'};
 
 export function configureOperator(scene) {
-  const sequence=mapSequence(scene),{timing,pipeline,subscribe,subscribed,values,duration}=sequence;
-  const example='of(1, 2, 3)';
-  // Pipe składa definicję; subskrypcja tworzy wykonanie.
-  const pipelineCaption='pipe składa definicję. map podwoi każdą emitowaną wartość';
-  const subscribeCaption='subscribe łączy odbiorcę ze źródłem i uruchamia wykonanie';
-  const firstCaption='Źródło emituje 1. map przekształca ją w 2, a odbiorca otrzymuje wynik';
-  // Kod pokazuje definicję, a osobny etap ilustruje subskrypcję.
-  Object.assign(scene,{graph:mapGraph,timing,playerLayout:'function',duration,code:example,ink:'#26323B',playerClass:'rx-flat-tiles',
-    codeFrames:[{at:timing.handoff,code:example+'\n.pipe(map(x => x * 2))',fadeIn:.3}],
-    rows:[R('Źródło',values.map(v=>E(0,v.value)),[],{completeAt:0}),
-      R('map',values.map(v=>E(0,v.result,'op')),[],{completeAt:0}),
-      R('Odbiorca',values.map(v=>E(0,v.result,'op')),[],{completeAt:0})],
-    captions:[[0,'of(1, 2, 3) definiuje źródło trzech kolejnych wartości'],[timing.handoff,pipelineCaption],
-      [subscribe,subscribeCaption],...values.flatMap(v=>[
-        [v.departure,`Źródło emituje ${v.value}. Wartość płynie do map`],
-        [v.arrival,`map przekształca ${v.value} w ${v.result}. Projekcja działa synchronicznie`],
-        [v.received,v.value==='1'?firstCaption:`Odbiorca otrzymuje ${v.result} i zachowuje wcześniejsze wartości`],
-      ]),[sequence.complete,'Źródło wysyła complete. Sygnał przechodzi przez map do odbiorcy'],
-      [sequence.finished,'map podwoił trzy wartości. Complete zakończyło to wykonanie']],
+  const sequence=mapSequence(scene),{timing,pipeline,subscribed,value,complete,finished,duration}=sequence;
+  const fill=laneSubscribers.A.fill,example="http.get<User>('/api/users/42')";
+  const captions={
+    pipeline:'pipe składa definicję: map zamieni User na imię i nazwisko. HTTP nadal nie działa',
+    subscribed:'subscribe A przechodzi przez map do HTTP i uruchamia jeden request',
+    response:'HTTP emituje jeden obiekt User. Wartość płynie do map',
+    mapped:'map synchronicznie zamienia User w string „Paweł Kondraciuk”',
+    received:'A dostaje jeden string: Paweł Kondraciuk',
+    complete:'HTTP wysyła complete. map przekazuje je dalej do A',
+  };
+  Object.assign(scene,{graph:mapGraph,timing,playerLayout:'function',duration,code:example,ink:'#26323B',playerClass:'rx-flat-tiles rx-two-lines',
+    // Druga linia dopisuje się (fade-in) razem z kafelkiem map; pipe nie uruchamia HTTP.
+    codeFrames:[{at:timing.handoff,code:example+'\n.pipe(map(user => `${user.firstName} ${user.lastName}`))',fadeIn:.3}],
+    rows:[R('HTTP GET',[E(value.response,operatorBalls.user,fill)],[B(sequence.connected,value.response,'request')],{completeAt:complete}),
+      R('map',[E(value.response,operatorBalls.text,fill)],[],{completeAt:complete}),
+      R('Odbiorca A',[E(value.response,operatorBalls.text,fill)],[],{completeAt:complete})],
+    captions:[[0,"http.get<User>('/api/users/42') to tylko definicja. Request jeszcze nie istnieje"],
+      [sequence.seconds(finished+.6),'Jeden request, jeden User, jeden string. complete zakończył wykonanie']],
+    metrics:[{label:'Requesty HTTP',count:'started'}],
     playback:{...manual([
-      {id:'pipeline',time:pipeline,caption:pipelineCaption},
-      {id:'subscribed',time:subscribed,caption:subscribeCaption},
-      {id:'first',time:values[0].held,caption:firstCaption},
-    ]),controller:'stages'},metrics:[],
+      {id:'pipeline',time:pipeline,caption:captions.pipeline},
+      {id:'subscribed',time:subscribed,caption:captions.subscribed},
+      {id:'response',time:sequence.seconds(value.response+timing.travel/2),caption:captions.response},
+      // Kulka stoi na środku wiersza map i ma już nową wartość (zmiana w połowie projekcji).
+      {id:'mapped',time:sequence.seconds(value.arrival+timing.transform*.62),caption:captions.mapped},
+      {id:'received',time:value.held,caption:captions.received},
+      {id:'complete',time:sequence.seconds(finished+.35),caption:captions.complete},
+    ]),controller:'stages'},
   });
 }
 
-// Wygląd torów jak w 04a: of(1, 2, 3) → map → odbiorca A w jednym rzędzie. Kulka wjeżdża do map, staje
-// i zmienia wartość; odebrane wyniki zostają kulkami w wierszu odbiorcy. Czasy z mapSequence (schedule).
+// Wygląd torów jak w 04a: HTTP GET → map → A w jednym rzędzie (ta sama pojedyncza subskrypcja A co w HTTP i interval).
+// Kulka User wjeżdża do map, staje i zmienia się w string; A pokazuje pełny wynik w polu widoku i ✓ complete.
 export function mapGraph(scene) {
-  const {timing,seconds,born,subscribe,values,complete,finished}=mapSequence(scene);
+  const {timing,seconds,born,subscribe,value,complete,finished}=mapSequence(scene);
   const halfSubscribe=timing.subscribe/2,halfTerminal=timing.terminal/2,fill=laneSubscribers.A.fill;
-  const top=scene.format==='4:3'?222:146,y=laneRowY(top,0),receiver={x:995,w:366,y};
+  const top=scene.format==='4:3'?222:146,y=laneRowY(top,0),receiver={x:960,w:480,y};
+  // Kolumny wyśrodkowane (40…1200): HTTP GET, map i szerszy odbiorca, który mieści pełne „Paweł Kondraciuk”.
   const nodes=[
-    {id:'source',x:217,w:310,label:'of(1, 2, 3)',terminalEdge:'source-map',...laneTile('source',top,{A:0},1)},
-    {id:'map',x:592,w:280,label:'map',color:'op',transformBalls:true,terminalEdge:'map-observer',...laneTile('operator',top,{A:0},1,{ready:false,born:timing.handoff})},
-    laneReceiver('observer','A',receiver,{ready:false,born}),
+    {id:'source',x:170,w:260,label:'HTTP GET',workLanes:true,progressUntilNext:true,terminalEdge:'source-map',...laneTile('source',top,{A:0},1)},
+    {id:'map',x:510,w:240,label:'map',color:'op',transformBalls:true,terminalEdge:'map-observer',...laneTile('operator',top,{A:0},1,{ready:false,born:timing.handoff})},
+    laneReceiver('observer','A',receiver,{ready:false,born,laneTerminalText:true}),
   ];
-  return {layout:'fixed',formatAware:true,width:1240,height:scene.format==='4:3'?612:460,...laneGraphLook(),
+  // Pole wyniku za inboxem i literą A (jak pola Cold): nazwa wyniku w monospace, po dotarciu — pełny string.
+  const k=laneLook.textScale,inbox=laneInbox(),fieldLeft=receiver.x-receiver.w/2+inbox.left+laneLook.icon+8*k+22*k+16;
+  const travelResponse=seconds(subscribe+halfSubscribe);
+  return {layout:'fixed',formatAware:true,width:1240,height:scene.format==='4:3'?612:460,...laneGraphLook(),ball:viewFieldBall,
     subscribers:{A:laneSubscribers.A},nodes,
-    edges:[{from:'source',to:'map',logicalStart:0,subscriber:'A'},{from:'map',to:'observer',logicalStart:0,subscriber:'A'}],
-    trays:[laneTray('observer',receiver,3)],
+    // Wywołanie subscribe to jedna chwila modelu dla całego łańcucha; harmonogram rozciąga tylko ilustrację.
+    edges:[{from:'source',to:'map',logicalStart:subscribe,subscriber:'A'},{from:'map',to:'observer',logicalStart:subscribe,subscriber:'A'}],
+    trays:[{anchor:'observer',x:fieldLeft,y,w:receiver.x+receiver.w/2-14-fieldLeft,field:{label:'fullName',value:`${coldUser.firstName} ${coldUser.lastName}`}}],
     callouts:[subscribeCallout('A','map-observer','source-map',{y:top/2})],
+    executions:[{id:'request',node:'source',edge:'source-map',duration:value.response-travelResponse}],
     schedule:{
-      'source-map':{start:seconds(subscribe+halfSubscribe),connectDuration:halfSubscribe,
-        end:{at:complete,logicalAt:0,kind:'complete',duration:seconds(complete+halfTerminal)-complete},
-        events:values.map(v=>({...E(v.departure,v.value,fill),logicalAt:0,arrival:v.arrival,phase:'to-map'}))},
+      'source-map':{start:travelResponse,connectDuration:halfSubscribe,
+        end:{at:complete,logicalAt:complete,kind:'complete',duration:halfTerminal},
+        events:[{...E(value.response,operatorBalls.user,fill),arrival:value.arrival}]},
       'map-observer':{start:subscribe,connectDuration:halfSubscribe,
-        end:{at:seconds(complete+halfTerminal),logicalAt:0,kind:'complete',duration:finished-seconds(complete+halfTerminal)},
-        events:values.map(v=>({...E(v.output,v.result,fill),logicalAt:0,arrival:v.received,phase:'to-observer'}))},
+        end:{at:seconds(complete+halfTerminal),logicalAt:complete,kind:'complete',duration:finished-seconds(complete+halfTerminal)},
+        // Projekcja jest synchroniczna: wynik ma logicalAt wejścia (odpowiedzi HTTP).
+        events:[{...E(value.output,operatorBalls.text,fill),logicalAt:value.response,arrival:value.received}]},
     },
   };
 }
@@ -167,13 +179,16 @@ function laneCodeLines(plan) {
   return {codeLines:lines,code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeFrames:[],playerClass:'rx-lanes rx-flat-tiles'};
 }
 // Cold (04a-dwa-tory): trzy pola widoku potrzebują danych tego samego użytkownika. Każde subskrybuje ten sam zimny
-// user$, więc powstają trzy niezależne, identyczne requesty (wszystkie trwają jednocześnie). B startuje 0,4 s po A,
-// żeby postój first (wiersz A w HTTP w pełni widoczny) wypadł przed subscribe B; C 0,2 s po B.
-// Każde HTTP emituje cały obiekt User — kulka „{…}”, bez rozbijania na pola; odbiorca wyświetla tylko swoją
-// właściwość. complete 1 s po next (jak w Subject i share), żeby odbiór i zakończenie były osobnymi etapami.
+// user$ (kolejno, co 0,25 s czasu modelu), więc powstają trzy niezależne, identyczne requesty, które trwają jednocześnie.
+// HTTP B kończy się błędem (error w 2,8 s), gdy A i C nadal pracują: bez User i bez complete; pole B pokazuje „Błąd”.
+// A i C emitują cały obiekt User — kulka „{…}”, bez rozbijania na pola; odbiorca wyświetla tylko swoją właściwość.
+// complete 1 s po next (jak w Subject i share), żeby odbiór i zakończenie były osobnymi etapami.
 const coldUser={firstName:'Paweł',lastName:'Kondraciuk',city:'Białystok'},coldUserSymbol='{…}';
-const coldFields=[{id:'A',key:'firstName',start:1},{id:'B',key:'lastName',start:1.4},{id:'C',key:'city',start:1.6}]
+const coldFields=[{id:'A',key:'firstName',start:1},{id:'B',key:'lastName',start:1.25},{id:'C',key:'city',start:1.5}]
   .map((f,slot)=>({...f,slot,edge:`http-${f.id}`,label:`user.${f.key}`,value:coldUser[f.key],response:f.start+3,complete:f.start+4}));
+// Scenariusz Cold: wykonanie B kończy się błędem przed odpowiedziami A i C (pozostałe slajdy używają coldFields bez zmian).
+const coldErrors={B:2.8},coldFieldError='Błąd';
+const coldOutcome=f=>coldErrors[f.id]===undefined?{kind:'complete',at:f.complete}:{kind:'error',at:coldErrors[f.id]};
 // Pola widoku A/B/C wspólne dla Cold i Subject: ta sama kolumna (x/w 960/436), wiersze na torach, etykieta właściwości
 // i miejsce na wartość (tray.field). Kulka obiektu ma ten sam rozmiar na obu slajdach.
 const viewFieldBall={r:34,font:26};
@@ -187,26 +202,30 @@ function viewFields(top,extra={},fields=coldFields) {
 function configureColdFields(scene) {
   const ev=(type,edge)=>({type,edge}),during=(from,to)=>({from,to}),user=f=>E(f.response,coldUserSymbol,laneSubscribers[f.id].fill);
   const http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},last=coldFields.at(-1);
-  // Jedna definicja; http.get świeci, gdy któreś wykonanie wysyła odpowiedź.
+  const ok=coldFields.filter(f=>coldOutcome(f).kind==='complete'),failed=coldFields.filter(f=>coldOutcome(f).kind==='error');
+  // Jedna definicja; http.get świeci, gdy któreś udane wykonanie wysyła odpowiedź.
   const lines=[[{text:'const user$ = '},{text:"http.get<User>('/api/users/42')",mark:http,
-    active:coldFields.map(f=>during(ev('source-next',f.edge),ev('deliver-next',f.edge)))},{text:';'}]];
+    active:ok.map(f=>during(ev('source-next',f.edge),ev('deliver-next',f.edge)))},{text:';'}]];
   Object.assign(scene,{graph:coldFieldsGraph,playerLayout:'function',duration:last.complete+2,ink:'#26323B',
     codeLines:lines,code:lines[0].map(part=>part.text).join(''),codeFrames:[],playerClass:'rx-lanes rx-flat-tiles',
     // Jeden przeskok (odbiorca → HTTP), więc subscribe trwa 1,2 s zamiast 1,6 s przez map.
     timing:{subscribe:1.2,travel:1,transform:1.4,terminal:.8,gap:.5},
-    rows:[...coldFields.map((f,i)=>R(`HTTP #${i+1}`,[user(f)],[B(f.start,f.response,'request')],{completeAt:f.complete})),
-      ...coldFields.map(f=>R(`Pole ${f.label}`,[user(f)],[],{completeAt:f.complete}))],
+    rows:[...coldFields.map((f,i)=>{const end=coldOutcome(f);
+        return R(`HTTP #${i+1}`,end.kind==='error'?[]:[user(f)],[B(f.start,end.kind==='error'?end.at:f.response,'request',end.kind==='error'?'error':'work')],
+          end.kind==='error'?{}:{completeAt:f.complete});}),
+      ...coldFields.map(f=>R(`Pole ${f.label}`,coldOutcome(f).kind==='error'?[]:[user(f)],[],coldOutcome(f).kind==='error'?{}:{completeAt:f.complete}))],
     captions:[[0,'Jedna definicja user$. Trzy pola widoku czekają na dane. Nic jeszcze nie działa'],
-      [1,'A (user.firstName) subskrybuje user$ i uruchamia HTTP #1'],
-      [1.4,'B (user.lastName) subskrybuje ten sam user$ i uruchamia HTTP #2'],
-      [1.6,'C (user.city) robi to samo: HTTP #3. Trzy requesty trwają jednocześnie'],
-      [4,'Każde HTTP zwraca cały obiekt User. Pole wyświetla tylko swoją właściwość'],
-      [5,'Każde wykonanie kończy się complete. Trzy pola są poprawne, ale requesty były trzy']],
+      [coldFields[0].start,'A (user.firstName) subskrybuje user$ i uruchamia HTTP #1'],
+      [coldFields[1].start,'B (user.lastName) subskrybuje ten sam user$ i uruchamia HTTP #2'],
+      [coldFields[2].start,'C (user.city) robi to samo: HTTP #3. Trzy requesty trwają jednocześnie'],
+      [ok[0].response,'A dostaje cały obiekt User i pokazuje imię'],
+      [ok.at(-1).response,'C dostaje cały obiekt User i pokazuje miasto']],
     metrics:[{label:'Observable',value:()=>1},{label:'Requesty HTTP',count:'started'}],
     playback:manual([
-      {id:'first',event:ev('connected',coldFields[0].edge),offset:.35,caption:'A subskrybuje user$ i uruchamia HTTP #1. Co się stanie, gdy subskrybuje B?'},
       {id:'requests',event:ev('connected',last.edge),offset:.35,caption:'A, B i C subskrybują ten sam user$. Trzy requesty HTTP trwają jednocześnie'},
-      {id:'received',event:ev('deliver-next',last.edge),offset:.35,caption:'Każde HTTP zwróciło cały obiekt User. Pola pokazują imię, nazwisko i miasto'},
+      // Pytanie: błąd B dotarł do pola, A i C nadal pracują — czy też się zatrzymają?
+      {id:'error',event:ev('disconnected',failed[0].edge),offset:.35,caption:'HTTP #2 kończy się błędem. Czy pozostałe requesty też się zatrzymają?'},
+      {id:'answer',event:ev('disconnected',ok.at(-1).edge),offset:.5,caption:'Nie: A i C kończą się poprawnie — User i complete. Każde wykonanie ma własny cykl życia'},
     ]),
   });
 }
@@ -222,17 +241,23 @@ export function coldFieldsGraph(scene) {
     subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,C:laneSubscribers.C},
     nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,progressUntilNext:true,
       ...laneTile('source',top,Object.fromEntries(coldFields.map(f=>[f.id,f.slot])),coldFields.length)},
-      // Pola widoku istnieją od READY (puste); litera i inbox wykonania pojawiają się z subscribe.
-      ...fields.nodes],
-    edges:coldFields.map(f=>({id:f.edge,from:'http',to:f.id,subscriber:f.id,logicalStart:f.start,
-      logicalEnd:{at:f.complete,kind:'complete'},events:[E(f.response,coldUserSymbol,laneSubscribers[f.id].fill)]})),
-    executions:coldFields.map((f,i)=>({id:`http-${i+1}`,node:'http',edge:f.edge,duration:f.response-f.start})),
-    trays:fields.trays,
+      // Pola widoku istnieją od READY (puste); litera i inbox wykonania pojawiają się z subscribe. Status zakończenia
+      // (✓ complete / ! error) tylko przy polach Cold — pozostałe slajdy z viewFields bez zmian.
+      ...fields.nodes.map(n=>({...n,laneTerminalText:true}))],
+    // Wykonanie z błędem: bez next i complete, tylko error; postęp liczony do spodziewanej odpowiedzi (workUntil),
+    // więc w chwili błędu pasek staje w połowie, jak w A i C, zamiast dobiegać do końca.
+    edges:coldFields.map(f=>{const end=coldOutcome(f);
+      return {id:f.edge,from:'http',to:f.id,subscriber:f.id,logicalStart:f.start,logicalEnd:end,
+        ...(end.kind==='error'?{events:[],workUntil:f.response}:{events:[E(f.response,coldUserSymbol,laneSubscribers[f.id].fill)]})};}),
+    executions:coldFields.map((f,i)=>({id:`http-${i+1}`,node:'http',edge:f.edge,
+      duration:(coldOutcome(f).kind==='error'?coldOutcome(f).at:f.response)-f.start})),
+    // Pole z błędem pokazuje „Błąd” w miejscu placeholdera (field.error), pozostałe — swoją właściwość User.
+    trays:fields.trays.map(t=>coldErrors[t.anchor]===undefined?t:{...t,field:{...t.field,error:coldFieldError}}),
     // .subscribe() nad kolumną pól, od subscribe do dotarcia impulsu do HTTP. Pola są widoczne od READY, więc
     // bez wyprzedzenia 0,3 s — napis B nie pojawia się jeszcze na postoju first.
     callouts:coldFields.map(f=>laneCallout('.subscribe()',f.id,laneEvent('subscribe',f.edge),laneEvent('connected',f.edge),{x:g.recvX,y:top/2})),
     timeline:[{type:'cold-summary',event:{type:'disconnected',edge:coldFields.at(-1).edge},offset:1,
-      caption:'Trzy pola wyglądają poprawnie, ale backend dostał trzy identyczne requesty'}],
+      caption:'Jedna definicja, trzy wykonania i trzy identyczne requesty — każde z własnym zakończeniem'}],
   };
 }
 
@@ -560,7 +585,8 @@ export function intervalGraph(scene) {
   return {layout:'fixed',formatAware:true,width:1240,height:scene.format==='4:3'?612:460,...laneGraphLook(),
     subscribers:{A:laneSubscribers.A},
     nodes:[{id:'interval',x:340,w:420,label:'interval(1000)',...laneTile('source',top,{A:0},1)},
-      laneReceiver('observer','A',receiver,{ready:false,born:0})],
+      // Status unsubscribe przy odbiorcy po dotarciu × do interval (bez complete): sam „×”, bo wiersz mieści trzy kulki.
+      laneReceiver('observer','A',receiver,{ready:false,born:0,laneTerminalText:{cancelled:'×'}})],
     trays:[laneTray('observer',receiver,3)],
     callouts:[subscribeCallout('A',edge,edge,{y:top/2}),
       ...(closed?[laneCallout('.unsubscribe()','A',laneEvent('inner-unsubscribe',edge),laneEvent('disconnected',edge),below)]:[])],
@@ -595,7 +621,8 @@ export function httpGraph(scene) {
   return {layout:'fixed',formatAware:true,width:1240,height:scene.format==='4:3'?612:460,...laneGraphLook(),ball,
     subscribers:{A:laneSubscribers.A},
     nodes:[{id:'http',x:340,w:420,label:'HTTP GET',workLanes:true,progressUntilNext:true,terminalEdge:'http-observer',...laneTile('source',top,{A:0},1)},
-      laneReceiver('observer','A',receiver,{ready:false,born:1})],
+      // Status zakończenia (✓ complete) przy odbiorcy, po dotarciu zielonego impulsu; HTTP GET bez napisu.
+      laneReceiver('observer','A',receiver,{ready:false,born:1,laneTerminalText:true})],
     trays:[laneTray('observer',receiver,1,ball)],
     callouts:[subscribeCallout('A','http-observer','http-observer',{y:top/2})],
     edges:[{from:'http',to:'observer',subscriber:'A',events:scene.rows[0].events,logicalStart:1.3}],
@@ -670,77 +697,79 @@ export function subjectGraph(scene) {
 }
 
 // Subject — ręczna emisja (05-zrodla-5): trzeci slajd techniczny, zaraz po HTTP (subscribe, next, complete) i interval
-// (wiele next, unsubscribe). Subject<number> z dwoma odbiorcami A/B: ręczne next(1) i next(2), potem error — trzeci
-// rodzaj powiadomienia, terminalny — i próba next(3), która niczego już nie emituje. Wygląd torów jak Subject + HTTP:
-// Subject x/w 177/230 po lewej, kompaktowi odbiorcy 960/436 z kulkami wartości. Kod to stale tylko definicja Subjecta;
-// subscribe, next i error są chwilowymi migawkami nad diagramem. Jawny harmonogram: czas ilustracji = czas modelu.
-const subjectManualTimes={subscribe:[.6,2.6],link:1,next:[4.6,8.2],hold:1.2,travel:1.4,error:11.8,errorDelay:.6,terminal:1.2,
-  late:14.8,lateHold:1.6,summary:16.6,duration:18.2};
+// (wiele next, unsubscribe). Subject jest hot: READY to sam kafelek Subject<number>; A subskrybuje i dostaje next(1),
+// dopiero potem pojawia się B — bez wcześniejszej 1 (brak historii). next(2) trafia do A i B, complete() zamyka obie
+// subskrypcje (bez unsubscribe). Odbiorca pojawia się (fade-in) tuż przed swoim subscribe. Subject nie ma upstreamu ani connection. Wygląd torów jak
+// Subject + HTTP: Subject x/w 217/340 po lewej, kompaktowi odbiorcy 960/466 z kulkami wartości. Kod to stale tylko
+// definicja Subjecta; subscribe, next i complete są chwilowymi migawkami. Jawny harmonogram: czas ilustracji = czas modelu.
+// next(1) trafia tylko do A (B jeszcze nie istnieje); B subskrybuje między next(1) i next(2).
+const subjectManualTimes={subscribe:[.6,6.2],reveal:.3,link:1,next:[2.6,8.6],hold:1.2,travel:1.4,complete:12.2,completeDelay:.6,terminal:1.2,
+  summary:14.8,duration:15.8};
 const subjectManualReceivers=[{id:'A',slot:0},{id:'B',slot:1}];
-// Migawki error (czerwień błędu) i next(3) po błędzie (szarość — wywołanie bez skutku); bez własnych torów.
-const subjectErrorCall={color:'#B51E2E',fill:'#F7D9D9',ink:'#8F1622',tint:'#FBE9EA'};
-const subjectIgnoredCall={color:'#808890',fill:'#E7E8E8',ink:'#5B6670',tint:'#EEF0F1'};
+// Odbiorcy emisji: ci, których subskrypcja jest zestawiona przed wywołaniem next.
+const subjectManualTargets=(at,call)=>subjectManualReceivers.filter((r,i)=>at.subscribe[i]+at.link<=call);
+// Migawka complete() w zieleni zakończenia; bez własnego toru.
+const subjectCompleteCall={color:'#087438',fill:'#DDF1E1',ink:'#0B5A2E',tint:'#E8F5EC'};
 export function configureSubjectManual(scene) {
   const at=subjectManualTimes,ev=(type,edge,extra={})=>({type,edge,...extra});
-  const nexts=at.next.map((call,i)=>({value:String(i+1),call,split:call+at.hold,delivered:call+at.hold+at.travel}));
-  const errorAt=at.error+at.errorDelay,errorArrival=errorAt+at.terminal,fill=subjectUpstream.fill;
+  const nexts=at.next.map((call,i)=>({value:String(i+1),call,split:call+at.hold,delivered:call+at.hold+at.travel,
+    targets:subjectManualTargets(at,call).map(r=>r.id)}));
+  const completeAt=at.complete+at.completeDelay,completeArrival=completeAt+at.terminal,fill=subjectUpstream.fill;
   const subjectMark={id:'subject',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
-  // Stały kod: wyłącznie definicja Subject; świeci od ręcznego next do wyjścia powiadomień i od error do jego wysłania.
-  // Próba next(3) po błędzie go nie podświetla — Subject jest już zatrzymany.
+  // Stały kod: wyłącznie definicja Subject; świeci od ręcznego next do wyjścia powiadomień i od complete() do jego wysłania.
   const lines=[[{text:'const subject$ = '},{text:'new Subject<number>()',mark:subjectMark,
-    active:[...nexts.map(n=>({from:{type:'manual-next',value:n.value},to:ev('source-next','subject-A',{value:n.value})})),
-      {from:{type:'manual-error'},to:ev('stream-error','subject-A')}]},{text:';'}]];
-  Object.assign(scene,{graph:subjectManualGraph,subjectManualTimes:{...at,nexts,errorAt,errorArrival},
+    active:[...nexts.map(n=>({from:{type:'manual-next',value:n.value},to:ev('source-next','subject-'+n.targets[0],{value:n.value})})),
+      {from:{type:'manual-complete'},to:ev('stream-complete','subject-A')}]},{text:';'}]];
+  Object.assign(scene,{graph:subjectManualGraph,subjectManualTimes:{...at,nexts,completeAt,completeArrival},
     playerLayout:'function',duration:at.duration,ink:'#26323B',playerClass:'rx-lanes rx-flat-tiles',
     title:'Subject — ręczna emisja',code:lines[0].map(part=>part.text).join(''),codeLines:lines,codeFrames:[],
-    rows:[R('Subject',nexts.map(n=>E(n.call,n.value,fill))),
-      ...subjectManualReceivers.map(r=>R('Odbiorca '+r.id,nexts.map(n=>E(n.split,n.value,fill))))],
-    // Odbiorcy: zestawione i jeszcze niezakończone subskrypcje (error kończy obie). Emisje next: tylko te, które
-    // Subject faktycznie rozesłał — next(3) po błędzie licznika nie zmienia.
-    metrics:[{label:'Odbiorcy',value:t=>t>=errorArrival?0:at.subscribe.filter(start=>t>=start+at.link).length},
+    rows:[R('Subject',nexts.map(n=>E(n.call,n.value,fill)),[],{completeAt:at.complete}),
+      ...subjectManualReceivers.map(r=>R('Odbiorca '+r.id,nexts.filter(n=>n.targets.includes(r.id)).map(n=>E(n.split,n.value,fill)),[],{completeAt:at.complete}))],
+    // Odbiorcy: zestawione i jeszcze niezakończone subskrypcje (complete zamyka obie). Emisje next: ręczne wywołania next.
+    metrics:[{label:'Odbiorcy',value:t=>t>=completeArrival?0:at.subscribe.filter(start=>t>=start+at.link).length},
       {label:'Emisje next',value:t=>nexts.filter(n=>t>=n.call).length}],
     captions:[[0,'new Subject<number>(): Subject nie ma jeszcze odbiorców i niczego nie emituje']],
     playback:manual([
-      {id:'subscribed-a',event:ev('connected','subject-A'),offset:.35,caption:'A subskrybuje Subject z obsługą next i error'},
-      {id:'subscribed-b',event:ev('connected','subject-B'),offset:.35,caption:'B też subskrybuje. Subject ma dwóch odbiorców'},
-      {id:'next-1',event:ev('deliver-next','subject-B',{value:'1'}),offset:.35,caption:'subject$.next(1): A i B dostają 1'},
-      {id:'next-2',event:ev('deliver-next','subject-B',{value:'2'}),offset:.35,caption:'subject$.next(2): A i B dostają 2'},
-      {id:'error',event:ev('disconnected','subject-B'),offset:.5,caption:'subject$.error(…): A i B dostają error. Obie subskrypcje kończą się błędem'},
-      {id:'next-after-error',event:{type:'manual-next',value:'3'},offset:.8,caption:'subject$.next(3) po error: Subject jest zatrzymany, nic nie płynie'},
+      {id:'subscribed-a',event:ev('connected','subject-A'),offset:.35,caption:'A subskrybuje Subject i czeka na wartości'},
+      {id:'next-1',event:ev('deliver-next','subject-A',{value:'1'}),offset:.35,caption:'subject$.next(1): A dostaje 1. B jeszcze nie istnieje'},
+      // Pytanie: B już subskrybuje — czy dostanie wcześniejszą 1? Odpowiedź (brak 1) widać dopiero przy next(2).
+      {id:'subscribed-b',event:ev('connected','subject-B'),offset:.35,caption:'B subskrybuje Subject. Czy dostanie wcześniejszą 1?'},
+      {id:'next-2',event:ev('deliver-next','subject-B',{value:'2'}),offset:.35,caption:'subject$.next(2): A i B dostają 2. B nie dostał 1 — Subject nie odtwarza historii'},
+      {id:'complete',event:ev('disconnected','subject-B'),offset:.5,caption:'subject$.complete(): A i B dostają complete. Obie subskrypcje są zamknięte'},
     ]),
   });
 }
 
 export function subjectManualGraph(scene) {
   const tall=scene.format==='4:3',top=tall?178:102,at=scene.subjectManualTimes;
-  const g={subjectX:177,subjectW:230,recvX:960,recvW:436},pos=r=>({x:g.recvX,w:g.recvW,y:laneRowY(top,r.slot)});
+  // Subject<number> mieści etykietę w jednej linii; szerszy odbiorca zostawia miejsce na „✓ complete” za dwiema kulkami.
+  const g={subjectX:217,subjectW:340,recvX:960,recvW:466},pos=r=>({x:g.recvX,w:g.recvW,y:laneRowY(top,r.slot)});
   // Kulka liczby jak w Subject + interval; wartości w kolorze emisji Subjecta (fill toru #1 z sąsiednich slajdów).
   const ball={r:34,font:30},fill=subjectUpstream.fill;
-  // error: osobna, terminalna notyfikacja — czerwony impuls od Subjecta do każdego odbiorcy, bez kulki i bez complete.
-  const error={at:at.errorAt,logicalAt:at.error,kind:'error',duration:at.terminal};
+  // complete: terminalna notyfikacja — zielony impuls od Subjecta do każdego odbiorcy, bez kulki i bez unsubscribe.
+  const complete={at:at.completeAt,logicalAt:at.complete,kind:'complete',duration:at.terminal};
   const call=(text,subscriber,from,to)=>({...laneCallout(text,subscriber,from,to,{x:620,y:top/2}),size:34,label:''});
   return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball,
-    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,U:subjectUpstream,E:subjectErrorCall,X:subjectIgnoredCall},
-    nodes:[{id:'subject',x:g.subjectX,w:g.subjectW,label:'Subject',splitBalls:true,splitGuides:false,upstreamStripe:false,hubFan:false,
-        laneTerminalText:true,emits:at.nexts.map(n=>({value:n.value,color:fill,at:n.call})),
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,U:subjectUpstream,C:subjectCompleteCall},
+    nodes:[{id:'subject',x:g.subjectX,w:g.subjectW,label:'Subject<number>',splitBalls:true,splitGuides:false,upstreamStripe:false,hubFan:false,
+        emits:at.nexts.map(n=>({value:n.value,color:fill,at:n.call})),
         ...laneTile('operator',top,Object.fromEntries(subjectManualReceivers.map(r=>[r.id,r.slot])),subjectManualReceivers.length)},
-      ...subjectManualReceivers.map(r=>laneReceiver(r.id,r.id,pos(r),{ready:true,laneTerminalText:true}))],
+      // Odbiorca nie istnieje przed swoim subscribe: pojawia się (fade-in) tuż przed nim, bez pustego prostokąta w READY.
+      ...subjectManualReceivers.map((r,i)=>laneReceiver(r.id,r.id,pos(r),{ready:false,born:at.subscribe[i]-at.reveal,laneTerminalText:true}))],
     edges:subjectManualReceivers.map((r,i)=>({id:'subject-'+r.id,from:'subject',to:r.id,subscriber:r.id,logicalStart:at.subscribe[i],
-      logicalEnd:{at:at.error,kind:'error'}})),
-    // Dwa powiadomienia każdej emisji: wspólne logicalAt (wywołanie next), ten sam kolor i wspólny wylot z portów Subject.
+      logicalEnd:{at:at.complete,kind:'complete'}})),
+    // Powiadomienia emisji tylko do aktualnych subskrybentów: wspólne logicalAt (wywołanie next), ten sam kolor i wylot.
     schedule:Object.fromEntries(subjectManualReceivers.map((r,i)=>['subject-'+r.id,{start:at.subscribe[i],connectDuration:at.link,
-      events:at.nexts.map(n=>({value:n.value,color:fill,at:n.split,arrival:n.delivered,logicalAt:n.call})),end:error}])),
+      events:at.nexts.filter(n=>n.targets.includes(r.id)).map(n=>({value:n.value,color:fill,at:n.split,arrival:n.delivered,logicalAt:n.call})),end:complete}])),
     trays:subjectManualReceivers.map(r=>laneTray(r.id,pos(r),2,ball)),
-    // Migawki w jednym miejscu nad diagramem, kolejno: subscribe z obsługą next i error (litera toru), next(1), next(2)
-    // (bez badge'a), error (czerwień) i next(3) po błędzie (szarość, gaśnie bez żadnej emisji).
-    callouts:[...subjectManualReceivers.map(r=>({...call(`const sub${r.id} = subject$.subscribe({ next, error })`,r.id,
+    // Migawki w jednym miejscu nad diagramem, kolejno: subscribe (litera toru), next(1), next(2) (bez badge'a)
+    // i complete() (zieleń zakończenia).
+    callouts:[...subjectManualReceivers.map(r=>({...call(`subject$.subscribe(observer${r.id})`,r.id,
         laneEvent('subscribe','subject-'+r.id),laneEvent('connected','subject-'+r.id)),label:r.id})),
-      ...at.nexts.map(n=>call(`subject$.next(${n.value})`,'U',{type:'manual-next',value:n.value},{type:'deliver-next',edge:'subject-B',value:n.value})),
-      call("subject$.error(new Error('Boom'))",'E',{type:'manual-error'},laneEvent('disconnected','subject-B',.8)),
-      call('subject$.next(3)','X',{type:'manual-next',value:'3'},{type:'manual-next',value:'3',offset:at.lateHold})],
-    timeline:[...at.nexts.map(n=>({type:'manual-next',value:n.value,at:n.call})),{type:'manual-error',at:at.error},
-      {type:'manual-next',value:'3',at:at.late,ignored:true},
-      {type:'subject-manual-summary',at:at.summary,caption:'A i B: 1, 2, error. Subject zakończył się błędem — next(3) nie dotarło'}],
+      ...at.nexts.map(n=>call(`subject$.next(${n.value})`,'U',{type:'manual-next',value:n.value},{type:'deliver-next',edge:'subject-'+n.targets.at(-1),value:n.value})),
+      call('subject$.complete()','C',{type:'manual-complete'},laneEvent('disconnected','subject-B',.8))],
+    timeline:[...at.nexts.map(n=>({type:'manual-next',value:n.value,at:n.call})),{type:'manual-complete',at:at.complete},
+      {type:'subject-manual-summary',at:at.summary,caption:'A: 1, 2, complete. B: 2, complete. Subject jest hot — późny odbiorca nie dostaje historii'}],
   };
 }
 

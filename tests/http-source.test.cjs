@@ -42,7 +42,10 @@ test('lane layout: centred HTTP GET → receiver A with the full response ball, 
   const svg=render(f);
   assert.match(svg,/>dane<\/text>/,'pełna etykieta „dane” w kulce');
   assert.ok(f.histories[0].balls&&f.histories[0].x<observer.x+observer.w/2);
-  assert.doesNotMatch(svg,/>✓ complete<\/text>|rx="12"/);
+  assert.doesNotMatch(svg,/rx="12"/);
+  // Jedyny tekst complete: status przy odbiorcy A, nie w kafelku HTTP GET.
+  assert.equal((svg.match(/data-lane-terminal="completed"[^>]*>✓ complete</g)||[]).length,1);
+  assert.ok(svg.indexOf('data-lane-terminal')>svg.indexOf('data-node="observer"'),'status w wierszu odbiorcy');
  }
  const {c}=await http('4:3'),arrived=c.events.find(e=>e.type==='deliver-next'&&e.edge==='http-observer');
  assert.deepEqual(values(c.snapshot(arrived.at-.01)),[]);assert.deepEqual(values(c.snapshot(arrived.at)),['dane']);
