@@ -53,21 +53,38 @@ test('late share: B subscribes only after HTTP #1 completed and starts HTTP #2',
  assert.equal(count(at(c,'deliver-next','share-B')+.1),2);
 });
 
-test('late share: six checkpoints match the narration and the speaker notes',async()=>{
- const {c}=await late(),ids=['subscribed-a','received-a','complete-a','subscribed-b','complete-b'];
+test('late share: two quick steps (A done, then B with HTTP #2) match the speaker notes',async()=>{
+ const {scene,c}=await late(),ids=['complete-a','complete-b'];
  assert.deepEqual(Array.from(c.stops,s=>s.id),ids);
+ // Drugi krok kończy scenę: po nim „dalej” zmienia slajd, bez osobnego etapu AUTO.
+ assert.equal(c.stops[1].time,c.duration);
  const ready=c.snapshot(0);
  assert.deepEqual(Array.from(ready.nodes.filter(n=>n.visible),n=>n.id),['http','share']);
  assert.ok(ready.nodes.every(n=>!(n.laneRows||[]).length));
+ assert.deepEqual(Array.from(ready.metrics,m=>[m.label,m.value]),[['Requesty HTTP',0],['Aktywne',0]]);
+ // Krótki request: odpowiedź 1 s czasu modelu po subskrypcji, complete chwilę po odbiorze.
+ for(const [up,out] of [['http-share','share-A'],['http-share-2','share-B']]){
+  assert.ok(at(c,'source-next',up)-at(c,'connected',up)<=1.05,up+' szybka odpowiedź');
+  assert.ok(at(c,'disconnected',out)-at(c,'deliver-next',out)<=2.5,out+' complete zaraz po wartości');
+ }
  const f=Object.fromEntries(c.stops.map(s=>[s.id,c.snapshot(s.time)]));
- assert.equal(lane(f['subscribed-a'],'http','#1').state,'running');assert.equal(f['subscribed-a'].nodes.find(n=>n.id==='B').visible,false);
- assert.deepEqual(balls(f['received-a'],'A'),['42']);assert.equal(lane(f['received-a'],'share','A').state,'running');
- assert.equal(lane(f['complete-a'],'http','#1').state,'completed');assert.equal(lane(f['complete-a'],'share','A').state,'completed');
- assert.equal(f['complete-a'].nodes.find(n=>n.id==='B').visible,false);
- assert.equal(f['complete-a'].edges.find(e=>e.id==='http-share').done,true,'zakończone połączenie A nie jest aktywne');
- assert.equal(lane(f['subscribed-b'],'http','#2').state,'running');assert.deepEqual(balls(f['subscribed-b'],'B'),[]);
- assert.equal(lane(f['complete-b'],'share','B').state,'completed');assert.deepEqual(balls(f['complete-b'],'B'),['42']);
+ const a=f['complete-a'];
+ assert.equal(lane(a,'http','#1').state,'completed');assert.equal(lane(a,'share','A').state,'completed');
+ assert.deepEqual(balls(a,'A'),['42']);assert.equal(a.nodes.find(n=>n.id==='B').visible,false);
+ assert.equal(a.edges.find(e=>e.id==='http-share').done,true,'zakończone połączenie A nie jest aktywne');
+ assert.deepEqual(Array.from(a.metrics,m=>m.value),[1,0]);
+ const b=f['complete-b'];
+ assert.equal(lane(b,'http','#2').state,'completed');assert.equal(lane(b,'share','B').state,'completed');
+ assert.deepEqual(balls(b,'B'),['42']);assert.deepEqual(Array.from(b.metrics,m=>m.value),[2,0]);
+ assert.equal(b.caption,'A kończy się poprawnie. Późny odbiorca B uruchamia nową subskrypcję upstream, więc powstaje HTTP #2.');
  for(const frame of Object.values(f))assert.equal(frame.tokens.length,0,'postój bez lecącej kulki');
+ // Zielony status ✓ complete przy obu odbiorcach po dotarciu impulsu.
+ for(const id of ['A','B'])assert.equal(scene.graph(scene).nodes.find(n=>n.id===id).laneTerminalText,true);
+ // Request #2 jest podpisany jako nowy, w kolorze B; aktywne = 1 w trakcie każdego requestu.
+ const during=c.snapshot(at(c,'connected','http-share-2')+.5);
+ const callout=during.callouts.find(x=>x.opacity>0&&x.label==='#2');
+ assert.equal(callout.text,'nowy request HTTP');assert.equal(callout.color,'#D8840F');
+ assert.deepEqual(Array.from(during.metrics,m=>m.value),[2,1]);
  const html=fs.readFileSync('index.html','utf8');
  const template=html.match(/<template data-checkpoint-notes="20-sharereplay">([\s\S]*?)<\/template>/)[1];
  assert.deepEqual([...template.matchAll(/data-checkpoint="([^"]+)"/g)].map(m=>m[1]),['ready',...ids,'finished']);
@@ -87,7 +104,7 @@ test('late share: ports share Y per lane, geometry is fixed and rewind is determ
   for(const s of c.stops)assert.equal(shape(c.snapshot(s.time)),shape(end),format);
   for(const n of end.nodes)assert.ok(n.y+n.h/2<=end.height&&n.x+n.w/2<=end.width,format+' '+n.id);
   assert.doesNotMatch(render(end),/NaN|Infinity|="undefined"/);
-  const before=JSON.stringify(c.snapshot(c.stops[2].time));c.snapshot(c.duration);c.snapshot(0);
-  assert.equal(JSON.stringify(c.snapshot(c.stops[2].time)),before);
+  const before=JSON.stringify(c.snapshot(c.stops[0].time));c.snapshot(c.duration);c.snapshot(0);
+  assert.equal(JSON.stringify(c.snapshot(c.stops[0].time)),before);
  }
 });

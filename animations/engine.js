@@ -131,7 +131,9 @@ export function compileScene(scene) {
       time=(stop.last?matches.at(-1):matches[0])?.at;
     }
     if(!Number.isFinite(time))throw new Error(`${scene.id}: nierozwiązany checkpoint ${stop.id}`);
-    return {...stop,time:time+(stop.offset||0)};
+    // Postój na końcu sceny (np. modelTime = scene.duration) nie może wypaść za nią przez błąd zaokrąglenia.
+    time+=stop.offset||0;
+    return {...stop,time:Math.abs(time-plan.duration)<1e-9?plan.duration:time};
   });
   const checkpoints=[...new Set([0,plan.duration,...events.map(e=>e.at),...stops.map(s=>s.time),...(scene.checkpoints||[]).map(plan.timeOf)])].filter(Number.isFinite).sort((a,b)=>a-b);
   // Wpis kodu może wskazać zdarzenie (jak postój) zamiast czasu ilustracji, np. dopisanie subscribe w chwili subskrypcji.

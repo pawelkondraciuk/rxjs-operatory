@@ -590,18 +590,15 @@
 					<h2>B przychodzi po odpowiedzi. Co dostanie?</h2>
 					<div class="rx-player" aria-label="B przychodzi po odpowiedzi. Co dostanie?"></div>
 					<aside class="notes">
-                        <p><strong>share:</strong> Tory jak w cold/Subject: HTTP GET → share() → A/B. A uruchamia HTTP #1, które zwraca 42 i kończy się. Domyślny share resetuje po complete, więc późny B uruchamia HTTP #2 — ta sama definicja, drugie wykonanie, dwa requesty.</p>
+                        <p><strong>share:</strong> Tory jak w cold/Subject: HTTP GET → share() → A/B, dwa krótkie kroki. A uruchamia HTTP #1, które od razu zwraca 42 i kończy się. Domyślny share resetuje po complete, więc późny B uruchamia HTTP #2 — ta sama definicja, nowa subskrypcja upstream, dwa requesty.</p>
                         <p><strong>shareReplay:</strong> Tory jak w share, z kieszenią „bufor” pod shareReplay(1). Jedno HTTP; 42 trafia do A i do bufora. Po complete bufor zostaje — refCount: true nie usuwa wyniku zakończonego źródła. Późny B dostaje 42 z bufora, bez nowego requestu. To semantyka RxJS 7.8.2, nie pełna polityka cache ani TTL.</p>
                         <p><strong>Przejście:</strong> Wiemy już, kiedy wykonuje się praca i jak ją współdzielić. Teraz map zwróci Observable: kto będzie decydował, kiedy uruchomić jego pracę?</p>
                     </aside>
 				<template data-checkpoint-notes="20-sharereplay">
                         <div data-checkpoint="ready"><p><strong>0 — Definicja</strong></p><p>Wracamy do HTTP. Wiemy już, że share współdzieli jedno aktywne wykonanie i sprząta po ostatnim odbiorcy. Ale co stanie się, jeśli drugi odbiorca pojawi się dopiero po zakończeniu requestu?</p></div>
-                        <div data-checkpoint="subscribed-a"><p><strong>1 — A subskrybuje</strong></p><p>A subskrybuje jako pierwszy. Share uruchamia HTTP.</p></div>
-                        <div data-checkpoint="received-a"><p><strong>2 — HTTP #1 emituje 42</strong></p><p>HTTP zwraca 42, a A otrzymuje wynik.</p></div>
-                        <div data-checkpoint="complete-a"><p><strong>3 — HTTP #1 complete</strong></p><p>Request się zakończył. Share domyślnie resetuje swoje współdzielenie po complete.</p></div>
-                        <div data-checkpoint="subscribed-b"><p><strong>4 — Późny odbiorca B</strong></p><p>Teraz pojawia się B. Czy dostanie wynik, który przed chwilą otrzymał A? Nie. Share nie pamięta ostatniej wartości.</p></div>
-                        <div data-checkpoint="complete-b"><p><strong>5 — HTTP #2</strong></p><p>Zamiast tego powstaje drugie wykonanie HTTP. Ta sama definicja Observable, ale nowy request.</p></div>
-                        <div data-checkpoint="finished"><p><strong>6 — Stan końcowy</strong></p><p>Obaj dostali 42, ale zwykły share uruchomił drugi request. A gdyby operator zapamiętał poprzednią wartość?</p><p>Prawo: shareReplay.</p></div>
+                        <div data-checkpoint="complete-a"><p><strong>1 — A: request #1, 42, complete</strong></p><p>A subskrybuje jako pierwszy, share podpina się do HTTP i startuje request #1. Odpowiedź przychodzi od razu: 42 trafia do A, potem complete. Request #1 i A są zakończone, a share domyślnie resetuje się po complete.</p><p>Pytanie: co dostanie B, jeśli przyjdzie teraz?</p></div>
+                        <div data-checkpoint="complete-b"><p><strong>2 — Późny B: request #2</strong></p><p>B subskrybuje po complete. Share nie pamięta 42 i nie ma już aktywnego upstreamu, więc subskrybuje HTTP od nowa — powstaje request #2. B dostaje nowe 42 i complete.</p></div>
+                        <div data-checkpoint="finished"><p><strong>3 — Stan końcowy</strong></p><p>Dwa osobne wiersze HTTP: #1 dla A i #2 dla B. B nie dostał powtórki starej wartości — uruchomił własny request. Licznik: dwa requesty, zero aktywnych.</p><p>A gdyby operator zapamiętał poprzednią wartość? Prawo: shareReplay.</p></div>
                     </template>
 				<template data-checkpoint-notes="20-sharereplay-2">
                         <div data-checkpoint="ready"><p><strong>0 — Definicja, pusty bufor</strong></p><p>Przed chwilą widzieliśmy, że przy zwykłym share() późny odbiorca uruchamia nowy request. A co jeśli chcemy zachować ostatnią wartość?</p></div>
