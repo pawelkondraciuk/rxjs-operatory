@@ -2,7 +2,7 @@
 // To osobna warstwa od pastelowych wyróżnień fragmentów (codeLines.mark): tokeny dostają kolor tekstu, wyróżnienia nadal tło i podkreślenie — obie współistnieją.
 // Zwraca rodzaj tokenu dla każdego znaku całego kodu (null — zwykła składnia), więc granice fragmentów nie mają znaczenia.
 const operators=new Set(['map','concatMap','mergeMap','switchMap','exhaustMap','concatAll','mergeAll','switchAll','exhaustAll',
-  'catchError','distinctUntilChanged','debounceTime','auditTime','throttleTime','sampleTime','filter','take','first','finalize',
+  'catchError','retry','distinctUntilChanged','debounceTime','auditTime','throttleTime','sampleTime','filter','take','first','finalize',
   'share','shareReplay','of','from','interval','timer','forkJoin','zip','merge','combineLatest','pairwise','bufferTime','defer',
   'withLatestFrom']);
 const keywords=new Set(['const','let','var','new','return','function','async','await']);

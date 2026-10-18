@@ -16,7 +16,7 @@ async function deck(format){
 
 test('4:3 diagrams fill the taller stage and keep every block inside the viewBox',async()=>{
  const {scenes,compile,render}=await deck('4:3');
- assert.equal(scenes.length,22);
+ assert.equal(scenes.length,24);
  for(const scene of scenes){
   const c=compile(scene);
   for(const time of [0,...c.stops.map(s=>s.time),c.duration]){

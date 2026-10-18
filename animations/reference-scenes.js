@@ -910,107 +910,86 @@ export function subjectIntervalGraph(scene) {
 }
 
 // shareReplay z refCount: false (pierwszy EXTRAS, x01-sharereplay-interval): interval(1000) → shareReplay(1) → A/B.
-// READY: same definicje — interval nie działa, pamięć pusta (refCount: false nie uruchamia źródła przed subscribe).
-// Pierwsze „dalej”: A subskrybuje (impuls przez shareReplay do interval), jedno upstream #1, emisje co sekundę
-// trafiają do pamięci huba (jedna kulka) i dalej do A. Akcje na żywo (scene.live.actions):
-//   unsub-a — subA.unsubscribe(): × od A kończy się na shareReplay, upstream #1 pracuje dalej;
-//   zero    — zero odbiorców: interval nadal emituje, kulka pamięci się podmienia (wyróżnienie refCount: false);
-//   sub-b   — B subskrybuje tylko shareReplay (bez nowego interval) i od razu dostaje ostatnią zapamiętaną wartość
-//             (odczytaną w chwili zestawienia subskrypcji, nie założoną z góry), potem kolejne emisje na żywo;
-//   summary — stan końcowy (A odłączony, B aktywny, to samo wykonanie interval). Bez complete i bez unsubscribe B.
-// Emisje trwają także podczas postojów; sprzątanie przy wyjściu ze slajdu robi main.js (reset sceny na żywo).
-const shareReplayIntervalTiming={born:.3,link:.8,period:1,travel:.8,store:.4,cancel:.8,calloutHold:.4,window:30,keep:5,margin:2,
-  actionGap:2,settle:1.6};
-const shareReplayIntervalActions=['unsub-a','zero','sub-b','summary'];
+// READY pokazuje same definicje. A uruchamia upstream i dostaje 0–3; po jego odejściu interval aktualizuje bufor
+// do 4 i 5 bez odbiorców. Późny B dostaje najpierw zachowane 5, a potem 6 i 7 na żywo. Brak complete i teardownu
+// upstreamu. MANUAL zatrzymuje stałe checkpointy, AUTO odtwarza dokładnie tę samą skończoną ilustrację.
+const shareReplayIntervalTiming={store:.4,cancel:.8,calloutHold:.4,duration:22};
+const shareReplayIntervalPlan={
+  subscribeA:.6,connectedA:1.6,upstreamStart:1.6,upstreamConnected:2.4,unsubscribeCall:9.7,unsubscribeA:10,
+  disconnectedA:10.8,subscribeB:14,connectedB:14.8,
+  upstream:[
+    {value:'0',at:3,arrival:3.7},{value:'1',at:4.5,arrival:5.2},{value:'2',at:6,arrival:6.7},
+    {value:'3',at:7.5,arrival:8.2},{value:'4',at:10.1,arrival:10.8},{value:'5',at:12.2,arrival:12.9},
+    {value:'6',at:16.5,arrival:17.2},{value:'7',at:19,arrival:19.7},
+  ],
+  a:[{value:'0',at:4.1,arrival:4.9},{value:'1',at:5.6,arrival:6.4},
+    {value:'2',at:7.1,arrival:7.9},{value:'3',at:8.6,arrival:9.4}],
+  // Pierwszy element to replay wartości zapisanej przed subskrypcją B; kolejne pochodzą z emisji live.
+  b:[{value:'5',at:15.2,arrival:16,logicalAt:14.8},{value:'6',at:17.6,arrival:18.4},{value:'7',at:20.1,arrival:20.9}],
+};
 export function configureShareReplayInterval(scene) {
-  // Umowne chwile akcji (druk, hash, podgląd Notes): A dostaje 0, 1, 2; na żywo chwile wybiera prowadzący.
-  const t=shareReplayIntervalTiming,defaults=[7.2,11,14.5,19];
-  const settled=[defaults[0]+2,defaults[1]+.5,defaults[2]+2.6,defaults[3]+.5];
-  Object.assign(scene,{graph:shareReplayIntervalGraph,playerLayout:'function',ink:'#26323B',playerClass:'rx-lanes rx-flat-tiles rx-two-lines',
-    title:'shareReplay — kto zatrzyma interval?',
-    rows:[R('interval(1000)'),R('shareReplay(1)'),R('Odbiorca A'),R('Odbiorca B')],
-    live:{start:0,window:t.window,keep:t.keep,margin:t.margin,defaultClose:22,actions:shareReplayIntervalActions,defaults,
-      actionGap:t.actionGap,settle:t.settle,autoplay:false,variant:shareReplayIntervalVariant},
-    playback:{entry:'manual',finish:'hold',live:true,stops:shareReplayIntervalActions.map((id,i)=>({id,time:settled[i]}))},
-  });
-  Object.assign(scene,shareReplayIntervalVariant(scene,{from:0,to:t.window,closedAt:null,actions:[]}));
-}
-
-// Wariant dla okna [from, to], wykonanych akcji (czasy ilustracji) i opcjonalnego zamrożenia closedAt (druk, „pokaż
-// wynik”: brak nowych emisji, bez complete). Czas ilustracji = czas modelu.
-function shareReplayIntervalVariant(scene,{from,to,closedAt,actions=[]}) {
-  const t=shareReplayIntervalTiming,closed=closedAt!==null&&closedAt!==undefined,end=closed?closedAt:to;
-  const subscribeA=t.born,hubA=subscribeA+t.link,upstream=hubA+t.link,first=upstream+t.period;
-  const emitAt=k=>first+t.period*k,arrival=k=>emitAt(k)+t.travel,stored=k=>arrival(k)+t.store,departure=k=>stored(k)+t.store;
-  const kAt=time=>Math.floor((time-first)/t.period),kTo=kAt(end);
-  const kFrom=Math.max(0,kAt(from)-4);
-  const [unsubCall,zeroAt,subBCall,summaryAt]=actions;
-  // A: wartości, które wyszły z pamięci przed rezygnacją; × rusza po dotarciu ostatniej z nich i kończy się na shareReplay.
-  const aLast=unsubCall===undefined?kTo:Math.min(kTo,kAt(unsubCall-2*t.store-t.travel));
-  const aUnsub=unsubCall===undefined?null:Math.max(unsubCall,aLast>=0?departure(aLast)+t.travel:unsubCall);
-  // B: zestawienie subskrypcji z shareReplay; odtworzenie ostatniej wartości zapisanej do tej chwili, potem emisje na żywo.
-  const bStart=subBCall===undefined?null:subBCall+t.born,bConnected=bStart===null?null:bStart+t.link;
-  const replayK=bConnected===null?null:kAt(bConnected-t.travel-t.store);
-  const replay=replayK!==null&&replayK>=0&&replayK<=kTo?{k:replayK,departure:bConnected+t.store}:null;
-  const range=(a,b)=>Array.from({length:Math.max(0,b-a+1)},(_,i)=>a+i);
-  const plan={end,subscribeA,hubA,upstream,emitAt,arrival,departure,kFrom,kTo,aLast,aUnsub,unsubCall,zeroAt,subBCall,bStart,bConnected,replay,
-    bFrom:bConnected===null?null:range(0,kTo).find(k=>stored(k)>bConnected)??kTo+1};
-  const receiversAt=time=>(time>=hubA&&(aUnsub===null||time<aUnsub)?1:0)+(bConnected!==null&&time>=bConnected?1:0);
-  const busy=[aUnsub===null?undefined:aUnsub+t.cancel+t.calloutHold,zeroAt,replay?replay.departure+t.travel+.3:bConnected,summaryAt];
+  const p=shareReplayIntervalPlan,intervalMark={id:'interval',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'};
   const shareMark={id:'share',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
   const refMark={id:'refcount',bg:'rgba(197,72,72,.14)',line:'#C54848',quiet:true};
-  const lines=[[{text:'const shared$ = interval(1000).pipe('}],
+  const lines=[[{text:'const shared$ = '},{text:'interval',mark:intervalMark},{text:'(1000).pipe('}],
     [{text:'  '},{text:'shareReplay',mark:shareMark},{text:'({ bufferSize: 1, '},{text:'refCount: false',mark:refMark,
-      active:zeroAt===undefined?[]:[{from:{type:'refcount-focus'},to:{type:'refcount-focus-end'}}]},{text:' }));'}]];
-  const captions=[[0,'Definicja: interval(1000).pipe(shareReplay(…)). Nic jeszcze nie działa, pamięć jest pusta'],
-    [subscribeA,'A subskrybuje: impuls przez shareReplay uruchamia jedno wykonanie interval'],
-    [first,'interval emituje co sekundę. shareReplay zapamiętuje ostatnią wartość i przekazuje ją A'],
-    ...(unsubCall===undefined?[]:[[unsubCall,'subA.unsubscribe(): × kończy się na shareReplay. Czy interval się zatrzymał?']]),
-    ...(zeroAt===undefined?[]:[[zeroAt,'Zero odbiorców, a interval nadal emituje: refCount: false utrzymuje upstream']]),
-    ...(subBCall===undefined?[]:[[subBCall,'B subskrybuje shareReplay. Bez nowego wykonania interval'],
-      ...(replay?[[replay.departure,`B od razu dostaje ostatnią zapamiętaną wartość (${replay.k}), potem kolejne na żywo`]]:[])]),
-    ...(summaryAt===undefined?[]:[[summaryAt,'A odłączony, B aktywny, to samo wykonanie interval. Źródło pracuje także bez odbiorców']])];
-  return {...scene,shareReplayPlan:plan,duration:closed?closedAt:to,
-    liveBusyUntil:busy,
+      active:[{from:{type:'refcount-focus'},to:{type:'refcount-focus-end'}}]},{text:' })'}],
+    [{text:');'}]];
+  Object.assign(scene,{graph:shareReplayIntervalGraph,playerLayout:'function',ink:'#26323B',playerClass:'rx-lanes rx-flat-tiles rx-two-lines',
+    title:'shareReplay — kto zatrzyma interval?',duration:shareReplayIntervalTiming.duration,shareReplayPlan:p,
     code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
-    metrics:[{label:'Odbiorcy',value:receiversAt},{label:'Upstream',value:time=>time>=upstream?1:0}],
-    captions};
+    rows:[R('interval(1000)'),R('shareReplay(1)'),R('Odbiorca A'),R('Odbiorca B')],
+    metrics:[{label:'Odbiorcy',value:t=>(t>=p.connectedA&&t<p.disconnectedA?1:0)+(t>=p.connectedB?1:0)},
+      {label:'Upstream',value:t=>t>=p.upstreamConnected?1:0}],
+    captions:[[0,'Definicja: interval i shareReplay są jeszcze bez subskrypcji; bufor jest pusty'],
+      [p.subscribeA,'A subskrybuje. shareReplay zestawia jedno połączenie z interval'],
+      [p.upstream[0].at,'interval emituje 0, 1, 2, 3. shareReplay przechowuje tylko ostatnią wartość'],
+      [p.unsubscribeCall,'A się odłącza. Impuls × kończy się na shareReplay, a upstream pozostaje aktywny'],
+      [p.upstream[5].at,'A nie ma. Kto teraz zatrzyma interval? Nikt — bufor nadal się aktualizuje'],
+      [p.subscribeB,'B subskrybuje później: najpierw dostaje 5 z bufora'],
+      [p.upstream[6].at,'Po replay B dostaje kolejne wartości 6 i 7 na żywo z tego samego źródła']],
+    playback:manual([
+      {id:'subscribed-a',time:2.75,caption:'A jest podłączony; shareReplay uruchomił jedno połączenie upstream'},
+      {id:'first-values',time:9.65,caption:'A dostał 0, 1, 2, 3; lokalny bufor shareReplay zawiera 3'},
+      {id:'unsub-a',time:11.55,caption:'A odłączony. Odbiorcy: 0, Upstream: 1; bufor zdążył zmienić się na 4'},
+      {id:'zero',time:13.65,caption:'A nie ma. Kto teraz zatrzyma interval? Nikt — refCount: false; bufor zawiera 5'},
+      {id:'replayed-b',time:16.35,caption:'B dołączył i najpierw dostał ostatnią wartość z bufora: 5'},
+      {id:'summary',time:21.25,caption:'B dostał następnie 6 i 7 na żywo. B i upstream pozostają aktywni'},
+    ]),
+  });
 }
 
 export function shareReplayIntervalGraph(scene) {
   const tall=scene.format==='4:3',top=tall?178:102,t=shareReplayIntervalTiming,p=scene.shareReplayPlan;
-  // Kolumny: interval(1000) mieści etykietę w jednej linii, shareReplay(1) z wierszem #1 (upstream i kulka pamięci)
-  // oraz wierszami A/B, odbiorcy pod wierszami A/B. Wszystkie połączenia poziome.
+  // Kolumny: interval(1000), shareReplay(1) z lokalną pamięcią w nagłówku oraz odbiorcy A/B.
+  // Upstream ma pustą etykietę: na tym slajdzie nie pokazujemy numerowanego wykonania #1.
   const g={sourceX:205,sourceW:310,hubX:600,hubW:330,recvX:1020,recvW:350};
-  // B istnieje dopiero od akcji sub-b (bez pustego kafelka wcześniej).
-  const receivers=[{id:'A',slot:1},...(p.bStart===null?[]:[{id:'B',slot:2}])],pos=r=>({x:g.recvX,w:g.recvW,y:laneRowY(top,r.slot)});
-  const fill=subjectUpstream.fill,value=(k,at,arrival)=>({value:String(k),color:fill,at,arrival,logicalAt:p.emitAt(k)});
-  const range=(a,b)=>Array.from({length:Math.max(0,b-a+1)},(_,i)=>a+i);
-  const aEvents=range(Math.max(p.kFrom,Math.max(0,p.aLast-3)),p.aLast).map(k=>value(k,p.departure(k),p.departure(k)+t.travel));
-  const bEvents=p.bConnected===null?[]:[...(p.replay?[{...value(p.replay.k,p.replay.departure,p.replay.departure+t.travel),logicalAt:p.bConnected}]:[]),
-    ...range(Math.max(p.bFrom,p.kFrom),p.kTo).map(k=>value(k,p.departure(k),p.departure(k)+t.travel))];
-  const callout=(text,subscriber,from,to,label)=>({...laneCallout(text,subscriber,from,to,{x:620,y:top/2}),size:34,...(label===undefined?{}:{label})});
+  const receivers=[{id:'A',slot:0,born:p.subscribeA-.3},{id:'B',slot:1,born:p.subscribeB-.3}];
+  const pos=r=>({x:g.recvX,w:g.recvW,y:laneRowY(top,r.slot)}),fill=subjectUpstream.fill;
+  const values=events=>events.map(e=>({...e,color:fill,logicalAt:e.logicalAt??e.at}));
+  const callout=(text,subscriber,from,to)=>({...laneCallout(text,subscriber,from,to,{x:620,y:top/2}),size:34});
   return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),
-    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,U:subjectUpstream},
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,U:{...subjectUpstream,label:''}},
     nodes:[{id:'interval',x:g.sourceX,w:g.sourceW,label:'interval(1000)',...laneTile('source',top,{U:0},1)},
-      {id:'share',x:g.hubX,w:g.hubW,label:'shareReplay(1)',color:'op',inputRow:true,replayMemory:true,hubFan:false,
-        ...laneTile('operator',top,{U:0,A:1,B:2},3)},
-      ...receivers.map(r=>laneReceiver(r.id,r.id,pos(r),{ready:false,born:r.id==='A'?0:p.subBCall,laneTerminalText:{cancelled:'×'}}))],
-    edges:[{id:'interval-share',from:'interval',to:'share',subscriber:'U',logicalStart:p.hubA,fixedStart:true},
+      {id:'share',x:g.hubX,w:g.hubW,label:'shareReplay(1)',labelX:g.hubX-40,labelSize:31,color:'op',
+        replayMemory:{header:true,x:g.hubX+118,y:top+laneLook.defH/2},hubFan:false,
+        ...laneTile('operator',top,{U:0,A:0,B:1},2)},
+      ...receivers.map(r=>laneReceiver(r.id,r.id,pos(r),{ready:false,born:r.born,laneTerminalText:{cancelled:'×'}}))],
+    edges:[{id:'interval-share',from:'interval',to:'share',subscriber:'U',logicalStart:p.upstreamStart,fixedStart:true},
       {id:'share-A',from:'share',to:'A',subscriber:'A',logicalStart:p.subscribeA,cancelPulse:true},
-      ...(p.bStart===null?[]:[{id:'share-B',from:'share',to:'B',subscriber:'B',logicalStart:p.bStart,fixedStart:true}])],
+      {id:'share-B',from:'share',to:'B',subscriber:'B',logicalStart:p.subscribeB,fixedStart:true}],
     schedule:{
-      'interval-share':{start:p.hubA,connectDuration:t.link,events:range(p.kFrom,p.kTo).map(k=>value(k,p.emitAt(k),p.arrival(k)))},
-      'share-A':{start:p.subscribeA,connectDuration:t.link,events:aEvents,
-        ...(p.aUnsub===null?{}:{end:{at:p.aUnsub,logicalAt:p.aUnsub,kind:'unsubscribe',duration:t.cancel}})},
-      ...(p.bStart===null?{}:{'share-B':{start:p.bStart,connectDuration:t.link,events:bEvents}})},
+      'interval-share':{start:p.upstreamStart,connectDuration:p.upstreamConnected-p.upstreamStart,events:values(p.upstream)},
+      'share-A':{start:p.subscribeA,connectDuration:p.connectedA-p.subscribeA,events:values(p.a),
+        end:{at:p.unsubscribeA,logicalAt:p.unsubscribeA,kind:'unsubscribe',duration:t.cancel}},
+      'share-B':{start:p.subscribeB,connectDuration:p.connectedB-p.subscribeB,events:values(p.b)},
+    },
     trays:receivers.map(r=>laneTray(r.id,pos(r),3)),
     callouts:[callout('const subA = shared$.subscribe(…)','A',laneEvent('subscribe','share-A'),laneEvent('connected','interval-share')),
-      ...(p.aUnsub===null?[]:[callout('subA.unsubscribe()','A',{type:'unsubscribe-call',edge:'share-A'},laneEvent('disconnected','share-A',t.calloutHold))]),
-      ...(p.bStart===null?[]:[callout('const subB = shared$.subscribe(…)','B',{type:'subscribe-call',edge:'share-B'},laneEvent('connected','share-B',.4))])],
-    timeline:[...(p.unsubCall===undefined?[]:[{type:'unsubscribe-call',edge:'share-A',at:p.unsubCall}]),
-      ...(p.subBCall===undefined?[]:[{type:'subscribe-call',edge:'share-B',at:p.subBCall}]),
-      ...(p.zeroAt===undefined?[]:[{type:'refcount-focus',at:p.zeroAt},{type:'refcount-focus-end',at:p.subBCall??p.end+1}])],
+      callout('subA.unsubscribe()','A',{type:'unsubscribe-call',edge:'share-A'},laneEvent('disconnected','share-A',t.calloutHold)),
+      callout('const subB = shared$.subscribe(…)','B',laneEvent('subscribe','share-B',-.3),laneEvent('connected','share-B',.4))],
+    timeline:[{type:'unsubscribe-call',edge:'share-A',at:p.unsubscribeCall},
+      {type:'refcount-focus',at:p.disconnectedA},{type:'refcount-focus-end',at:p.subscribeB}],
   };
 }
 
@@ -1644,4 +1623,173 @@ function debounceAuditGraph(scene) {
     trays:[tray('obs1',tops[0]),tray('obs2',tops[1])],callouts,
     timeline:[{type:'time-summary',event:{type:'deliver-next',edge:'deb-obs1'},offset:.35,
       caption:'8,5 s: 3,5 s ciszy — debounceTime emituje E do S1. S1: E · S2: C, E'}]};
+}
+
+// retry z exponential backoff (EXTRAS): jedna subskrypcja A, cztery kolejne subskrypcje tego samego cold HTTP.
+// Trzy błędy kończą się na retry; okna 1/2/4 s są częścią jednego deterministycznego zegara sceny.
+export function configureRetryBackoff(scene) {
+  const windows=[{start:4.9,end:5.9,seconds:1},{start:9.5,end:11.5,seconds:2},{start:15.1,end:19.1,seconds:4}];
+  const attempts=[
+    {start:1.3,connected:2.1,end:4.1,kind:'error'},
+    {start:5.9,connected:6.7,end:8.7,kind:'error'},
+    {start:11.5,connected:12.3,end:14.3,kind:'error'},
+    {start:19.1,connected:19.9,next:21.9,end:22.9,kind:'complete'},
+  ];
+  const ev=(type,edge,offset=0)=>({type,edge,...(offset?{offset}:{})}),during=(from,to)=>({from,to});
+  const httpMark={id:'retry-http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'};
+  const retryMark={id:'retry-op',bg:'rgba(216,179,230,.4)',line:'#a36ab7'};
+  const timerMark={id:'retry-timer',bg:'rgba(216,179,230,.3)',line:'#805095'};
+  const httpActive=attempts.map((_,i)=>during(ev('connected',`source-retry-${i+1}`),
+    ev(i<3?'stream-error':'stream-complete',`source-retry-${i+1}`)));
+  const retryActive=[...windows.map((_,i)=>during(ev('stream-error',`source-retry-${i+1}`),ev('subscribe',`source-retry-${i+2}`))),
+    during(ev('deliver-next','source-retry-4'),ev('disconnected','retry-observer'))];
+  const lines=[
+    [{text:'http.get',mark:httpMark,active:httpActive},{text:"<User>('/api/users/42').pipe("}],
+    [{text:'  '},{text:'retry',mark:retryMark,active:retryActive},{text:'({' }],
+    [{text:'    count: 3,'}],
+    [{text:'    delay: (_error, retryCount) =>'}],
+    [{text:'      '},{text:'timer',mark:timerMark,active:windows.map((_,i)=>retryActive[i])},{text:'(1000 * 2 ** (retryCount - 1))'}],
+    [{text:'  })'}],
+    [{text:')'}],
+  ];
+  const code=lines.map(line=>line.map(part=>part.text).join('')).join('\n');
+  Object.assign(scene,{title:'retry — nie udało się? Spróbuj później',graph:retryBackoffGraph,playerLayout:'expanded',
+    playerClass:'rx-flat-tiles rx-retry',duration:26,ink:'#26323B',code,codeLines:lines,
+    retryPlan:{windows,attempts},
+    rows:[...attempts.map((attempt,i)=>R(`#${i+1} · HTTP GET`,i===3?[E(attempt.next,'User','a')]:[],
+      [B(attempt.connected,attempt.end,'request',attempt.kind==='error'?'error':'work')],attempt.kind==='complete'?{completeAt:attempt.end}:{})),
+      R('A',[E(22.8,'User','a')],[],{completeAt:23.7})],
+    captions:[[0,'Definicja Observable. Request jeszcze nie istnieje'],[1.3,'A subskrybuje raz; retry subskrybuje źródło HTTP'],
+      [4.9,'Błąd #1 przechwycony. A nadal czeka. Backoff: 1 s'],[9.5,'Błąd #2 przechwycony. Backoff rośnie z 1 s do 2 s'],
+      [15.1,'Błąd #3 przechwycony. Teraz czekamy 4 s'],[19.1,'Po 4 s retry uruchamia czwarte wykonanie HTTP'],
+      [24.5,'Czwarty request: User i complete. A nie dostał pośrednich błędów'],
+      [25.35,'#1 error → 1 s · #2 error → 2 s · #3 error → 4 s · #4 User + complete']],
+    metrics:[{label:'Requesty HTTP',count:'started'},{label:'Aktywne',count:'active'}],
+    playback:{entry:'manual',finish:'hold',afterLastManualStop:'start-auto',controller:'stages',resetOnExit:true,
+      unskippable:windows.map(({start,end})=>({from:start,to:end})),stops:[
+        {id:'request-1',time:2.45,caption:'A subskrybuje. Powstaje HTTP #1 — pierwszy request jest natychmiastowy'},
+        {id:'error-1',time:4.9,caption:'HTTP #1: error. retry go przechwytuje; A nie dostaje błędu'},
+        {id:'request-2',time:7.05,caption:'Po pełnej 1 sekundzie retry ponownie subskrybuje źródło: HTTP #2'},
+        {id:'error-2',time:9.5,caption:'HTTP #2: error. Poprzednio 1 s, teraz backoff wynosi 2 s'},
+        {id:'request-3',time:12.65,caption:'Po pełnych 2 sekundach powstaje HTTP #3'},
+        {id:'error-3',time:15.1,caption:'1, 2, 4 sekundy. Ile czekalibyśmy przy następnym ponowieniu?'},
+        {id:'request-4',time:20.25,caption:'Odpowiedź: 8 sekund, gdyby pozwalał limit. Tutaj po 4 s rusza HTTP #4'},
+        {id:'success',time:24.85,caption:'HTTP #4 wysyła User i complete. A otrzymuje dokładnie next(User) → complete'},
+        {id:'summary',time:25.35,caption:'count: 3 = maksymalnie trzy ponowienia, czyli cztery requesty HTTP łącznie'},
+      ]},
+  });
+}
+
+function retryBackoffGraph(scene) {
+  const large=scene.format==='4:3',height=large?612:460,top=large?105:70,defH=large?56:46,rowH=large?68:52;
+  const y=top+defH+rowH/2,subscriber={A:{color:'#7457D9',fill:'#D9CFF5',progress:'#C4B6F0',ink:'#513A9A',label:'A'}};
+  const tile=(id,label,x,w,kind,extra={})=>({id,label,x,w,top,defH,rowH,laneSlots:{A:0},growRows:true,
+    y:top+(defH+rowH)/2,h:defH+rowH,ready:true,detail:'',statusInside:false,terminalBadge:true,rx:7,
+    ...(kind==='source'?{headerFill:'#8FC9D4',runtimeFill:'#E3F0F3'}:{headerFill:'#D8B3E6',runtimeFill:'#EDE6F8'}),...extra});
+  const colors=Array(4).fill('#7457D9');
+  const stackItems=scene.retryPlan.attempts.map((_,i)=>({id:`#${i+1}`,edge:`source-retry-${i+1}`,color:colors[i]}));
+  const nodes=[tile('source','HTTP GET',180,300,'source',{growRows:false,workLanes:true,progressUntilNext:true,
+      y:top+defH/2,h:defH,executionStack:{items:stackItems,shiftDuration:.4}}),
+    tile('retry','retry',600,340,'operator',{laneTimer:{kind:'countdown',label:'czekam',windows:scene.retryPlan.windows}}),
+    {id:'observer',label:'',x:1055,w:310,y,h:rowH,top:y-rowH/2,defH:0,rowH,laneSlots:{A:0},ready:false,born:.2,subscriber:'A',
+      headerFill:'#EAE4F7',runtimeFill:'#EDE6F8',terminalBadge:true,detail:'',statusInside:false,laneTerminalText:true,
+      inbox:{size:large?27:24,left:16,font:large?30:27},rx:7}],edges=[],schedule={};
+  scene.retryPlan.attempts.forEach((attempt,i)=>{
+    const id=`source-retry-${i+1}`,events=i===3?[{...E(attempt.next,'User',colors[i]),arrival:22.7}]:[];
+    edges.push({id,from:'source',to:'retry',subscriber:'A',retryAttempt:true,hideAfterTerminal:true,logicalStart:attempt.start,
+      logicalEnd:{at:attempt.end,kind:attempt.kind}});
+    schedule[id]={start:attempt.start,connectDuration:.8,events,
+      end:{at:attempt.end,logicalAt:attempt.end,kind:attempt.kind,duration:.8}};
+  });
+  edges.push({id:'retry-observer',from:'retry',to:'observer',subscriber:'A',logicalStart:.5,logicalEnd:{at:23.7,kind:'complete'}});
+  schedule['retry-observer']={start:.5,connectDuration:.8,events:[{...E(22.8,'User','#7457D9'),arrival:23.6}],
+    end:{at:23.7,logicalAt:23.7,kind:'complete',duration:.8}};
+  return {layout:'fixed',formatAware:true,width:1240,height,nodes,edges,schedule,trays:[{anchor:'observer',x:1025,y,w:190,balls:true,max:1}],
+    subscribers:subscriber,laneWire:5,portRadius:11,ball:{r:large?27:23,font:large?25:22,textFill:'#fff'},
+    executions:scene.retryPlan.attempts.map((attempt,i)=>({id:`http-${i+1}`,node:'source',edge:`source-retry-${i+1}`,
+      value:`#${i+1}`,label:`HTTP #${i+1}`,duration:attempt.end-attempt.start})),
+    ...(large?{textScale:1.18,labelScale:1.3}:{})};
+}
+
+// combineLatest (drugi EXTRAS): dwa kontrolowane źródła i lokalny stan jednego wykonania operatora.
+// Każde wejście ma stały kolor, a wynik zachowuje oba kolory jako jedna, dwuczęściowa para.
+const latestColors={user:'#B85D05',language:'#087FAD'};
+export function configureCombineLatestWithLatestFrom(scene) {
+  const input={
+    user:[{value:'42',color:latestColors.user,at:3.2,arrival:4.2,logicalAt:3.2},
+      {value:'43',color:latestColors.user,at:12.2,arrival:13.2,logicalAt:12.2}],
+    language:[{value:'PL',color:latestColors.language,at:6.2,arrival:7.2,logicalAt:6.2},
+      {value:'EN',color:latestColors.language,at:9.4,arrival:10.4,logicalAt:9.4}],
+  };
+  const combine=[{value:'[42, PL]',color:latestColors.language,at:8,arrival:9,logicalAt:6.2},
+    {value:'[42, EN]',color:latestColors.language,at:11.2,arrival:12.2,logicalAt:9.4},
+    {value:'[43, EN]',color:latestColors.user,at:14,arrival:15,logicalAt:12.2}];
+  const combineMark={id:'combine-latest',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
+  const lines=[[{text:'combineLatest',mark:combineMark},{text:'([userId$, language$])'}]];
+  Object.assign(scene,{title:'combineLatest — ostatnie wartości z wielu źródeł',graph:combineLatestWithLatestFromGraph,
+    playerLayout:'expanded',playerClass:'rx-flat-tiles rx-combinelatest',duration:16.1,
+    latestPlan:{input,combine},
+    code:'combineLatest([userId$, language$])',codeLines:lines,codeFrames:[],
+    rows:[R('userId$',input.user),R('language$',input.language),R('combineLatest',combine)],
+    captions:[[0,'Dwa źródła. combineLatest czeka na pierwszą wartość z każdego z nich']],
+    metrics:[{label:'Wyniki S1',value:t=>combine.filter(v=>v.arrival<=t).length}],
+    playback:{entry:'manual',finish:'hold',afterLastManualStop:'start-auto',stops:[
+      {id:'subscribed',time:2.65,caption:'S1 subskrybuje wynik, a combineLatest podłącza oba źródła'},
+      {id:'user-42',time:4.85,caption:'Zapamiętane ID: 42. Brak języka, więc S1 nadal nic nie dostaje'},
+      {id:'language-pl',time:9.25,caption:'Oba sloty są pełne. Pierwszy wynik: [42, PL]'},
+      {id:'language-en',time:12.45,caption:'Zmienił się tylko język. Ostatnie ID wystarcza do wyniku [42, EN]'},
+      {id:'user-43',time:15.25,caption:'Nowe ID łączy się z ostatnim językiem: [43, EN]'},
+      {id:'summary',time:15.8,caption:'Po pierwszych wartościach każda emisja dowolnego źródła tworzy aktualną parę'},
+    ]},
+  });
+}
+
+function combineLatestWithLatestFromGraph(scene) {
+  const large=scene.format==='4:3',height=large?612:460,sourceX=130,sourceW=215,opX=485,opW=310,receiverX=950,receiverW=540;
+  const top=large?90:50,defH=large?40:34,sourceDefH=defH,rowH=large?74:64,inputH=sourceDefH+rowH+4;
+  const userY=top+defH+inputH/2,languageY=userY+inputH,outputY=top+defH+2*inputH+rowH/2;
+  const ball=large?{r:25,font:29,textFill:'#fff'}:{r:23,font:25,textFill:'#fff'};
+  const pair={partWidth:40,height:46,font:23,textFill:'#fff'};
+  const subscribers={U1:{color:latestColors.user,fill:'#F6D9BC',ink:'#7C4008',label:''},
+    U2:{color:latestColors.language,fill:'#D5ECF5',ink:'#075C7D',label:''},
+    S1:{color:'#7457D9',fill:'#D9CFF5',ink:'#513A9A',label:'S1'}};
+  const row=(subscriber,y,h,tint)=>({subscriber,top:y-h/2,h,growth:1,color:subscribers[subscriber].color,tint});
+  // Stałe pasy są widoczne w READY; subscribe aktywuje porty bez zmiany geometrii.
+  const source=(id,label,y,subscriber)=>({id,label,x:sourceX,w:sourceW,top:y-sourceDefH-rowH/2,defH:sourceDefH,rowH,
+    laneSlots:{[subscriber]:0},y:y-sourceDefH/2,h:sourceDefH+rowH,ready:true,
+    labelOffset:-rowH/2,labelSize:large?32:29,
+    laneRows:[row(subscriber,y,rowH,subscriber==='U1'?'#FAEBDD':'#E4F3F8')],
+    headerFill:'#8FC9D4',runtimeFill:subscriber==='U1'?'#FAEBDD':'#E4F3F8',terminalBadge:true,detail:'',statusInside:false,rx:7});
+  const operatorH=defH+2*inputH+rowH;
+  const nodes=[source('user-source','userId$',userY,'U1'),source('language-source','language$',languageY,'U2'),
+    {id:'combine-op',label:'combineLatest',x:opX,w:opW,top,defH,y:top+operatorH/2,h:operatorH,ready:true,color:'op',
+      headerFill:'#D8B3E6',runtimeFill:'#F3EDF8',terminalBadge:true,detail:'',statusInside:false,rx:7,
+      labelOffset:-operatorH/2+defH/2,labelSize:large?32:29,hubFan:false,
+      laneRows:[row('U1',userY,inputH,'#FAEBDD'),row('U2',languageY,inputH,'#E4F3F8'),{...row('S1',outputY,rowH,'#EDE6F8'),label:'S1'}],
+      inputMemories:[
+        {id:'user',label:'id',empty:'—',edge:'user-combine',x:opX+opW/2-ball.r-18,y:userY,ball},
+        {id:'language',label:'lang',empty:'—',edge:'language-combine',x:opX+opW/2-ball.r-18,y:languageY,ball},
+      ]},
+    {id:'s1',label:'',x:receiverX,w:receiverW,y:outputY,h:rowH,top:outputY-rowH/2,defH:0,rowH,
+      laneSlots:{S1:0},ready:true,subscriber:'S1',headerFill:'#EAE4F7',runtimeFill:'#EDE6F8',terminalBadge:true,
+      detail:'',statusInside:false,inbox:{size:25,left:16,font:30,ready:true,label:'S1'},rx:7}];
+  const edges=[
+    {id:'user-combine',from:'user-source',to:'combine-op',subscriber:'U1',points:[[sourceX+sourceW/2,userY],[opX-opW/2,userY]]},
+    {id:'language-combine',from:'language-source',to:'combine-op',subscriber:'U2',points:[[sourceX+sourceW/2,languageY],[opX-opW/2,languageY]]},
+    {id:'combine-s1',from:'combine-op',to:'s1',subscriber:'S1',points:[[opX+opW/2,outputY],[receiverX-receiverW/2,outputY]]},
+  ];
+  const schedule={
+    'combine-s1':{start:.45,connectDuration:.8,events:scene.latestPlan.combine.map(v=>({...v}))},
+    'user-combine':{start:1.25,connectDuration:.8,events:scene.latestPlan.input.user.map(v=>({...v}))},
+    'language-combine':{start:1.25,connectDuration:.8,events:scene.latestPlan.input.language.map(v=>({...v}))},
+  };
+  const trays=[{anchor:'s1',x:receiverX-receiverW/2+170,y:outputY,w:receiverW-130,lines:1,columns:3,columnStep:130,pairs:true,pair}];
+  const valueParts=Object.fromEntries(scene.latestPlan.combine.map(v=>[v.value,[
+    {value:v.value.match(/\[(\d+)/)[1],color:latestColors.user},
+    {value:v.value.match(/, ([A-Z]+)/)[1],color:latestColors.language},
+  ]]));
+  return {layout:'fixed',formatAware:true,width:1240,height,nodes,edges,trays,schedule,subscribers,laneWire:5,portRadius:11,
+    ball:{...ball,pair,valueParts},
+    ...(large?{textScale:1.25,labelScale:1.4}:{}),timeline:[{type:'latest-summary',at:15.8,
+      caption:'Stan: id 43, lang EN · S1: [42, PL], [42, EN], [43, EN]'}]};
 }

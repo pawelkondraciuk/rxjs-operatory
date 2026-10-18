@@ -48,7 +48,11 @@ export function createStageController(player,options={}) {
     cancelResume();if(suspensions.size)return;
     if(player.state==='finished'){options.onNavigate?.(1);return;}
     if(player.live){nextLive(player.live);return;}
-    if(player.isPlaying){const end=target??nextCheckpoint();player.seek(end);target=null;changed();}else start();
+    if(player.isPlaying){
+      // Niektóre etapy reprezentują realny czas (np. exponential backoff). Kolejne „dalej” nie może ich skrócić.
+      if(player.canSkip===false)return;
+      const end=target??nextCheckpoint();player.seek(end);target=null;changed();
+    }else start();
   }
   function previous(){
     cancelResume();if(suspensions.size)return;

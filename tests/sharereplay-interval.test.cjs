@@ -1,128 +1,113 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules,playbackHarness}=require('./v2-harness.cjs');
-// x01-sharereplay-interval (pierwszy EXTRAS): interval(1000).pipe(shareReplay({ bufferSize: 1, refCount: false })).
 const id='x01-sharereplay-interval';
+
 async function deck(format='4:3'){
  class Slide{constructor(id){this.id=id;this.dataset={animation:id};this.heading={};this.player={setAttribute(){}};}
   querySelector(s){return s==='h2'?this.heading:this.player;}cloneNode(){return new Slide(this.id);}after(){}}
  const slides=[...fs.readFileSync('index.html','utf8').matchAll(/data-animation="([^"]+)"/g)].map(m=>new Slide(m[1]));
  const m=await modules(['catalog','presentation','engine','renderer'],{document:{querySelectorAll:()=>slides}});
- const scene=m.presentation.prepareSlides(m.catalog.scenes,{format}).get(id);
- const variant=actions=>m.engine.compileScene(scene.live.variant(scene,{from:0,to:30,closedAt:null,actions}));
- return {m,scene,variant,render:m.renderer.renderScene};
+ const scene=m.presentation.prepareSlides(m.catalog.scenes,{format}).get(id),compiled=m.engine.compileScene(scene);
+ return {m,scene,compiled,render:m.renderer.renderScene};
 }
-const metric=(f,label)=>f.metrics.find(x=>x.label===label).value;
-const values=(f,anchor)=>Array.from(f.histories.find(h=>h.anchor===anchor)?.values||[],v=>v.value);
-const hub=f=>f.nodes.find(n=>n.id==='share');
-const lanes=(f,node)=>Array.from(f.nodes.find(n=>n.id===node)?.laneStates||[],l=>l.subscriber+':'+l.state);
+const metric=(frame,label)=>frame.metrics.find(x=>x.label===label).value;
+const values=(frame,anchor)=>Array.from(frame.histories.find(h=>h.anchor===anchor)?.values||[],v=>v.value);
+const hub=frame=>frame.nodes.find(n=>n.id==='share');
+const lane=(frame,node,subscriber)=>frame.nodes.find(n=>n.id===node)?.laneStates.find(l=>l.subscriber===subscriber);
+const atStop=(compiled,id)=>compiled.snapshot(compiled.stops.find(s=>s.id===id).time);
 
-test('READY: only the definition — no receivers, no lanes, interval idle, empty memory, counters 0/0',async()=>{
- const {scene,variant,render}=await deck(),c=variant([]),ready=c.snapshot(0),svg=render(ready);
+test('READY pokazuje wyłącznie definicję, pustą pamięć i liczniki 0/0',async()=>{
+ const {scene,compiled,render}=await deck(),ready=compiled.snapshot(0),svg=render(ready);
  assert.equal(scene.title,'shareReplay — kto zatrzyma interval?');
- assert.equal(scene.code,'const shared$ = interval(1000).pipe(\n  shareReplay({ bufferSize: 1, refCount: false }));');
- assert.equal(scene.playback.controller,'stages');assert.equal(scene.live.autoplay,false);
- assert.deepEqual(Array.from(scene.playback.stops,s=>s.id),['unsub-a','zero','sub-b','summary']);
- assert.deepEqual(Array.from(ready.nodes.filter(n=>n.visible&&n.opacity>0),n=>n.label),['interval(1000)','shareReplay(1)'],'A pojawia się dopiero z subscribe');
+ assert.equal(scene.code,'const shared$ = interval(1000).pipe(\n  shareReplay({ bufferSize: 1, refCount: false })\n);');
+ assert.equal(scene.live,undefined);assert.equal(scene.playback.controller,'stages');
+ assert.deepEqual(Array.from(scene.playback.stops,s=>s.id),
+  ['subscribed-a','first-values','unsub-a','zero','replayed-b','summary']);
+ assert.deepEqual(Array.from(ready.nodes.filter(n=>n.visible&&n.opacity>0),n=>n.label),['interval(1000)','shareReplay(1)']);
  assert.ok(ready.edges.every(e=>!e.visible));assert.equal(hub(ready).memoryBall.value,undefined);
  assert.deepEqual([metric(ready,'Odbiorcy'),metric(ready,'Upstream')],[0,0]);
- assert.doesNotMatch(svg,/data-lane-memory|data-token="travel"/);
- assert.equal(c.events.some(e=>e.type==='source-next'&&e.at<c.events.find(x=>x.type==='connected'&&x.edge==='interval-share').at),false,'interval nie emituje przed subskrypcją');
+ assert.deepEqual(Array.from(ready.codeView.flat().filter(p=>p.mark),p=>p.mark.id),['interval','share','refcount']);
+ assert.equal(ready.codeSyntax,true);
+ assert.doesNotMatch(svg,/data-lane-memory|data-token="travel"|#1/);
 });
 
-test('A subscribes through shareReplay to interval: exactly one upstream; 0, 1, 2 reach A via the memory ball',async()=>{
- const {variant,render}=await deck(),c=variant([7.2]);
- const subs=c.events.filter(e=>e.type==='subscribe');
- assert.deepEqual(Array.from(subs,e=>e.edge),['share-A','interval-share'],'A → shareReplay, potem jedno upstream');
- const shareA=c.events.find(e=>e.type==='connected'&&e.edge==='share-A').at,up=c.events.find(e=>e.type==='connected'&&e.edge==='interval-share').at;
- assert.ok(up>shareA,'impuls biegnie dalej do interval');
- const mid=c.snapshot((shareA+up)/2);
- assert.deepEqual(Array.from(mid.callouts,x=>x.text),['const subA = shared$.subscribe(…)']);
- assert.deepEqual(values(c.snapshot(9),'A'),['0','1','2']);
- assert.equal(hub(c.snapshot(c.events.find(e=>e.type==='deliver-next'&&e.edge==='interval-share'&&e.value==='2').at+.45)).memoryBall.value,'2','pamięć aktualizuje się przy dotarciu do shareReplay');
- assert.ok(render(c.snapshot(9)).includes('data-lane-memory="'));
- assert.deepEqual([metric(c.snapshot(up+.1),'Odbiorcy'),metric(c.snapshot(up+.1),'Upstream')],[1,1]);
+test('A uruchamia dokładnie jeden upstream i dostaje 0, 1, 2, 3',async()=>{
+ const {compiled}=await deck(),subscribed=atStop(compiled,'subscribed-a'),first=atStop(compiled,'first-values');
+ assert.deepEqual(Array.from(compiled.events.filter(e=>e.type==='subscribe'),e=>e.edge),
+  ['share-A','interval-share','share-B']);
+ assert.deepEqual([metric(subscribed,'Odbiorcy'),metric(subscribed,'Upstream')],[1,1]);
+ assert.deepEqual(values(first,'A'),['0','1','2','3']);assert.equal(hub(first).memoryBall.value,'3');
+ assert.deepEqual(values(first,'B'),[]);assert.equal(lane(first,'interval','U').state,'running');
 });
 
-test('subA.unsubscribe(): × stops at shareReplay; upstream keeps running and updating memory with zero receivers',async()=>{
- const {variant,render}=await deck(),c=variant([7.2,11]);
- const ends=c.events.filter(e=>e.type==='inner-unsubscribe');
- assert.deepEqual(Array.from(ends,e=>e.edge),['share-A'],'× tylko na share-A');
- assert.equal(c.events.some(e=>e.edge==='interval-share'&&['inner-unsubscribe','stream-complete','disconnected'].includes(e.type)),false,'upstream nie odłączony');
- assert.equal(c.events.some(e=>e.type==='stream-complete'),false,'bez complete');
- const gone=c.events.find(e=>e.type==='disconnected'&&e.edge==='share-A').at;
- const zero=c.snapshot(gone+3);
- assert.deepEqual([metric(zero,'Odbiorcy'),metric(zero,'Upstream')],[0,1],'0 odbiorców / 1 upstream');
- assert.deepEqual(lanes(zero,'interval'),['U:running']);assert.deepEqual(lanes(zero,'A'),['A:cancelled']);
- assert.deepEqual(values(zero,'A'),['0','1','2'],'A nic więcej nie dostaje');
- const memAt=t=>hub(c.snapshot(t)).memoryBall.value;
- assert.ok(Number(memAt(gone+3))>Number(memAt(gone+1)),'kulka pamięci się podmienia');
- assert.ok(c.events.some(e=>e.type==='source-next'&&e.edge==='interval-share'&&e.at>gone+2),'interval nadal emituje');
- const svg=render(zero);
- assert.match(svg,/data-connection="interval-share" data-phase="subscribed"/);
- assert.ok(zero.codeView.flat().find(p=>p.mark?.id==='refcount').active,'wyróżnienie refCount: false');
- assert.doesNotMatch(svg,/✓ complete|data-node="B"/);
+test('po unsubscribe A upstream pozostaje aktywny i pamięć zmienia się z 4 na 5 bez odbiorców',async()=>{
+ const {compiled,render}=await deck(),unsub=atStop(compiled,'unsub-a'),zero=atStop(compiled,'zero');
+ assert.deepEqual(Array.from(compiled.events.filter(e=>e.type==='inner-unsubscribe'),e=>e.edge),['share-A']);
+ assert.equal(compiled.events.some(e=>e.edge==='interval-share'&&['inner-unsubscribe','stream-complete','disconnected'].includes(e.type)),false);
+ assert.equal(compiled.events.some(e=>e.type==='stream-complete'),false);
+ assert.deepEqual([metric(unsub,'Odbiorcy'),metric(unsub,'Upstream')],[0,1]);
+ assert.equal(lane(unsub,'A','A').state,'cancelled');assert.equal(lane(unsub,'interval','U').state,'running');
+ assert.deepEqual(values(unsub,'A'),['0','1','2','3']);assert.equal(hub(unsub).memoryBall.value,'4');
+ assert.deepEqual([metric(zero,'Odbiorcy'),metric(zero,'Upstream')],[0,1]);assert.equal(hub(zero).memoryBall.value,'5');
+ assert.ok(zero.codeView.flat().find(p=>p.mark?.id==='refcount').active);
+ assert.match(render(zero),/data-connection="interval-share" data-phase="subscribed"/);
+ assert.doesNotMatch(render(zero),/data-node="B"|#1/);
 });
 
-test('late B: subscribe stops at shareReplay, immediately gets the value stored at connection time, then live values',async()=>{
- const {variant}=await deck();
- for(const subB of [14.5,17.3,22]){
-  const c=variant([7.2,11,subB]);
-  assert.equal(c.events.filter(e=>e.type==='subscribe'&&e.edge==='interval-share').length,1,'bez drugiego interval');
-  const connected=c.events.find(e=>e.type==='connected'&&e.edge==='share-B').at;
-  const storedNow=hub(c.snapshot(connected)).memoryBall.value;
-  const bValues=c.events.filter(e=>e.type==='deliver-next'&&e.edge==='share-B').map(e=>e.value);
-  assert.equal(bValues[0],storedNow,`B@${subB}: pierwsza wartość = pamięć w chwili subskrypcji`);
-  assert.ok(bValues.slice(1).every((v,i)=>Number(v)===Number(storedNow)+i+1),'potem kolejne emisje bez historii');
-  assert.ok(bValues.length>=3);
-  const f=c.snapshot(connected+4);
-  assert.deepEqual([metric(f,'Odbiorcy'),metric(f,'Upstream')],[1,1]);
-  assert.deepEqual(lanes(f,'A'),['A:cancelled']);
-  assert.equal(c.events.some(e=>e.type==='stream-complete'||e.type==='inner-unsubscribe'&&e.edge!=='share-A'),false);
- }
+test('późny B dostaje najpierw 5 z pamięci, a potem 6 i 7 na żywo',async()=>{
+ const {compiled}=await deck(),replayed=atStop(compiled,'replayed-b'),final=atStop(compiled,'summary');
+ const bEvents=compiled.events.filter(e=>e.type==='deliver-next'&&e.edge==='share-B');
+ assert.deepEqual(Array.from(bEvents,e=>e.value),['5','6','7']);
+ assert.equal(bEvents[0].logicalAt,14.8,'pierwszy next B jest replay przy subskrypcji, nie nową emisją interval');
+ assert.deepEqual(values(replayed,'B'),['5']);assert.equal(hub(replayed).memoryBall.value,'5');
+ assert.deepEqual(values(final,'B'),['5','6','7']);assert.equal(hub(final).memoryBall.value,'7');
+ assert.deepEqual([metric(final,'Odbiorcy'),metric(final,'Upstream')],[1,1]);
+ assert.equal(lane(final,'A','A').state,'cancelled');assert.equal(lane(final,'B','B').state,'running');
+ assert.equal(lane(final,'interval','U').state,'running');
 });
 
-test('layout: interval → shareReplay(1) with #1 row and memory ball → A/B, horizontal wires, fits both formats',async()=>{
+test('bufor jest lokalnym stanem nagłówka, bez numerowanego lane i osobnego panelu',async()=>{
  for(const format of ['4:3','16:9']){
-  const {variant,render}=await deck(format),c=variant([7.2,11,14.5,19]),f=c.snapshot(20),svg=render(f);
-  assert.ok(f.nodes.every(n=>!n.visible||n.y+n.h/2<=f.height&&n.y-n.h/2>=0),format);
-  for(const e of f.edges.filter(e=>e.visible))assert.ok(e.points.every(p=>p[1]===e.points[0][1]),e.id+' poziomo');
-  const memory=hub(f).memoryBall,row=hub(f).laneRows.find(r=>r.input);
-  assert.ok(row&&memory.y>row.top&&memory.y<row.top+row.h,'kulka w wierszu #1');
-  assert.doesNotMatch(svg,/data-buffer|bufor|pamięć<|NaN|Infinity/);
+  const {compiled,render}=await deck(format),frame=atStop(compiled,'summary'),svg=render(frame),node=hub(frame);
+  assert.ok(frame.nodes.every(n=>!n.visible||n.y+n.h/2<=frame.height&&n.y-n.h/2>=0),format);
+  for(const edge of frame.edges.filter(e=>e.visible))assert.ok(edge.points.every(p=>p[1]===edge.points[0][1]),edge.id+' poziomo');
+  assert.ok(node.memoryBall.y>node.top&&node.memoryBall.y<node.top+node.defH,'pamięć w nagłówku');
+  assert.ok(node.memoryBall.x>node.labelX,'pamięć po prawej stronie etykiety');
+  assert.deepEqual(Array.from(node.laneRows,r=>r.subscriber),['A','B'],'bez osobnego wiersza upstream/bufora');
+  assert.equal((svg.match(/data-token="memory"/g)||[]).length,1);
+  assert.doesNotMatch(svg,/#1|data-buffer|NaN|Infinity/);
  }
 });
 
-test('stages: manual flow, undo, reset and leaving leave no running timer; finish and print give still frames',async()=>{
- const {scene}=await deck(),h=await playbackHarness(),{player,controller}=h.create({scene});
- assert.equal(player.state,'ready');h.advance(3000);assert.equal(player.time,0,'bez „dalej” nic nie rusza');
- controller.next();h.advance(9000);
- assert.ok(player.snapshot.metrics.find(x=>x.label==='Upstream').value===1);
- for(let i=0;i<4;i++){controller.next();h.advance(4000);assert.equal(player.live.stage,i+1);assert.equal(player.isPlaying,true,'emisje trwają na postoju');}
- const memory=Number(player.snapshot.nodes.find(n=>n.id==='share').memoryBall.value);h.advance(3000);
- assert.ok(Number(player.snapshot.nodes.find(n=>n.id==='share').memoryBall.value)>memory,'interval pracuje dalej');
- controller.previous();assert.equal(player.live.stage,3);
- controller.reset();assert.equal(player.state,'ready');assert.equal(player.time,0);
- controller.suspend('slide');h.advance(5000);assert.equal(h.frames.size,0,'po wyjściu brak RAF');
- const p2=h.create({scene});p2.player.finish();assert.equal(p2.player.state,'finished');assert.equal(h.frames.size,0);
- const fin=p2.player.snapshot;
- assert.deepEqual(Array.from(fin.metrics,x=>x.value),[1,1]);
- assert.deepEqual(Array.from(fin.nodes.find(n=>n.id==='A').laneStates,l=>l.state),['cancelled']);
+test('MANUAL zatrzymuje stałe checkpointy, AUTO odtwarza całość, cofanie/reset/F są deterministyczne',async()=>{
+ const {scene}=await deck(),h=await playbackHarness();
+ const manual=h.create({scene}),times=scene.playback.stops.map(s=>s.time);
+ for(const expected of times){manual.controller.next();h.advance(30000);assert.equal(manual.player.time,expected);assert.equal(manual.player.isPlaying,false);}
+ const stopped=manual.player.time;h.advance(5000);assert.equal(manual.player.time,stopped,'checkpoint pozostaje nieruchomy');
+ manual.controller.previous();assert.equal(manual.player.time,times.at(-2));
+ manual.controller.reset();assert.equal(manual.player.state,'ready');assert.equal(manual.player.time,0);
+ manual.controller.suspend('slide');h.advance(5000);assert.equal(h.frames.size,0,'po wyjściu brak RAF');
+
+ const auto=h.create({scene});auto.controller.setMode('auto');h.advance(30000);
+ assert.equal(auto.player.state,'finished');assert.deepEqual(Array.from(auto.player.snapshot.metrics,x=>x.value),[1,1]);
+ assert.deepEqual(values(auto.player.snapshot,'B'),['5','6','7']);
+
+ const still=h.create({scene});still.player.finish();assert.equal(still.player.state,'finished');assert.equal(h.frames.size,0);
+ assert.deepEqual(Array.from(still.player.snapshot.metrics,x=>x.value),[1,1]);
+ assert.equal(lane(still.player.snapshot,'A','A').state,'cancelled');assert.equal(lane(still.player.snapshot,'B','B').state,'running');
 });
 
-test('placement and notes: first EXTRAS right after Pytania?, notes per action with the question before the answer',async()=>{
- const {m}=await deck();
+test('miejsce w EXTRAS i notatki odpowiadają sześciu etapom oraz finałowi',async()=>{
  const sc=await modules(['scene-config']);
- assert.equal(sc['scene-config'].extraOrder[0],id);
- assert.ok(!sc['scene-config'].mainOrder.includes(id));
+ assert.equal(sc['scene-config'].extraOrder[0],id);assert.ok(!sc['scene-config'].mainOrder.includes(id));
  const html=fs.readFileSync('index.html','utf8');
  assert.ok(html.indexOf(`<section id="${id}"`)>html.indexOf('<section id="pytania"'));
  const source=html.match(new RegExp(`<template data-checkpoint-notes="${id}">([\\s\\S]*?)</template>`))[1];
- const notes=Object.fromEntries([...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)].map(([,k,v])=>[k,v]));
- assert.deepEqual(Object.keys(notes),['ready','unsub-a','zero','sub-b','summary','finished']);
- assert.match(notes.ready,/HTTP samo się kończy\. Co się stanie, jeśli współdzielimy źródło, które nigdy się nie kończy\?[\s\S]*Pierwszy subskrybent uruchamia interval/);
- assert.match(notes['unsub-a'],/Czy to oznacza, że interval też przestał działać\?/);assert.doesNotMatch(notes['unsub-a'],/utrzymuje połączenie/);
- assert.match(notes.zero,/Przy refCount ustawionym na false shareReplay utrzymuje połączenie upstream/);
- assert.match(notes['sub-b'],/Nie powstaje nowa subskrypcja interval/);
- assert.match(notes.summary,/potencjalna pułapka[\s\S]*A co zmieniłoby refCount: true\?/);
- void m;
+ const notes=Object.fromEntries([...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)].map(([,key,value])=>[key,value]));
+ assert.deepEqual(Object.keys(notes),['ready','subscribed-a','first-values','unsub-a','zero','replayed-b','summary','finished']);
+ const all=Object.values(notes).join(' ');
+ assert.match(notes['first-values'],/zapamiętuje ostatnią wartość/);
+ assert.match(notes.zero,/refCount: false[\s\S]*nie odłącza się od źródła[\s\S]*interval działa dalej/);
+ assert.match(notes['replayed-b'],/najpierw[\s\S]*bufora[\s\S]*potem[\s\S]*na żywo/i);
+ assert.match(notes.finished,/nieskończonych[\s\S]*w tle/);assert.doesNotMatch(all,/#1|subB\.unsubscribe/);
 });

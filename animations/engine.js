@@ -10,6 +10,8 @@ const evaluate=(value,time)=>typeof value==='function'?value(time):value;
 const captionAt=(captions,time)=>(captions||[]).filter(c=>c[0]<=time).at(-1)?.[1]||'';
 // Rosnący kafelek (laneSlots): góra i część definicji (defH) są stałe, wiersz wykonania slotu i leży pod nią (rowH na wiersz).
 const laneY=(n,id)=>{
+  const row=n.laneRows?.find(row=>row.subscriber===id);
+  if(row)return row.top+row.h/2;
   if(n.laneSlots&&id in n.laneSlots)return n.top+n.defH+(n.laneSlots[id]+.5)*n.rowH;
   const i=(n.laneIds||[]).indexOf(id);return i<0?n.y:n.y+(n.laneTop||0)+i*(n.laneStep||0);
 };
@@ -198,7 +200,7 @@ export function compileScene(scene) {
   };
   // Zakończony tor zostaje jako przygaszona historia: kabel i gniazda w kolorze toru z mniejszym kryciem.
   const trail=.35,laneAccent={complete:'#26804E',error:'#C54848'},laneIdle='#808890';
-  const presence=(time,shown,hidden)=>Math.min(clamp((time-shown)/fadeDuration),1-(1-trail)*clamp((time-hidden)/fadeDuration));
+  const presence=(time,shown,hidden,endOpacity=trail)=>Math.min(clamp((time-shown)/fadeDuration),1-(1-endOpacity)*clamp((time-hidden)/fadeDuration));
   // Kabel toru: subscribe rysuje go od odbiorcy; complete/error przebiega krótkim impulsem w kolorze stanu do odbiorcy,
   // potem kabel wraca do koloru toru z mniejszym kryciem. Unsubscribe bez impulsu: kabel szarzeje i gaśnie.
   function laneEdgeState(r,time) {
@@ -219,16 +221,18 @@ export function compileScene(scene) {
       return {...base,phase:'unsubscribe',color:p>0?laneIdle:color,offset:0,progress:1,opacity:1-(1-trail)*p,done:p>=1};
     }
     const start=Math.max(r.end.at,...r.events.filter(e=>e.at<=r.end.at).map(e=>e.arrival)),p=clamp((time-start)/duration);
-    return {...base,phase:r.end.kind,color,offset:0,progress:1,opacity:1-(1-trail)*clamp((time-start-duration)/fadeDuration),done:p>=1,
+    const opacity=r.hideAfterTerminal?1-p:1-(1-trail)*clamp((time-start-duration)/fadeDuration);
+    return {...base,phase:r.end.kind,color,offset:0,progress:1,opacity,done:p>=1,
       ...(time>=start&&p<1?{pulse:{at:p,color:laneAccent[r.end.kind]||laneAccent.complete}}:{})};
   }
   function socketsOf(n,time) {
     return laneRecords.flatMap(r=>{
       const hidden=hideAt(r),side=r.a.id===n.id?'out':r.b.id===n.id?'in':null;
       if(!side)return [];
-      const opacity=side==='out'?presence(time,connectedAt(r),hidden.out):presence(time,r.start,hidden.in);
+      const opacity=side==='out'?presence(time,connectedAt(r),hidden.out,r.hideAfterTerminal?0:trail):presence(time,r.start,hidden.in,r.hideAfterTerminal?0:trail);
       const idle=r.end?.kind==='unsubscribe'&&time>=(side==='out'?hidden.out:hidden.in);
-      return opacity>0?[{side,subscriber:r.subscriber,edge:r.id,y:laneY(n,r.subscriber),color:idle?laneIdle:subscriberColor(r.subscriber),opacity,
+      const points=r.points||geometry(r.a,r.b),y=side==='out'?points[0][1]:points.at(-1)[1];
+      return opacity>0?[{side,subscriber:r.subscriber,edge:r.id,y,color:idle?laneIdle:subscriberColor(r.subscriber),opacity,
         ...(graph.portRadius?{r:graph.portRadius}:{})}]:[];
     });
   }
@@ -239,7 +243,11 @@ export function compileScene(scene) {
   function laneStatesOf(n,time) {
     const ids=[...new Set(laneRecords.filter(r=>r.a.id===n.id||r.b.id===n.id).map(r=>r.subscriber))];
     return ids.flatMap(subscriber=>{
-      const out=laneRecords.find(r=>r.a.id===n.id&&r.subscriber===subscriber),input=laneRecords.find(r=>r.b.id===n.id&&r.subscriber===subscriber);
+      // Kolejne subskrypcje tego samego źródła (np. retry) mogą używać wielu krawędzi tego samego toru.
+      // Kafelek pokazuje najnowszą rozpoczętą, a wcześniejsze terminale pozostają historią na przewodach.
+      const latest=items=>items.filter(r=>r.start<=time).sort((a,b)=>a.start-b.start).at(-1)||items[0];
+      const out=latest(laneRecords.filter(r=>r.a.id===n.id&&r.subscriber===subscriber));
+      const input=latest(laneRecords.filter(r=>r.b.id===n.id&&r.subscriber===subscriber));
       // Hub (np. share): wyjścia odbiorców to chipy subskrypcji, wspólne wejście pokazuje samo gniazdo.
       const hub=laneRecords.some(r=>r.a.id===n.id);
       const role=out&&n.workLanes?'work':out?'operator':hub?null:'receiver';
@@ -273,6 +281,7 @@ export function compileScene(scene) {
         lane.fallback={label:n.laneFallback.label,opacity:Math.min(clamp((time-shown.from)/fadeDuration),1-clamp((time-shown.to)/fadeDuration))};
       if(role==='operator'&&n.memory)lane.memory=memoryOf(n,out,input,time);
       if(role==='operator'&&n.laneTimer)Object.assign(lane,timerOf(n,out,input,time));
+      if(lane.timer&&state==='completed')Object.assign(lane.timer,{active:false,progress:1,text:'complete'});
       if(role==='work') {
         // progressUntilNext: oczekiwanie kończy się z wysłaniem pierwszej wartości (odpowiedź HTTP), nie dopiero z complete.
         const firstNext=n.progressUntilNext?out.events[0]?.at:undefined;
@@ -303,7 +312,18 @@ export function compileScene(scene) {
   // wejścia dojedzie do slotu (storeMove), niezależnie od liczby odbiorców. Kulka stoi w wierszu wejścia (inputRow).
   function replayMemoryOf(n,time) {
     const input=laneRecords.find(r=>r.b.id===n.id),stored=(input?.events||[]).filter(e=>e.arrival+storeMove<=time).at(-1);
-    return {x:memorySlot(n),y:input?laneY(n,input.subscriber):n.y,...(stored?{value:stored.value,color:stored.color||'a',since:stored.arrival+storeMove}:{})};
+    const header=typeof n.replayMemory==='object'&&n.replayMemory.header;
+    const x=n.replayMemory?.x??memorySlot(n),y=n.replayMemory?.y??(header?n.top+n.defH/2:input?laneY(n,input.subscriber):n.y);
+    return {x,y,...(stored?{value:stored.value,color:stored.color||'a',since:stored.arrival+storeMove}:{})};
+  }
+  // inputMemories: kilka niezależnych slotów ostatniej wartości, przypisanych do konkretnych wejść operatora.
+  // Sloty są częścią stanu operatora, nie osobnymi panelami ani emisjami. Nowa wartość zastępuje poprzednią po
+  // krótkim dojeździe od portu wejściowego; źródłem prawdy pozostaje plan zdarzeń danej krawędzi.
+  function inputMemoriesOf(n,time) {
+    return (n.inputMemories||[]).map(slot=>{
+      const input=records.find(r=>r.id===slot.edge),stored=(input?.events||[]).filter(e=>e.arrival+storeMove<=time).at(-1);
+      return {...slot,...(stored?{value:stored.value,color:stored.color||'a',since:stored.arrival+storeMove}:{})};
+    });
   }
   // Środek kulki pamięci: tuż przed portem wyjścia, w odległości jak kulka czekająca przy porcie.
   function memorySlot(n){return n.x+n.w/2-(graph.ball?.r??25)-18;}
@@ -318,6 +338,13 @@ export function compileScene(scene) {
   // debounce: każde wejście zaczyna odliczanie od nowa; audit: pierwsze wejście bez otwartego okna otwiera okno, kolejne
   // tylko podmieniają zapamiętaną wartość. Po emisji (wyjście z logicalAt = koniec) operator nie trzyma wartości.
   function timerOf(n,out,input,time) {
+    if(n.laneTimer.kind==='countdown') {
+      const window=n.laneTimer.windows.find(({start,end})=>time>=start&&time<=end);
+      const period=window ? window.end-window.start : 1;
+      const remaining=window ? Math.max(0,window.end-time) : null;
+      return {timer:{label:n.laneTimer.label,progress:window?clamp((time-window.start)/period):0,active:Boolean(window),
+        text:window?`${n.laneTimer.label} ${remaining.toFixed(1).replace('.',',')} s`:'gotowy',since:window?.start}};
+    }
     const {kind,period,label}=n.laneTimer,logical=plan.logicalTime(time);
     const arrived=(input?.events||[]).filter(e=>e.arrival<=time);
     let open=null;
@@ -363,6 +390,29 @@ export function compileScene(scene) {
     if(!n.laneSlots||!n.growRows)return {};
     const rows=laneRowsOf(n,time),h=n.defH+rows.reduce((sum,row)=>sum+row.growth*n.rowH,0);
     return {y:n.top+h/2,h,labelOffset:-h/2+n.defH/2,laneRows:rows,defH:n.defH};
+  }
+
+  // executionStack: kolejne wykonania jednego cold źródła pod wspólnym nagłówkiem. Najnowszy rekord zajmuje
+  // pierwszy wiersz, a wcześniejsze terminale płynnie przesuwają się w dół. To historia subskrypcji źródła,
+  // bez dodatkowych węzłów, odbiorców ani zegara; pozycje wynikają wyłącznie z czasu snapshotu.
+  function executionStackOf(n,time) {
+    if(!n.executionStack)return {};
+    const shift=n.executionStack.shiftDuration??rowGrowth,smooth=value=>value*value*(3-2*value);
+    const items=n.executionStack.items.map((item,index)=>({...item,index,record:records.find(r=>r.id===item.edge)}))
+      .filter(item=>item.record&&time>=item.record.start);
+    const revealed=item=>smooth(clamp((time-item.record.start)/shift));
+    const rows=items.map(item=>{
+      const r=item.record,growth=revealed(item);
+      const rank=items.filter(other=>other.index>item.index).reduce((sum,other)=>sum+revealed(other),0);
+      const connected=connectedAt(r),ended=r.end&&time>=r.end.at;
+      const state=time<connected?'subscribing':!ended?'running':r.end.kind==='complete'?'completed':r.end.kind==='error'?'error':'cancelled';
+      const stop=r.events[0]?.at??r.end?.at??plan.duration;
+      const progress=time<connected?0:state==='completed'||state==='error'?1:clamp((time-connected)/Math.max(1e-9,stop-connected));
+      return {id:item.id,edge:item.edge,rank,top:n.top+n.defH+rank*n.rowH,h:n.rowH*growth,growth,state,
+        progress,color:item.color||subscriberColor(r.subscriber),since:ended?r.end.at:connected};
+    });
+    const h=n.defH+items.reduce((sum,item)=>sum+revealed(item)*n.rowH,0);
+    return {y:n.top+h/2,h,labelOffset:-h/2+n.defH/2,defH:n.defH,laneRows:[],executionRows:rows};
   }
 
   // Rozdzielenia w hubie: wejście wspólnego upstreamu → wyjścia z tą samą wartością (logicalAt), które wychodzą po nim.
@@ -485,8 +535,17 @@ export function compileScene(scene) {
     // krawędzi (storeMove) i tam staje się zapamiętaną wartością; wyjście rusza z portu przy emisji timera.
     for(const n of nodes) if(n.laneTimer?.ball||n.replayMemory) for(const input of laneRecords.filter(r=>r.b.id===n.id)) for(const e of input.events) {
       if(time<e.arrival||time>=e.arrival+storeMove)continue;
-      const left=n.x-n.w/2,u=(time-e.arrival)/storeMove,ease=u*u*(3-2*u);
-      tokens.push({x:left+(memorySlot(n)-left)*ease,y:laneY(n,input.subscriber),value:e.value,color:e.color||'a',edge:input.id,phase:'store'});
+      const from=pointAt(input.points||geometry(input.a,input.b),1),memory=n.replayMemory?replayMemoryOf(n,time):null;
+      const target=memory||{x:memorySlot(n),y:laneY(n,input.subscriber)},u=(time-e.arrival)/storeMove,ease=u*u*(3-2*u);
+      tokens.push({x:from[0]+(target.x-from[0])*ease,y:from[1]+(target.y-from[1])*ease,value:e.value,color:e.color||'a',edge:input.id,phase:'store'});
+    }
+    for(const n of nodes) for(const slot of n.inputMemories||[]) {
+      const input=records.find(r=>r.id===slot.edge);
+      for(const e of input?.events||[]) {
+        if(time<e.arrival||time>=e.arrival+storeMove)continue;
+        const from=pointAt(input.points||geometry(input.a,input.b),1),u=(time-e.arrival)/storeMove,ease=u*u*(3-2*u);
+        tokens.push({x:from[0]+(slot.x-from[0])*ease,y:from[1]+(slot.y-from[1])*ease,value:e.value,color:e.color||'a',edge:input.id,phase:'store'});
+      }
     }
     // replayMemory (opt-in, hub np. shareReplay): każde powiadomienie wyjścia rusza z kulki pamięci do portu wyjścia
     // w ostatnich storeMove s przed wylotem — także odtworzenie ostatniej wartości dla późnego odbiorcy.
@@ -546,7 +605,7 @@ export function compileScene(scene) {
       const completeTime=terminalTime('complete'),errorTime=terminalTime('error');
       const completed=Boolean(r.completeAt!==undefined&&(completeTime!==undefined?time>=completeTime:t>=r.completeAt));
       // teardownEdge: operator przekazał błąd dalej, ale sam kończy się teardown — bez czerwonego obrysu kafelka.
-      const errored=n.teardownEdge?false:errorTime!==undefined?time>=errorTime:r.events.some(e=>e.kind==='error'&&e.at<=t)||span?.kind==='error'&&t>=span.end;
+      const errored=n.executionStack?false:n.teardownEdge?false:errorTime!==undefined?time>=errorTime:r.events.some(e=>e.kind==='error'&&e.at<=t)||span?.kind==='error'&&t>=span.end;
       const active=Boolean(span&&started&&!canceled&&!completed&&!errored&&t<span.end);
       const queued=r.spans.some(p=>p.kind==='queue'&&p.start<=t&&t<p.end)||
         Boolean(n.createdBy&&n.inner&&time>=births.get(n.id)&&!started&&r.spans.some(p=>p.kind==='queue'));
@@ -588,10 +647,11 @@ export function compileScene(scene) {
         opacity:n.ready||n.instant?1:clamp((time-births.get(n.id))/fadeDuration),fill,status,notification,workState,
         active:activity||Boolean(transform&&time<transform.until),progress,showProgress:Boolean(span&&(active||canceled)),transform:transform?.label,
         disabled:evaluate(n.disabled,t),
-        ...(laneRecords.length?{socketDots:socketsOf(n,time),laneStates:laneStatesOf(n,time),...growingTile(n,time),
+        ...(laneRecords.length?{socketDots:socketsOf(n,time),laneStates:laneStatesOf(n,time),...growingTile(n,time),...executionStackOf(n,time),
           ...(n.subscriber?{laneColor:subscriberColor(n.subscriber),...(n.rowTint?{laneTint:graph.subscribers?.[n.subscriber]?.tint}:{})}:{}),
           ...(n.splitBalls?{splitGuides:n.splitGuides===false?[]:splitGuides(n,time)}:{}),
-          ...(n.buffer?{bufferPocket:bufferOf(n,time)}:{}),...(n.replayMemory?{memoryBall:replayMemoryOf(n,time)}:{})}:{})};
+          ...(n.buffer?{bufferPocket:bufferOf(n,time)}:{}),...(n.replayMemory?{memoryBall:replayMemoryOf(n,time)}:{}),
+          ...(n.inputMemories?{memoryBalls:inputMemoriesOf(n,time)}:{})}:{})};
     });
     const histories=trays.map(q=>{
       const values=records.filter(e=>e.b.id===q.anchor).flatMap(e=>e.events.filter(v=>v.arrival<=time));

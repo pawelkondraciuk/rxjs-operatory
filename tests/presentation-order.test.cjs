@@ -46,12 +46,12 @@ test('MAIN preserves the opening and orders final variants independently, ending
  for(const id of expectedMain.filter(id=>id!=='pytania'))assert.equal(scenes.get(id).group,'main',id);
 });
 
-test('EXTRAS contains only shareReplay + interval',async()=>{
+test('EXTRAS contains shareReplay, latest-value comparison and retry backoff',async()=>{
  const {container,prepared,config}=await presentation({extras:true});
  const ids=container.children.map(s=>s.id);
- assert.equal(ids.length,mainEnd+1);
+ assert.equal(ids.length,mainEnd+3);
  assert.deepEqual(ids.slice(10,mainEnd),expectedMain);
- assert.deepEqual(ids.slice(mainEnd),['x01-sharereplay-interval']);
+ assert.deepEqual(ids.slice(mainEnd),['x01-sharereplay-interval','x02-combinelatest-withlatestfrom','x03-retry-backoff']);
  assert.deepEqual(ids.slice(mainEnd),Array.from(config.extraOrder));
  assert.deepEqual(ids.filter(Boolean).sort(),prepared.map(s=>s.id).filter(Boolean).sort());
  assert.equal(new Set(ids.filter(Boolean)).size,ids.filter(Boolean).length);
@@ -72,10 +72,12 @@ test('MAIN shows distinctUntilChanged once, right after the four *Map, and keeps
  assert.deepEqual(story.map(at),story.map((_,i)=>at(story[0])+i));
 });
 
-test('only the remaining extra hash enables the EXTRAS route',async()=>{
- const extra=await presentation({requestedId:'x01-sharereplay-interval'});
- assert.equal(extra.route.extras,true);
- assert.equal(extra.container.children.length,mainEnd+1);
+test('either current extra hash enables the complete EXTRAS route',async()=>{
+ for(const requestedId of ['x01-sharereplay-interval','x02-combinelatest-withlatestfrom','x03-retry-backoff']){
+  const extra=await presentation({requestedId});
+  assert.equal(extra.route.extras,true);
+  assert.equal(extra.container.children.length,mainEnd+3);
+ }
  for(const requestedId of ['06a-cold-hot-2','16-czas-cztery-2','18-async-2','28-resolver-batch','16-czas-cztery','04-operator','unknown']){
   const {container,route}=await presentation({requestedId});assert.equal(route.extras,false,requestedId);assert.equal(container.children.length,mainEnd);
  }
@@ -83,7 +85,7 @@ test('only the remaining extra hash enables the EXTRAS route',async()=>{
 
 test('print includes every expanded slide once, with main narration before extras',async()=>{
  const {container,prepared}=await presentation({printMode:true});
- assert.equal(container.children.length,mainEnd+1);
+ assert.equal(container.children.length,mainEnd+3);
  assert.deepEqual(container.children.map(s=>s.id).filter(Boolean).sort(),prepared.map(s=>s.id).filter(Boolean).sort());
  assert.deepEqual(container.children.slice(10,mainEnd).map(s=>s.id),expectedMain);
 });

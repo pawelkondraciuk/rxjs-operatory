@@ -19,7 +19,7 @@ Sceny MAIN z pytaniami zaczynają od nieruchomego READY. Prawo / Page Down uruch
 
 W oknie prelegenta (`S`) podgląd następnego slajdu domyślnie pokazuje dużą nazwę, np. **switchMap**, i krótki podtytuł. Wskazuje kolejny slajd, także podczas ręcznych postojów bieżącej animacji. Przełącznik **Podgląd: Tytuł / Slajd** w prawym dolnym rogu tego pola przywraca standardowy podgląd. Wybór jest zapamiętywany w przeglądarce. Notatki pozostają w standardowym polu Notes. Opcjonalne `data-speaker-title` na sekcji ustawia własny podpis wyłącznie dla prelegenta.
 
-Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 33 slajdy dają 49 stron PDF.
+Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 35 slajdów daje 51 stron PDF.
 
 Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przywraca ekran panoramiczny 1280×720. `W` przeładowuje stronę w drugim formacie, zostając na tym samym slajdzie i fragmencie; animacja wraca do stanu tego fragmentu. Linki do EXTRAS i powrót do pytań zachowują wybrany format. Druk działa w obu: `?print-pdf` (4:3) lub `?print-pdf&ratio=16:9`. W 4:3 slajdy wykorzystują pełną wysokość: większe zdjęcia i kody QR, wyższe diagramy, większy tekst i kapsułki w animacjach (×1,15), etykiety kafelków do ×1,3 oraz większy tytuł (64 px; za długi zmniejsza się, by został w jednej linii), kod (42 px, długi łańcuch przechodzi do nowej linii przed .pipe/.subscribe) i podpis.
 
@@ -35,7 +35,7 @@ Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorz
 
 Pełne otwarcie pozostaje bez zmian: społeczność, historia meet.js, fotografie, autor, tytuł i pytania o operatory. Budżet **30–35 minut dotyczy tylko części właściwej**; otwarcie, pytania i dogrywka są dodatkowo.
 
-MAIN ma **32 slajdy (21 animowanych)**. EXTRAS zawiera **1 slajd animowany**. Całość obejmuje 25 bazowych slajdów HTML i 33 slajdy po rozwinięciu wariantów. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
+MAIN ma **32 slajdy (21 animowanych)**. EXTRAS zawiera **3 slajdy animowane**. Całość obejmuje 27 bazowych slajdów HTML i 35 slajdów po rozwinięciu wariantów. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
 
 Kolejność po otwarciu:
 
@@ -57,7 +57,7 @@ Kolejność po otwarciu:
 
 Na map + concatAll i przejście do concatMap przewidziano około 3 minut z bloku flatteningu. Czasy są planem prelegenta, nie pomiarem odtwarzacza.
 
-**EXTRAS zawiera jeden przygotowany dodatkowy przykład:** `x01-sharereplay-interval`, czyli shareReplay z `refCount: false` na źródle interval. Prelegent uruchamia go ręcznie z linku na slajdzie „Pytania?”. Bezpośredni hash zachowanego dodatku włącza ścieżkę EXTRAS, a link „Powrót do pytań” zachowuje wybrany format.
+**EXTRAS zawiera trzy przygotowane dodatkowe przykłady:** `x01-sharereplay-interval`, czyli shareReplay z `refCount: false` na źródle interval; `x02-combinelatest-withlatestfrom`, czyli combineLatest z dwoma źródłami i lokalną pamięcią ostatnich wartości; oraz `x03-retry-backoff`, czyli retry z exponential backoff 1 → 2 → 4 s. Prelegent uruchamia pierwszy ręcznie z linku na slajdzie „Pytania?”, a pozostałe znajdują się bezpośrednio po nim. Bezpośredni hash dowolnego dodatku włącza pełną ścieżkę EXTRAS, a link „Powrót do pytań” zachowuje wybrany format.
 
 ## Legenda bloczków
 
@@ -536,44 +536,74 @@ Semantyka zastępowania błędu: [implementacja catchError w RxJS 7.8.2](https:/
 - **Czy można współdzielić?** Jeśli kilku odbiorców potrzebuje tych samych danych, zastanówmy się, czy naprawdę każdy musi uruchamiać własne wykonanie.
 - **Zakończenie:** Nie chodzi o zapamiętanie wszystkich operatorów RxJS. Chodzi o to, żeby rozumieć, jakie decyzje podejmują za nas — wtedy z operatorami, które znamy, możemy wreszcie spokojnie zagadać.
 
-## Pytania i dodatek
+## Pytania i dodatki
 
 ### Pytania? — `pytania`
 
 **Temat:** zakończenie głównej części i wejście do dodatku.
 
-**Na ekranie:** koniec MAIN i jeden link do dodatkowego przykładu shareReplay z `refCount: false` na interval (`x01-sharereplay-interval`). Pilot nie przechodzi automatycznie z MAIN do dodatku. Dodatek ma link „Powrót do pytań”.
+**Na ekranie:** koniec MAIN i link do pierwszego dodatkowego przykładu shareReplay z `refCount: false` na interval (`x01-sharereplay-interval`). Pilot nie przechodzi automatycznie z MAIN do dodatków. Wszystkie trzy dodatki mają link „Powrót do pytań”.
 
 **Speaker notes:** Zaproś do pytań. Jeśli chcesz rozwinąć temat, otwórz dodatkowy przykład shareReplay i interval.
 
 ### shareReplay — kto zatrzyma interval? — `x01-sharereplay-interval`
 
-**Jedyny slajd EXTRAS, zaraz po „Pytania?”** Rozwinięcie share/shareReplay z MAIN. Cel: 60–90 s.
+**Pierwszy slajd EXTRAS, zaraz po „Pytania?”** Rozwinięcie share/shareReplay z MAIN. Cel: 60–90 s.
 
-**Kod:** `const shared$ = interval(1000).pipe(` / `  shareReplay({ bufferSize: 1, refCount: false }));` — marka na `shareReplay` i osobna na `refCount: false` (czerwonawa, świeci od etapu „zero odbiorców” do subskrypcji B).
+**Kod:** trzy linie `const shared$ = interval(1000).pipe(` / `  shareReplay({ bufferSize: 1, refCount: false })` / `);` z kolorowaniem składni i markami na `interval`, `shareReplay` oraz `refCount: false`.
 
-**Na bloczkach:** interval(1000) (niebieski, jeden wiersz `#1`) → shareReplay(1) (fioletowy: wiersz `#1` z kulką pamięci ostatniej wartości — bez prostokąta „bufor” — oraz wiersze A i B) → odbiorcy A (fioletowy) i B (pomarańczowy), pełne kafelki torów, wszystkie połączenia poziome. Bez dolnej sekcji inner. Liczniki: Odbiorcy i Upstream.
+**Na bloczkach:** interval(1000) → shareReplay(1) → odbiorcy A/B. Upstream nie ma identyfikatora `#1`. Jedna wspólna kulka pamięci stoi po prawej stronie nagłówka shareReplay jako lokalny stan operatora; nie ma osobnego wiersza ani panelu bufora. Liczniki: Odbiorcy i Upstream.
 
-Scena na żywo (interval emituje co sekundę także na postojach, kontroler etapów jak Subject + interval):
+Scena ma deterministyczne checkpointy: MANUAL zatrzymuje kadr, AUTO odtwarza całą sekwencję do finału. Zatrzymanie ilustracji nie oznacza zatrzymania semantycznego upstreamu.
 
 | Etap | Na ekranie | Odbiorcy / Upstream |
 | --- | --- | --- |
 | READY | Same definicje, interval nie działa, pamięć pusta (`refCount: false` nie uruchamia źródła przed subscribe). | 0 / 0 |
-| dalej: A subskrybuje | Migawka `const subA = shared$.subscribe(…)`; impuls od A przez shareReplay do interval, jedno upstream `#1`. Liczby 0, 1, 2… wpadają do kulki pamięci i dalej do A. | 1 / 1 |
-| `unsub-a` | `subA.unsubscribe()`: szary × od A kończy się na shareReplay, wiersz A szary, przy A ×. Upstream aktywny. Pytanie: czy interval się zatrzymał? | 0 / 1 |
-| `zero` | Zero odbiorców: interval nadal emituje, kulka pamięci się podmienia (3, 4, 5… — tyle, ile faktycznie minie), nic nie płynie dalej; wyróżnione `refCount: false`. | 0 / 1 |
-| `sub-b` | `const subB = shared$.subscribe(…)`: impuls kończy się na shareReplay (bez drugiego interval). B od razu dostaje wartość zapamiętaną w chwili subskrypcji — tylko ostatnią — potem kolejne emisje na żywo. | 1 / 1 |
-| `summary` | A odłączony, B aktywny, to samo wykonanie interval, pamięć z ostatnią wartością. Bez complete i bez unsubscribe B. | 1 / 1 |
+| `subscribed-a` | A podłącza się do shareReplay, a shareReplay do interval. Jeszcze bez emisji. | 1 / 1 |
+| `first-values` | A dostaje 0, 1, 2, 3; kulka pamięci w nagłówku podmienia się i kończy na 3. | 1 / 1 |
+| `unsub-a` | `subA.unsubscribe()`: szary × kończy się na shareReplay. A jest wyszarzony, upstream pozostaje aktywny, a bufor aktualizuje się do 4. | 0 / 1 |
+| `zero` | Brak aktywnych odbiorców; interval emituje 5, lokalny bufor pokazuje 5 i świeci `refCount: false`. Pytanie: „A nie ma. Kto teraz zatrzyma interval?”. | 0 / 1 |
+| `replayed-b` | B podłącza się bez drugiej subskrypcji interval i najpierw dostaje zachowane 5. | 1 / 1 |
+| `summary` | B dostaje następnie 6 i 7 na żywo. A odłączony, B i upstream aktywni, bufor pokazuje 7. | 1 / 1 |
 
-Prawo po podsumowaniu przechodzi dalej; lewo cofa ostatnią akcję; wyjście ze slajdu sprząta wykonanie (powrót od READY). Druk i podgląd Notes używają umownych chwil akcji (A dostaje 0, 1, 2).
+Lewo cofa do poprzedniego stabilnego kadru, R wraca do READY, F i druk pokazują finał. W finale nie ma complete ani unsubscribe upstreamu.
 
 | Nr | Checkpoint | Notatka prelegenta |
 | --- | --- | --- |
-| 0 | READY / A subskrybuje | Na MAIN widzieliśmy, że shareReplay potrafi zapamiętać wynik HTTP. Ale HTTP samo się kończy. Co się stanie, jeśli współdzielimy źródło, które nigdy się nie kończy? — Pierwszy subskrybent uruchamia interval. ShareReplay zapamiętuje ostatnią wyemitowaną wartość. |
-| 1 | unsub-a | A się odłącza. Nie mamy już odbiorców. Czy to oznacza, że interval też przestał działać? |
-| 2 | zero | Nie. Przy refCount ustawionym na false shareReplay utrzymuje połączenie upstream. Interval dalej emituje, a bufor nadal się aktualizuje. |
-| 3 | sub-b | Nowy odbiorca natychmiast dostaje ostatnią zapamiętaną wartość. Potem otrzymuje kolejne emisje na żywo. Nie powstaje nowa subskrypcja interval. |
-| 4 | summary | To potencjalna pułapka: nie mamy już odbiorców, ale źródło nadal może zużywać zasoby. A co zmieniłoby refCount: true? |
+| 0 | READY | Kod i dwa boksy definicji. `refCount: false` nie uruchamia źródła przed pierwszą subskrypcją. |
+| 1 | subscribed-a | Pierwszy odbiorca uruchamia interval; liczymy tylko odbiorców i stan upstreamu. |
+| 2 | first-values | shareReplay zapamiętuje ostatnią wartość: A widzi 0–3, bufor zawiera 3. |
+| 3 | unsub-a | A odchodzi, lecz unsubscribe kończy się na shareReplay. Upstream nadal działa i zapisuje 4. |
+| 4 | zero | Przy `refCount: false` operator nie odłącza się od źródła po odejściu ostatniego odbiorcy; interval działa dalej i zapisuje 5. |
+| 5 | replayed-b | Późny B dostaje najpierw ostatnią wartość z bufora, potem będzie odbierał emisje na żywo. |
+| 6 | summary / FINISHED | B dostaje 6 i 7 na żywo. Nieskończone źródło może nadal pracować w tle, nawet gdy przez pewien czas nie ma odbiorców. |
+
+### combineLatest — ostatnie wartości z wielu źródeł — `x02-combinelatest-withlatestfrom`
+
+**Drugi slajd EXTRAS, bezpośrednio po shareReplay.** Dwa kontrolowane źródła przekazują wartości do jednego wykonania `combineLatest`. Kod: `combineLatest([userId$, language$])`.
+
+**Na bloczkach:** `userId$` i `language$` stoją jeden pod drugim i mają osobne przewody do fioletowego `combineLatest`. Operator ma jeden fioletowy nagłówek i trzy przylegające pasy: pomarańczowy id i niebieski lang ze slotami ostatnich wartości przy prawej krawędzi oraz jeden fioletowy pas wyjściowy S1. Osie wejść są wyrównane z execution lanes źródeł. Kompaktowy odbiorca z ikoną i oznaczeniem S1 stoi na osi wyjścia; trzy dwukolorowe pary mieszczą się w jednej poziomej historii. Niższe nagłówki źródeł pozwalają ustawić je blisko siebie bez kolizji. READY ma puste sloty i brak połączeń. Subskrypcja S1 najpierw dociera do operatora, który następnie podłącza oba źródła. Nie ma panelu prac, timerów, complete, error ani unsubscribe.
+
+| Checkpoint | Stan operatora | Historia S1 |
+| --- | --- | --- |
+| `subscribed` | `id: —`, `lang: —`; dwa aktywne wejścia | pusta |
+| `user-42` | `id: 42`, `lang: —` | pusta |
+| `language-pl` | `id: 42`, `lang: PL` | `[42, PL]` |
+| `language-en` | `id: 42`, `lang: EN` | `[42, PL]`, `[42, EN]` |
+| `user-43` | `id: 43`, `lang: EN` | `[42, PL]`, `[42, EN]`, `[43, EN]` |
+| `summary` | ostatnie wartości 43 i EN; połączenia aktywne | trzy dwukolorowe pary |
+
+`userId$` jest pomarańczowy, a `language$` niebieski przez cały przepływ. Wynik jest jedną zwartą parą z dwoma kolorowymi segmentami, zarówno podczas przelotu, jak i w historii. Speaker notes podkreślają warunek pierwszej wartości ze wszystkich źródeł oraz późniejszą reakcję na każdą zmianę dowolnego wejścia.
+
+### retry — nie udało się? Spróbuj później — `x03-retry-backoff`
+
+**Trzeci slajd EXTRAS, bezpośrednio po combineLatest.** Kod używa współczesnego API `retry({ count, delay })`: `count: 3` pozwala na trzy ponowienia poza pierwszym wykonaniem, czyli maksymalnie cztery requesty HTTP. Funkcja `delay` zwraca `timer(1000 * 2 ** (retryCount - 1))`, dlatego kolejne odstępy wynoszą 1, 2 i 4 sekundy.
+
+**Na bloczkach:** jeden niezmienny pipeline HTTP GET → retry → pełny odbiorca A, bez dolnego panelu. A pojawia się przy subskrypcji i subskrybuje tylko raz. Pod jednym niebieskim nagłówkiem HTTP GET rośnie stos wykonań tego samego cold Observable: najnowsze jest zawsze na górze, a wcześniejsze płynnie przesuwają się niżej i pozostają jako historia. Pierwsze trzy wiersze `#1–#3` kończą się czerwonym error; `#4` pokazuje User i complete. Tylko górne wykonanie ma aktywny port i przewód do jednego operatora retry; historyczne wiersze nie mają własnych odbiorców ani przewodów.
+
+Po każdym z trzech błędów czerwony impuls kończy się na retry i nie dociera do A. MANUAL zatrzymuje się przy błędzie; następne prawo uruchamia pełne odliczanie w jedynym lane operatora (`czekam 1,0 s`, `2,0 s`, `4,0 s`) i dopiero po jego zakończeniu nową subskrypcję źródła. Wtedy zakończone wiersze przesuwają się o jedną pozycję w dół, a nowa próba pojawia się bezpośrednio pod nagłówkiem HTTP GET. Ponowne „dalej” nie skraca odliczania. AUTO zachowuje te same odstępy. W czasie backoff licznik „Aktywne” wynosi 0. Wyjście ze slajdu resetuje scenę i zatrzymuje wspólny RAF.
+
+Checkpointy: request-1, error-1, request-2, error-2, request-3, error-3 (pytanie o następne 8 s), request-4, success i summary. Finał: Requesty HTTP 4, Aktywne 0; A otrzymał `next(User) → complete`, bez trzech pośrednich błędów. Notatki przypominają o terminalnym error po wyczerpaniu prób, maksymalnym opóźnieniu, jitterze i ponawianiu wyłącznie odpowiednich błędów przejściowych.
 
 ## Gdzie jest źródło treści
 

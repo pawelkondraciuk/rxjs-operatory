@@ -163,7 +163,10 @@ root.addEventListener('keydown',event=>{
  if(event.target.matches('input')||(['Enter',' '].includes(event.key)&&event.target.matches('button')))event.stopPropagation();
 });
 paint();
-const api={subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener);},pause,play,playTo,playContinuously,toggle,step,finishStep,reset:restart,restart,seek,finish:()=>{
+const protectedRanges=scene.playback?.unskippable||[];
+const api={subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener);},pause,play,playTo,playContinuously,toggle,step,finishStep,reset:restart,restart,seek,
+get canSkip(){return !protectedRanges.some(({from,to})=>time>=from-1e-7&&time<to-1e-7);},
+get resetOnExit(){return Boolean(scene.playback?.resetOnExit);},finish:()=>{
  // „Pokaż wynik” w trakcie emisji anuluje bieżące wykonanie; druk i READY — umowna chwila defaultClose.
  if(live&&liveClosed===null){
   if(live.actions)finishActions();

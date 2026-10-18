@@ -17,6 +17,8 @@
 .rx-player.rx-function .rx-toolbar { bottom:0; height:74px; }
 .rx-player.rx-function:has(.rx-toolbar:not([hidden])) .rx-summary { visibility:hidden; }
 .rx-player.rx-function .rx-finish { display:none; }
+.rx-player.rx-retry { grid-template-rows:158px 582px 110px; }
+.rx-player.rx-retry .rx-code { font-size:25px; line-height:1.02; }
 .rx-player * { box-sizing:border-box; }
 .rx-player .rx-code { color:#483566; font:42px/1.25 Consolas,ui-monospace,monospace; white-space:pre-wrap; overflow-wrap:anywhere; align-self:center; }
 .rx-player .rx-stage { min-width:0; min-height:0; display:flex; align-items:center; justify-content:center; }
@@ -33,6 +35,8 @@
 /* Format 16:9: dotychczasowa siatka 60/330/90 i 60/480/72 oraz rozmiary tekstu. */
 [data-ratio="16-9"] .rx-player { grid-template-rows:60px 330px 90px; height:480px; }
 [data-ratio="16-9"] .rx-player.rx-expanded, [data-ratio="16-9"] .rx-player.rx-function { grid-template-rows:60px 480px 72px; height:612px; }
+[data-ratio="16-9"] .rx-player.rx-retry { grid-template-rows:92px 448px 72px; }
+[data-ratio="16-9"] .rx-player.rx-retry .rx-code { font-size:19px; line-height:1.02; }
 [data-ratio="16-9"] .rx-player .rx-code { font-size:26px; }
 [data-ratio="16-9"] .reveal .animation-slide h2 { font-size:44px; height:76px; white-space:normal; }
 [data-ratio="16-9"] .rx-player .rx-caption { font-size:26px; }
@@ -68,6 +72,8 @@
 .reveal .extras-start a { display:inline-block; padding:12px 20px; border:2px solid #483566; border-radius:8px; color:#483566; }
 [data-ratio="16-9"] .reveal .extras-start { margin-bottom:20px; font-size:28px; }
 .reveal .extras-back { position: absolute; right: 0; top: 4px; font: 16px Arial, sans-serif; color: #53616b; }
+#x02-combinelatest-withlatestfrom .extras-back { top:76px; }
+#x02-combinelatest-withlatestfrom .rx-step-mode { top:116px; }
 .reveal .extras-slide h2 { text-transform: none; }
 
 @media print {

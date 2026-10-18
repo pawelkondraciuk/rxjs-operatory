@@ -255,6 +255,26 @@ function ball(x,y,value,color,size,scale=1,attrs='') {
   const title=label===String(value)?'':`<title>${esc(value)}</title>`;
   return `<g ${attrs}>${title}<circle cx="${x}" cy="${y}" r="${r}" fill="${colors[color]||color}" stroke="#fff" stroke-width="3"/>${text(x,y+1,label,size.font*scale,`style="font-weight:700${size.textFill?';fill:'+esc(size.textFill):''}"`)}</g>`;
 }
+// Jeden wynik złożony z kilku semantycznie kolorowanych części (np. para combineLatest).
+// Konfiguracja jest opt-in na poziomie grafu; zwykłe wartości nadal korzystają z ball().
+function valuePair(x,y,value,parts,size,scale=1,attrs='') {
+  const partWidth=size.partWidth*scale,h=size.height*scale,w=partWidth*parts.length,r=h/2,left=x-w/2,top=y-h/2;
+  let out=`<g ${attrs} data-result-pair="${esc(value)}"><title>${esc(value)}</title>`;
+  out+=`<rect x="${left}" y="${top}" width="${w}" height="${h}" rx="${r}" fill="${colors[parts[0].color]||parts[0].color}"/>`;
+  parts.slice(1).forEach((part,i)=>{
+    const px=left+(i+1)*partWidth,last=i===parts.length-2;
+    out+=last?`<path d="M${px} ${top}H${left+w-r}A${r} ${r} 0 0 1 ${left+w} ${y}A${r} ${r} 0 0 1 ${left+w-r} ${top+h}H${px}Z" fill="${colors[part.color]||part.color}"/>`:
+      `<rect x="${px}" y="${top}" width="${partWidth}" height="${h}" fill="${colors[part.color]||part.color}"/>`;
+  });
+  parts.forEach((part,i)=>{
+    if(i)out+=`<path d="M${left+i*partWidth} ${top+5*scale}V${top+h-5*scale}" stroke="#fff" stroke-width="2" opacity=".8"/>`;
+    out+=text(left+(i+.5)*partWidth,y+1,part.value,size.font*scale,`style="font-weight:700;fill:${size.textFill||'#fff'}"`);
+  });
+  out+=`<rect x="${left}" y="${top}" width="${w}" height="${h}" rx="${r}" fill="none" stroke="#fff" stroke-width="3"/>`;
+  out+=text(left-13*scale,y+1,'[',size.font*1.05*scale,'style="font-weight:700;fill:#43525b"')+
+    text(left+w+13*scale,y+1,']',size.font*1.05*scale,'style="font-weight:700;fill:#43525b"')+'</g>';
+  return out;
+}
 // Ikona odbiorcy „inbox”: tacka z wcięciem, obrys w kolorze tekstu.
 function inboxIcon(x,y,size) {
   const h=size*.78,top=y-h/2,bottom=y+h/2,mid=top+h*.5,right=x+size,line=`stroke="#26323B" stroke-width="${(size/10).toFixed(2)}" fill="none" stroke-linejoin="round" stroke-linecap="round"`;
@@ -350,8 +370,9 @@ export function renderScene(frame,options={}) {
     const inside=n.statusInside&&n.status,labelShift=inside?-12*k:0;
     // Etykieta kafelka rośnie do labelScale (4:3), o ile najdłuższa linia mieści się w szerokości; inaczej zostaje przy textScale.
     const longest=Math.max(1,...lines.map(line=>Array.from(line).length));
-    const labelSize=clamp((n.w-24)/(longest*.55),26*k,26*(frame.labelScale||k)),lineStep=28*labelSize/26;
-    lines.forEach((line,i)=>svg+=text(n.x,n.y+(n.labelOffset||0)+labelShift+(i-(lines.length-1)/2)*lineStep,line,labelSize,n.notification&&!n.terminalBadge?'style="fill:#fff"':''));
+    const naturalLabelSize=clamp((n.w-24)/(longest*.55),26*k,26*(frame.labelScale||k));
+    const labelSize=n.labelSize??naturalLabelSize,lineStep=28*labelSize/26,labelX=n.labelX??n.x;
+    lines.forEach((line,i)=>svg+=text(labelX,n.y+(n.labelOffset||0)+labelShift+(i-(lines.length-1)/2)*lineStep,line,labelSize,n.notification&&!n.terminalBadge?'style="fill:#fff"':''));
     if(inside)svg+=text(n.x,n.y+16*k,n.status,20*k,n.notification?'style="fill:#fff"':failed?'style="fill:#b51e2e"':'');
     else if(n.status)svg+=text(n.x,n.y+n.h/2+21*k,n.status,20*k,failed?'style="fill:#b51e2e"':'');
     if(n.showProgress)svg+=`<rect data-work-progress="${n.progress}" x="${n.x-n.w/2}" y="${n.y+n.h/2-9}" width="${n.w*n.progress}" height="9" fill="#132f42"/>`;
@@ -376,7 +397,26 @@ export function renderScene(frame,options={}) {
       svg+=`<rect x="${left+1}" y="${row.top}" width="${6*k}" height="${h}" fill="${stripe}"${state==='cancelled'&&!row.stripe?' opacity=".45"':''}/>`;
       svg+=`<path d="M${left} ${row.top}H${left+n.w}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/>`;
       // Wiersz subskrypcji wejścia huba (inputRow, np. #1 w shareReplay): sama etykieta, stan niesie upstream.
-      if(row.input&&row.label)svg+=text(left+22*k,row.top+h/2,row.label,24*k,'style="font-weight:700;fill:#43525b;text-anchor:start"');
+      if(row.label)svg+=text(left+22*k,row.top+h/2,row.label,24*k,'style="font-weight:700;fill:#43525b;text-anchor:start"');
+      svg+='</g>';
+    }
+    // Stos kolejnych wykonań jednego cold źródła: najnowsze jest zawsze pierwszym wierszem pod nagłówkiem,
+    // a zakończone próby pozostają poniżej jako historia. Pozycje i wzrost pochodzą z deterministycznego snapshotu.
+    for(const row of n.executionRows||[]) {
+      const left=n.x-n.w/2,h=Math.max(0,row.h-1),stateFill={completed:'#DDF1E1',error:'#F7D9D9',cancelled:'#E7E8E8'}[row.state]||n.runtimeFill||'#fff';
+      const status={subscribing:'subskrybuje',running:'w trakcie',completed:'✓ complete',error:'! error',cancelled:'× odłączono'}[row.state];
+      const ink={completed:'#087438',error:'#9B1C28',cancelled:'#5B6670'}[row.state]||'#26323B';
+      svg+=`<g data-execution-row="${esc(row.id)}" data-row-rank="${row.rank.toFixed(4)}" data-row-state="${row.state}" opacity="${row.growth.toFixed(3)}">`;
+      svg+=`<rect x="${left+1}" y="${row.top}" width="${n.w-2}" height="${h}" fill="${stateFill}"/>`;
+      svg+=`<rect x="${left+1}" y="${row.top}" width="${7*k}" height="${h}" fill="${row.state==='cancelled'?'#808890':row.color}"${row.state==='cancelled'?' opacity=".45"':''}/>`;
+      if(row.state==='running'&&row.progress>0) {
+        const x0=left+1+7*k,width=n.w-2-7*k,w=width*row.progress;
+        svg+=`<rect data-work-fill="${row.progress}" x="${x0}" y="${row.top}" width="${w}" height="${h}" fill="${row.color}" fill-opacity=".24"/>`;
+        if(row.progress<1)svg+=`<rect x="${x0+w-3*k}" y="${row.top}" width="${3*k}" height="${h}" fill="${row.color}"/>`;
+      }
+      svg+=`<path d="M${left} ${row.top}H${left+n.w}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/>`;
+      if(h>20*k)svg+=text(left+24*k,row.top+h/2,row.id,23*k,'style="font-weight:700;fill:#43525b;text-anchor:start"')+
+        text(left+n.w-16*k,row.top+h/2,status,19*k,`style="font-weight:700;fill:${ink};text-anchor:end"`);
       svg+='</g>';
     }
     // Tory subskrybentów: stan wykonania jako mały element w kafelku definicji, gniazda na krawędziach.
@@ -384,7 +424,14 @@ export function renderScene(frame,options={}) {
     const hubInputs=(n.socketDots||[]).filter(d=>d.side==='in'&&!(n.laneStates||[]).some(l=>l.subscriber===d.subscriber));
     // Przesunięcie robi miejsce na stałe rozwidlenie huba; bez niego (hubFan:false) litera stoi przy pasku toru.
     const chipLeft=n.x-n.w/2+(hubInputs.length&&n.hubFan!==false?50:22)*k,inRow=Boolean(rows.length);
+    // Opcjonalny odbiorca definicji jest czytelny także przed pierwszą subskrypcją.
+    if(n.inbox?.ready&&!(n.laneStates||[]).some(lane=>lane.role==='receiver')) {
+      const x0=n.x-n.w/2+n.inbox.left;
+      svg+=inboxIcon(x0,n.y,n.inbox.size)+text(x0+n.inbox.size+8*k,n.y,n.inbox.label||n.subscriber,n.inbox.font,
+        'style="font-weight:700;fill:#43525b;text-anchor:start"');
+    }
     for(const lane of n.laneStates||[]) {
+      if(n.executionStack&&lane.role==='work')continue;
       const dim=lane.state==='cancelled'?.55:1;
       svg+=`<g data-lane="${esc(lane.subscriber)}" data-lane-role="${lane.role}" data-lane-state="${lane.state}"${lane.progress===undefined?'':` data-work-progress="${lane.progress}"`} opacity="${lane.opacity*dim}"><title>${esc((lane.label||lane.subscriber)+' · '+lane.status)}</title>`;
       if(lane.role==='work'&&inRow) {
@@ -410,13 +457,13 @@ export function renderScene(frame,options={}) {
         if(timerRow) {
           const h=Math.max(0,timerRow.h*timerRow.growth-1),left=n.x-n.w/2+1+7*k,width=n.w-2-7*k,w=width*lane.timer.progress;
           if(lane.timer.active) {
-            svg+=`<rect data-lane-timer="${lane.timer.progress}" x="${left}" y="${timerRow.top}" width="${w}" height="${h}" fill="${lane.progressFill||lane.fill||lane.color}"/>`;
+            svg+=`<rect data-lane-timer="${+lane.timer.progress.toFixed(4)}" x="${left}" y="${timerRow.top}" width="${w}" height="${h}" fill="${lane.progressFill||lane.fill||lane.color}"/>`;
             if(lane.timer.progress>0)svg+=`<rect x="${left+w-3*k}" y="${timerRow.top}" width="${3*k}" height="${h}" fill="${lane.color}"/>`;
           }
           svg+=text(n.x-n.w/2+80*k,lane.y,lane.timer.text,22*k,`data-lane-timer-text="true" style="text-anchor:start;font-weight:${lane.timer.active?700:500};fill:${lane.timer.active?'#26323B':'#7A858C'}"`);
         }
         // Wiersz operatora: sama litera toru; stan niesie tło wiersza.
-        if(lane.label)svg+=text(chipLeft+(hubInputs.length&&n.hubFan!==false?18:6)*k,lane.y,lane.label,24*k,`style="font-weight:700;fill:${lane.labelColor||'#43525b'};text-anchor:start"`);
+        if(lane.label&&!rows.some(row=>row.subscriber===lane.subscriber&&row.label))svg+=text(chipLeft+(hubInputs.length&&n.hubFan!==false?18:6)*k,lane.y,lane.label,24*k,`style="font-weight:700;fill:${lane.labelColor||'#43525b'};text-anchor:start"`);
         // Chwilowy fallback (np. of([]) w catchError): pigułka przy prawej krawędzi wiersza, jak etap catchError w panelu prac.
         if(lane.fallback) {
           const font=20*k,fw=String(lane.fallback.label).length*.6*font+16*k,fx=n.x+n.w/2-12*k-fw;
@@ -475,6 +522,19 @@ export function renderScene(frame,options={}) {
       const m=n.memoryBall,pulse=reduced?0:clamp(1-(frame.time-m.since)/.3);
       svg+=ball(m.x,m.y,m.value,m.color,frame.ball||{r:25,font:29,textFill:'#fff'},1+.15*pulse,`data-lane-memory="${esc(String(m.value))}" data-token="memory"`);
     }
+    for(const m of n.memoryBalls||[]) {
+      const size=m.ball||frame.ball||{r:25,font:29,textFill:'#fff'},id=m.id||m.edge,label=m.label||id,empty=m.empty??'—';
+      svg+=`<g data-memory-slot="${esc(id)}" data-memory-value="${esc(String(m.value??''))}">`+
+        text(m.x-size.r-14*k,m.y,`${label}:`,20*k,'style="font-family:Consolas,ui-monospace,monospace;font-weight:700;fill:#65566C;text-anchor:end"')+
+        `<circle cx="${m.x}" cy="${m.y}" r="${size.r}" fill="none" stroke="#B384C6" stroke-width="2" stroke-dasharray="6 5"/>`;
+      if(m.value===undefined)svg+=text(m.x,m.y+1,empty,size.font*.8,'style="font-weight:700;fill:#8b7695"');
+      else {
+        const pulse=reduced?0:clamp(1-(frame.time-m.since)/.3);
+        svg+=ball(m.x,m.y,m.value,m.color,size,1+.15*pulse,
+          `data-lane-memory="${esc(String(m.value))}" data-token="memory"`);
+      }
+      svg+='</g>';
+    }
     for(const dot of n.socketDots||[])
       svg+=`<circle data-socket="${dot.side}" data-subscriber="${esc(dot.subscriber)}" cx="${dot.side==='out'?n.x+n.w/2:n.x-n.w/2}" cy="${dot.y}" r="${dot.r??13*k}" fill="${dot.color}" stroke="#fff" stroke-width="3" opacity="${dot.opacity}"/>`;
     svg+='</g>';
@@ -484,6 +544,7 @@ export function renderScene(frame,options={}) {
     const edge=reduced&&frame.edges.find(e=>e.id===t.edge),point=edge?.points?.at(-1);
     // Opcjonalne krycie tokenu (np. wartość gasnąca w Subject bez odbiorców).
     const attrs=`data-value-on="${esc(t.edge||'source')}" data-token="${esc(t.phase)}"${t.opacity===undefined?'':` opacity="${+t.opacity.toFixed(3)}"`}`;
+    if(frame.ball?.valueParts?.[t.value]){svg+=valuePair(point?.[0]??t.x,point?.[1]??t.y,t.value,frame.ball.valueParts[t.value],frame.ball.pair,reduced?1:t.scale||1,attrs);continue;}
     if(frame.ball){svg+=ball(point?.[0]??t.x,point?.[1]??t.y,t.value,t.color,frame.ball,reduced?1:t.scale||1,attrs);continue;}
     svg+=token(point?.[0]??t.x,point?.[1]??t.y,t.value,t.color,attrs,150*k,Boolean(panels.length),k);
   }
@@ -515,6 +576,16 @@ export function renderScene(frame,options={}) {
         if(overflow&&i===0&&shift<=0)return;
         const opacity=overflow&&i===0?+shift.toFixed(3):fade;
         svg+=ball(h.x+(i-(overflow?1:0)+shift)*step,h.y,value.value,value.color||'a',size,1,`data-token="received" opacity="${opacity}"`);
+      });
+      continue;
+    }
+    if(h.pairs) {
+      const shown=h.values.slice(-3);
+      shown.forEach((v,i)=>{
+        const opacity=reduced||v.shownAt===undefined?1:clamp((frame.time-v.shownAt)/.3);
+        const columns=h.columns||1,x=h.x+(i%columns)*(h.columnStep||0),y=h.y+Math.floor(i/columns)*(h.lineStep||0);
+        svg+=valuePair(x,y,v.value,frame.ball?.valueParts?.[v.value]||[],h.pair||frame.ball.pair,1,
+          `data-token="received" opacity="${opacity}"`);
       });
       continue;
     }
