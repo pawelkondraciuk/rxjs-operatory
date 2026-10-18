@@ -41,6 +41,10 @@
 [data-ratio="16-9"] .rx-player.rx-expanded .rx-caption { font-size:21px; }
 [data-ratio="16-9"] .rx-player.rx-expanded .rx-metric { font-size:18px; }
 [data-ratio="16-9"] .rx-player.rx-expanded .rx-metric b { font-size:28px; }
+/* 16:9, układ function (tory, rodzina 05, 20): stopka ma 72 px, więc liczniki są kompaktowe, z etykietą w jednej linii
+   (także rx-lanes; inaczej dwuliniowa etykieta wypycha licznik ponad linię stopki). */
+[data-ratio="16-9"] .rx-player.rx-function .rx-metric { font-size:18px; line-height:1.1; gap:2px; max-width:none; white-space:nowrap; }
+[data-ratio="16-9"] .rx-player.rx-function .rx-metric b { font-size:30px; }
 [data-ratio="16-9"] .rx-player .rx-toolbar { bottom:-114px; }
 [data-ratio="16-9"] .rx-player:is(.rx-expanded, .rx-function) .rx-toolbar { bottom:0; }
 .rx-player button { font:20px/1.25 Arial,sans-serif; padding:10px 14px; border:1px solid #958875; border-radius:4px; cursor:pointer; background:#eae4d9; color:var(--ink); white-space:nowrap; }
