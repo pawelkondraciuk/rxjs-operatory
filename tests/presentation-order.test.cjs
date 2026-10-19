@@ -4,10 +4,11 @@ const fs=require('node:fs');
 const {modules}=require('./v2-harness.cjs');
 
 // Cold → Subject → share (HTTP, interval, późny odbiorca); cztery *Map obok siebie, potem jeden distinctUntilChanged.
-const expectedMain=['05-zrodla-2','05-zrodla','05-zrodla-5','04-operator','04a-dwa-tory','05-zrodla-3','04a-dwa-tory-2','05-zrodla-4','04a-dwa-tory-3',
+const expectedMain=['05-zrodla-2','05-zrodla','05-zrodla-5','02-znane-operatory','03-a-share','04-operator','04a-dwa-tory','05-zrodla-3','04a-dwa-tory-2','05-zrodla-4','04a-dwa-tory-3',
  '20-sharereplay','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','11a-distinct-switchmap',
  'b04-catcherror-2','b04-catcherror','16-czas-cztery','25-podsumowanie','pytania'];
-const mainEnd=10+expectedMain.length;
+const openingLength=8;
+const mainEnd=openingLength+expectedMain.length;
 
 async function presentation(options={}){
  const container={children:[],append(slide){slide.remove();this.children.push(slide);slide.parent=this;},
@@ -28,7 +29,7 @@ async function presentation(options={}){
   const id=tag.match(/\bid="([^"]+)"/)?.[1]||'',animation=tag.match(/data-animation="([^"]+)"/)?.[1];
   container.append(new Slide(id,animation,/data-extras/.test(tag)));
  }
- const opening=container.children.slice(0,10);
+ const opening=container.children.slice(0,openingLength);
  const document={querySelector:()=>container,querySelectorAll:()=>container.children.filter(s=>s.dataset.animation),createElement:()=>({})};
  const m=await modules(['catalog','presentation','scene-config','engine'],{document});
  const scenes=m.presentation.prepareSlides(m.catalog.scenes);
@@ -40,17 +41,18 @@ async function presentation(options={}){
 test('MAIN preserves the opening and orders final variants independently, ending on questions',async()=>{
  const {container,opening,scenes}=await presentation();
  assert.equal(container.children.length,mainEnd);
- assert.deepEqual(container.children.slice(0,10),opening);
- assert.deepEqual(container.children.slice(10).map(s=>s.id),expectedMain);
+ assert.deepEqual(container.children.slice(0,openingLength),opening);
+ assert.equal(opening.at(-1).id,'tytul');
+ assert.deepEqual(container.children.slice(openingLength).map(s=>s.id),expectedMain);
  for(const slide of container.children){assert.equal(slide.extra,false,slide.id);assert.equal(slide.back,null,slide.id);}
- for(const id of expectedMain.filter(id=>id!=='pytania'))assert.equal(scenes.get(id).group,'main',id);
+ for(const id of expectedMain.filter(id=>scenes.has(id)))assert.equal(scenes.get(id).group,'main',id);
 });
 
 test('EXTRAS contains shareReplay, latest-value comparison, retry backoff and defer',async()=>{
  const {container,prepared,config}=await presentation({extras:true});
  const ids=container.children.map(s=>s.id);
  assert.equal(ids.length,mainEnd+4);
- assert.deepEqual(ids.slice(10,mainEnd),expectedMain);
+ assert.deepEqual(ids.slice(openingLength,mainEnd),expectedMain);
  assert.deepEqual(ids.slice(mainEnd),['x01-sharereplay-interval','x02-combinelatest-withlatestfrom','x03-retry-backoff','x04-defer']);
  assert.deepEqual(ids.slice(mainEnd),Array.from(config.extraOrder));
  assert.deepEqual(ids.filter(Boolean).sort(),prepared.map(s=>s.id).filter(Boolean).sort());
@@ -59,13 +61,13 @@ test('EXTRAS contains shareReplay, latest-value comparison, retry backoff and de
 });
 
 test('MAIN shows distinctUntilChanged once, right after the four *Map, and keeps Subject/share comparisons adjacent',async()=>{
- const {container,scenes}=await presentation(),ids=container.children.slice(10).map(s=>s.id);
+ const {container,scenes}=await presentation(),ids=container.children.slice(openingLength).map(s=>s.id);
  assert.deepEqual(ids.filter(id=>/distinct/.test(id)),['11a-distinct-switchmap']);
  assert.equal(scenes.has('14-distinct'),false);
  const at=id=>ids.indexOf(id);
  assert.deepEqual(['09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','11a-distinct-switchmap'].map(at),[0,1,2,3,4].map(i=>at('09-concatmap')+i));
- // Pierwsze trzy slajdy techniczne: HTTP, interval, Subject (ręczne next i complete), zaraz po nich operator.
- const opening=['05-zrodla-2','05-zrodla','05-zrodla-5','04-operator'];
+ // HTTP, interval i Subject przed pytaniami o operatory; potem Operator to funkcja.
+ const opening=['05-zrodla-2','05-zrodla','05-zrodla-5','02-znane-operatory','03-a-share','04-operator'];
  assert.deepEqual(opening.map(at),opening.map((_,i)=>at(opening[0])+i));
  // Cold → Subject + HTTP → share + HTTP → Subject + interval → share + interval → share/shareReplay późny odbiorca.
  const story=['04a-dwa-tory','05-zrodla-3','04a-dwa-tory-2','05-zrodla-4','04a-dwa-tory-3','20-sharereplay','20-sharereplay-2'];
@@ -87,7 +89,7 @@ test('print includes every expanded slide once, with main narration before extra
  const {container,prepared}=await presentation({printMode:true});
  assert.equal(container.children.length,mainEnd+4);
  assert.deepEqual(container.children.map(s=>s.id).filter(Boolean).sort(),prepared.map(s=>s.id).filter(Boolean).sort());
- assert.deepEqual(container.children.slice(10,mainEnd).map(s=>s.id),expectedMain);
+ assert.deepEqual(container.children.slice(openingLength,mainEnd).map(s=>s.id),expectedMain);
 });
 
 test('removed extras stay absent from MAIN, EXTRAS, print and direct hashes',async()=>{

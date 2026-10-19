@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const {modules,playbackHarness,revealMock}=require('./v2-harness.cjs');
 const history=frame=>Array.from(frame.histories[0].values,v=>v.value);
 const close=(actual,expected)=>assert.ok(Math.abs(actual-expected)<1e-8,`${actual} != ${expected}`);
-const stopIds=['pipeline','subscribed','response','mapped','received','complete'];
+const stopIds=['pipeline','arrived','mapped','received','complete'];
 const definition="http.get<User>('/api/users/42')";
 const piped=definition+'\n.pipe(map(user => `${user.firstName} ${user.lastName}`))';
 async function subject() {
@@ -16,41 +16,60 @@ const requests=frame=>frame.metrics.find(m=>m.label==='Requesty HTTP').value;
 const stop=(c,id)=>c.stops.find(s=>s.id===id).time;
 const fieldOf=svg=>svg.slice(svg.indexOf('data-field="observer"'),svg.indexOf('</g>',svg.indexOf('data-field="observer"')));
 
-test('READY shows only the http.get<User> definition; pipe and map fade in together without starting HTTP',async()=>{
-  const {scene,compiled:c,m}=await subject();
+// Kod jako linie fragmentów: tekst i krycie każdej linii (druga linia ma zarezerwowane miejsce od READY).
+const line=(frame,i)=>frame.codeView[i].map(p=>p.text).join('');
+const lineOpacity=(frame,i)=>Math.min(...frame.codeView[i].map(p=>p.opacity));
+const markOf=(frame,id)=>frame.codeView.flat().find(p=>p.mark?.id===id);
+test('READY shows the http.get<User> definition and receiver A; pipe and map fade in together without starting HTTP',async()=>{
+  const {scene,compiled:c,m,render=m.renderer.renderScene}=await subject();
   assert.deepEqual(Array.from(m.catalog.scenes.filter(s=>s.playback.controller==='stages'),s=>s.id),['04-operator']);
   assert.deepEqual(Array.from(c.stops,s=>s.id),stopIds);
-  const ready=c.snapshot(0),pipeline=c.snapshot(stop(c,'pipeline')),subscribed=c.snapshot(stop(c,'subscribed'));
-  assert.equal(ready.code,definition);
-  assert.equal(pipeline.code,piped);assert.equal(c.snapshot(c.duration).code,piped);
+  const ready=c.snapshot(0),pipeline=c.snapshot(stop(c,'pipeline')),arrived=c.snapshot(stop(c,'arrived'));
+  assert.equal(scene.code,piped);
+  assert.equal(line(ready,0),definition);assert.equal(lineOpacity(ready,0),1);
+  assert.equal(line(ready,1),'.pipe(map(user => `${user.firstName} ${user.lastName}`))');assert.equal(lineOpacity(ready,1),0);
+  assert.equal(lineOpacity(pipeline,1),1);
   assert.doesNotMatch(piped,/of\(|subscribe|x \* 2/);
   assert.equal(ready.nodes.find(n=>n.id==='source').label,'HTTP GET');
   assert.equal(ready.nodes.find(n=>n.id==='map').visible,false);
   assert.equal(pipeline.nodes.find(n=>n.id==='map').visible,true);
-  assert.equal(ready.codeReveal.opacity,0);
   const fading=c.snapshot(scene.timing.handoff+.15);
-  close(fading.codeReveal.opacity,.5);close(fading.nodes.find(n=>n.id==='map').opacity,.5);
+  close(lineOpacity(fading,1),.5);close(fading.nodes.find(n=>n.id==='map').opacity,.5);
+  // Odbiorca A od READY: ikona inbox, litera A i puste pole fullName.
+  const readySvg=render(ready),receiverSvg=readySvg.slice(readySvg.indexOf('data-node="observer"'));
+  assert.equal(ready.nodes.find(n=>n.id==='observer').visible,true);
+  assert.match(receiverSvg,/data-icon="inbox"[^]*>A<\/text>/);assert.match(fieldOf(readySvg),/>fullName<\/text>/);
   for(const frame of [ready,pipeline]) {
-    assert.equal(frame.nodes.find(n=>n.id==='observer').visible,false);
     assert.ok(frame.edges.every(e=>!e.visible));
     assert.equal(requests(frame),0,'pipe nie uruchamia HTTP');
     assert.equal(frame.tokens.length,0);assert.deepEqual(history(frame),[]);
   }
   assert.match(c.stops[0].caption,/pipe/);
-  assert.ok(subscribed.edges.every(e=>e.visible&&e.phase==='subscribed'&&e.subscriber==='A'));
-  assert.equal(subscribed.panels.length,0,'bez dolnej sekcji inner');
+  assert.ok(arrived.edges.every(e=>e.visible&&e.phase==='subscribed'&&e.subscriber==='A'));
+  assert.equal(arrived.panels.length,0,'bez dolnej sekcji inner');
+});
+
+test('code colours http.get and map like the other lane slides; each lights up while its part works',async()=>{
+  const {compiled:c}=await subject();
+  assert.deepEqual(JSON.parse(JSON.stringify(markOf(c.snapshot(0),'http').mark)),{id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'});
+  assert.deepEqual(JSON.parse(JSON.stringify(markOf(c.snapshot(0),'map').mark)),{id:'map',bg:'rgba(216,179,230,.45)',line:'#b384c6'});
+  const sent=c.events.find(e=>e.type==='source-next'&&e.edge==='source-map').at;
+  const flying=c.snapshot(sent+.2);assert.ok(markOf(flying,'http').active);assert.ok(!markOf(flying,'map').active);
+  const mapped=c.snapshot(stop(c,'mapped'));assert.ok(markOf(mapped,'map').active);assert.ok(!markOf(mapped,'http').active);
+  const done=c.snapshot(stop(c,'received'));assert.ok(!markOf(done,'map').active&&!markOf(done,'http').active);
 });
 
 test('subscribe A travels through map to HTTP and starts exactly one request',async()=>{
-  const {compiled:c,scene}=await subject();
+  const {compiled:c}=await subject();
   const downstream=c.plan.records.get('map-observer'),upstream=c.plan.records.get('source-map');
   close(upstream.start,downstream.start+downstream.connectDuration);
-  close(stop(c,'subscribed')-downstream.start,scene.timing.subscribe+scene.timing.laneReveal);
+  // subscribe rusza zaraz po postoju pipeline (ten sam etap co request i emisja do map).
+  assert.ok(downstream.start-.3>=stop(c,'pipeline')&&downstream.start-stop(c,'pipeline')<.5);
   const shown=t=>Array.from(c.snapshot(t).callouts||[],k=>k.text+' '+k.label);
   assert.deepEqual(shown(downstream.start),['.subscribe() A']);
   for(const s of c.stops)assert.deepEqual(shown(s.time),[],s.id);
   assert.equal(c.snapshot(downstream.start).nodes.find(n=>n.id==='source').laneRows.length,0);
-  const frame=c.snapshot(stop(c,'subscribed'));
+  const frame=c.snapshot(upstream.start+upstream.connectDuration+.6);
   assert.equal(frame.nodes.find(n=>n.id==='source').laneRows[0].growth,1);
   assert.equal(requests(frame),1);
   assert.ok(lane(frame,'source').progress>0&&lane(frame,'source').progress<.5,'request trwa');
@@ -65,9 +84,11 @@ test('HTTP emits one User object; map turns it into one string in the same logic
   const [input]=inputs,[output]=outputs;
   assert.equal(output.logicalAt,input.logicalAt,'projekcja synchroniczna');
   close(output.at-input.arrival,scene.timing.transform);
-  const response=c.snapshot(stop(c,'response'));
-  assert.deepEqual(Array.from(response.tokens,t=>[t.phase,t.value]),[['travel','{…}']]);
-  assert.equal(lane(response,'source').progress,1,'request zakończony odpowiedzią');
+  // Postój arrived: User dotarł do portu map i jeszcze nie jest przekształcony.
+  const arrived=c.snapshot(stop(c,'arrived')),port=arrived.nodes.find(n=>n.id==='map');
+  assert.deepEqual(Array.from(arrived.tokens,t=>t.value),['{…}']);
+  assert.ok(Math.abs(arrived.tokens[0].x-(port.x-port.w/2))<1,'kulka User na wejściu map');
+  assert.equal(lane(arrived,'source').progress,1,'request zakończony odpowiedzią');
   const mapped=c.snapshot(stop(c,'mapped')),map=mapped.nodes.find(n=>n.id==='map');
   assert.deepEqual(Array.from(mapped.tokens,t=>[t.phase,t.value]),[['transform','"…"']]);
   assert.ok(Math.abs(mapped.tokens[0].x-map.x)<1e-6,'kulka stoi w środku map');
@@ -133,7 +154,7 @@ test('custom timing preserves the storyboard and all checkpoint snapshots are de
   const custom={...scene,timing:{...scene.timing,subscribe:1.4,request:1.2,travel:.8,transform:.6,receivedHold:.4,terminal:.7}};
   m['reference-scenes'].configureOperator(custom);
   const c=m.engine.compileScene(custom),points=[0,...c.stops.map(s=>s.time),...c.events.map(e=>e.at),c.duration];
-  close(stop(c,'subscribed')-c.plan.records.get('map-observer').start,1.4+custom.timing.laneReveal);
+  close(stop(c,'arrived'),c.plan.records.get('source-map').events[0].arrival);
   for(let i=1;i<c.stops.length;i++)assert.ok(c.stops[i].time>c.stops[i-1].time);
   for(const time of points) {
     const frame=JSON.stringify(c.snapshot(time));c.snapshot(c.duration);c.snapshot(0);

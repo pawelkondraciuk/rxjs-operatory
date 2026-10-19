@@ -34,7 +34,7 @@ test('HTTP slides share the accepted panel and retain native Reveal playback',as
   assert.equal(c.snapshot(c.duration).nodes.find(n=>n.id==='observer').notification,'complete');
  }
 });
-test('real concatMap queue is visible at the answer, while concatAll queues existing unsubscribed Observables',async()=>{
+test('concatMap introduces the queue after the single Observable example in concatAll',async()=>{
  const {scenes,compile,render}=await family(),c=compile(scenes.get('09-concatmap'));
  const q=c.snapshot(c.stops.at(-1).time),queued=q.nodes.find(n=>n.id==='queued1');
  assert.equal(queued.label,'B (wartość)');assert.equal(queued.opacity,1);assert.equal(q.executionCounts.started,1);
@@ -42,8 +42,8 @@ test('real concatMap queue is visible at the answer, while concatAll queues exis
  const done=render(c.snapshot(c.duration));assert.equal((done.match(/data-inner-state="completed"/g)||[]).length,3);
  assert.doesNotMatch(done,/PRACE WEWNĘTRZNE|data-queue=|EMISJE|ODBIÓR/);assert.match(done,/data-panel-divider="true"/);
  const all=compile(scenes.get('08-map-strumienie')),f=all.snapshot(all.stops.at(-1).time),svg=render(f);
- assert.equal(f.executionCounts.started,1);assert.match(svg,/W KOLEJCE · Observable/);
- assert.deepEqual(Array.from(f.innerWorkPanels[0].rows.filter(r=>r.state==='queued'),r=>r.value),['B$','C$']);
+ assert.equal(f.executionCounts.started,1);assert.doesNotMatch(svg,/W KOLEJCE|data-inner-placeholder/);
+ assert.deepEqual(Array.from(f.innerWorkPanels[0].rows,r=>r.value),['A$']);
  assert.equal(f.executions.some(e=>e.id==='B'),false);
 });
 test('real mergeMap demonstrates chronological reception: B overlaps A and returns first',async()=>{

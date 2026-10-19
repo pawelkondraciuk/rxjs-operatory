@@ -425,8 +425,9 @@ export function renderScene(frame,options={}) {
     const hubInputs=(n.socketDots||[]).filter(d=>d.side==='in'&&!(n.laneStates||[]).some(l=>l.subscriber===d.subscriber));
     // Przesunięcie robi miejsce na stałe rozwidlenie huba; bez niego (hubFan:false) litera stoi przy pasku toru.
     const chipLeft=n.x-n.w/2+(hubInputs.length&&n.hubFan!==false?50:22)*k,inRow=Boolean(rows.length);
-    // Opcjonalny odbiorca definicji jest czytelny także przed pierwszą subskrypcją.
-    if(n.inbox?.ready&&!(n.laneStates||[]).some(lane=>lane.role==='receiver')) {
+    // Opcjonalny odbiorca definicji jest czytelny także przed pierwszą subskrypcją; zostaje pod wierszem odbiorcy,
+    // dopóki ten nie skończy fade-in (bez mignięcia ikony i litery przy subscribe).
+    if(n.inbox?.ready&&!(n.laneStates||[]).some(lane=>lane.role==='receiver'&&lane.opacity>=1)) {
       const x0=n.x-n.w/2+n.inbox.left;
       svg+=inboxIcon(x0,n.y,n.inbox.size)+text(x0+n.inbox.size+8*k,n.y,n.inbox.label||n.subscriber,n.inbox.font,
         'style="font-weight:700;fill:#43525b;text-anchor:start"');

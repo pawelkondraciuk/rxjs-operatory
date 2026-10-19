@@ -9,9 +9,9 @@ async function family(){
 const find=(c,selector)=>c.events.find(e=>Object.entries(selector).every(([k,v])=>e[k]===v));
 const rows=(c,t)=>c.snapshot(t).innerWorkPanels[0].rows;
 
-test('the four HTTP slides share S1, frameless rows, palette and one response per completed request',async()=>{
+test('the five HTTP slides share S1, frameless rows, palette and one response per completed request',async()=>{
  const {definitions,scene,compile,render}=await family();
- const expected={concatAll:['A','B','C'],concatMap:['A','B','C'],mergeMap:['B','A','C'],switchMap:['B','C'],exhaustMap:['A','C']};
+ const expected={concatAll:['A'],concatMap:['A','B','C'],mergeMap:['B','A','C'],switchMap:['B','C'],exhaustMap:['A','C']};
  for(const format of ['4:3','16:9'])for(const [id,mode]of definitions){
   const s=scene(id,format),c=compile(s),f=c.snapshot(c.duration),panel=f.panels[0],receiver=f.nodes.find(n=>n.id==='observer');
   assert.equal(s.http,true);assert.equal(panel.frameless,true);
@@ -31,27 +31,57 @@ test('the four HTTP slides share S1, frameless rows, palette and one response pe
  }
 });
 
-test('map creates Observable references synchronously; concatAll queues existing inner without subscribing',async()=>{
- const {scene,compile,render}=await family(),c=compile(scene('08-map-strumienie'));
+test('map creates one Observable synchronously; concatAll subscribes one successful HTTP without any queue',async()=>{
+ const {scene,compile,render}=await family();
+ for(const format of ['4:3','16:9']){
+ const s=scene('08-map-strumienie',format),c=compile(s);
  const input=c.plan.records.get('source-projection').events[0],mapped=c.plan.records.get('projection-op').events[0];
+ assert.equal(c.plan.records.get('source-projection').events.length,1);
+ assert.equal(c.plan.records.get('projection-op').events.length,1);
  assert.equal(input.logicalAt,mapped.logicalAt);assert.equal(mapped.value,'A$');
  const before=c.snapshot(input.arrival+(mapped.at-input.arrival)*.25),after=c.snapshot(input.arrival+(mapped.at-input.arrival)*.75);
  assert.equal(before.tokens.find(t=>t.phase==='transform').value,'A');
  assert.equal(after.tokens.find(t=>t.phase==='transform').value,'A$');
- const question=c.stops.at(-1).time,f=c.snapshot(question);
- assert.equal(f.executionCounts.started,1);
- const queued=rows(c,question).filter(r=>r.state==='queued');
- assert.deepEqual(Array.from(queued,r=>r.value),['B$','C$']);assert.ok(queued.every(r=>r.existingObservable&&r.stages===undefined&&r.wires===undefined));
- for(const [i,value]of ['A','B','C'].entries()){
-  const born=find(c,{type:'inner-create',node:'inner'+i}),got=find(c,{type:'deliver-next',edge:'projection-op',value:value+'$'});
-  assert.equal(born.at,got.at);
-  const subscription=c.plan.records.get('inner'+i+'-op');
-  assert.ok(subscription.start>=born.at);
+ assert.equal(s.code,'source$.pipe(map(id => http.get(url(id))), concatAll())');
+ assert.deepEqual(Array.from(c.stops,s=>s.id),['subscribe','first','active']);
+ assert.equal(s.playback.entry,'manual');assert.equal(s.playback.afterLastManualStop,'start-auto');assert.equal(s.playback.finish,'hold');
+ const [subscribed,created,active]=c.stops.map(s=>c.snapshot(s.time));
+ assert.equal(subscribed.executionCounts.started,0);
+ assert.ok(subscribed.edges.filter(e=>e.subscriber).every(e=>e.phase==='subscribed'&&e.progress===1));
+ assert.equal(created.executionCounts.started,0);
+ assert.equal(created.innerWorkPanels[0].rows.length,0);
+ assert.equal(created.tokens.find(t=>t.phase==='transform').value,'A$');
+ assert.equal(active.executionCounts.started,1);assert.equal(active.executionCounts.active,1);
+ assert.deepEqual(Array.from(active.innerWorkPanels[0].rows,r=>[r.id,r.value,r.state]),[['#1','A$','active']]);
+ assert.ok(active.innerWorkPanels[0].rows[0].stages[0].progress>0&&active.innerWorkPanels[0].rows[0].stages[0].progress<1);
+ const born=find(c,{type:'inner-create',node:'inner0'}),subscription=c.plan.records.get('inner0-op');
+ assert.equal(born.at,mapped.arrival);assert.ok(subscription.start>=born.at);
+ assert.ok(c.stops[1].time<subscription.start);
+ const response=subscription.events[0],output=c.plan.records.get('op-observer').events[0];
+ assert.equal(subscription.events.length,1);assert.equal(response.value,'A');
+ assert.ok(response.at>find(c,{type:'inner-subscribe',node:'inner0'}).at);
+ assert.equal(response.arrival,output.at,'wynik wychodzi z concatAll dopiero po odbiorze przez inner #1');
+ const received=c.snapshot(response.arrival);
+ assert.equal(received.innerWorkPanels[0].rows[0].receiver.value,'A');
+ assert.equal(received.histories[0].values.length,0,'S1 jeszcze czeka na przelot wyniku');
+ assert.ok(response.arrival<subscription.end.at);
+ const final=c.snapshot(c.duration);
+ assert.equal(final.innerWorkPanels[0].rows[0].receiver.state,'completed');
+ assert.equal(final.nodes.find(n=>n.id==='observer').notification,'complete');
+ assert.deepEqual(Array.from(final.histories[0].values,v=>v.value),['A']);
+ assert.deepEqual(Array.from(final.metrics,m=>[m.label,m.value]),[['Innery uruchomione',1],['Aktywne',0]]);
+ assert.equal(final.caption,'map tworzy Observable. concatAll subskrybuje go i przepuszcza jego wynik dalej.');
+ assert.equal(c.events.filter(e=>e.type==='inner-create').length,1);
+ assert.ok(!c.events.some(e=>['queue-add','queue-pop','inner-unsubscribe','stream-error'].includes(e.type)));
+ for(const t of [...c.checkpoints,...Array.from({length:Math.ceil(c.duration*10)},(_,i)=>i/10)]){
+  const f=c.snapshot(t),svg=render(f);
+  assert.ok(f.innerWorkPanels[0].rows.length<=1);
+  assert.ok(f.innerWorkPanels[0].rows.every(r=>r.id==='#1'&&r.state!=='queued'&&r.state!=='pending'));
+  assert.doesNotMatch(svg,/W KOLEJCE|data-inner-placeholder|inner #2|B\$|C\$|Kolejka/);
+  assert.doesNotMatch(f.caption,/kolejk|czeka[ją]*|B\$|C\$/i);
+  assert.ok(f.executionCounts.started<=1);
  }
- assert.match(render(f),/W KOLEJCE · Observable/);
- const r=c.plan.records.get('inner1-op');
- assert.equal(rows(c,r.start+.4).find(row=>row.id==='#2').state,'subscribing');
- assert.equal(rows(c,r.start+r.connectDuration+.1).find(row=>row.id==='#2').state,'active');
+ }
 });
 
 const comparison=definitions.slice(1);

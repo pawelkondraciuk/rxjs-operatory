@@ -6,7 +6,7 @@ const node=(frame,id)=>frame.nodes.find(n=>n.id===id);
 const lanes=(frame,id)=>Array.from(node(frame,id).laneStates,l=>`${l.role}:${l.subscriber}:${l.state}`);
 const metric=(frame,label)=>frame.metrics.find(m=>m.label===label).value;
 const shown=frame=>Array.from(frame.callouts||[],x=>x.text);
-const stopIds=['subscribed-a','next-1','subscribed-b','next-2','complete'];
+const stopIds=['subscribed-a','emit-1','next-1','subscribed-b','emit-2','next-2','complete'];
 const receivers=['A','B'];
 const colors={A:'#7457D9',B:'#D8840F'};
 async function manual(format='4:3'){
@@ -23,7 +23,7 @@ test('READY: only new Subject<number>() and the Subject tile; receivers A/B do n
  assert.equal(scene.title,'Subject — ręczna emisja');
  assert.equal(scene.code,'const subject$ = new Subject<number>();');
  assert.doesNotMatch(scene.code,/subscribe|next|error|complete|http|User|connection/);
- assert.equal(node(ready,'subject').label,'Subject<number>');
+ assert.equal(node(ready,'subject').label,'Subject');
  assert.deepEqual(Array.from(c.stops,s=>s.id),stopIds);
  assert.equal(scene.playback.controller,'stages');
  assert.equal(node(ready,'subject').visible,true);
@@ -135,10 +135,43 @@ test('complete: a green pulse from Subject closes both subscriptions; no error, 
  assert.equal(metric(stop,'Odbiorcy'),0);assert.equal(metric(stop,'Emisje next'),2);
  assert.deepEqual(shown(stop),['subject$.complete()'],'migawka widoczna na postoju');
  const end=c.snapshot(c.duration);
- assert.equal((end.callouts||[]).length,0);
+ assert.deepEqual(shown(end),['subject$.complete()'],'complete() zostaje do końca');
  assert.match(end.caption,/A: 1, 2, complete\. B: 2, complete[\s\S]*nie dostaje historii/);
  assert.ok(end.edges.every(e=>e.done&&!e.pulse));
  assert.doesNotMatch(render(end),/NaN|Infinity/);
+});
+
+test('stages: each callout stays on its stop and fades after resuming; next(1) waits inside, next(2) stops on both ports',async()=>{
+ const {c,at}=await manual(),frame=id=>c.snapshot(at(id));
+ const expected={'subscribed-a':['subject$.subscribe(observerA)'],'emit-1':['subject$.next(1)'],'next-1':[],
+  'subscribed-b':['subject$.subscribe(observerB)'],'emit-2':['subject$.next(2)'],'next-2':[],complete:['subject$.complete()']};
+ for(const [id,texts] of Object.entries(expected)){
+  const f=frame(id);assert.deepEqual(shown(f),texts,id);
+  for(const x of f.callouts||[])assert.equal(x.opacity,1,id+': pełna migawka na postoju');
+  // Po wznowieniu migawka subscribe/next gaśnie (complete() zostaje).
+  if(texts.length&&id!=='complete')assert.ok(!shown(c.snapshot(at(id)+.45)).includes(texts[0]),id+': gaśnie po wznowieniu');
+ }
+ // Odbiorca pojawia się i od razu subskrybuje (jeden etap).
+ assert.ok(at('subscribed-a')>c.events.find(e=>e.type==='connected'&&e.edge==='subject-A').at);
+ const one=frame('emit-1'),hub=node(one,'subject');
+ assert.deepEqual(Array.from(one.tokens,t=>[t.value,t.phase]),[['1','emit']],'kulka 1 stoi w Subjecie');
+ assert.ok(Math.abs(one.tokens[0].x-hub.x)<1e-6&&one.tokens[0].y===hub.laneStates[0].y);
+ assert.deepEqual(values(one,'A'),[]);
+ const two=frame('emit-2'),right=node(two,'subject').x+node(two,'subject').w/2;
+ assert.deepEqual(Array.from(two.tokens,t=>t.edge).sort(),['subject-A','subject-B'],'2 rozeszło się do obu wyjść');
+ assert.ok(two.tokens.every(t=>Math.abs(t.x-right)<1),'kulki stoją na portach Subjecta');
+ assert.deepEqual(values(two,'A'),['1']);assert.deepEqual(values(two,'B'),[]);
+ const middle=c.snapshot(at('emit-2')-1),lanes_=node(middle,'subject').laneStates;
+ assert.ok(middle.tokens[0].y>lanes_[0].y&&middle.tokens[0].y<lanes_[1].y,'wcześniej kulka 2 startuje ze środka');
+});
+
+test('tiles have the same size as on the interval slide',async()=>{
+ const {m,c}=await manual();
+ const base=m.catalog.scenes.find(s=>s.id==='05-zrodla');
+ const interval=m.engine.compileScene(m['scene-config'].configureScene({...base,rendererId:'05-zrodla',sourceExample:0,format:'4:3'})).snapshot(5);
+ const f=c.snapshot(c.duration),size=(frame,id)=>[node(frame,id).x,node(frame,id).w,node(frame,id).defH,node(frame,id).rowH];
+ assert.deepEqual(size(f,'subject').slice(0,2),size(interval,'interval').slice(0,2));
+ for(const id of receivers)assert.deepEqual(size(f,id),size(interval,'observer'),id);
 });
 
 test('layout keeps Subject → A/B on horizontal lanes inside the diagram in both formats',async()=>{
@@ -160,7 +193,7 @@ test('layout keeps Subject → A/B on horizontal lanes inside the diagram in bot
  }
 });
 
-test('checkpoint notes follow the new order: question at B, answer at next(2), hot summary before the operator slide',async()=>{
+test('checkpoint notes follow the new order: question at B, answer at next(2), hot summary before the audience question about operators',async()=>{
  const {c}=await manual();
  const html=require('node:fs').readFileSync('index.html','utf8');
  const source=html.match(/<template data-checkpoint-notes="05-zrodla-5">([\s\S]*?)<\/template>/)[1];
@@ -171,7 +204,7 @@ test('checkpoint notes follow the new order: question at B, answer at next(2), h
  assert.doesNotMatch(notes['subscribed-b'],/Subject nie odtwarza/,'pytanie bez odpowiedzi');
  assert.match(notes['next-2'],/Nie\. Subject nie odtwarza wcześniejszych wartości\. B dostaje dopiero dwójkę, podczas gdy A otrzymał zarówno jedynkę, jak i dwójkę/);
  assert.match(notes.complete,/Complete trafia do wszystkich odbiorców i zamyka ich subskrypcje/);
- assert.match(notes.finished,/Subject jest przykładem hot Observable — rozsyła emisje do aktualnych subskrybentów\. Nowy odbiorca nie dostaje historii\. Do różnicy między hot i cold jeszcze wrócimy[\s\S]*Prawo: Operator to funkcja/);
+ assert.match(notes.finished,/Subject jest przykładem hot Observable — rozsyła emisje do aktualnych subskrybentów\. Nowy odbiorca nie dostaje historii\. Do różnicy między hot i cold jeszcze wrócimy[\s\S]*Prawo: „Jakie znasz operatory RxJS/);
  assert.doesNotMatch(source,/error\(|next\(3\)|BehaviorSubject|ReplaySubject|shareReplay/);
 });
 
@@ -186,12 +219,12 @@ test('all checkpoints rewind deterministically; going back removes B and never s
  controller.next();h.advance(30000);assert.equal(player.state,'finished');assert.equal(h.frames.size,0);
  assert.deepEqual(values(player.snapshot,'A'),['1','2']);assert.deepEqual(values(player.snapshot,'B'),['2']);
  for(const id of receivers)assert.deepEqual(lanes(player.snapshot,id),[`receiver:${id}:completed`]);
- controller.previous();assert.equal(player.time,player.stops.at(-1).time);
- controller.previous();assert.equal(player.time,player.stops.at(-2).time);
+ const back=id=>{controller.previous();assert.equal(player.time,player.stops.find(s=>s.id===id).time,id);};
+ back('complete');back('next-2');
  assert.ok(player.snapshot.nodes.every(n=>n.laneStates.every(l=>l.state==='running')),'cofnięcie przed complete przywraca aktywne subskrypcje');
- controller.previous();assert.equal(player.time,player.stops.at(-3).time);
- assert.deepEqual(values(player.snapshot,'A'),['1']);assert.deepEqual(values(player.snapshot,'B'),[]);
- controller.previous();assert.equal(player.time,player.stops.at(-4).time);
+ back('emit-2');assert.deepEqual(values(player.snapshot,'A'),['1']);assert.deepEqual(values(player.snapshot,'B'),[]);
+ back('subscribed-b');assert.deepEqual(values(player.snapshot,'A'),['1']);assert.deepEqual(values(player.snapshot,'B'),[]);
+ back('next-1');
  assert.equal(node(player.snapshot,'B').visible,false,'B znika po cofnięciu przed jego subscribe');
  assert.deepEqual(values(player.snapshot,'A'),['1']);
  controller.reset();assert.equal(player.time,0);assert.equal(player.snapshot.tokens.length,0);

@@ -127,16 +127,13 @@ test('manual to auto continues from the first result and holds FINISHED without 
   api.controller.reset();assert.equal(api.time,0);assert.equal(api.state,'ready');assert.equal(callbacks.size,0);
 });
 
-test('concatAll queues created Observables, switchMap pauses before cancel then aborts without delivery',async()=>{
+test('concatAll has one active inner; switchMap pauses before cancel then aborts without delivery',async()=>{
   const {player}=await harness();
   const concat=player('08-map-strumienie').api;
   concat.seek(concat.stops.at(-1).time);
   assert.equal(concat.snapshot.nodes.find(n=>n.id==='inner0').workState,'active');
-  for(const id of ['inner1','inner2']) {
-    const n=concat.snapshot.nodes.find(n=>n.id===id);
-    assert.ok(n.visible);assert.equal(n.workState,'queued');assert.equal(n.showProgress,false);
-    assert.equal(concat.snapshot.edges.find(e=>e.from===id).visible,false);
-  }
+  assert.deepEqual(Array.from(concat.snapshot.nodes.filter(n=>n.inner),n=>n.id),['inner0']);
+  assert.ok(!concat.snapshot.nodes.some(n=>n.workState==='queued'));
   // Pytanie switchMap: A nadal pracuje, B dotarło, ale jeszcze nie anulowało A ani nie utworzyło inner.
   const sw=player('11-switchmap').api;sw.seek(sw.stops.find(s=>s.id==='question').time);
   assert.equal(sw.snapshot.nodes.find(n=>n.id==='inner0').workState,'active');
@@ -215,10 +212,10 @@ test('flatten strategies use identical inputs, queue values before projection an
   assert.deepEqual(Array.from(exhaust.snapshot.histories.find(h=>h.anchor==='observer').values,v=>v.value),['A','C']);
 });
 
-test('concatAll queues a reference only after it leaves map and arrives at concatAll',async()=>{
+test('concatAll reveals its only inner after the Observable leaves map and arrives at concatAll',async()=>{
   const {scenes,engine:{compileScene}}=await harness();
   const model=compileScene(scenes.get('08-map-strumienie'));
-  for(const [i,value] of ['A','B','C'].entries()) {
+  for(const [i,value] of ['A'].entries()) {
     const creation=model.events.find(e=>e.type==='inner-create'&&e.node==='inner'+i);
     const mapped=model.events.find(e=>e.type==='deliver-next'&&e.edge==='source-projection'&&e.value===value);
     const arrival=model.events.find(e=>e.type==='deliver-next'&&e.edge==='projection-op'&&e.value===value+'$');
@@ -264,21 +261,28 @@ test('work panel shows queued input immediately and holds an aborted progress ba
   assert.equal(sw.api.snapshot.nodes.find(n=>n.id==='inner2').workState,'completed');
 });
 
-test('internal work has no subscription wires and queued Observables are grey from their first frame',async()=>{
+test('the single Observable example has no interlevel wires or waiting rows at any transition',async()=>{
   const {scenes,engine:{compileScene},player}=await harness();
   const model=compileScene(scenes.get('08-map-strumienie'));
-  for(const id of ['inner1','inner2']) {
-    const birth=model.events.find(e=>e.type==='inner-create'&&e.node===id).at;
-    for(const dt of [0,.01,.1]) {
-      const node=model.snapshot(birth+dt).nodes.find(n=>n.id===id);
-      assert.equal(node.workState,'queued');assert.equal(node.fill,'#e7ecef');
-      assert.equal(node.showProgress,false);
-    }
-  }
   const p=player('08-map-strumienie');
-  for(const stop of p.api.stops) {
-    p.api.seek(stop.time);
+  for(const t of model.checkpoints) {
+    p.api.seek(t);
+    assert.ok(p.api.snapshot.innerWorkPanels[0].rows.every(r=>r.id==='#1'&&!['queued','pending'].includes(r.state)));
     assert.doesNotMatch(p.elements.get('.rx-stage').innerHTML,/data-connection="inner/);
     assert.doesNotMatch(p.elements.get('.rx-stage').innerHTML,/data-value-on="inner/);
   }
+});
+
+test('after three manual stops the single HTTP finishes automatically and holds the same frame as finish()',async()=>{
+  const {player,callbacks}=await harness(),{api}=player('08-map-strumienie');
+  assert.equal(api.stops.length,3);
+  api.seek(api.stops.at(-1).time);api.playContinuously();
+  for(let now=0;now<30000;now+=50){const pending=[...callbacks.values()];callbacks.clear();pending.forEach(fn=>fn(now));}
+  assert.equal(api.state,'finished');assert.equal(api.time,api.duration);assert.equal(callbacks.size,0);
+  assert.equal(api.snapshot.executionCounts.started,1);assert.equal(api.snapshot.executionCounts.active,0);
+  assert.equal(api.snapshot.innerWorkPanels[0].rows[0].receiver.state,'completed');
+  const final=JSON.stringify(api.snapshot);api.seek(0);api.finish();assert.equal(JSON.stringify(api.snapshot),final);
+  api.seek(api.stops[1].time);assert.equal(api.snapshot.executionCounts.started,0);
+  assert.equal(api.snapshot.tokens.find(t=>t.phase==='transform').value,'A$');
+  api.seek(0);assert.equal(api.state,'ready');assert.equal(api.snapshot.executionCounts.started,0);assert.equal(callbacks.size,0);
 });

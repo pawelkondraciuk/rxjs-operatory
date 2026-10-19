@@ -16,7 +16,7 @@ function mapSequence(scene) {
     if(!Number.isFinite(value)||value<=0)throw new Error(`${scene.id}: nieprawidłowy czas ilustracji ${key}`);
   }
   const seconds=value=>Math.round(value*1e9)/1e9;
-  // Odbiorca (wiersz wykonania) pojawia się po etapie pipeline; subscribe rusza, gdy jest w pełni widoczny.
+  // subscribe rusza krótko po etapie pipeline (handoff + reveal); odbiorca jest widoczny od READY.
   const born=seconds(timing.pipeline+timing.handoff),subscribe=seconds(born+timing.reveal),connected=seconds(subscribe+timing.subscribe);
   // laneReveal: wiersz HTTP (litera, port, początek postępu) wchodzi po zestawieniu subskrypcji; postój subscribed czeka na niego.
   const subscribed=seconds(connected+timing.laneReveal);
@@ -32,19 +32,24 @@ function mapSequence(scene) {
 const operatorBalls={user:'{…}',text:'"…"'};
 
 export function configureOperator(scene) {
-  const sequence=mapSequence(scene),{timing,pipeline,subscribed,value,complete,finished,duration}=sequence;
+  const sequence=mapSequence(scene),{timing,pipeline,value,complete,finished,duration}=sequence;
   const fill=laneSubscribers.A.fill,example="http.get<User>('/api/users/42')";
   const captions={
     pipeline:'pipe składa definicję: map zamieni User na imię i nazwisko. HTTP nadal nie działa',
-    subscribed:'subscribe A przechodzi przez map do HTTP i uruchamia jeden request',
-    response:'HTTP emituje jeden obiekt User. Wartość płynie do map',
+    arrived:'subscribe A uruchomił jeden request. HTTP wyemitował User — wartość dotarła do map',
     mapped:'map synchronicznie zamienia User w string „Paweł Kondraciuk”',
     received:'A dostaje jeden string: Paweł Kondraciuk',
     complete:'HTTP wysyła complete. map przekazuje je dalej do A',
   };
-  Object.assign(scene,{graph:mapGraph,timing,playerLayout:'function',duration,code:example,ink:'#26323B',playerClass:'rx-flat-tiles rx-two-lines',
-    // Druga linia dopisuje się (fade-in) razem z kafelkiem map; pipe nie uruchamia HTTP.
-    codeFrames:[{at:timing.handoff,code:example+'\n.pipe(map(user => `${user.firstName} ${user.lastName}`))',fadeIn:.3}],
+  // Wyróżnienia kodu jak na torach 04a i Subject + HTTP: http.get turkusowo (od wysłania odpowiedzi do dotarcia do map),
+  // map fioletowo (podczas przekształcenia). Druga linia pojawia się (fade-in) razem z kafelkiem map; pipe nie uruchamia HTTP.
+  const ev=(type,edge)=>({type,edge}),shown={type:'node-create',node:'map'};
+  const http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},map={id:'map',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
+  const lines=[[{text:example,mark:http,active:[{from:ev('source-next','source-map'),to:ev('deliver-next','source-map')}]}],
+    [{text:'.pipe(',show:shown},{text:'map(user => `${user.firstName} ${user.lastName}`)',mark:map,show:shown,
+      active:[{from:ev('deliver-next','source-map'),to:ev('source-next','map-observer')}]},{text:')',show:shown}]];
+  Object.assign(scene,{graph:mapGraph,timing,playerLayout:'function',duration,ink:'#26323B',playerClass:'rx-flat-tiles rx-two-lines',
+    code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
     rows:[R('HTTP GET',[E(value.response,operatorBalls.user,fill)],[B(sequence.connected,value.response,'request')],{completeAt:complete}),
       R('map',[E(value.response,operatorBalls.text,fill)],[],{completeAt:complete}),
       R('Odbiorca A',[E(value.response,operatorBalls.text,fill)],[],{completeAt:complete})],
@@ -53,8 +58,8 @@ export function configureOperator(scene) {
     metrics:[{label:'Requesty HTTP',count:'started'}],
     playback:{...manual([
       {id:'pipeline',time:pipeline,caption:captions.pipeline},
-      {id:'subscribed',time:subscribed,caption:captions.subscribed},
-      {id:'response',time:sequence.seconds(value.response+timing.travel/2),caption:captions.response},
+      // Jeden etap: subscribe A przez map do HTTP, request i emisja User aż do portu map.
+      {id:'arrived',time:value.arrival,caption:captions.arrived},
       // Kulka stoi na środku wiersza map i ma już nową wartość (zmiana w połowie projekcji).
       {id:'mapped',time:sequence.seconds(value.arrival+timing.transform*.62),caption:captions.mapped},
       {id:'received',time:value.held,caption:captions.received},
@@ -66,14 +71,15 @@ export function configureOperator(scene) {
 // Wygląd torów jak w 04a: HTTP GET → map → A w jednym rzędzie (ta sama pojedyncza subskrypcja A co w HTTP i interval).
 // Kulka User wjeżdża do map, staje i zmienia się w string; A pokazuje pełny wynik w polu widoku i ✓ complete.
 export function mapGraph(scene) {
-  const {timing,seconds,born,subscribe,value,complete,finished}=mapSequence(scene);
+  const {timing,seconds,subscribe,value,complete,finished}=mapSequence(scene);
   const halfSubscribe=timing.subscribe/2,halfTerminal=timing.terminal/2,fill=laneSubscribers.A.fill;
   const top=scene.format==='4:3'?222:146,y=laneRowY(top,0),receiver={x:960,w:480,y};
   // Kolumny wyśrodkowane (40…1200): HTTP GET, map i szerszy odbiorca, który mieści pełne „Paweł Kondraciuk”.
   const nodes=[
     {id:'source',x:170,w:260,label:'HTTP GET',workLanes:true,progressUntilNext:true,terminalEdge:'source-map',...laneTile('source',top,{A:0},1)},
     {id:'map',x:510,w:240,label:'map',color:'op',transformBalls:true,terminalEdge:'map-observer',...laneTile('operator',top,{A:0},1,{ready:false,born:timing.handoff})},
-    laneReceiver('observer','A',receiver,{ready:false,born,laneTerminalText:true}),
+    // Odbiorca A z ikoną inbox, literą i polem fullName widoczny od READY (jak HTTP GET).
+    laneReceiver('observer','A',receiver,{ready:true,laneTerminalText:true,inbox:{...laneInbox(),ready:true}}),
   ];
   // Pole wyniku za inboxem i literą A (jak pola Cold): nazwa wyniku w monospace, po dotarciu — pełny string.
   const k=laneLook.textScale,inbox=laneInbox(),fieldLeft=receiver.x-receiver.w/2+inbox.left+laneLook.icon+8*k+22*k+16;
@@ -562,17 +568,22 @@ export function shareReplayLateGraph(scene) {
 }
 
 // interval(1000): emisje bez końca, aż do ręcznego unsubscribe. Scena jest „na żywo”: model jest analityczny
-// (emisja co 1 s od zestawionej subskrypcji), a player kompiluje go dla przesuwanego okna czasu (scene.live).
-// Bez unsubscribe scena trwa do końca okna; .unsubscribe() wybiera chwilę rezygnacji i kończy scenę.
-const intervalTiming={subscribe:.3,connect:.8,period:1,travel:.8,cancel:.8,settle:.8,window:30,keep:5,demoClose:4.95};
+// (emisja co 1 s od startu emisji), a player kompiluje go dla przesuwanego okna czasu (scene.live).
+// Etapy jak na HTTP: definicja → odbiorca (born) → subscribe (postój subscribed z migawką .subscribe() A) → emisje bez
+// końca od live.start → .unsubscribe() (migawka zostaje do końca sceny). Postoje przed live.start to zwykłe etapy kontrolera.
+const intervalTiming={born:.3,subscribe:1.3,connect:.8,emit:.5,period:1,travel:.8,cancel:.8,settle:.8,window:30,keep:5,demoLead:3.85};
 export function configureInterval(scene) {
-  const t=intervalTiming,start=t.subscribe+t.connect;
+  const t=intervalTiming,connected=t.subscribe+t.connect,start=connected+t.emit;
   Object.assign(scene,{graph:intervalGraph,playerLayout:'function',ink:'#26323B',playerClass:'rx-flat-tiles',
     title:'interval: strumień bez końca',code:'interval(1000)',
-    rows:[R('interval(1000)'),R('Odbiorca A')],
-    // window/keep: długość i zapas okna kompilacji (s); defaultClose: rezygnacja dla druku i „pokaż wynik”.
-    live:{start,window:t.window,keep:t.keep,margin:2,defaultClose:t.demoClose,variant:intervalVariant},
+    // .subscribe(render) dopisuje się razem z migawką .subscribe() A (0,3 s przed subscribe), jak na HTTP.
+    codeFrames:[{event:{type:'subscribe',edge:'interval-observer'},offset:-.3,code:'interval(1000).subscribe(render)',fadeIn:.3}],
+    rows:[R('interval'),R('Odbiorca A')],
+    // window/keep: długość i zapas okna kompilacji (s); defaultClose: rezygnacja dla druku i „pokaż wynik” (wartości 0, 1, 2).
+    live:{start,window:t.window,keep:t.keep,margin:2,defaultClose:start+t.demoLead,variant:intervalVariant},
     playback:{entry:'manual',finish:'hold',live:true,stops:[
+      {id:'receiver',time:t.born+.6,caption:'Odbiorca A czeka. Bez subscribe interval nic nie emituje'},
+      {id:'subscribed',time:connected+.35,caption:'.subscribe() dotarło do interval. Emisje jeszcze nie ruszyły'},
       {id:'live',time:start,caption:'interval emituje co sekundę: 0, 1, 2… Sam się nie kończy'}]},
   });
   Object.assign(scene,intervalVariant(scene,{from:0,to:t.window,closedAt:null}));
@@ -590,8 +601,8 @@ function intervalVariant(scene,{from,to,closedAt}) {
   return {...scene,intervalPlan:{start,kFrom,kTo,unsubscribeAt},
     duration:closed?unsubscribeAt+t.cancel+t.settle:to,
     metrics:[{label:'emisje',value:emitted}],
-    captions:[[0,'interval(1000) to definicja. Bez subscribe nic nie emituje'],
-      [t.subscribe,'.subscribe() tworzy wykonanie A i łączy je z interval'],
+    captions:[[0,'interval(1000) to definicja. Bez subscribe nic nie emituje'],[t.born,'Odbiorca A czeka. Nic go jeszcze nie łączy z interval'],
+      [t.subscribe,'.subscribe() tworzy wykonanie A i łączy je z interval'],[start,'interval emituje co sekundę: 0, 1, 2… Sam się nie kończy'],
       ...(closed?[[unsubscribeAt,'.unsubscribe() A: rezygnacja biegnie od odbiorcy do interval'],
         [unsubscribeAt+t.cancel,'interval przestał emitować. Bez complete — to rezygnacja odbiorcy, nie koniec strumienia']]:[])]};
 }
@@ -602,53 +613,68 @@ export function intervalGraph(scene) {
   const events=[];
   for(let k=kFrom;k<=kTo;k++){const at=start+t.period*(k+1);events.push({...E(at,String(k),fill),logicalAt:at,arrival:at+t.travel});}
   const edge='interval-observer',closed=unsubscribeAt!==null;
-  // .unsubscribe() zaczyna się przy odbiorcy (pod jego wierszem), nie w pasie nagłówków.
+  // .unsubscribe() zaczyna się przy odbiorcy (pod jego wierszem), nie w pasie nagłówków; zostaje do końca sceny.
   const below={x:receiver.x,y:receiver.y+laneLook.rowH/2+48};
   return {layout:'fixed',formatAware:true,width:1240,height:scene.format==='4:3'?612:460,...laneGraphLook(),
     subscribers:{A:laneSubscribers.A},
-    nodes:[{id:'interval',x:340,w:420,label:'interval(1000)',...laneTile('source',top,{A:0},1)},
+    nodes:[{id:'interval',x:340,w:420,label:'interval',...laneTile('source',top,{A:0},1)},
+      // Odbiorca pojawia się przed subscribe już z ikoną inbox i literą A (inbox.ready).
       // Status unsubscribe przy odbiorcy po dotarciu × do interval (bez complete): sam „×”, bo wiersz mieści trzy kulki.
-      laneReceiver('observer','A',receiver,{ready:false,born:0,laneTerminalText:{cancelled:'×'}})],
+      laneReceiver('observer','A',receiver,{ready:false,born:t.born,laneTerminalText:{cancelled:'×'},inbox:{...laneInbox(),ready:true}})],
     trays:[laneTray('observer',receiver,3)],
-    callouts:[subscribeCallout('A',edge,edge,{y:top/2}),
-      ...(closed?[laneCallout('.unsubscribe()','A',laneEvent('inner-unsubscribe',edge),laneEvent('disconnected',edge),below)]:[])],
+    // Migawka .subscribe() A zostaje na postoju subscribed i gaśnie, gdy ruszają emisje.
+    callouts:[laneCallout('.subscribe()','A',laneEvent('subscribe',edge,-.3),laneEvent('connected',edge,start-t.subscribe-t.connect),{y:top/2}),
+      ...(closed?[laneCallout('.unsubscribe()','A',laneEvent('inner-unsubscribe',edge),laneEvent('disconnected',edge,Infinity),below)]:[])],
     edges:[{id:edge,from:'interval',to:'observer',subscriber:'A',logicalStart:t.subscribe,cancelPulse:true,events:[]}],
     schedule:{[edge]:{start:t.subscribe,connectDuration:t.connect,events,
       ...(closed?{end:{at:unsubscribeAt,logicalAt:unsubscribeAt,kind:'unsubscribe',duration:t.cancel}}:{})}}};
 }
 
-// Wariant HTTP: subskrypcja uruchamia request (praca tylko w kafelku HTTP), odpowiedź „dane” trafia do boxu pod odbiorcą,
-// potem complete. Odbiorca ma własny wiersz bez pracy, więc nie pokazuje paska ani „praca trwa”.
+// Wariant HTTP: etapy definicja → odbiorca → subscribe → request i emisja → dotarcie → complete. Subskrypcja dociera
+// do HTTP i staje (migawka .subscribe() A widoczna na postoju); request rusza dopiero w następnym etapie (workStart).
+// Praca tylko w kafelku HTTP; odbiorca ma własny wiersz bez pracy, więc nie pokazuje paska ani „praca trwa”.
+// Czas ilustracji = czas modelu (schedule): born — odbiorca, subscribe/connect — impuls do HTTP, work — start requestu,
+// next — wylot odpowiedzi, travel — przelot, complete — wysłanie complete (terminal 0,8 s).
+const httpTimes={born:.3,subscribe:1.3,connect:.8,work:2.6,next:5.6,travel:1.4,complete:7.6,terminal:.8,duration:9.2};
 export function configureHttp(scene) {
-  const response=[E(7,'dane','http')];
-  // 9,9 s: complete dociera w 9,1 s, rozbłysk wiersza odbiorcy wygasa przed FINISHED.
-  Object.assign(scene,{graph:httpGraph,playerLayout:'function',duration:9.9,ink:'#26323B',playerClass:'rx-flat-tiles',
+  const at=httpTimes,ev=(type,offset)=>({type,edge:'http-observer',...(offset?{offset}:{})});
+  const response=[E(at.next,'dane','http')],arrival=at.next+at.travel,completed=at.complete+at.terminal;
+  // 9,2 s: complete dociera w 8,4 s, rozbłysk wiersza odbiorcy wygasa przed FINISHED.
+  Object.assign(scene,{graph:httpGraph,httpTimes:at,playerLayout:'function',duration:at.duration,ink:'#26323B',playerClass:'rx-flat-tiles',
     title:'HTTP: od definicji do wykonania',code:"http.get('/api/data')",
-    // .subscribe(render) dopisuje się z tym samym fade-in co odbiorca (born:1).
-    codeFrames:[{at:1,code:"http.get('/api/data').subscribe(render)",fadeIn:.3}],
-    rows:[R('HTTP',response,[B(2.1,7,'request')],{completeAt:7}),R('Odbiorca',response)],
-    captions:[[0,'Definicja HTTP jest gotowa. Request jeszcze nie istnieje'],[1,'subscribe tworzy odbiorcę i łączy go ze źródłem'],[2.1,'Dopiero subskrypcja uruchamia request'],[7.8,'Odbiorca dostał dane. Za chwilę nadejdzie complete'],[9.2,'Complete kończy to wykonanie HTTP']],
+    // .subscribe(render) dopisuje się razem z migawką .subscribe() A (0,3 s przed subscribe).
+    codeFrames:[{event:ev('subscribe'),offset:-.3,code:"http.get('/api/data').subscribe(render)",fadeIn:.3}],
+    rows:[R('HTTP',response,[B(at.work,at.next,'request')],{completeAt:at.next}),R('Odbiorca',response)],
+    captions:[[0,'Definicja HTTP jest gotowa. Request jeszcze nie istnieje'],[at.born,'Odbiorca A jest gotowy, ale nic go nie łączy z HTTP'],
+      [at.subscribe,'.subscribe() łączy odbiorcę A z HTTP'],[at.work,'Dopiero subskrypcja uruchamia request'],[at.next,'HTTP emituje odpowiedź'],
+      [arrival,'Odbiorca dostał dane. Za chwilę nadejdzie complete'],[completed,'Complete kończy to wykonanie HTTP']],
     metrics:[],
-    playback:manual([{id:'request',event:{type:'connected',edge:'http-observer'},offset:.35,caption:'Subskrypcja dotarła do HTTP. Request ruszył'},
+    playback:manual([{id:'receiver',event:{type:'node-create',node:'observer'},offset:.6,caption:'Odbiorca A czeka. Bez subscribe nie ma requestu'},
+      {id:'subscribed',event:ev('connected'),offset:.35,caption:'.subscribe() dotarło do HTTP. Request jeszcze nie ruszył'},
+      {id:'response',event:{type:'source-next',edge:'http-observer',value:'dane'},offset:.3,caption:'Request zakończony. HTTP emituje dane'},
       {id:'first',event:{type:'deliver-next',edge:'http-observer',value:'dane'},offset:.35,caption:'Odbiorca dostał dane; complete jeszcze nie dotarło'}]),
   });
 }
 
-// Wygląd torów: HTTP GET (definicja) → odbiorca A, który pojawia się razem z .subscribe(render). Request to postęp
-// w wierszu HTTP od zestawionej subskrypcji do odpowiedzi; „dane” zostają kulką w wierszu odbiorcy, potem complete.
+// Wygląd torów: HTTP GET (definicja) → odbiorca A, który pojawia się w osobnym etapie przed subscribe. Request to postęp
+// w wierszu HTTP od workStart do odpowiedzi; „dane” zostają kulką w wierszu odbiorcy, potem complete.
 export function httpGraph(scene) {
-  const top=scene.format==='4:3'?222:146,receiver={x:910,w:400,y:laneRowY(top,0)};
+  const at=scene.httpTimes,top=scene.format==='4:3'?222:146,receiver={x:910,w:400,y:laneRowY(top,0)};
   // Większa kulka mieści pełne „dane”.
-  const ball={r:34,font:26},fill=laneSubscribers.A.fill;
+  const ball={r:34,font:26},fill=laneSubscribers.A.fill,edge='http-observer';
   return {layout:'fixed',formatAware:true,width:1240,height:scene.format==='4:3'?612:460,...laneGraphLook(),ball,
     subscribers:{A:laneSubscribers.A},
-    nodes:[{id:'http',x:340,w:420,label:'HTTP GET',workLanes:true,progressUntilNext:true,terminalEdge:'http-observer',...laneTile('source',top,{A:0},1)},
+    nodes:[{id:'http',x:340,w:420,label:'HTTP GET',workLanes:true,progressUntilNext:true,terminalEdge:edge,...laneTile('source',top,{A:0},1)},
       // Status zakończenia (✓ complete) przy odbiorcy, po dotarciu zielonego impulsu; HTTP GET bez napisu.
-      laneReceiver('observer','A',receiver,{ready:false,born:1,laneTerminalText:true})],
+      // Odbiorca pojawia się przed subscribe już z ikoną inbox i literą A (inbox.ready).
+      laneReceiver('observer','A',receiver,{ready:false,born:at.born,laneTerminalText:true,inbox:{...laneInbox(),ready:true}})],
     trays:[laneTray('observer',receiver,1,ball)],
-    callouts:[subscribeCallout('A','http-observer','http-observer',{y:top/2})],
-    edges:[{from:'http',to:'observer',subscriber:'A',events:scene.rows[0].events,logicalStart:1.3}],
-    schedule:{'http-observer':{start:1.3,connectDuration:.8,events:[{...scene.rows[0].events[0],color:fill,arrival:7.8}],end:{at:8.3,logicalAt:7,kind:'complete',duration:.8}}}};
+    // Migawka zostaje na postoju subscribed i gaśnie, gdy rusza request.
+    callouts:[laneCallout('.subscribe()','A',laneEvent('subscribe',edge,-.3),laneEvent('connected',edge,at.work-at.subscribe-at.connect),{y:top/2})],
+    edges:[{from:'http',to:'observer',subscriber:'A',events:scene.rows[0].events,logicalStart:at.subscribe}],
+    schedule:{[edge]:{start:at.subscribe,connectDuration:at.connect,workStart:at.work,
+      events:[{...scene.rows[0].events[0],color:fill,arrival:at.next+at.travel}],
+      end:{at:at.complete,logicalAt:at.next,kind:'complete',duration:at.terminal}}}};
 }
 
 // Subject (05-zrodla-3): kontynuacja Cold — te same pola widoku A/B/C, ale jeden HTTP zasila je przez Subject.
@@ -734,12 +760,16 @@ export function subjectGraph(scene) {
 // Subject — ręczna emisja (05-zrodla-5): trzeci slajd techniczny, zaraz po HTTP (subscribe, next, complete) i interval
 // (wiele next, unsubscribe). Subject jest hot: READY to sam kafelek Subject<number>; A subskrybuje i dostaje next(1),
 // dopiero potem pojawia się B — bez wcześniejszej 1 (brak historii). next(2) trafia do A i B, complete() zamyka obie
-// subskrypcje (bez unsubscribe). Odbiorca pojawia się (fade-in) tuż przed swoim subscribe. Subject nie ma upstreamu ani connection. Wygląd torów jak
-// Subject + HTTP: Subject x/w 217/340 po lewej, kompaktowi odbiorcy 960/466 z kulkami wartości. Kod to stale tylko
-// definicja Subjecta; subscribe, next i complete są chwilowymi migawkami. Jawny harmonogram: czas ilustracji = czas modelu.
+// subskrypcje (bez unsubscribe). Odbiorca pojawia się (fade-in) tuż przed swoim subscribe. Subject nie ma upstreamu ani connection.
+// Wygląd torów i wymiary kafelków jak interval (05-zrodla): Subject x/w 340/420, kompaktowi odbiorcy 910/400 z kulkami
+// wartości. Kod to stale tylko definicja Subjecta; subscribe, next i complete są migawkami: subscribe i next widoczne do
+// postoju, gasną w następnym etapie; complete() zostaje do końca. Jawny harmonogram: czas ilustracji = czas modelu.
 // next(1) trafia tylko do A (B jeszcze nie istnieje); B subskrybuje między next(1) i next(2).
-const subjectManualTimes={subscribe:[.6,6.2],reveal:.3,link:1,next:[2.6,8.6],hold:1.2,travel:1.4,complete:12.2,completeDelay:.6,terminal:1.2,
-  summary:14.8,duration:15.8};
+// Etapy: subscribe A → next(1): kulka czeka w Subjecie (emit-1) → dotarcie do A → subscribe B → next(2): kulka ze środka
+// rozchodzi się do portów A i B i staje (emit-2) → dotarcie do A i B → complete().
+// emitStop: postój emit-1 po fade-in kulki (przed ruchem do portu); calloutTail: migawka gaśnie tuż po wznowieniu.
+const subjectManualTimes={subscribe:[.6,5.8],reveal:.3,link:1,next:[2.3,7.5],hold:1.2,travel:1.4,complete:10.8,completeDelay:.6,terminal:1.2,
+  emitStop:.5,calloutTail:.1,summary:13.6,duration:14.6};
 const subjectManualReceivers=[{id:'A',slot:0},{id:'B',slot:1}];
 // Odbiorcy emisji: ci, których subskrypcja jest zestawiona przed wywołaniem next.
 const subjectManualTargets=(at,call)=>subjectManualReceivers.filter((r,i)=>at.subscribe[i]+at.link<=call);
@@ -766,9 +796,11 @@ export function configureSubjectManual(scene) {
     captions:[[0,'new Subject<number>(): Subject nie ma jeszcze odbiorców i niczego nie emituje']],
     playback:manual([
       {id:'subscribed-a',event:ev('connected','subject-A'),offset:.35,caption:'A subskrybuje Subject i czeka na wartości'},
+      {id:'emit-1',event:{type:'manual-next',value:'1'},offset:at.emitStop,caption:'subject$.next(1): Subject ma wartość 1 do rozesłania'},
       {id:'next-1',event:ev('deliver-next','subject-A',{value:'1'}),offset:.35,caption:'subject$.next(1): A dostaje 1. B jeszcze nie istnieje'},
       // Pytanie: B już subskrybuje — czy dostanie wcześniejszą 1? Odpowiedź (brak 1) widać dopiero przy next(2).
       {id:'subscribed-b',event:ev('connected','subject-B'),offset:.35,caption:'B subskrybuje Subject. Czy dostanie wcześniejszą 1?'},
+      {id:'emit-2',event:ev('source-next','subject-A',{value:'2'}),caption:'subject$.next(2): Subject rozsyła 2 do wszystkich aktualnych odbiorców — A i B'},
       {id:'next-2',event:ev('deliver-next','subject-B',{value:'2'}),offset:.35,caption:'subject$.next(2): A i B dostają 2. B nie dostał 1 — Subject nie odtwarza historii'},
       {id:'complete',event:ev('disconnected','subject-B'),offset:.5,caption:'subject$.complete(): A i B dostają complete. Obie subskrypcje są zamknięte'},
     ]),
@@ -777,8 +809,8 @@ export function configureSubjectManual(scene) {
 
 export function subjectManualGraph(scene) {
   const tall=scene.format==='4:3',top=tall?178:102,at=scene.subjectManualTimes;
-  // Subject<number> mieści etykietę w jednej linii; szerszy odbiorca zostawia miejsce na „✓ complete” za dwiema kulkami.
-  const g={subjectX:217,subjectW:340,recvX:960,recvW:466},pos=r=>({x:g.recvX,w:g.recvW,y:laneRowY(top,r.slot)});
+  // Wymiary kafelków jak na interval (05-zrodla): źródło 340/420, odbiorca 910/400.
+  const g={subjectX:340,subjectW:420,recvX:910,recvW:400},pos=r=>({x:g.recvX,w:g.recvW,y:laneRowY(top,r.slot)});
   // Kulka liczby jak w Subject + interval; wartości w kolorze emisji Subjecta (fill toru #1 z sąsiednich slajdów).
   const ball={r:34,font:30},fill=subjectUpstream.fill;
   // complete: terminalna notyfikacja — zielony impuls od Subjecta do każdego odbiorcy, bez kulki i bez unsubscribe.
@@ -786,7 +818,7 @@ export function subjectManualGraph(scene) {
   const call=(text,subscriber,from,to)=>({...laneCallout(text,subscriber,from,to,{x:620,y:top/2}),size:34,label:''});
   return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball,
     subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,U:subjectUpstream,C:subjectCompleteCall},
-    nodes:[{id:'subject',x:g.subjectX,w:g.subjectW,label:'Subject<number>',splitBalls:true,splitGuides:false,upstreamStripe:false,hubFan:false,
+    nodes:[{id:'subject',x:g.subjectX,w:g.subjectW,label:'Subject',splitBalls:true,splitGuides:false,upstreamStripe:false,hubFan:false,
         emits:at.nexts.map(n=>({value:n.value,color:fill,at:n.call})),
         ...laneTile('operator',top,Object.fromEntries(subjectManualReceivers.map(r=>[r.id,r.slot])),subjectManualReceivers.length)},
       // Odbiorca nie istnieje przed swoim subscribe: pojawia się (fade-in) tuż przed nim, bez pustego prostokąta w READY.
@@ -798,11 +830,14 @@ export function subjectManualGraph(scene) {
       events:at.nexts.filter(n=>n.targets.includes(r.id)).map(n=>({value:n.value,color:fill,at:n.split,arrival:n.delivered,logicalAt:n.call})),end:complete}])),
     trays:subjectManualReceivers.map(r=>laneTray(r.id,pos(r),2,ball)),
     // Migawki w jednym miejscu nad diagramem, kolejno: subscribe (litera toru), next(1), next(2) (bez badge'a)
-    // i complete() (zieleń zakończenia).
+    // i complete() (zieleń zakończenia). subscribe i next zostają na swoim postoju (subscribed-X, emit-N) i gasną tuż po
+    // wznowieniu; complete() zostaje do końca sceny.
     callouts:[...subjectManualReceivers.map(r=>({...call(`subject$.subscribe(observer${r.id})`,r.id,
-        laneEvent('subscribe','subject-'+r.id),laneEvent('connected','subject-'+r.id)),label:r.id})),
-      ...at.nexts.map(n=>call(`subject$.next(${n.value})`,'U',{type:'manual-next',value:n.value},{type:'deliver-next',edge:'subject-'+n.targets.at(-1),value:n.value})),
-      call('subject$.complete()','C',{type:'manual-complete'},laneEvent('disconnected','subject-B',.8))],
+        laneEvent('subscribe','subject-'+r.id),laneEvent('connected','subject-'+r.id,.35+at.calloutTail)),label:r.id})),
+      // Postój emisji: przy jednym odbiorcy kulka czeka w Subjecie (emit-1), przy kilku — staje na portach po rozejściu (emit-2).
+      ...at.nexts.map(n=>call(`subject$.next(${n.value})`,'U',{type:'manual-next',value:n.value},n.targets.length>1?
+        {type:'source-next',edge:'subject-'+n.targets[0],value:n.value,offset:at.calloutTail}:{type:'manual-next',value:n.value,offset:at.emitStop+at.calloutTail})),
+      call('subject$.complete()','C',{type:'manual-complete'},laneEvent('disconnected','subject-B',Infinity))],
     timeline:[...at.nexts.map(n=>({type:'manual-next',value:n.value,at:n.call})),{type:'manual-complete',at:at.complete},
       {type:'subject-manual-summary',at:at.summary,caption:'A: 1, 2, complete. B: 2, complete. Subject jest hot — późny odbiorca nie dostaje historii'}],
   };
@@ -1053,7 +1088,7 @@ function buildFlattenGraph(scene) {
     if(!all&&job.start>job.at)nodes.push({...workRow,id:'queued'+i,label:job.value+' (wartość)',color:'muted',detail:'w kolejce',
       instant:true,createdBy:{edge:'source-op',value:job.value},until:job.start});
     nodes.push({...workRow,id:'inner'+i,label:(scene.http?'HTTP ':'')+job.value+(scene.http?'':'$'),ri,inner:true,
-      // concatAll: wpis kolejki powstaje, gdy utworzone przez map Observable dotrze do concatAll.
+      // concatAll: inner ujawnia się po dotarciu Observable utworzonego przez map.
       born:job.start,createdBy:all?{edge:'projection-op',value:job.value+'$'}:undefined,ready:false,cancelLabel:'anulowana · ABORT (klient)'});
     edges.push({from:'inner'+i,to:'op',events:scene.rows[ri].events,workRow:ri,gateWork:true,internal:true,logicalStart:job.start,
       points:[[315,y],[275-i*14,y],[275-i*14,100],[operatorX,100],[operatorX,82]]});
@@ -1183,7 +1218,7 @@ export function configureHttpWorkPanel(graph,scene,frame,{columns=[{id:'source',
   graph.trays=[{anchor:'observer',x:970,y:laneY,w:270,balls:true,max:4,gap:8,ball:{r:29.5,font:34.2,textFill:'#fff'}}];
   const works=scene.jobs.map((job,i)=>({id:'#'+(i+1),slot:i,value:job.value,color:['#6D4CD3','#B85D05','#087FAD','#B73770'][i%4],
     node:'inner'+i,edge:edge(i),queuedNode:graph.nodes.some(n=>n.id==='queued'+i)?'queued'+i:undefined,
-    ...(all?{value:job.value+'$',queueObservable:true,queueLabel:'W KOLEJCE · Observable'}:{}),
+    ...(all?{value:job.value+'$',...(scene.jobs.length>1?{queueObservable:true,queueLabel:'W KOLEJCE · Observable'}:{})}:{}),
     ...(job.ignored?{ignoredNode:'ignored'+i}:{}),
     // Wejście z decide: wiersz pokazuje „?” od dotarcia do operatora aż do reakcji.
     ...(scene.rows[0].events.some(e=>e.value===job.value&&e.decide)?{input:{edge:all?'projection-op':'source-op',value:job.value}}:{}),
@@ -1235,10 +1270,11 @@ const comparison={input:[{at:.6,value:'A',dur:3},{at:2.1,value:'B',dur:1.2},{at:
 
 export function configureFlatten(scene,mode) {
   const all=mode==='concatAll',httpWork=httpWorkSlides.has(scene.id),compare=comparisonSlides.has(scene.id)&&!all;
+  const intro=httpWork&&all;
   const concatHttp=scene.id==='09-concatmap'&&mode==='concatMap'&&!compare;
   // Wspólne wejście i potencjalny czas pracy dla czterech strategii.
   const input=compare?comparison.input.map((v,i)=>({...v,color:['a','b','c'][i]})):
-    (all?[1,1.2,1.4]:[1,1.45,1.9,2.7]).map((at,i)=>({at,value:'ABCD'[i],dur:1.2,color:['a','b','c','a'][i]}));
+    (intro?[1]:all?[1,1.2,1.4]:[1,1.45,1.9,2.7]).map((at,i)=>({at,value:'ABCD'[i],dur:1.2,color:['a','b','c','a'][i]}));
   let end=0;
   const jobs=input.map((v,i)=>{
     if(mode==='exhaustMap'&&v.at<end)return {...v,ignored:true};
@@ -1282,7 +1318,29 @@ export function configureFlatten(scene,mode) {
   if(httpWork&&!concatHttp)scene.playback.stops.find(s=>s.id==='active').caption='Pierwszy HTTP jest aktywny; każda odpowiedź oznacza jedną wartość i complete.';
   if(compare)configureComparison(scene,mode);
   else if(mode==='mergeMap')overlapTail(scene);
+  if(intro) {
+    const summary='map tworzy Observable. concatAll subskrybuje go i przepuszcza jego wynik dalej.';
+    Object.assign(scene,{
+      captions:[[0,'map może zwrócić Observable. concatAll subskrybuje go, aby odebrać wynik.'],[completed,summary]],
+      playback:manual([
+        {id:'subscribe',event:{type:'connected',edge:'source-projection'},offset:.35,
+          caption:'S1 subskrybuje source$ przez concatAll i map. HTTP jeszcze nie działa.'},
+        // A$ jest już widoczne w map, ale jeszcze nie dotarło do concatAll — HTTP nie jest subskrybowane.
+        {id:'first',event:{type:'source-next',edge:'projection-op',value:'A$'},offset:-.15,
+          caption:'map tworzy A$ — zimne Observable HTTP. Samo utworzenie nie uruchamia requestu.'},
+        {id:'active',event:{type:'inner-subscribe',node:'inner0'},offset:.35,
+          caption:'concatAll subskrybuje A$. Działa jeden request HTTP.'},
+      ]),
+      timeline:[
+        {type:'inner-response',event:{type:'deliver-next',edge:'inner0-op',value:'A'},
+          caption:'HTTP przekazuje odpowiedź do inner #1. concatAll przesyła ją dalej do S1.'},
+        {type:'result-received',event:{type:'deliver-next',edge:'op-observer',value:'A'},
+          caption:'S1 odbiera wynik jednego requestu HTTP.'},
+      ],
+    });
+  }
   configureFlattenPlayback(scene);
+  if(intro)scene.metrics=[{label:'Innery uruchomione',count:'started'},{label:'Aktywne',count:'active'}];
 }
 
 // Podpisy i postoje porównania. concatMap pokazuje pełną subskrypcję S1; pozostałe trzy zaczynają od zestawionego S1
@@ -1328,7 +1386,7 @@ export function configureFlattenPlayback(scene) {
   scene.playerLayout='expanded';
   scene.metrics=[{label:'uruchomione',count:'started'},{label:'aktywne',count:'active'}];
   if(scene.playback?.stops)scene.playback={...scene.playback,finish:'hold',stops:scene.playback.stops.map(stop=>
-    stop.id==='first'||stop.id==='question'&&['concatMap','concatAll'].includes(mode)?{...stop,offset:.35}:stop)};
+    stop.id==='first'||stop.id==='question'&&['concatMap','concatAll'].includes(mode)?{...stop,offset:stop.offset??.35}:stop)};
   else scene.playback={entry:'auto',finish:'hold'};
   const final=scene.captions.at(-1);
   if(final?.[0]===scene.rows.at(-1).completeAt)scene.captions=scene.captions.slice(0,-1);

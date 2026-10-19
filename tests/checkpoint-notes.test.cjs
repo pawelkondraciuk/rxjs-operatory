@@ -27,7 +27,7 @@ test('Subject checkpoint notes use native Reveal fragment notes and keep READY s
 });
 test('checkpoint notes leave other variants untouched and print uses the final explanation',async()=>{
  const {['checkpoint-notes']:m}=await modules(['checkpoint-notes']);
- for(const id of ['05-zrodla','05-zrodla-2','06-subskrypcja']){
+ for(const id of ['05-zrodla','06-subskrypcja']){
   const s=slide(id);assert.equal(m.prepareCheckpointNotes(s),false);assert.equal(s.note.innerHTML,'existing variant notes');
   assert.ok(s.markers.every(marker=>marker.children.length===0));
  }
@@ -53,7 +53,7 @@ test('Notes receiver restores the requested frame only for a matching template a
  calls.length=0;send(5);assert.equal(calls.at(-1)[1],20);
  calls.length=0;send(-1);assert.equal(calls.at(-1)[1],0);
  calls.length=0;send(4,{origin:'http://untrusted'});send(4,{source:{}});assert.equal(calls.length,0);
- s.id='05-zrodla-2';send(4);assert.equal(calls.length,0);
+ s.id='05-zrodla';send(4);assert.equal(calls.length,0);
 });
 
 test('restoring fragment state does not turn Notes synchronization into pilot actions',async()=>{
@@ -81,7 +81,7 @@ test('the main window ignores every setState from the Notes window, before and a
  send({method:'setState',args:[{indexh:14,indexf:-1}]});assert.deepEqual(calls,[['stop']]);
  calls.length=0;send({namespace:'reveal-notes',type:'connected'});assert.deepEqual(calls,[],'handshake przechodzi do pluginu');
  send({method:'setState',args:[{indexh:14,indexf:3}]});assert.deepEqual(calls,[['stop']],'podgląd nie steruje główną prezentacją');
- s.id='05-zrodla-2';calls.length=0;send({method:'setState',args:[{indexh:3,indexf:0}]});assert.deepEqual(calls,[['stop']],'także slajdy bez szablonu');
+ s.id='05-zrodla';calls.length=0;send({method:'setState',args:[{indexh:3,indexf:0}]});assert.deepEqual(calls,[['stop']],'także slajdy bez szablonu');
  // Inne okna (nie Notes otwarte z tej prezentacji) nie są dotykane.
  calls.length=0;listener({source:{},origin:view.location.origin,data:JSON.stringify({method:'setState',args:[{indexh:1}]}),stopImmediatePropagation:()=>calls.push(['stop'])});
  assert.deepEqual(calls,[]);

@@ -24,13 +24,8 @@ add("05-zrodla","Skąd płyną wartości?","timer · HTTP · Subject",20,[
  R("odbiorca Subject",[E(12,"B","b"),E(16,"C","c")],[B(8,18,"subskrypcja","source","subscription")])
 ],[[0,"Wartości mogą pochodzić z timera, HTTP albo ręcznego next()."],[4,"Subject emituje A. Odbiorca jeszcze nie słucha."],[8,"Odbiorca subskrybuje zwykły Subject."],[12,"Odbiera B. Wcześniejszego A nie dostaje."]],"To zwykły Subject, bez replay. Timer i HTTP są osobnymi przykładami źródeł. Odbiorca Subject subskrybuje dopiero w 8. sekundzie.");
 
-add("08-map-strumienie","A jeśli wartością jest Observable?","map(id => request$(id)) → concatAll()",22,[
- R("wejście",[E(1,"a"),E(4,"b","b")]),
- R("po map",[E(1,"A$"),E(4,"B$","b")]),
- R("A$ · subskrypcja",[E(3,"A1"),E(5,"A2")],[B(1,7,"A$","a")],{completeAt:7}),
- R("B$ · subskrypcja",[E(9,"B1","b"),E(11,"B2","b")],[B(4,7,"czeka","muted","queue"),B(7,13,"B$","b")],{completeAt:13}),
- R("concatAll · wynik",[E(3,"A1"),E(5,"A2"),E(9,"B1","b"),E(11,"B2","b")])
-],[[0,"map zwraca Observable. Sam go nie subskrybuje."],[1,"concatAll subskrybuje zimne A$."],[4,"B$ już istnieje, ale jeszcze czeka na subskrypcję."],[7,"A$ kończy się. Dopiero teraz startuje B$."],[13,"map + concatAll prowadzi do idei concatMap."]],"Rozróżnij zwykłe wartości a, b od referencji A$, B$. Zimne źródła wewnętrzne rozpoczynają emisje przy subskrypcji.");
+// Model pojedynczego innera i postoje nadaje configureReferences.
+add("08-map-strumienie","A jeśli wartością jest Observable?","source$.pipe(map(id => http.get(url(id))), concatAll())",1,[],[],"map tworzy Observable. concatAll subskrybuje go i przepuszcza jego wynik dalej.");
 function mapping(mode){
  const input=[{at:1,value:"A",dur:6,color:"a"},{at:4,value:"B",dur:6,color:"b"},{at:7.2,value:"C",dur:6,color:"c"}];
  let end=0;

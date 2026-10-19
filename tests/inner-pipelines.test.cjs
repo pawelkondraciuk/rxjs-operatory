@@ -46,17 +46,15 @@ test('every checkpoint of the eight slides uses the same columns; texts stay ins
  }
 });
 
-test('concatAll: #1 is subscribed at once (no W KOLEJCE flash); B$ and C$ wait as Observable placeholders without HTTP',async()=>{
+test('concatAll introduction: one HTTP pipeline completes without placeholders or extra inner subscribers',async()=>{
  const {compile,render}=await deck(),c=compile('08-map-strumienie');
- const first=render(c.snapshot(at(c,'first')));
- assert.doesNotMatch(rowSvg(first,'#1'),/data-inner-placeholder/,'#1 bez kolejki');
- const q=c.snapshot(at(c,'question')),svg=render(q);
- assert.deepEqual(Array.from(q.innerWorkPanels[0].rows,r=>r.id+':'+r.value+':'+r.state),['#1:A$:active','#2:B$:queued','#3:C$:queued']);
- for(const id of ['#2','#3']){
-  assert.match(rowSvg(svg,id),/data-inner-placeholder="queued"[\s\S]*>W KOLEJCE · Observable</);
-  assert.doesNotMatch(rowSvg(svg,id),/data-inner-header|data-inner-receiver|data-inner-port/);
- }
- assert.equal(q.executionCounts.started,1,'żaden request B$/C$ przed subskrypcją przez concatAll');
+ const active=c.snapshot(at(c,'active')),svg=render(active);
+ assert.deepEqual(Array.from(active.innerWorkPanels[0].rows,r=>r.id+':'+r.value+':'+r.state),['#1:A$:active']);
+ assert.match(rowSvg(svg,'#1'),/data-inner-header="source"[\s\S]*>HTTP GET</);
+ assert.match(rowSvg(svg,'#1'),/data-inner-receiver="#1"[\s\S]*>inner #1</);
+ const done=render(c.snapshot(c.duration));
+ assert.match(rowSvg(done,'#1'),/data-stage-state="completed"[\s\S]*data-receiver-state="completed"[\s\S]*>✓ complete</);
+ for(const t of [0,...c.checkpoints,c.duration])assert.doesNotMatch(render(c.snapshot(t)),/data-inner-placeholder|W KOLEJCE|data-inner-work="#(?:2|3)"/);
 });
 
 test('switchMap and distinct: cancelled pipelines keep their tiles, grey out and show × odłączono without complete; duplicates create no row',async()=>{

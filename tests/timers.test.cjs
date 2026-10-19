@@ -10,6 +10,13 @@ async function interval(format){
 const values=frame=>Array.from(frame.histories[0].values,v=>v.value);
 const lane=(frame,id)=>frame.nodes.find(n=>n.id===id).laneStates?.[0];
 const delivered=(frame,from=0)=>values(frame).slice(from);
+// Etapy przed emisjami jak na HTTP: READY → odbiorca → subscribe (postój z migawką) → dalej uruchamia emisje (t = 2,45 s).
+function toEmissions({controller,h,player}){
+ controller.next();h.advance(1500);assert.equal(player.time,stopTime(player,'receiver'));
+ controller.next();h.advance(2500);assert.equal(player.time,stopTime(player,'subscribed'));
+ controller.next();
+}
+const stopTime=(player,id)=>player.stops.find(s=>s.id===id).time;
 async function live(format){
  const {scene,render}=await interval(format),h=await playbackHarness(),{player,controller,elements}=h.create({scene});
  return {scene,render,h,player,controller,elements,svg:()=>elements.get('.rx-stage').innerHTML};
@@ -27,14 +34,35 @@ test('READY shows only the definition: no receiver, no lane, no emissions',async
  h.advance(5000);assert.equal(player.time,0,'bez „dalej” nic nie rusza');
 });
 
-test('first next subscribes A; interval then emits 0, 1, 2… every second without stopping on checkpoints',async()=>{
+test('stages before emissions: receiver with inbox and A, then subscribe stops with .subscribe() A visible and no emission',async()=>{
  const {player,controller,h,svg}=await live('4:3');
- controller.next();h.advance(1300);
+ assert.deepEqual(Array.from(player.stops,s=>s.id),['receiver','subscribed','live']);
+ controller.next();h.advance(1500);
+ let f=player.snapshot;
+ assert.equal(player.state,'paused');assert.equal(player.live.state,'idle');
+ assert.equal(f.nodes.find(n=>n.id==='observer').opacity,1);assert.ok(f.edges.every(e=>!e.visible));
+ assert.match(svg(),/data-node="observer"[^]*data-icon="inbox"[^]*>A<\/text>/,'odbiorca od razu z ikoną inbox i literą A');
+ assert.doesNotMatch(f.code,/subscribe/);assert.ok(!f.callouts?.length);
+ h.advance(3000);assert.equal(player.time,stopTime(player,'receiver'),'bez „dalej” stoi');
+ controller.next();h.advance(2500);
+ f=player.snapshot;
+ assert.equal(player.live.state,'idle');assert.equal(f.edges[0].phase,'subscribed');
+ assert.match(f.code,/interval\(1000\)\.subscribe\(render\)/);
+ assert.deepEqual(Array.from(f.callouts,c=>[c.text,c.label,c.opacity]),[['.subscribe()','A',1]]);
+ assert.deepEqual(values(f),[]);assert.equal(f.metrics[0].value,0);
+ h.advance(3000);assert.equal(player.time,stopTime(player,'subscribed'),'emisje dopiero po „dalej”');
+ controller.next();h.advance(600);
+ assert.ok(!player.snapshot.callouts?.length,'migawka gaśnie, gdy ruszają emisje');assert.equal(player.live.state,'running');
+});
+
+test('third next starts emissions; interval then emits 0, 1, 2… every second without stopping on checkpoints',async()=>{
+ const {player,controller,h,svg}=await live('4:3');
+ toEmissions({player,controller,h});h.advance(400);
  const f=player.snapshot;
  assert.equal(lane(f,'interval').state,'running');assert.equal(lane(f,'observer').state,'running');
  assert.equal(f.edges[0].phase,'subscribed');assert.equal(player.live.state,'running');
- // Po 5 s emisji: 0–4 dotarły, licznik nadal działa.
- h.advance(5800);
+ // Po 5,9 s emisji: 0–4 dotarły, licznik nadal działa.
+ h.advance(5650);
  assert.deepEqual(delivered(player.snapshot,-3),['2','3','4']);assert.equal(player.snapshot.metrics[0].value,5);
  assert.equal(player.state,'playing');
  // Po 30 s: nadal działa, najwyżej 3 widoczne kulki (+1 wypadająca), stała geometria.
@@ -51,11 +79,11 @@ test('first next subscribes A; interval then emits 0, 1, 2… every second witho
 
 test('next during emissions starts .unsubscribe(): grey × pulse travels left, lanes cancel, no complete, no later next',async()=>{
  const {player,controller,h,svg,render}=await live('4:3');
- controller.next();h.advance(7300);
+ toEmissions({player,controller,h});h.advance(6350);
  const before=player.snapshot.metrics[0].value;
  controller.next();assert.equal(player.live.state,'closed');
  // Wartość już wysłana dociera; po niej rusza unsubscribe, bez nowych emisji.
- // next w 7,3 s: wartość wysłana w 7,1 s dociera w 7,9 s, dopiero wtedy rusza pocisk unsubscribe.
+ // next w 8,8 s: wartość wysłana w 8,6 s dociera w 9,4 s, dopiero wtedy rusza pocisk unsubscribe.
  h.advance(400);assert.ok(!player.snapshot.edges[0].cancel,'najpierw dociera wysłana wartość');
  h.advance(300);
  const travelling=player.snapshot;
@@ -74,30 +102,38 @@ test('next during emissions starts .unsubscribe(): grey × pulse travels left, l
  assert.ok(end.metrics[0].value<=before+1);
  const count=end.metrics[0].value;assert.equal(Number(values(end).at(-1)),count-1,'ostatnia emisja dotarła przed unsubscribe');
  h.advance(10000);assert.equal(player.snapshot.metrics[0].value,count);assert.equal(h.frames.size,0,'brak zegara po anulowaniu');
+ // .unsubscribe() zostaje widoczne do końca sceny (także w FINISHED).
+ assert.deepEqual(Array.from(player.snapshot.callouts,c=>[c.text,c.opacity]),[['.unsubscribe()',1]]);
 });
 
 test('third next navigates away; rewinding steps back; re-entry reset starts from zero',async()=>{
  const navigation=[];
  const {scene}=await interval('4:3'),h=await playbackHarness();
  const {player,controller}=h.create({scene,controls:{stageOptions:{onNavigate:d=>navigation.push(d)}}});
- controller.next();h.advance(4300);controller.next();h.advance(4000);
+ toEmissions({player,controller,h});h.advance(1850);controller.next();h.advance(4000);
  assert.equal(player.state,'finished');assert.deepEqual(navigation,[]);
  controller.next();assert.deepEqual(navigation,[1]);
- // ← z anulowanego wraca do emisji od zera, kolejne ← do READY.
+ // ← z anulowanego wraca do emisji od zera, kolejne ← do postoju subscribed, odbiorcy i READY.
  controller.previous();assert.equal(player.live.state,'running');assert.equal(player.isPlaying,true);
  assert.deepEqual(values(player.snapshot),[]);
  h.advance(2500);assert.deepEqual(values(player.snapshot),['0']);
- controller.previous();assert.equal(player.state,'ready');assert.equal(player.live.state,'idle');
+ controller.previous();assert.equal(player.time,stopTime(player,'subscribed'));assert.equal(player.live.state,'idle');assert.equal(player.isPlaying,false);
+ assert.deepEqual(values(player.snapshot),[]);
+ controller.previous();assert.equal(player.time,stopTime(player,'receiver'));
+ controller.previous();assert.equal(player.state,'ready');
  controller.previous();assert.deepEqual(navigation,[1,-1]);
  // Wyjście ze slajdu: suspend + reset (jak w main.js) — po powrocie READY, nic nie odtwarza się samo.
  controller.next();h.advance(6000);controller.suspend('slide');controller.reset();
  assert.equal(player.state,'ready');assert.equal(h.frames.size,0);
  controller.resume('slide');assert.equal(player.isPlaying,false);h.advance(3000);assert.equal(player.time,0);
- controller.next();h.advance(3000);assert.deepEqual(values(player.snapshot),['0'],'licznik od zera');
+ toEmissions({player,controller,h});h.advance(2500);assert.deepEqual(values(player.snapshot),['0'],'licznik od zera');
 });
 
 test('quick repeated next never doubles the execution; AUTO and pause never unsubscribe by themselves',async()=>{
  const {player,controller,h}=await live('16:9');
+ // Szybkie „dalej” kończy każdy etap przed emisjami, zamiast go przeskakiwać.
+ controller.next();controller.next();assert.equal(player.time,stopTime(player,'receiver'));assert.equal(player.isPlaying,false);
+ controller.next();controller.next();assert.equal(player.time,stopTime(player,'subscribed'));assert.equal(player.isPlaying,false);
  controller.next();controller.next();assert.equal(player.live.state,'running');assert.equal(player.time,player.live.start);
  assert.equal(h.frames.size,1,'jeden RAF');
  controller.setMode('auto');h.advance(20000);assert.equal(player.live.state,'running');assert.equal(player.isPlaying,true);
@@ -106,13 +142,15 @@ test('quick repeated next never doubles the execution; AUTO and pause never unsu
  controller.next();controller.next();assert.equal(player.state,'finished');
 });
 
-test('Reveal fragments follow the three stages and FINISHED/print shows a cancelled, still frame',async()=>{
+test('Reveal fragments follow the stages and FINISHED/print shows a cancelled, still frame',async()=>{
  const {scene}=await interval('4:3'),h=await playbackHarness(),{deck,stage,bindings}=revealMock();
- stage.markers=stage.markers.slice(0,2);
+ stage.markers=Array.from({length:4},(_,index)=>({index,visible:false,closest(s){return s==='section'?stage:s==='.rx-fragment-steps'?stage.markers:null;}}));
  const {player,controller}=h.create({scene,controls:{stageOptions:{onNavigate:d=>deck.navigation.push(d)}}});
  const adapter=h.install(deck,{getController:s=>s===stage?controller:null});adapter.refresh();
- deck.press(39);h.advance(3000);assert.equal(deck.fragmentIndex,0);assert.equal(player.live.state,'running');
- deck.press(39);h.advance(4000);assert.equal(deck.fragmentIndex,1);assert.equal(player.state,'finished');
+ deck.press(39);h.advance(1500);assert.equal(deck.fragmentIndex,0);assert.equal(player.live.state,'idle');
+ deck.press(39);h.advance(2500);assert.equal(deck.fragmentIndex,1);assert.equal(player.live.state,'idle');
+ deck.press(39);h.advance(3000);assert.equal(deck.fragmentIndex,2);assert.equal(player.live.state,'running');
+ deck.press(39);h.advance(4000);assert.equal(deck.fragmentIndex,3);assert.equal(player.state,'finished');
  deck.press(39);assert.deepEqual(deck.navigation,[1]);
  assert.ok(bindings.size>0);adapter.destroy();
  const printed=(await live('4:3'));printed.player.finish();
@@ -120,20 +158,20 @@ test('Reveal fragments follow the three stages and FINISHED/print shows a cancel
  assert.equal(printed.player.state,'finished');assert.equal(lane(f,'observer').state,'cancelled');
  assert.deepEqual(values(f),['0','1','2']);assert.ok(!f.edges[0].cancel);
  // „Pokaż wynik” w trakcie emisji kończy bieżące wykonanie, nie cofa do umownej chwili.
- const running=await live('4:3');running.controller.next();running.h.advance(12000);
+ const running=await live('4:3');toEmissions(running);running.h.advance(12000);
  const count=running.player.snapshot.metrics[0].value;running.controller.finish();
  assert.equal(running.player.state,'finished');assert.ok(running.player.snapshot.metrics[0].value>=count);
  assert.ok(Number(values(running.player.snapshot).at(-1))>=count-1);
 });
 
-test('lane look in both formats: one row interval(1000) → A, balls inside the receiver row, .subscribe() above',async()=>{
+test('lane look in both formats: one row interval → A, balls inside the receiver row, .subscribe() above',async()=>{
  for(const format of ['4:3','16:9']){
   const {player,controller,h,svg}=await live(format);
-  controller.next();h.advance(400);
+  controller.next();h.advance(1500);controller.next();h.advance(2500);
   const f=player.snapshot,source=f.nodes.find(n=>n.id==='interval'),receiver=f.nodes.find(n=>n.id==='observer');
-  assert.equal(f.textScale,1.42);assert.equal(source.label,'interval(1000)');assert.equal(source.fill,'#8FC9D4');
+  assert.equal(f.textScale,1.42);assert.equal(source.label,'interval');assert.equal(source.fill,'#8FC9D4');
   assert.deepEqual(Array.from(f.callouts,c=>c.text),['.subscribe()']);assert.ok(f.callouts[0].y<source.y-source.h/2);
-  h.advance(6000);
+  controller.next();h.advance(6000);
   const g=player.snapshot,h0=g.histories[0];
   assert.equal(h0.y,lane(g,'observer').y);assert.equal(lane(g,'interval').y,h0.y);
   assert.equal(h0.max,3);
@@ -145,7 +183,7 @@ test('lane look in both formats: one row interval(1000) → A, balls inside the 
 test('unsubscribe status: a short × at A only after × reaches interval, never ✓ complete; counter keeps the emitted count',async()=>{
  for(const format of ['4:3','16:9']){
   const {player,controller,h,svg,render}=await live(format);
-  controller.next();h.advance(5400);
+  toEmissions({player,controller,h});h.advance(5400);
   const count=player.snapshot.metrics[0].value;
   assert.ok(count>=4);
   controller.next();

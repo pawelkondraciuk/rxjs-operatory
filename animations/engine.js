@@ -291,7 +291,9 @@ export function compileScene(scene) {
         // progressUntilNext: oczekiwanie kończy się z wysłaniem pierwszej wartości (odpowiedź HTTP), nie dopiero z complete.
         const firstNext=n.progressUntilNext?out.events[0]?.at:undefined;
         const to=out.workUntil!==undefined?plan.timeOf(out.workUntil):firstNext??out.end?.at??plan.duration;
-        lane.progress=state==='completed'?1:clamp(((stoppedAt??time)-from)/Math.max(1e-9,to-from));
+        // workStart (opt-in, czas ilustracji): praca rusza później niż zestawienie subskrypcji (np. osobny etap HTTP 05-zrodla-2).
+        const begin=Math.max(from,out.workStart??from);
+        lane.progress=state==='completed'?1:clamp(((stoppedAt??time)-begin)/Math.max(1e-9,to-begin));
       }
       return [lane];
     });

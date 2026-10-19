@@ -30,7 +30,7 @@ export function createStageController(player,options={}) {
     if(mode==='auto')run();else player.playTo(target);
     changed();
   }
-  // Scena na żywo: READY → dalej: subscribe i emisje bez końca → dalej: unsubscribe → dalej: następny slajd.
+  // Scena na żywo: READY → [postoje przed live.start] → dalej: emisje bez końca → dalej: unsubscribe → dalej: następny slajd.
   // Żaden checkpoint ani tryb AUTO nie wywołuje unsubscribe samoczynnie.
   // Akcje (np. subA/subB/subC.unsubscribe()): READY → start emisji; dalej wykonuje kolejną akcję, a w trakcie jej
   // animacji tylko ją kończy; po ostatniej — następny slajd. Emisje biegną dalej, żadna akcja nie dzieje się sama.
@@ -41,11 +41,16 @@ export function createStageController(player,options={}) {
     else{options.onNavigate?.(1);return;}
     target=null;changed();
   }
+  // Postoje przed live.start (np. odbiorca, subscribe) to zwykłe etapy: dalej gra do kolejnego, w trakcie ruchu go kończy.
+  const introStops=live=>player.stops.filter(stop=>stop.time<live.start-epsilon);
   function nextLive(live){
     if(live.actions){nextActions(live);return;}
+    const stop=introStops(live).find(stop=>stop.time>player.time+epsilon);
     if(live.state==='closed')player.finish(); // dokończ rozpoczęte unsubscribe
     else if(live.state==='running'){live.close();player.playContinuously();}
-    else if(player.isPlaying){player.seek(live.start);player.playContinuously();} // dokończ subscribe, emisje trwają
+    // W ruchu: dokończ etap przed emisjami, a po ostatnim z nich — dojdź do emisji (trwają dalej).
+    else if(player.isPlaying){if(!player.finishStep()){player.seek(live.start);player.playContinuously();}}
+    else if(stop){player.playTo(stop.time);target=stop.time;changed();return;}
     else player.playContinuously();
     target=null;changed();
   }
@@ -69,7 +74,9 @@ export function createStageController(player,options={}) {
     }
     if(live&&live.state==='closed'){live.reopen();player.seek(live.start);player.playContinuously();target=null;changed();return;}
     if(player.time<=epsilon){options.onNavigate?.(-1);return;}
-    if(live){live.reopen();player.seek(0);target=null;changed();return;}
+    // Z emisji (albo z etapu przed nimi) — poprzedni postój przed live.start, ostatecznie READY.
+    if(live){const back=[0,...introStops(live).map(stop=>stop.time)].reverse().find(time=>time<player.time-epsilon)??0;
+      live.reopen();player.seek(back);target=null;changed();return;}
     const previous=[...checkpoints()].reverse().find(time=>time<player.time-epsilon)??0;
     target=null;player.seek(previous);changed();
   }
