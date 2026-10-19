@@ -1,5 +1,6 @@
 // Slajd „kod źródłowy krok po kroku” (section[data-code-walk]): pierwsze i ostatnie linie stoją, środek przewija się
 // w oknie o stałej liczbie linii. Kod ukryty nad i pod oknem zastępuje zwinięty komentarz // {...}.
+// Tryb full pokazuje cały kod od początku, a fragmenty zmieniają wyłącznie wyróżnienie linii.
 // Etapy to natywne fragmenty Reveal (.code-walk-step): stan wybiera CSS po .current-fragment, więc przód/tył, szybkie
 // przechodzenie, hash, podgląd Notes i druk (osobne strony fragmentów) działają bez własnego zegara i handlerów.
 import { codeTokens } from './code-syntax.js';
@@ -33,11 +34,14 @@ export function codeWalkTokens(code) {
 const range=text=>{const [a,b=a]=String(text).split('-').map(Number);return [a,b];};
 // Model: linie stałe (top/bottom), środek, okno i etapy. Numery linii w danych są 1-based i dotyczą całego kodu.
 // Etap: from — pierwsza linia okna, focus — wyróżnione linie (w oknie). Etap 0 to zwinięty środek (sam // {...}).
-export function codeWalkModel(code,{top,bottom,window,steps}) {
-  const lines=code.replace(/^\n+|\s+$/g,'').split('\n'),first=top+1,last=lines.length-bottom;
+export function codeWalkModel(code,{mode='window',top,bottom,window,steps}) {
+  const lines=code.replace(/^\n+|\s+$/g,'').split('\n');
+  if(mode==='full'){top=0;bottom=0;window=lines.length;}
+  const first=top+1,last=lines.length-bottom;
   if(!(top>=0&&bottom>=0&&window>0&&last-first+1>=window))throw new Error('code-walk: nieprawidłowe okno');
   const fold=`${(lines[first-1].match(/^\s*/)[0])}// {...}`;
-  return {lines,top,bottom,window,fold,middle:[first,last],steps:steps.map(({from,focus},i)=>{
+  return {mode,lines,top,bottom,window,fold,middle:[first,last],steps:steps.map(({from,focus},i)=>{
+    if(mode==='full')from=first;
     const [a,b]=range(focus);
     if(!(from>=first&&from+window-1<=last&&a>=from&&b<=from+window-1&&a<=b))throw new Error(`code-walk: etap ${i+1} poza oknem`);
     return {from,focus:[a,b],offset:from-first,above:from>first,below:from+window-1<last};
@@ -59,9 +63,11 @@ export function codeWalkHtml(model) {
   const starts=lines.reduce((acc,line,i)=>[...acc,i?acc[i-1]+lines[i-1].length+1:0],[]);
   const line=(n,cls)=>`<div class="cw-line ${cls}">${lineHtml(lines[n-1],kinds,starts[n-1])}</div>`;
   const vars=[`--cw-window:${model.window}`,...steps.flatMap((s,i)=>[`--cw-o${i+1}:${s.offset}`,`--cw-a${i+1}:${+s.above}`,`--cw-b${i+1}:${+s.below}`])];
-  const middleClass=n=>['cw-mid',...steps.flatMap((s,i)=>[
+  const middleClass=n=>[model.mode==='full'?'cw-full-line':'cw-mid',...steps.flatMap((s,i)=>[
     ...(n>=s.focus[0]&&n<=s.focus[1]?[`cw-f${i+1}`]:[]),...(n>=s.from&&n<s.from+model.window?[`cw-w${i+1}`]:[])])].join(' ');
   const fold=side=>`<div class="cw-line cw-fold cw-fold-${side}" aria-hidden="true">${lineHtml(model.fold,foldKinds,0)}</div>`;
+  if(model.mode==='full')return `<div class="code-walk code-walk-full" role="img" aria-label="${esc(code).replace(/"/g,'&quot;')}">`+
+    lines.map((_,i)=>line(i+1,middleClass(i+1))).join('')+'</div>';
   return `<div class="code-walk" style="${vars.join(';')}" role="img" aria-label="${esc(code).replace(/"/g,'&quot;')}">`+
     lines.slice(0,top).map((_,i)=>line(i+1,'cw-fixed')).join('')+fold('top')+
     `<div class="cw-viewport"><div class="cw-track">${lines.slice(first-1,last).map((_,i)=>line(first+i,middleClass(first+i))).join('')}</div></div>`+
@@ -70,14 +76,15 @@ export function codeWalkHtml(model) {
 
 // Buduje okno kodu z section[data-code-walk]: źródło w script[type="text/plain"].code-walk-source, etapy w
 // .code-walk-step[data-from][data-focus] (kolejne fragmenty Reveal; notatki etapu w ich aside.notes).
+// data-code-walk-mode="full": bez okna i zwijania; kroki wymagają tylko data-focus.
 export function prepareCodeWalk(section) {
   const source=section.querySelector('.code-walk-source'),steps=[...section.querySelectorAll('.code-walk-step')];
-  const model=codeWalkModel(source.textContent,{top:Number(section.dataset.fixedTop),bottom:Number(section.dataset.fixedBottom),
+  const model=codeWalkModel(source.textContent,{mode:section.dataset.codeWalkMode,top:Number(section.dataset.fixedTop),bottom:Number(section.dataset.fixedBottom),
     window:Number(section.dataset.window),steps:steps.map(step=>({from:Number(step.dataset.from),focus:step.dataset.focus}))});
   steps.forEach((step,i)=>step.classList.add(`cw-step-${i+1}`));
   const holder=section.ownerDocument.createElement('div');
   // Pełna wysokość (stałe linie, dwa zwinięte fragmenty i okno) zarezerwowana od etapu 0.
-  holder.className='code-walk-holder';holder.style.setProperty('--cw-lines',String(model.top+model.bottom+2+model.window));
+  holder.className='code-walk-holder';holder.style.setProperty('--cw-lines',String(model.mode==='full'?model.lines.length:model.top+model.bottom+2+model.window));
   holder.innerHTML=codeWalkHtml(model);
   source.replaceWith(holder);
   return model;

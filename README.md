@@ -19,7 +19,7 @@ Sceny MAIN z pytaniami zaczynają od nieruchomego READY. Prawo / Page Down uruch
 
 W oknie prelegenta (`S`) podgląd następnego slajdu domyślnie pokazuje dużą nazwę, np. **switchMap**, i krótki podtytuł. Wskazuje kolejny slajd, także podczas ręcznych postojów bieżącej animacji. Przełącznik **Podgląd: Tytuł / Slajd** w prawym dolnym rogu tego pola przywraca standardowy podgląd. Wybór jest zapamiętywany w przeglądarce. Notatki pozostają w standardowym polu Notes. Opcjonalne `data-speaker-title` na sekcji ustawia własny podpis wyłącznie dla prelegenta.
 
-Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 37 slajdów daje 57 stron PDF (także pięć stanów kodu `05b-http-kod`: zwinięty środek i cztery etapy).
+Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 38 slajdów daje 60 stron PDF (także pięć stanów kodu `05b-http-kod`: zwinięty środek i cztery etapy, oraz trzy stany pełnego kodu `04b-map-kod`: bez wyróżnienia i dwa kolejne wyróżnienia).
 
 Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przywraca ekran panoramiczny 1280×720. `W` przeładowuje stronę w drugim formacie, zostając na tym samym slajdzie i fragmencie; animacja wraca do stanu tego fragmentu. Linki do EXTRAS i powrót do pytań zachowują wybrany format. Druk działa w obu: `?print-pdf` (4:3) lub `?print-pdf&ratio=16:9`. W 4:3 slajdy wykorzystują pełną wysokość: większe zdjęcia i kody QR, wyższe diagramy, większy tekst i kapsułki w animacjach (×1,15), etykiety kafelków do ×1,3 oraz większy tytuł (64 px; za długi zmniejsza się, by został w jednej linii), kod (42 px, długi łańcuch przechodzi do nowej linii przed .pipe/.subscribe) i podpis.
 
@@ -35,12 +35,12 @@ Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorz
 
 Otwarcie do tytułu pozostaje bez zmian: społeczność, historia meet.js, fotografie i autor. Po tytule pokazujemy HTTP, Cold, interval, Subject — ręczną emisję, ręczny multicast HTTP i odłączanie źródła interval, a dopiero potem pytania o znane operatory i share. Budżet **30–35 minut dotyczy tylko części właściwej**; otwarcie, pytania i dogrywka są dodatkowo.
 
-MAIN ma **33 slajdy (21 animowanych)**. EXTRAS zawiera **4 slajdy animowane**. Całość obejmuje 29 bazowych slajdów HTML i 37 slajdów po rozwinięciu wariantów. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
+MAIN ma **34 slajdy (21 animowanych)**. EXTRAS zawiera **4 slajdy animowane**. Całość obejmuje 30 bazowych slajdów HTML i 38 slajdów po rozwinięciu wariantów. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
 
 Kolejność po slajdzie tytułowym:
 
-1. Pierwsze slajdy techniczne pokazują komplet podstawowych zachowań Observable: HTTP — subscribe, next, complete (`05-zrodla-2`) → kod źródłowy httpGet krok po kroku (`05b-http-kod`) → Cold: jedna definicja, trzy wykonania, error (`04a-dwa-tory`) → interval na żywo — cold, osobne wykonanie każdego odbiorcy, unsubscribe (`05-zrodla`) → Subject — ręczne next, późny subskrybent bez historii i complete (`05-zrodla-5`) → Subject: ręczny multicast HTTP (`05-zrodla-3`) → Subject — kto odłączy źródło? (`05-zrodla-4`). Po nich „Jakie znasz operatory RxJS?” (`02-znane-operatory`) → HTTP GET + map: obiekt User → „Paweł Kondraciuk” (`04-operator`) → „A share?” (`03-a-share`), wstęp do share + HTTP.
-2. Jedna historia Cold → Subject → share na tych samych przykładach: cold — trzy subskrypcje, trzy HTTP, B kończy się błędem (`04a-dwa-tory`) → Subject + HTTP: jeden HTTP, trzech odbiorców (`05-zrodla-3`) → Subject + interval: odbiorcy odchodzą, źródło nadal działa (`05-zrodla-4`) → pytanie o znane operatory → HTTP GET + map (`04-operator`) → „A share?” (`03-a-share`) → share + HTTP: jeden HTTP, trzech odbiorców (`04a-dwa-tory-2`) → share + interval: ostatni odbiorca odłącza źródło (`04a-dwa-tory-3`) → share + HTTP: późny odbiorca uruchamia nowy request (`20-sharereplay`) → shareReplay + HTTP: późny odbiorca dostaje wynik z bufora (`20-sharereplay-2`). Powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
+1. Pierwsze slajdy techniczne pokazują komplet podstawowych zachowań Observable: HTTP — subscribe, next, complete (`05-zrodla-2`) → kod źródłowy httpGet krok po kroku (`05b-http-kod`) → Cold: jedna definicja, trzy wykonania, error (`04a-dwa-tory`) → interval na żywo — cold, osobne wykonanie każdego odbiorcy, unsubscribe (`05-zrodla`) → Subject — ręczne next, późny subskrybent bez historii i complete (`05-zrodla-5`) → Subject: ręczny multicast HTTP (`05-zrodla-3`) → Subject — kto odłączy źródło? (`05-zrodla-4`). Po nich „Jakie znasz operatory RxJS?” (`02-znane-operatory`) → HTTP GET + map: obiekt User → „Paweł Kondraciuk” (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`), wstęp do share + HTTP.
+2. Jedna historia Cold → Subject → share na tych samych przykładach: cold — trzy subskrypcje, trzy HTTP, B kończy się błędem (`04a-dwa-tory`) → Subject + HTTP: jeden HTTP, trzech odbiorców (`05-zrodla-3`) → Subject + interval: odbiorcy odchodzą, źródło nadal działa (`05-zrodla-4`) → pytanie o znane operatory → HTTP GET + map (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`) → share + HTTP: jeden HTTP, trzech odbiorców (`04a-dwa-tory-2`) → share + interval: ostatni odbiorca odłącza źródło (`04a-dwa-tory-3`) → share + HTTP: późny odbiorca uruchamia nowy request (`20-sharereplay`) → shareReplay + HTTP: późny odbiorca dostaje wynik z bufora (`20-sharereplay-2`). Powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
 3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap (cztery *Map obok siebie) → distinctUntilChanged przed switchMap (`11a-distinct-switchmap`, jedyny distinctUntilChanged w MAIN).
 4. catchError wewnątrz/na zewnątrz → wspólne porównanie debounceTime i auditTime (`16-czas-cztery`).
 5. Cztery pytania podsumowania → „Pytania?” → rozmowa z salą albo dodatkowy przykład.
@@ -198,7 +198,7 @@ Brak notatek w HTML.
 
 ### Operator to funkcja — `04-operator`
 
-**MAIN — bezpośrednio po „Jakie znasz operatory RxJS?”; przed „A share?”.** Jedna historia o danych użytkownika: ten sam obiekt `User` (`{ firstName: 'Paweł', lastName: 'Kondraciuk', city: 'Białystok' }`) co na Cold i Subject + HTTP wraca na share + HTTP. Kod:
+**MAIN — bezpośrednio po „Jakie znasz operatory RxJS?”; przed „myMap od środka”.** Jedna historia o danych użytkownika: ten sam obiekt `User` (`{ firstName: 'Paweł', lastName: 'Kondraciuk', city: 'Białystok' }`) co na Cold i Subject + HTTP wraca na share + HTTP. Kod:
 
 ```ts
 httpGet<User>('/api/users/42')
@@ -217,9 +217,30 @@ httpGet<User>('/api/users/42')
 | 5 | complete | Zielony impuls z HTTP przez map do A; wiersze HTTP GET, map i A zielenieją, a przy A (nad długim wynikiem, w linii etykiety pola) pojawia się `✓ complete` — bez napisu w HTTP GET i map. Map nie zatrzymuje complete i nie wywołuje drugiego requestu. |
 | — | FINISHED | Podpis „Jeden request, jeden User, jeden string. complete zakończył wykonanie”. |
 
-**Speaker notes** (`template[data-checkpoint-notes="04-operator"]`): „Załóżmy, że pobieramy dane użytkownika z HTTP. Dostajemy cały obiekt, ale nasz widok potrzebuje tylko pełnego imienia i nazwiska” → pipe nie uruchamia HTTP → subscribe uruchamia jeden request → „Operator map dostaje pojedynczą wartość i synchronicznie ją przekształca. Tutaj z obiektu User tworzymy string” (map działa dla każdej kolejnej emisji, nasze HTTP emituje jedną) → „HTTP wykonał jeden request i wyemitował jeden obiekt. Map przekształcił go w jeden string. To nadal jedno wykonanie Observable” → „Map nie zmienia sposobu zakończenia — complete przechodzi dalej do odbiorcy” → przejście do „A share?”: przypomnienie trzech requestów na Cold i jednego HTTP ręcznie podłączonego do Subjecta; pytanie, czy operator może podłączyć źródło za nas. Po „A share?” wracamy do surowego `user$ = httpGet<User>('/api/users/42')`, bez map.
+**Speaker notes** (`template[data-checkpoint-notes="04-operator"]`): „Załóżmy, że pobieramy dane użytkownika z HTTP. Dostajemy cały obiekt, ale nasz widok potrzebuje tylko pełnego imienia i nazwiska” → pipe nie uruchamia HTTP → subscribe uruchamia jeden request → „Operator map dostaje pojedynczą wartość i synchronicznie ją przekształca. Tutaj z obiektu User tworzymy string” (map działa dla każdej kolejnej emisji, nasze HTTP emituje jedną) → „HTTP wykonał jeden request i wyemitował jeden obiekt. Map przekształcił go w jeden string. To nadal jedno wykonanie Observable” → „Map nie zmienia sposobu zakończenia — complete przechodzi dalej do odbiorcy” → przejście do „myMap od środka”: zobaczymy w kodzie subskrypcję biegnącą w lewo i emisję płynącą w prawo. Po „A share?” wracamy do surowego `user$ = httpGet<User>('/api/users/42')`, bez map.
 
 Kontroler `stages`: → zaczyna lub kończy etap, ← cofa checkpoint także w AUTO, Spacja pauzuje/wznawia, M zmienia tryb, R przywraca zatrzymany READY. Tempo ilustracji: etap pipe 0,65 s, pojawienie odbiorcy 0,3 s, subscribe 3,2 s, request 2,6 s, przelot 1,4 s, projekcja 2 s, zatrzymanie odbioru 0,5 s, terminal 1,6 s, cisza 1 s przed FINISHED.
+
+### myMap od środka — `04b-map-kod`
+
+**MAIN — bezpośrednio po „Operator to funkcja”, przed „A share?”.** Cały poniższy kod jest widoczny od wejścia, z ciemnym panelem i kolorowaniem jak na „httpGet od środka” (37 px w 4:3, 36 px w 16:9). Bez zwijania i przewijania. Dwa natywne fragmenty Reveal kolejno wyróżniają tylko linię `return source$.subscribe({`, a potem `next: value => subscriber.next(fn(value)),`; pierwsze wyróżnienie znika przy drugim. Lewo cofa, a kolejne prawo po drugim wyróżnieniu przechodzi do „A share?”.
+
+```ts
+function myMap<T, R>(fn: (value: T) => R) {
+  return (source$: Observable<T>) =>
+    new Observable<R>(subscriber => {
+
+      return source$.subscribe({
+        next: value => subscriber.next(fn(value)),
+        error: err => subscriber.error(err),
+        complete: () => subscriber.complete()
+      });
+
+    });
+}
+```
+
+**Speaker notes (początek i dwa fragmenty):** Wywołanie `myMap(fn)` tworzy funkcję operatora, a podanie `source$` tworzy nowy Observable — nadal tylko definicję. Przy subskrypcji wynikowego Observable `source$.subscribe(...)` podłącza źródło: subskrypcja idzie w lewo, jak od A przez map do HTTP. Zwrócona subskrypcja zapewnia odłączenie źródła przy rezygnacji odbiorcy. Gdy źródło emituje, `fn(value)` synchronicznie przekształca wartość, a `subscriber.next(...)` wysyła wynik w prawo. `error` i `complete` są przekazywane dalej. Na koniec przypomnij trzy requesty na Cold i jeden HTTP ręcznie podłączony do Subjecta; zapytaj, czy operator może podłączyć źródło za nas. Prawo: „A share?”. Cel: 30–45 s w ramach bloku wprowadzenia.
 
 ### Tory wykonania: cold, share() + HTTP i share() + interval — `04a-dwa-tory`, `-2`, `-3`
 

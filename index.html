@@ -437,8 +437,29 @@
                         <div data-checkpoint="mapped"><p><strong>3 — map przekształca wartość</strong></p><p>Operator map dostaje pojedynczą wartość i synchronicznie ją przekształca. Tutaj z obiektu User tworzymy string.</p><p>Kulka zatrzymuje się w wierszu map i zmienia się z „{…}” w „"…"” — string z imieniem i nazwiskiem; w kodzie świeci map. To ta sama subskrypcja, map nie tworzy nowej. Map działa tak dla każdej kolejnej emisji źródła — nasze HTTP emituje akurat tylko jedną wartość.</p></div>
                         <div data-checkpoint="received"><p><strong>4 — Odbiorca dostaje wynik</strong></p><p>HTTP wykonał jeden request i wyemitował jeden obiekt. Map przekształcił go w jeden string. To nadal jedno wykonanie Observable.</p><p>Pole A (fullName) pokazuje: Paweł Kondraciuk. Requesty HTTP: 1.</p></div>
                         <div data-checkpoint="complete"><p><strong>5 — Complete</strong></p><p>Map nie zmienia sposobu zakończenia — complete przechodzi dalej do odbiorcy.</p><p>Zielony impuls z HTTP przez map do A; wiersze HTTP GET, map i A zielenieją, a po dotarciu impulsu przy A pojawia się ✓ complete (tylko przy odbiorcy, bez napisu w HTTP GET i map). Map nie uruchamia dodatkowej pracy i nie zatrzymuje complete.</p></div>
-                        <div data-checkpoint="finished"><p><strong>6 — Przejście do pytania o share</strong></p><p>Na razie mamy jeden widok, który wyświetla pełne imię i nazwisko. Pamiętacie Cold: trzy niezależne elementy interfejsu uruchamiały trzy requesty. Subject pozwolił rozesłać wynik jednego HTTP, ale musieliśmy sami podłączyć źródło. Czy operator może zrobić to za nas?</p><p>Prawo: „A share?”. Potem wrócimy do surowego user$ = httpGet&lt;User&gt;('/api/users/42'), bez map, i tych samych trzech pól (firstName, lastName, city).</p></div>
+                        <div data-checkpoint="finished"><p><strong>6 — Zajrzyjmy do środka map</strong></p><p>Widzieliśmy subskrypcję biegnącą w lewo i przekształconą wartość płynącą w prawo. Zobaczmy teraz, jak te dwa kierunki wyglądają w kodzie prostego operatora myMap.</p><p>Prawo: „myMap od środka”.</p></div>
                     </template>
+				</section>
+
+				<section id="04b-map-kod" class="code-walk-slide" data-code-walk data-code-walk-mode="full">
+					<h2>myMap od środka</h2>
+					<script type="text/plain" class="code-walk-source">
+function myMap<T, R>(fn: (value: T) => R) {
+  return (source$: Observable<T>) =>
+    new Observable<R>(subscriber => {
+
+      return source$.subscribe({
+        next: value => subscriber.next(fn(value)),
+        error: err => subscriber.error(err),
+        complete: () => subscriber.complete()
+      });
+
+    });
+}
+</script>
+					<span class="fragment code-walk-step" data-focus="5"><aside class="notes"><p><strong>1 — Subskrypcja idzie w lewo</strong></p><p>Dopiero gdy odbiorca subskrybuje wynikowy Observable, wykonuje się funkcja przekazana do new Observable. source$.subscribe(...) podłącza operator do źródła — tak jak impuls subskrypcji biegnący od A przez map do HTTP na poprzednim diagramie.</p><p>Zwracamy subskrypcję źródła jako teardown: rezygnacja odbiorcy odłączy również źródło. Prawo: emisja w drugą stronę.</p></aside></span>
+					<span class="fragment code-walk-step" data-focus="6"><aside class="notes"><p><strong>2 — Emisja idzie w prawo</strong></p><p>Gdy źródło emituje wartość, fn(value) synchronicznie ją przekształca, a subscriber.next(...) przekazuje wynik odbiorcy — to kulka User zmieniająca się w string i płynąca dalej do A. error i complete przechodzą do odbiorcy bez zmiany.</p><p>Na razie mamy jeden widok, który wyświetla pełne imię i nazwisko. Pamiętacie Cold: trzy niezależne elementy interfejsu uruchamiały trzy requesty. Subject pozwolił rozesłać wynik jednego HTTP, ale musieliśmy sami podłączyć źródło. Czy operator może zrobić to za nas?</p><p>Prawo: „A share?”. Potem wrócimy do surowego user$ = httpGet&lt;User&gt;('/api/users/42'), bez map, i tych samych trzech pól (firstName, lastName, city).</p></aside></span>
+					<aside class="notes"><p><strong>0 — Od definicji do wykonania</strong></p><p>To uproszczony operator myMap. Wywołanie myMap(fn) zwraca funkcję przyjmującą source$ i tworzącą nowy Observable. Na tym etapie mamy tylko definicję: nie ma jeszcze subskrypcji ani wywołania fn.</p><p>Cały kod jest widoczny od początku. Dwa kolejne kliknięcia wyróżnią tylko dwie linie: source$.subscribe(...) i subscriber.next(fn(value)). One tłumaczą poprzednią animację: subskrypcja idzie w lewo, emisja w prawo. Cel: 30–45 s.</p></aside>
 				</section>
 
 				<section id="04a-dwa-tory" class="animation-slide" data-animation="04a-dwa-tory">

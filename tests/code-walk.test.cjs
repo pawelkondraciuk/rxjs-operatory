@@ -104,3 +104,47 @@ test('speaker notes: one per step inside its fragment, plus the folded overview'
  const overview=body.slice(body.lastIndexOf('</span>')).match(/<aside class="notes">([\s\S]*?)<\/aside>/)[1];
  assert.match(overview,/0 — Jak działa httpGet\?[\s\S]*\/\/ \{\.\.\.\}/);
 });
+
+test('full myMap slide preserves all code and highlights only upstream subscribe then downstream next',async()=>{
+ const {['code-walk']:w}=await modules(['code-walk']);
+ const section=html.match(/<section id="04b-map-kod"[^>]*>([\s\S]*?)<\/section>/)[0];
+ assert.match(section,/data-code-walk-mode="full"/);
+ const source=section.match(/<script type="text\/plain" class="code-walk-source">([\s\S]*?)<\/script>/)[1];
+ const steps=[...section.matchAll(/<span class="fragment code-walk-step" data-focus="(\d+)">([\s\S]*?)<\/span>/g)]
+  .map(([,focus,notes])=>({focus,notes}));
+ let holder;
+ const classes=steps.map(()=>[]);
+ const model=w.prepareCodeWalk({dataset:{codeWalkMode:'full'},
+  querySelector:()=>({textContent:source,replaceWith:n=>{holder=n;}}),
+  querySelectorAll:()=>steps.map((s,i)=>({dataset:{focus:s.focus},classList:{add:c=>classes[i].push(c)}})),
+  ownerDocument:{createElement:()=>({style:{props:{},setProperty(k,v){this.props[k]=v;}}})}});
+ assert.equal(model.lines.join('\n'),`function myMap<T, R>(fn: (value: T) => R) {
+  return (source$: Observable<T>) =>
+    new Observable<R>(subscriber => {
+
+      return source$.subscribe({
+        next: value => subscriber.next(fn(value)),
+        error: err => subscriber.error(err),
+        complete: () => subscriber.complete()
+      });
+
+    });
+}`);
+ assert.equal(holder.style.props['--cw-lines'],'12');
+ assert.deepEqual(classes,[['cw-step-1'],['cw-step-2']]);
+ assert.doesNotMatch(holder.innerHTML,/cw-fold|cw-viewport|cw-track|cw-mid|cw-fixed/);
+ const lines=[...holder.innerHTML.matchAll(/<div class="cw-line ([^"]*)">([\s\S]*?)<\/div>/g)];
+ assert.deepEqual(lines.map(([,cls,line])=>text(line)),Array.from(model.lines));
+ assert.deepEqual(lines.filter(([,cls])=>/cw-f\d/.test(cls)).map(([,cls,line])=>text(line).trim()),
+  ['return source$.subscribe({','next: value => subscriber.next(fn(value)),']);
+ assert.match(holder.innerHTML,/<span class="cw-tok-next">next<\/span>/);
+ assert.match(holder.innerHTML,/<span class="cw-tok-complete">complete<\/span>/);
+ assert.match(holder.innerHTML,/<span class="cw-tok-error">error<\/span>/);
+ assert.match(steps[0].notes,/Subskrypcja idzie w lewo[\s\S]*teardown/);
+ assert.match(steps[1].notes,/Emisja idzie w prawo[\s\S]*Prawo: „A share\?”/);
+ assert.throws(()=>w.codeWalkModel(source,{mode:'full',steps:[{focus:'13'}]}),/poza oknem/);
+ for(const [size,lh,pad,title,height] of [[37,1.5,44,90,960],[36,1.34,36,64,720]]){
+  assert.ok(Math.max(...model.lines.map(l=>l.length))*.602*size+48<=1280);
+  assert.ok(title+model.lines.length*lh*size+pad<=height);
+ }
+});
