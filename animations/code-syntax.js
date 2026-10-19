@@ -30,7 +30,7 @@ export function codeTokens(code) {
     const kind=templatePipe?'op':keywords.has(word)?'kw':
       code[i-1]==='<'&&code[end]==='>'?'type':
       !property&&call&&operators.has(word)?'op':
-      word.endsWith('$')||!property&&word==='http'||property&&word==='get'&&code.slice(Math.max(0,i-5),i)==='http.'?'src':
+      word.endsWith('$')||!property&&word==='httpGet'?'src':
       !property&&params.has(word)?'param':null;
     if(kind)mark(i,end,kind);
   }

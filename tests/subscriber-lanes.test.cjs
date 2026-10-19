@@ -129,13 +129,13 @@ test('code shows only the user$ definition, without subscribe or field operators
  const {c,at}=await lanes();
  const view=t=>Array.from(c.snapshot(t).codeView,line=>Array.from(line,part=>({...part})));
  for(const t of [0,...c.stops.map(s=>s.time),c.duration])
-  assert.equal(view(t).map(line=>line.map(p=>p.text).join('')).join('\n'),"const user$ = http.get<User>('/api/users/42');");
+  assert.equal(view(t).map(line=>line.map(p=>p.text).join('')).join('\n'),"const user$ = httpGet<User>('/api/users/42');");
  assert.deepEqual(view(0).flat().filter(p=>p.mark).map(p=>p.mark.id),['http']);
  assert.doesNotMatch(c.snapshot(0).code,/map|pluck|subscribe|catchError/);
  const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at;
  const http=t=>view(t).flat().find(p=>p.mark?.id==='http').active;
  assert.equal(http(at('requests')),false);assert.equal(http(at('error')),false);
- assert.equal(http((ev('source-next','http-C')+ev('deliver-next','http-C'))/2),true,'http.get świeci, gdy odpowiedź wylatuje');
+ assert.equal(http((ev('source-next','http-C')+ev('deliver-next','http-C'))/2),true,'httpGet świeci, gdy odpowiedź wylatuje');
 });
 
 test('cold: a transient .subscribe() overlay per field, from the receiver subscribing until the impulse reaches HTTP',async()=>{
@@ -291,12 +291,12 @@ test('share(): MANUAL holds joined-b indefinitely without finishing HTTP; AUTO k
   &&ev('connected','share-C')<ev('source-next','http-share')&&ev('deliver-next','share-C')<ev('stream-complete','http-share'));
 });
 
-test('share(): code grows from user$ = http.get<User>(...) to .pipe(share()) with marks; transient .subscribe() A to HTTP, B and C only to share()',async()=>{
+test('share(): code grows from user$ = httpGet<User>(...) to .pipe(share()) with marks; transient .subscribe() A to HTTP, B and C only to share()',async()=>{
  const {c,at,scene}=await lanes('4:3','04a-dwa-tory-2');
  const text=(frame,visible)=>Array.from(frame.codeView,line=>Array.from(line).filter(p=>!visible||p.opacity>0).map(p=>p.text).join('')).join('\n');
- assert.equal(text(c.snapshot(0)),"const user$ = http.get<User>('/api/users/42');\n  .pipe(share());",'miejsce na obie linie od READY');
- assert.equal(text(c.snapshot(0),true),"const user$ = http.get<User>('/api/users/42');\n",'READY: sama definicja user$');
- assert.equal(text(c.snapshot(at('share-added')),true),"const user$ = http.get<User>('/api/users/42')\n  .pipe(share());",'średnik gaśnie, dochodzi .pipe(share())');
+ assert.equal(text(c.snapshot(0)),"const user$ = httpGet<User>('/api/users/42');\n  .pipe(share());",'miejsce na obie linie od READY');
+ assert.equal(text(c.snapshot(0),true),"const user$ = httpGet<User>('/api/users/42');\n",'READY: sama definicja user$');
+ assert.equal(text(c.snapshot(at('share-added')),true),"const user$ = httpGet<User>('/api/users/42')\n  .pipe(share());",'średnik gaśnie, dochodzi .pipe(share())');
  assert.match(scene.playerClass,/rx-code-steps/,'układ kodu jak w Subject + HTTP');
  const marks=Array.from(c.snapshot(0).codeView).flat().filter(p=>p.mark);
  assert.deepEqual(marks.map(p=>p.mark.id),['http','share']);
@@ -464,7 +464,7 @@ test('share slides use the cold look: pipeline code, transient subscribe/unsubsc
  for(const id of ['share-unsub']){
   const {c,at}=await shareUnsub();
   const code=Array.from(c.snapshot(0).codeView,line=>Array.from(line,p=>p.text).join('')).join('\n');
-  assert.equal(code,'http.get<number>(url)\n  .pipe(map(x => x * 2), share())',id+': sam pipeline, łamany przed .pipe');
+  assert.equal(code,'httpGet<number>(url)\n  .pipe(map(x => x * 2), share())',id+': sam pipeline, łamany przed .pipe');
   const marks=Array.from(c.snapshot(0).codeView).flat().filter(p=>p.mark).map(p=>p.mark.id);
   assert.deepEqual(marks,['http','map','share']);
   const shown=t=>Array.from(c.snapshot(t).callouts||[],x=>x.text+' '+x.label);

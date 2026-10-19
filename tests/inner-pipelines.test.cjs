@@ -87,12 +87,12 @@ test('catchError inside: HTTP GET → catchError → inner subscriber gets [] an
 
 test('code syntax: tokens are coloured on every slide as a layer independent of the pastel marks; code text unchanged',async()=>{
  const {m,scenes}=await deck(),{codeTokens}=m['code-syntax'];
- const code="klik$.pipe(switchMap(id =>\n  http.get(url(id)).pipe(catchError(() => of([])))))";
+ const code="klik$.pipe(switchMap(id =>\n  httpGet(url(id)).pipe(catchError(() => of([])))))";
  const kinds=codeTokens(code),kindAt=word=>kinds[code.indexOf(word)];
  assert.equal(kindAt('klik$'),'src');assert.equal(kindAt('switchMap'),'op');assert.equal(kindAt('catchError'),'op');assert.equal(kindAt('of('),'op');
- assert.equal(kindAt('http'),'src');assert.equal(kinds[code.indexOf('get')],'src');assert.equal(kindAt('id =>'),'param');
+ assert.equal(kindAt('httpGet'),'src');assert.equal(kinds[code.indexOf('httpGet')+6],'src','całe httpGet jako źródło');assert.equal(kindAt('id =>'),'param');
  assert.equal(kinds[code.indexOf('url')],null,'pomocnicza funkcja bez koloru');assert.equal(kinds[code.indexOf('pipe')],null);
- const typed="const user$ = http.get<User>('/api/users/42');",tk=codeTokens(typed);
+ const typed="const user$ = httpGet<User>('/api/users/42');",tk=codeTokens(typed);
  assert.equal(tk[typed.indexOf('User')],'type');assert.equal(tk[typed.indexOf("'/api")],'str');assert.equal(tk[0],'kw');
  // Każdy slajd z kodem (01-tytul nie jest podpięty do HTML, 25-podsumowanie nie ma kodu).
  for(const [id,scene]of scenes)if(scene.code)assert.equal(scene.codeSyntax,true,id);
@@ -111,5 +111,5 @@ test('code syntax: tokens are coloured on every slide as a layer independent of 
   assert.equal(shown,player.snapshot.codeView?player.snapshot.codeView.map(l=>l.map(p=>p.text).join('')).join('\n'):player.snapshot.code,id);
  }
  const op=h.create({scene:scenes.get('04-operator')}).elements.get('.rx-code').innerHTML;
- assert.match(op,/<span class="rx-tok rx-tok-src">http<\/span>/);assert.match(op,/rx-tok-str">&#39;\/api\/users\/42&#39;</);
+ assert.match(op,/<span class="rx-tok rx-tok-src">httpGet<\/span>/);assert.match(op,/rx-tok-str">&#39;\/api\/users\/42&#39;</);
 });

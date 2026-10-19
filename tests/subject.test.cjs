@@ -7,7 +7,7 @@ const lanes=(frame,id)=>Array.from(node(frame,id).laneStates,l=>`${l.role}:${l.s
 const fieldOf=(svg,id)=>svg.slice(svg.indexOf(`data-field="${id}"`),svg.indexOf('</g>',svg.indexOf(`data-field="${id}"`)));
 const stopIds=['defined','connect-http','request','multicast','complete'];
 const fields=[['A','user.firstName','Paweł'],['B','user.lastName','Kondraciuk'],['C','user.city','Białystok']];
-const codeText=['const subject$ = new Subject<User>();',"const http$ = http.get<User>('/api/users/42');",'','http$.subscribe(subject$);'];
+const codeText=['const subject$ = new Subject<User>();',"const http$ = httpGet<User>('/api/users/42');",'','http$.subscribe(subject$);'];
 // Krycie i aktywność fragmentów kodu w klatce: linia → [opacity…].
 const codeOpacity=frame=>frame.codeView.map(line=>line.map(part=>part.opacity));
 const lineShown=(frame,i)=>frame.codeView[i].every(part=>part.opacity===1);
@@ -58,7 +58,7 @@ test('defined: the http$ line and the HTTP GET header appear without an executio
  const born=c.events.find(e=>e.type==='node-create'&&e.node==='http').at;
  assert.ok(born>0&&born<at('defined'));
  assert.ok(lineShown(f,0)&&lineShown(f,1)&&lineHidden(f,3),'druga linia (definicja http$) widoczna, subscribe jeszcze nie');
- assert.equal(markOf(f,'http').text,"http.get<User>('/api/users/42')");
+ assert.equal(markOf(f,'http').text,"httpGet<User>('/api/users/42')");
  assert.equal(node(f,'http').opacity,1,'nagłówek HTTP GET w pełni widoczny');
  assert.equal(node(f,'http').laneRows.length,0,'bez wiersza wykonania HTTP');
  assert.equal(node(f,'http').laneStates.length,0);
@@ -99,12 +99,12 @@ test('connect-http: the http$.subscribe(subject$) line appears, then the subscri
  assert.ok(node(c.snapshot(start),'http').laneRows.every(r=>r.growth<1),'wiersz wykonania powstaje dopiero z subskrypcją');
 });
 
-test('code marks match share(): Subject purple, http.get turquoise; subscribe has no permanent mark',async()=>{
+test('code marks match share(): Subject purple, httpGet turquoise; subscribe has no permanent mark',async()=>{
  const {c,ev}=await subject(),end=c.snapshot(c.duration);
  assert.deepEqual({...markOf(end,'subject').mark},{id:'subject',bg:'rgba(216,179,230,.45)',line:'#b384c6'});
  assert.deepEqual({...markOf(end,'http').mark},{id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'});
  assert.equal(markOf(end,'subject').text,'new Subject<User>()');
- assert.ok(markOf(c.snapshot(ev('source-next','http-subject')+.1),'http').active,'http.get świeci podczas odpowiedzi');
+ assert.ok(markOf(c.snapshot(ev('source-next','http-subject')+.1),'http').active,'httpGet świeci podczas odpowiedzi');
  assert.equal(markOf(end,'http').active,false);
  assert.equal(markOf(end,'subscribe').active,false);
  assert.equal(JSON.stringify(codeOpacity(end)),'[[1,1,1],[1,1,1],[],[1,1,1]]');
@@ -223,7 +223,7 @@ test('Subject checkpoint notes follow the stops and end with the question about 
  const notes=Object.fromEntries([...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)].map(([,id,text])=>[id,text]));
  assert.deepEqual(Object.keys(notes),['ready',...Array.from(c.stops,s=>s.id),'finished']);
  assert.match(notes.ready,/Wracamy do Subjecta[\s\S]*nie wywołujemy next ręcznie — obiekt użytkownika pobierzemy z HTTP[\s\S]*trzy identyczne requesty[\s\S]*ci sami trzej odbiorcy/);
- assert.match(notes.defined,/const http\$ = http\.get[\s\S]*tylko definicja: nie ma wykonania ani requestu/);
+ assert.match(notes.defined,/const http\$ = httpGet[\s\S]*tylko definicja: nie ma wykonania ani requestu/);
  assert.match(notes['connect-http'],/Jest również Observerem[\s\S]*http\$\.subscribe\(subject\$\)[\s\S]*Subject jest Observerem/);
  assert.doesNotMatch(notes['connect-http'],/Migawka/);
  assert.match(notes.request,/jeden request, niezależnie od liczby odbiorców Subjecta/);

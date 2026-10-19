@@ -4,7 +4,7 @@ const {modules,playbackHarness,revealMock}=require('./v2-harness.cjs');
 const history=frame=>Array.from(frame.histories[0].values,v=>v.value);
 const close=(actual,expected)=>assert.ok(Math.abs(actual-expected)<1e-8,`${actual} != ${expected}`);
 const stopIds=['pipeline','arrived','mapped','received','complete'];
-const definition="http.get<User>('/api/users/42')";
+const definition="httpGet<User>('/api/users/42')";
 const piped=definition+'\n.pipe(map(user => `${user.firstName} ${user.lastName}`))';
 async function subject() {
   const m=await modules(['catalog','engine','renderer','reference-scenes']);
@@ -20,7 +20,7 @@ const fieldOf=svg=>svg.slice(svg.indexOf('data-field="observer"'),svg.indexOf('<
 const line=(frame,i)=>frame.codeView[i].map(p=>p.text).join('');
 const lineOpacity=(frame,i)=>Math.min(...frame.codeView[i].map(p=>p.opacity));
 const markOf=(frame,id)=>frame.codeView.flat().find(p=>p.mark?.id===id);
-test('READY shows the http.get<User> definition and receiver A; pipe and map fade in together without starting HTTP',async()=>{
+test('READY shows the httpGet<User> definition and receiver A; pipe and map fade in together without starting HTTP',async()=>{
   const {scene,compiled:c,m,render=m.renderer.renderScene}=await subject();
   assert.deepEqual(Array.from(m.catalog.scenes.filter(s=>s.playback.controller==='stages'),s=>s.id),['04-operator']);
   assert.deepEqual(Array.from(c.stops,s=>s.id),stopIds);
@@ -49,7 +49,7 @@ test('READY shows the http.get<User> definition and receiver A; pipe and map fad
   assert.equal(arrived.panels.length,0,'bez dolnej sekcji inner');
 });
 
-test('code colours http.get and map like the other lane slides; each lights up while its part works',async()=>{
+test('code colours httpGet and map like the other lane slides; each lights up while its part works',async()=>{
   const {compiled:c}=await subject();
   assert.deepEqual(JSON.parse(JSON.stringify(markOf(c.snapshot(0),'http').mark)),{id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'});
   assert.deepEqual(JSON.parse(JSON.stringify(markOf(c.snapshot(0),'map').mark)),{id:'map',bg:'rgba(216,179,230,.45)',line:'#b384c6'});

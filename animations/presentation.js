@@ -20,7 +20,7 @@ export function prepareSlides(scenes, { format = '4:3' } = {}) {
       // konfiguruje configureScene.
       variants = [0,1,2,3,4].map(i => ({ ...original, sourceExample:i, duration:i===1?11:20,
         title:['interval: strumień bez końca','HTTP: odpowiedź i complete','Subject: odbierasz od chwili subskrypcji','Subject — kto odłączy źródło?','Subject — ręczna emisja'][i],
-        code:['interval(1000)','http.get(\'/api/data\')','subject$.subscribe(observer)','',''][i],
+        code:['interval(1000)','httpGet(\'/api/data\')','subject$.subscribe(observer)','',''][i],
         captions:[[],[],[[0,'Subject może emitować bez odbiorcy.'],[4,'A bez subskrypcji.'],[8,'Odbiorca subskrybuje.'],[12,'Dostaje B.'],[16,'Dostaje C. Trzy emisje, dwa odbiory.']],[],[]][i],
       }));
     } else if (original.id === '04a-dwa-tory') {

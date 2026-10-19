@@ -5,7 +5,7 @@ const R=(label,events=[],spans=[],extra={})=>({label,events,spans,...extra});
 const B=(start,end,label,kind='work',extra={})=>({start,end,label,kind,...extra});
 const manual=stops=>({entry:'manual',stops,afterLastManualStop:'start-auto',finish:'hold'});
 
-// Operator to funkcja (04-operator): http.get<User>('/api/users/42').pipe(map(user => `${…} ${…}`)). http.get to nasz
+// Operator to funkcja (04-operator): httpGet<User>('/api/users/42').pipe(map(user => `${…} ${…}`)). httpGet to nasz
 // klient HTTP (nie RxJS): po subskrypcji uruchamia jeden request, emituje jeden obiekt User i complete. map synchronicznie
 // zamienia User w string „Paweł Kondraciuk” — wejście i wynik projekcji mają wspólne logicalAt. Czasy (schedule)
 // wyłącznie rozciągają ilustrację; ten sam obiekt User wraca na następnym slajdzie Cold.
@@ -33,7 +33,7 @@ const operatorBalls={user:'{…}',text:'"…"'};
 
 export function configureOperator(scene) {
   const sequence=mapSequence(scene),{timing,pipeline,value,complete,finished,duration}=sequence;
-  const fill=laneSubscribers.A.fill,example="http.get<User>('/api/users/42')";
+  const fill=laneSubscribers.A.fill,example="httpGet<User>('/api/users/42')";
   const captions={
     pipeline:'pipe składa definicję: map zamieni User na imię i nazwisko. HTTP nadal nie działa',
     arrived:'subscribe A uruchomił jeden request. HTTP wyemitował User — wartość dotarła do map',
@@ -41,7 +41,7 @@ export function configureOperator(scene) {
     received:'A dostaje jeden string: Paweł Kondraciuk',
     complete:'HTTP wysyła complete. map przekazuje je dalej do A',
   };
-  // Wyróżnienia kodu jak na torach 04a i Subject + HTTP: http.get turkusowo (od wysłania odpowiedzi do dotarcia do map),
+  // Wyróżnienia kodu jak na torach 04a i Subject + HTTP: httpGet turkusowo (od wysłania odpowiedzi do dotarcia do map),
   // map fioletowo (podczas przekształcenia). Druga linia pojawia się (fade-in) razem z kafelkiem map; pipe nie uruchamia HTTP.
   const ev=(type,edge)=>({type,edge}),shown={type:'node-create',node:'map'};
   const http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},map={id:'map',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
@@ -53,7 +53,7 @@ export function configureOperator(scene) {
     rows:[R('HTTP GET',[E(value.response,operatorBalls.user,fill)],[B(sequence.connected,value.response,'request')],{completeAt:complete}),
       R('map',[E(value.response,operatorBalls.text,fill)],[],{completeAt:complete}),
       R('Odbiorca A',[E(value.response,operatorBalls.text,fill)],[],{completeAt:complete})],
-    captions:[[0,"http.get<User>('/api/users/42') to tylko definicja. Request jeszcze nie istnieje"],
+    captions:[[0,"httpGet<User>('/api/users/42') to tylko definicja. Request jeszcze nie istnieje"],
       [sequence.seconds(finished+.6),'Jeden request, jeden User, jeden string. complete zakończył wykonanie']],
     metrics:[{label:'Requesty HTTP',count:'started'}],
     playback:{...manual([
@@ -179,7 +179,7 @@ function laneCodeLines(plan) {
   const split=sessions.flatMap(session=>{const sub=plan.subs.find(x=>x.session===session&&x.receives);
     return sub?[during(ev('deliver-next',upstreamEdge('map',session.index)),ev('source-next',`share-${sub.id}`))]:[];});
   // Pipe łamie się świadomie przed .pipe (bez przypadkowego zawijania w środku wywołania).
-  const lines=[[{text:'http.get<number>(url)',mark:http,active:response}],
+  const lines=[[{text:'httpGet<number>(url)',mark:http,active:response}],
     [{text:'  .pipe('},{text:'map(x => x * 2)',mark:map,active:transform},{text:', '},
       {text:'share()',mark:share,active:split},{text:')'}]];
   return {codeLines:lines,code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeFrames:[],playerClass:'rx-lanes rx-flat-tiles'};
@@ -209,8 +209,8 @@ function configureColdFields(scene) {
   const ev=(type,edge)=>({type,edge}),during=(from,to)=>({from,to}),user=f=>E(f.response,coldUserSymbol,laneSubscribers[f.id].fill);
   const http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},last=coldFields.at(-1);
   const ok=coldFields.filter(f=>coldOutcome(f).kind==='complete'),failed=coldFields.filter(f=>coldOutcome(f).kind==='error');
-  // Jedna definicja; http.get świeci, gdy któreś udane wykonanie wysyła odpowiedź.
-  const lines=[[{text:'const user$ = '},{text:"http.get<User>('/api/users/42')",mark:http,
+  // Jedna definicja; httpGet świeci, gdy któreś udane wykonanie wysyła odpowiedź.
+  const lines=[[{text:'const user$ = '},{text:"httpGet<User>('/api/users/42')",mark:http,
     active:ok.map(f=>during(ev('source-next',f.edge),ev('deliver-next',f.edge)))},{text:';'}]];
   Object.assign(scene,{graph:coldFieldsGraph,playerLayout:'function',duration:last.complete+2,ink:'#26323B',
     codeLines:lines,code:lines[0].map(part=>part.text).join(''),codeFrames:[],playerClass:'rx-lanes rx-flat-tiles',
@@ -325,9 +325,9 @@ function configureShareFields(scene) {
   const http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},share={id:'share',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
   const value=E(at.response,coldUserSymbol,laneSubscribers.A.fill),defined={type:'node-create',node:'share'};
   // Kod rośnie jak w Subject + HTTP: READY — sama definicja user$ ze średnikiem; z kafelkiem share() średnik gaśnie,
-  // a w zarezerwowanej drugiej linii pojawia się .pipe(share()). http.get świeci podczas odpowiedzi, share() — przy
+  // a w zarezerwowanej drugiej linii pojawia się .pipe(share()). httpGet świeci podczas odpowiedzi, share() — przy
   // rozesłaniu next i complete (jak Subject).
-  const lines=[[{text:'const user$ = '},{text:"http.get<User>('/api/users/42')",mark:http,
+  const lines=[[{text:'const user$ = '},{text:"httpGet<User>('/api/users/42')",mark:http,
       active:[during(ev('source-next','http-share'),ev('deliver-next','http-share'))]},{text:';',hide:defined}],
     [{text:'  .pipe(',show:defined},{text:'share()',mark:share,show:defined,active:[during(ev('deliver-next','http-share'),ev('source-next','share-A')),
       during(ev('disconnected','http-share'),ev('disconnected','share-A'))]},{text:');',show:defined}]];
@@ -336,7 +336,7 @@ function configureShareFields(scene) {
     code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
     rows:[R('HTTP #1',[value],[B(upstreamStart,at.response,'request')],{completeAt:at.complete}),
       ...shareFields.map(f=>R(`Pole ${f.label}`,[{...value,at:split}],[],{completeAt:upstreamEnd}))],
-    captions:[[0,'user$ = http.get(...): jedna definicja. Trzy pola czekają. Nic jeszcze nie działa'],
+    captions:[[0,'user$ = httpGet(...): jedna definicja. Trzy pola czekają. Nic jeszcze nie działa'],
       [at.born,'.pipe(share()) dodaje operator. Nadal nic nie działa'],
       [at.a,'A subskrybuje. share() sam podłącza się do HTTP i uruchamia jeden request'],
       [at.b,'B dołącza do share(). HTTP nadal wykonuje jeden request'],
@@ -641,9 +641,9 @@ export function configureHttp(scene) {
   const response=[E(at.next,'dane','http')],arrival=at.next+at.travel,completed=at.complete+at.terminal;
   // 9,2 s: complete dociera w 8,4 s, rozbłysk wiersza odbiorcy wygasa przed FINISHED.
   Object.assign(scene,{graph:httpGraph,httpTimes:at,playerLayout:'function',duration:at.duration,ink:'#26323B',playerClass:'rx-flat-tiles',
-    title:'HTTP: od definicji do wykonania',code:"http.get('/api/data')",
+    title:'HTTP: od definicji do wykonania',code:"httpGet('/api/data')",
     // .subscribe(render) dopisuje się razem z migawką .subscribe() A (0,3 s przed subscribe).
-    codeFrames:[{event:ev('subscribe'),offset:-.3,code:"http.get('/api/data').subscribe(render)",fadeIn:.3}],
+    codeFrames:[{event:ev('subscribe'),offset:-.3,code:"httpGet('/api/data').subscribe(render)",fadeIn:.3}],
     rows:[R('HTTP',response,[B(at.work,at.next,'request')],{completeAt:at.next}),R('Odbiorca',response)],
     captions:[[0,'Definicja HTTP jest gotowa. Request jeszcze nie istnieje'],[at.born,'Odbiorca A jest gotowy, ale nic go nie łączy z HTTP'],
       [at.subscribe,'.subscribe() łączy odbiorcę A z HTTP'],[at.work,'Dopiero subskrypcja uruchamia request'],[at.next,'HTTP emituje odpowiedź'],
@@ -692,7 +692,7 @@ export function configureSubject(scene) {
   const at=subjectTimes,ev=(type,edge,offset=0)=>({type,edge,...(offset?{offset}:{})});
   const connected=at.subscribe+at.link,arrival=at.next+at.travel,split=arrival+at.hold,delivered=split+at.travel;
   const upstreamEnd=at.complete+at.terminal,downstreamEnd=upstreamEnd+at.terminal;
-  // Wyróżnienia jak na share(): Subject (operator) fioletowo, http.get turkusowo; .subscribe(subject$) bez stałego tła,
+  // Wyróżnienia jak na share(): Subject (operator) fioletowo, httpGet turkusowo; .subscribe(subject$) bez stałego tła,
   // chwilowo w kolorze toru U — od pojawienia się linii do chwili po zestawieniu subskrypcji HTTP (widoczne na postoju).
   const subjectMark={id:'subject',bg:'rgba(216,179,230,.45)',line:'#b384c6'},httpMark={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'};
   const subscribeMark={id:'subscribe',bg:'rgba(35,143,131,.16)',line:subjectUpstream.color,quiet:true};
@@ -700,7 +700,7 @@ export function configureSubject(scene) {
   // Miejsce na wszystkie linie jest zarezerwowane od READY (show: fade-in 0,3 s); pusta linia oddziela definicje od wywołania.
   const lines=[[{text:'const subject$ = '},{text:'new Subject<User>()',mark:subjectMark,
       active:[{from:ev('deliver-next','http-subject'),to:ev('source-next','subject-A')},{from:ev('disconnected','http-subject'),to:ev('disconnected','subject-A')}]},{text:';'}],
-    [{text:'const http$ = ',show:defined},{text:"http.get<User>('/api/users/42')",mark:httpMark,show:defined,
+    [{text:'const http$ = ',show:defined},{text:"httpGet<User>('/api/users/42')",mark:httpMark,show:defined,
       active:[{from:ev('source-next','http-subject'),to:ev('deliver-next','http-subject')}]},{text:';',show:defined}],
     [],
     [{text:'http$',show:connect},{text:'.subscribe(subject$)',mark:subscribeMark,show:connect,
@@ -713,7 +713,7 @@ export function configureSubject(scene) {
       ...coldFields.map(f=>R(`Pole ${f.label}`,[{...value,at:split}],[],{completeAt:upstreamEnd}))],
     metrics:[{label:'Odbiorcy',value:()=>coldFields.length},{label:'Requesty HTTP',count:'started'}],
     captions:[[0,'Ci sami trzej odbiorcy subskrybują Subject. HTTP jeszcze nie jest podłączony'],
-      [at.born,'const http$ = http.get(...) to tylko definicja. Request jeszcze nie istnieje'],
+      [at.born,'const http$ = httpGet(...) to tylko definicja. Request jeszcze nie istnieje'],
       [at.connect,'http$.subscribe(subject$): subskrybujemy HTTP, a Subject jest Observerem']],
     playback:manual([
       {id:'defined',event:defined,offset:at.defined,caption:'Definicja http$: nagłówek HTTP GET bez wykonania. Request jeszcze nie istnieje'},
@@ -1299,7 +1299,7 @@ export function configureFlatten(scene,mode) {
   Object.assign(scene,{rows,jobs,operatorName:mode,http:httpWork||mode==='switchMap',graph:flattenGraph,duration:completed+1.2,
     // Tempo ilustracji jak w 04a (cold HTTP): krok subscribe 0,8 s, przelot 1 s, przekształcenie w map 1,4 s, terminal 0,8 s.
     ...(httpWork?{playerClass:'rx-flat-tiles',timing:{subscribe:all?2.4:1.6,travel:1,transform:1.4,terminal:.8,gap:.5}}:{}),
-    code:httpWork?(all?'source$.pipe(map(id => http.get(url(id))), concatAll())':`${mode==='switchMap'?'id$':'source$'}.pipe(${mode}(id => http.get(url(id))))`):all?'source$.pipe(map(id => request$(id)), concatAll())':mode==='switchMap'?'id$.pipe(switchMap(id => http.get(`/api/users/${id}`)))':`source$.pipe(${mode}(makeInner$))`,
+    code:httpWork?(all?'source$.pipe(map(id => httpGet(url(id))), concatAll())':`${mode==='switchMap'?'id$':'source$'}.pipe(${mode}(id => httpGet(url(id))))`):all?'source$.pipe(map(id => request$(id)), concatAll())':mode==='switchMap'?'id$.pipe(switchMap(id => httpGet(`/api/users/${id}`)))':`source$.pipe(${mode}(makeInner$))`,
     captions:[[0,all?'map tworzy zimne Observable; concatAll subskrybuje po kolei.':mode==='mergeMap'?'Te same A/B/C/D: C pracuje dłużej, D krócej — kolejność wyników może się zmienić.':mode==='switchMap'?'Każde wejście uruchamia HTTP; nowe ID odłącza poprzednią subskrypcję.':'Te same A, B, C, D i czas pracy: 1,2 s od subskrypcji.'],
       [1,'A uruchamia pierwszą pracę.'],[1.45,question],[1.9,all?'B$ i C$ czekają bez pracy HTTP.':mode==='switchMap'?'Unsubscribe przerywa klienta; dopiero potem rusza nowe HTTP.':mode==='exhaustMap'?'B i C pominięte. Ich inner nie powstają.':'Strategia operatora określa kolejkę lub współbieżność.'],
       [2.7,mode==='exhaustMap'?'A$ skończyło się. D może uruchomić nowy inner.':'Wartości z aktywnych inner trafiają do odbiorcy.'],[completed,'Outer i wymagane inner zakończyły się. Wynik: complete.']],
@@ -1354,7 +1354,7 @@ function configureComparison(scene,mode) {
     switchMap:{id:'answer',event:ev('disconnected',{edge:'inner0-op'}),offset:.35,caption:'switchMap: unsubscribe inner A — anulowane, bez complete. S1 działa dalej'},
     exhaustMap:{id:'answer',event:arrivedB,offset:comparison.decide+.4,caption:'exhaustMap: B pominięte. Bez projekcji, bez HTTP, bez kolejki'},
   }[mode];
-  Object.assign(scene,{preconnected:!first,code:`source$.pipe(${mode}(id => http.get(url(id))))`,
+  Object.assign(scene,{preconnected:!first,code:`source$.pipe(${mode}(id => httpGet(url(id))))`,
     captions:[[0,first?'Projekcja zwraca Observable; concatMap decyduje, kiedy go zasubskrybować.':`Ten sam problem, inny operator: S1 już subskrybuje source$ przez ${mode}.`],
       [comparison.input[0].at,'A: projekcja tworzy inner, HTTP A startuje.'],
       [comparison.input[1].at,question],
@@ -1364,7 +1364,7 @@ function configureComparison(scene,mode) {
     playback:manual([
       ...(first?[
         {id:'subscribe',modelTime:.3,caption:'.subscribe(): S1 subskrybuje concatMap, a concatMap — source$.'},
-        {id:'first',event:ev('deliver-next',{edge:'source-op',value:'A'}),caption:'A dotarło do concatMap. Projekcja: id => http.get(url(A))'},
+        {id:'first',event:ev('deliver-next',{edge:'source-op',value:'A'}),caption:'A dotarło do concatMap. Projekcja: id => httpGet(url(A))'},
         {id:'active',event:ev('inner-subscribe',{node:'inner0'}),offset:.05,caption:'concatMap subskrybuje inner A: HTTP A startuje.'}]:[]),
       {id:'question',event:arrivedB,offset:.35,caption:question},
       answer,
@@ -1413,7 +1413,7 @@ export function configureCatchInside(scene) {
   const op={id:'switch',bg:'rgba(216,179,230,.45)',line:'#b384c6'},http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'};
   // Kod w dwóch liniach (pełny przykład z wcięciami nie mieści się nad diagramem); fragmenty świecą, gdy pracują.
   const lines=[[{text:'klik$.pipe('},{text:'switchMap',mark:op,active:jobs.map((job,i)=>during(ev('deliver-next','source-op',{value:job.value}),ev('inner-subscribe',`inner${i}-catch${i}`)))},{text:'(id =>'}],
-    [{text:'  '},{text:'http.get(url(id))',mark:http,active:[during(ev('inner-subscribe','inner0-catch0'),ev('stream-error','inner0-catch0')),
+    [{text:'  '},{text:'httpGet(url(id))',mark:http,active:[during(ev('inner-subscribe','inner0-catch0'),ev('stream-error','inner0-catch0')),
       during(ev('inner-subscribe','inner1-catch1'),ev('inner-next','inner1-catch1'))]},
       {text:'.pipe('},{text:'catchError(() => of([]))',mark:{...op,id:'catch'},active:[during(ev('disconnected','inner0-catch0'),ev('inner-next','catch0-op'))]},{text:')))'}]];
   Object.assign(scene,{jobs,operatorName:'switchMap',catchTimes:at,graph:catchInsideGraph,duration:at.response+1.5,
@@ -1486,7 +1486,7 @@ export function configureCatchOutside(scene) {
   const op={id:'switch',bg:'rgba(216,179,230,.45)',line:'#b384c6'},http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'};
   // Te same dwie linie co wewnątrz; zmienia się tylko miejsce catchError (za switchMap zamiast w .pipe HTTP).
   const lines=[[{text:'klik$.pipe('},{text:'switchMap',mark:op,active:[during(ev('deliver-next','source-op',{value:'A'}),ev('inner-subscribe','inner0-op'))]},{text:'(id =>'}],
-    [{text:'  '},{text:'http.get(url(id))',mark:http,active:[during(ev('inner-subscribe','inner0-op'),ev('stream-error','inner0-op'))]},
+    [{text:'  '},{text:'httpGet(url(id))',mark:http,active:[during(ev('inner-subscribe','inner0-op'),ev('stream-error','inner0-op'))]},
       {text:'), '},{text:'catchError(() => of([]))',mark:{...op,id:'catch'},active:[during(ev('disconnected','op-catch'),ev('disconnected','catch-observer'))]},{text:')'}]];
   Object.assign(scene,{jobs,operatorName:'switchMap',catchTimes:at,graph:catchOutsideGraph,duration:at.b+2.5,
     title:'catchError na zewnątrz',playerLayout:'expanded',playerClass:'rx-flat-tiles rx-catch-inside',
@@ -1582,7 +1582,7 @@ export function configureDistinctSwitch(scene,profileId=scene.id) {
   const lines=[[{text:profile.source+'.pipe('},{text:'distinctUntilChanged()',mark:{...op,id:'distinct'},active:distinctInput.map(v=>during(arrived(v.at),
       v.dup?{...arrived(v.at),offset:decide}:ev('source-next',{edge:'distinct-op',logicalAt:v.at})))},{text:','}],
     [{text:'  '},{text:'switchMap',mark:op,active:jobs.map((job,i)=>during(ev('deliver-next',{edge:'distinct-op',logicalAt:job.at}),ev('inner-subscribe',{edge:`inner${i}-op`})))},
-      {text:'(id => '},{text:`http.get(${profile.url})`,mark:http,active:jobs.map((job,i)=>during(ev('inner-subscribe',{edge:`inner${i}-op`}),
+      {text:'(id => '},{text:`httpGet(${profile.url})`,mark:http,active:jobs.map((job,i)=>during(ev('inner-subscribe',{edge:`inner${i}-op`}),
         ev(job.cancelled?'inner-unsubscribe':'inner-next',{edge:`inner${i}-op`})))},{text:'))'}]];
   // Wynik S1: każde niezanulowane HTTP zwraca swoją wartość.
   const results=jobs.filter(job=>!job.cancelled);
@@ -1739,7 +1739,7 @@ export function configureRetryBackoff(scene) {
     during(ev('deliver-next','source-retry-4'),ev('disconnected','retry-observer'))];
   // Trzy linie jak w x01 (rx-two-lines: 36/24 px): pełna konfiguracja retry z RxJS 7, bez skracania wzoru backoff.
   const lines=[
-    [{text:'http.get',mark:httpMark,active:httpActive},{text:"<User>('/api/users/42').pipe("}],
+    [{text:'httpGet',mark:httpMark,active:httpActive},{text:"<User>('/api/users/42').pipe("}],
     [{text:'  '},{text:'retry',mark:retryMark,active:retryActive},{text:'({ count: 3, delay: (_error, retryCount) =>'}],
     [{text:'    '},{text:'timer',mark:timerMark,active:windows.map((_,i)=>retryActive[i])},{text:'(1000 * 2 ** (retryCount - 1)) }));'}],
   ];

@@ -109,3 +109,52 @@
    Siatka i diagram są te same od READY, więc pojawienie się linii niczego nie przesuwa. */
 .rx-player.rx-code-steps .rx-code { align-self:start; padding-top:calc((108px - 1.25em) / 2); position:relative; z-index:1; }
 [data-ratio="16-9"] .rx-player.rx-code-steps .rx-code { padding-top:calc((60px - 1.25em) / 2); }
+
+/* Kod źródłowy krok po kroku (section[data-code-walk], animations/code-walk.js). Ciemny panel o wysokim kontraście:
+   pierwsze i ostatnie linie stoją, środek przewija się w oknie --cw-window linii; ukryty kod zastępuje // {...}.
+   Etap wybiera .current-fragment kroku (Reveal): przód/tył, hash, podgląd Notes i strony fragmentów w druku bez JS.
+   Holder rezerwuje pełną wysokość od etapu 0, więc rozwinięcie okna nie przesuwa tytułu (Reveal center). */
+.reveal .code-walk-slide h2 { font-family:var(--r-heading-font); font-size:64px; line-height:1.12; text-transform:none; letter-spacing:-.02em; margin:0 0 18px; text-align:left; }
+.reveal .code-walk-slide .code-walk-step { position:absolute; }
+.code-walk-holder { --cw-lh:1.5em; font:37px/1.5 Consolas,ui-monospace,monospace; min-height:calc(var(--cw-lines) * var(--cw-lh) + 44px); text-align:left; }
+.code-walk { --cw-shown:0; --cw-offset:0; --cw-above:1; --cw-below:0; --cw-bottom-slot:0; --cw-ease:cubic-bezier(.2,.8,.2,1);
+  background:#16191D; color:#E6E6E6; border-radius:14px; padding:22px 0; box-shadow:0 12px 32px rgba(0,0,0,.28); }
+.code-walk .cw-line { display:block; height:var(--cw-lh); line-height:var(--cw-lh); white-space:pre; padding:0 24px; transition:opacity .35s, background-color .35s, box-shadow .35s; }
+.code-walk .cw-viewport { height:calc(var(--cw-shown) * var(--cw-lh)); overflow:hidden; transition:height .5s var(--cw-ease); }
+.code-walk .cw-track { transform:translateY(calc(var(--cw-offset) * -1 * var(--cw-lh))); transition:transform .5s var(--cw-ease); }
+.code-walk .cw-fold { font-style:italic; }
+.code-walk .cw-fold-top { opacity:var(--cw-above); }
+.code-walk .cw-fold-bottom { opacity:var(--cw-below); height:calc(var(--cw-bottom-slot) * var(--cw-lh)); overflow:hidden; transition:height .5s var(--cw-ease), opacity .35s; }
+/* Etap 1+: stałe linie przygaszone, okno: kontekst bardzo słaby, wyróżnione linie pełne z żółtym pasem (kolor pracy). */
+.code-walk-slide:has(.code-walk-step.current-fragment) .code-walk { --cw-shown:var(--cw-window); --cw-bottom-slot:1; }
+.code-walk-slide:has(.code-walk-step.current-fragment) .code-walk .cw-fixed { opacity:.5; }
+.code-walk-slide:has(.code-walk-step.current-fragment) .code-walk .cw-mid { opacity:.28; }
+.code-walk-slide:has(.cw-step-1.current-fragment) .code-walk { --cw-offset:var(--cw-o1); --cw-above:var(--cw-a1); --cw-below:var(--cw-b1); }
+.code-walk-slide:has(.cw-step-2.current-fragment) .code-walk { --cw-offset:var(--cw-o2); --cw-above:var(--cw-a2); --cw-below:var(--cw-b2); }
+.code-walk-slide:has(.cw-step-3.current-fragment) .code-walk { --cw-offset:var(--cw-o3); --cw-above:var(--cw-a3); --cw-below:var(--cw-b3); }
+.code-walk-slide:has(.cw-step-4.current-fragment) .code-walk { --cw-offset:var(--cw-o4); --cw-above:var(--cw-a4); --cw-below:var(--cw-b4); }
+.code-walk-slide:has(.cw-step-5.current-fragment) .code-walk { --cw-offset:var(--cw-o5); --cw-above:var(--cw-a5); --cw-below:var(--cw-b5); }
+.code-walk-slide:has(.cw-step-6.current-fragment) .code-walk { --cw-offset:var(--cw-o6); --cw-above:var(--cw-a6); --cw-below:var(--cw-b6); }
+.code-walk-slide:has(.cw-step-1.current-fragment) .code-walk .cw-f1,
+.code-walk-slide:has(.cw-step-2.current-fragment) .code-walk .cw-f2,
+.code-walk-slide:has(.cw-step-3.current-fragment) .code-walk .cw-f3,
+.code-walk-slide:has(.cw-step-4.current-fragment) .code-walk .cw-f4,
+.code-walk-slide:has(.cw-step-5.current-fragment) .code-walk .cw-f5,
+.code-walk-slide:has(.cw-step-6.current-fragment) .code-walk .cw-f6 { opacity:1; background:rgba(255,193,92,.18); box-shadow:inset 9px 0 0 #FFC15C; }
+.code-walk .cw-tok-kw { color:#FF7AC6; }
+.code-walk .cw-tok-type { color:#4EC9B0; }
+.code-walk .cw-tok-fn { color:#F2E58F; }
+.code-walk .cw-tok-param { color:#9CDCFE; }
+.code-walk .cw-tok-str { color:#F0A27A; }
+.code-walk .cw-tok-src { color:#5FD0E8; }
+.code-walk .cw-tok-op { color:#D7A1FF; }
+.code-walk .cw-tok-com { color:#8FA3B4; }
+/* Notyfikacje i sprzątanie w kolorach zdarzeń prezentacji (next, complete, error, abort/unsubscribe). */
+.code-walk .cw-tok-next { color:#7CC4FF; font-weight:700; }
+.code-walk .cw-tok-complete { color:#5FE08A; font-weight:700; }
+.code-walk .cw-tok-error { color:#FF6E6E; font-weight:700; }
+.code-walk .cw-tok-abort { color:#FFA94D; font-weight:700; }
+[data-ratio="16-9"] .reveal .code-walk-slide h2 { font-size:44px; margin-bottom:10px; }
+[data-ratio="16-9"] .code-walk-holder { --cw-lh:1.34em; font-size:36px; min-height:calc(var(--cw-lines) * var(--cw-lh) + 36px); }
+[data-ratio="16-9"] .code-walk { padding:18px 0; }
+@media (prefers-reduced-motion: reduce) { .code-walk .cw-line, .code-walk .cw-viewport, .code-walk .cw-track, .code-walk .cw-fold-bottom { transition:none; } }

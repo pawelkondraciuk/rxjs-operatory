@@ -42,7 +42,7 @@ test('map creates one Observable synchronously; concatAll subscribes one success
  const before=c.snapshot(input.arrival+(mapped.at-input.arrival)*.25),after=c.snapshot(input.arrival+(mapped.at-input.arrival)*.75);
  assert.equal(before.tokens.find(t=>t.phase==='transform').value,'A');
  assert.equal(after.tokens.find(t=>t.phase==='transform').value,'A$');
- assert.equal(s.code,'source$.pipe(map(id => http.get(url(id))), concatAll())');
+ assert.equal(s.code,'source$.pipe(map(id => httpGet(url(id))), concatAll())');
  assert.deepEqual(Array.from(c.stops,s=>s.id),['subscribe','first','active']);
  assert.equal(s.playback.entry,'manual');assert.equal(s.playback.afterLastManualStop,'start-auto');assert.equal(s.playback.finish,'hold');
  const [subscribed,created,active]=c.stops.map(s=>c.snapshot(s.time));
@@ -93,7 +93,7 @@ test('the four strategies stop at the same moment: A works at half, B arrived, i
  for(const [id,mode]of comparison){
   const s=scene(id),c=compile(s),t=stopAt(c,'question'),f=c.snapshot(t),r=rows(c,t),svg=render(f);
   assert.equal(JSON.stringify(s.rows[0].events),input,id);
-  assert.equal(s.code,`source$.pipe(${mode}(id => http.get(url(id))))`);
+  assert.equal(s.code,`source$.pipe(${mode}(id => httpGet(url(id))))`);
   assert.deepEqual(Array.from(r,row=>[row.id,row.value,row.state]),[['#1','A','active'],['#2','B','pending']],id);
   assert.equal(r[1].question,1);assert.equal(r[1].stages,undefined);assert.equal(r[1].wires,undefined);
   assert.doesNotMatch(svg,/w kolejce|pominięte|anulowane|data-inner-cancel/,id);

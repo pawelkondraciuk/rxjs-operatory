@@ -88,11 +88,11 @@ test('completed attempts move down smoothly and only the newest HTTP can run',as
  assert.ok(fresh.growth>0&&fresh.growth<1,'#2 płynnie pojawia się pod nagłówkiem');
 });
 
-test('code keeps RxJS 7 retry config and highlights http.get, retry and timer',async()=>{
+test('code keeps RxJS 7 retry config and highlights httpGet, retry and timer',async()=>{
  const {m,scene,c}=await deck(),kinds=m['code-syntax'].codeTokens(scene.code),kind=word=>{
   const i=scene.code.indexOf(word);return new Set(kinds.slice(i,i+word.length));
  };
- assert.equal(scene.code,"http.get<User>('/api/users/42').pipe(\n  retry({ count: 3, delay: (_error, retryCount) =>\n    timer(1000 * 2 ** (retryCount - 1)) }));");
+ assert.equal(scene.code,"httpGet<User>('/api/users/42').pipe(\n  retry({ count: 3, delay: (_error, retryCount) =>\n    timer(1000 * 2 ** (retryCount - 1)) }));");
  assert.match(scene.playerClass,/rx-lanes rx-flat-tiles rx-two-lines/);
  assert.deepEqual([...kind('http')],['src']);assert.deepEqual([...kind('retry')],['op']);assert.deepEqual([...kind('timer')],['op']);
  assert.deepEqual(Array.from(c.snapshot(0).codeView.flat().filter(part=>part.mark),part=>part.mark.id),['retry-http','retry-op','retry-timer']);

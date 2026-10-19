@@ -18,6 +18,7 @@ import { installAutoFinishGuard } from './animations/reveal-auto-finish.js';
 import { installSpeakerPreview } from './animations/speaker-preview.js';
 import { prepareCheckpointNotes, installCheckpointNotesReceiver, installNotesKeyBridge, installNotesMirror, isNotesPreview, showNotesPreviewFrame } from './animations/checkpoint-notes.js';
 import { FORMATS, formatFromSearch, withFormat, toggledFormatUrl } from './animations/format.js';
+import { prepareCodeWalk } from './animations/code-walk.js';
 
 const params = new URLSearchParams(location.search);
 const printMode = params.has('print-pdf');
@@ -33,6 +34,8 @@ const requestedId = requestedParts[0];
 const requestedFragment = Number(requestedParts[/^\d+$/.test(requestedId) ? 2 : 1]);
 const sceneById = prepareSlides(scenes, { format });
 const route = arrangeSlides(sceneById, { extras: params.has('extras'), printMode, requestedId });
+// Kod źródłowy krok po kroku: okno kodu budowane przed inicjalizacją Reveal (etapy to zwykłe fragmenty).
+document.querySelectorAll('[data-code-walk]').forEach(prepareCodeWalk);
 // Bezpośredni hash dodatku ma taki sam URL ścieżki jak wejście przez menu.
 // Usunięcie query przy powrocie powoduje przeładowanie i przywraca sam MAIN.
 if (route.extras && !params.has('extras') && !printMode) {

@@ -25,7 +25,7 @@ add("05-zrodla","Skąd płyną wartości?","timer · HTTP · Subject",20,[
 ],[[0,"Wartości mogą pochodzić z timera, HTTP albo ręcznego next()."],[4,"Subject emituje A. Odbiorca jeszcze nie słucha."],[8,"Odbiorca subskrybuje zwykły Subject."],[12,"Odbiera B. Wcześniejszego A nie dostaje."]],"To zwykły Subject, bez replay. Timer i HTTP są osobnymi przykładami źródeł. Odbiorca Subject subskrybuje dopiero w 8. sekundzie.");
 
 // Model pojedynczego innera i postoje nadaje configureReferences.
-add("08-map-strumienie","A jeśli wartością jest Observable?","source$.pipe(map(id => http.get(url(id))), concatAll())",1,[],[],"map tworzy Observable. concatAll subskrybuje go i przepuszcza jego wynik dalej.");
+add("08-map-strumienie","A jeśli wartością jest Observable?","source$.pipe(map(id => httpGet(url(id))), concatAll())",1,[],[],"map tworzy Observable. concatAll subskrybuje go i przepuszcza jego wynik dalej.");
 function mapping(mode){
  const input=[{at:1,value:"A",dur:6,color:"a"},{at:4,value:"B",dur:6,color:"b"},{at:7.2,value:"C",dur:6,color:"c"}];
  let end=0;

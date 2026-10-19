@@ -13,7 +13,7 @@ const lane=(frame,id)=>node(frame,id).laneStates?.[0];
 
 test('only the HTTP row works; the receiver row gets the response, then both complete',async()=>{
  const {scene,c}=await http();
- assert.equal(scene.code,"http.get('/api/data')");
+ assert.equal(scene.code,"httpGet('/api/data')");
  assert.deepEqual(Array.from(c.stops,s=>s.id),['receiver','subscribed','response','first']);
  // Na postoju subscribed subskrypcja jest zestawiona, ale request jeszcze nie ruszył.
  const subscribed=c.snapshot(c.stops[1].time);

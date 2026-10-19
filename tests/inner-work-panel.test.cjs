@@ -87,7 +87,7 @@ test('reduced motion keeps completed work history without terminal pulses',async
 
 test('each HTTP emits exactly one response before complete; four fixed-size ball slots fit in the receiver',async()=>{
  const {c,scene,render}=await harness();
- assert.equal(scene.http,true);assert.match(scene.code,/concatMap\(id => http.get/);
+ assert.equal(scene.http,true);assert.match(scene.code,/concatMap\(id => httpGet/);
  for(const record of [...c.plan.records.values()].filter(r=>/^inner\d+-op$/.test(r.id))){
   assert.equal(record.events.length,1);assert.equal(record.events[0].logicalAt,record.end.logicalAt);
   assert.ok(record.events[0].arrival<record.end.at);

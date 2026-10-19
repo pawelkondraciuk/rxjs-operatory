@@ -95,7 +95,7 @@ test('catchError outside: click B appears in the detached klik$, never reaches s
 test('catchError outside: checkpoints follow the narration and speaker notes, code marks and rewind are deterministic',async()=>{
  const {scene,c,render}=await deck(),ids=['click-a','error','caught','fallback','click-b'];
  assert.deepEqual(Array.from(c.stops,s=>s.id),ids);
- assert.equal(scene.code,'klik$.pipe(switchMap(id =>\n  http.get(url(id))), catchError(() => of([])))');
+ assert.equal(scene.code,'klik$.pipe(switchMap(id =>\n  httpGet(url(id))), catchError(() => of([])))');
  const f=Object.fromEntries(c.stops.map(s=>[s.id,c.snapshot(s.time)]));
  assert.equal(lane(f['click-a'],'observer').state,'running');assert.equal(row(f['click-a']).stages[0].state,'active');
  assert.ok(row(f['click-a']).stages[0].progress>0);assert.equal(f['click-a'].executionCounts.started,1);
