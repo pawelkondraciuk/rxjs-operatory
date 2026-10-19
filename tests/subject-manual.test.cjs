@@ -171,7 +171,7 @@ test('tiles have the same size as on the interval slide',async()=>{
  const interval=m.engine.compileScene(m['scene-config'].configureScene({...base,rendererId:'05-zrodla',sourceExample:0,format:'4:3'})).snapshot(5);
  const f=c.snapshot(c.duration),size=(frame,id)=>[node(frame,id).x,node(frame,id).w,node(frame,id).defH,node(frame,id).rowH];
  assert.deepEqual(size(f,'subject').slice(0,2),size(interval,'interval').slice(0,2));
- for(const id of receivers)assert.deepEqual(size(f,id),size(interval,'observer'),id);
+ for(const id of receivers)assert.deepEqual(size(f,id),size(interval,'A'),id);
 });
 
 test('layout keeps Subject → A/B on horizontal lanes inside the diagram in both formats',async()=>{

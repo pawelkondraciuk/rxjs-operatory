@@ -8,7 +8,13 @@ export function createStageController(player,options={}) {
   const suspensions=new Set(),listeners=new Set();
   function nextCheckpoint(){return checkpoints().find(time=>time>player.time+epsilon)??player.duration;}
   // Scena na żywo z akcjami: etap to liczba wykonanych akcji, nie czas (chwile akcji wybiera prowadzący).
-  function reachedIndex(){return player.live?.actions?player.live.stage:checkpoints().findLastIndex(time=>time<=player.time+epsilon);}
+  // Postoje przed akcjami (np. subscribe i start emisji) liczą się po czasie, dopóki nie ma akcji.
+  function reachedIndex(){
+    const live=player.live;
+    if(!live?.actions)return checkpoints().findLastIndex(time=>time<=player.time+epsilon);
+    const before=player.stops.slice(0,player.stops.length-live.actions.length);
+    return (live.stage?before.length:before.filter(stop=>stop.time<=player.time+epsilon).length)+live.stage;
+  }
   function state(){return {mode,state:player.state,time:player.time,target,checkpointIndex:reachedIndex(),checkpoints:checkpoints(),suspended:suspensions.size>0};}
   function changed(){
     if(player.isPlaying&&mode==='auto')target=nextCheckpoint();
@@ -44,8 +50,8 @@ export function createStageController(player,options={}) {
   // Postoje przed live.start (np. odbiorca, subscribe) to zwykłe etapy: dalej gra do kolejnego, w trakcie ruchu go kończy.
   const introStops=live=>player.stops.filter(stop=>stop.time<live.start-epsilon);
   function nextLive(live){
-    if(live.actions){nextActions(live);return;}
     const stop=introStops(live).find(stop=>stop.time>player.time+epsilon);
+    if(live.actions&&live.state!=='idle'){nextActions(live);return;}
     if(live.state==='closed')player.finish(); // dokończ rozpoczęte unsubscribe
     else if(live.state==='running'){live.close();player.playContinuously();}
     // W ruchu: dokończ etap przed emisjami, a po ostatnim z nich — dojdź do emisji (trwają dalej).
@@ -65,10 +71,15 @@ export function createStageController(player,options={}) {
   function previous(){
     cancelResume();if(suspensions.size)return;
     const live=player.live;
-    // Akcje: cofnięcie ostatniej (kadr z chwili jej wywołania, emisje biegną dalej); bez akcji — poprzedni slajd.
+    // Akcje: cofnięcie ostatniej (kadr z chwili jej wywołania, emisje biegną dalej); bez akcji — poprzedni postój
+    // przed live.start (jeśli scena je ma), ostatecznie poprzedni slajd.
     if(live?.actions){
       if(live.state==='closed'){live.reopen();player.seek(0);player.playContinuously();}
       else if(live.stage>0){live.undo();player.playContinuously();}
+      else if(player.time>epsilon&&introStops(live).length){
+        const back=[0,...introStops(live).map(stop=>stop.time)].reverse().find(time=>time<player.time-epsilon)??0;
+        live.reopen();player.seek(back);
+      }
       else{options.onNavigate?.(-1);return;}
       target=null;changed();return;
     }

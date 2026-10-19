@@ -2,9 +2,10 @@ import { configureFlatten, configureSubject, configureSubjectInterval, configure
 
 // Końcowe ID po rozwinięciu wariantów; otwarcie do tytułu pozostaje w kolejności HTML.
 export const mainOrder = [
-  // Trzy pierwsze slajdy techniczne: HTTP (subscribe/next/complete) z kodem źródłowym httpGet (05b-http-kod), interval (next, unsubscribe), Subject (ręczne next i complete).
-  // Potem pytania o znane operatory i share, operator oraz historia Cold → Subject + HTTP → share HTTP → Subject + interval → share + interval → późny odbiorca.
-  '05-zrodla-2','05b-http-kod','05-zrodla','05-zrodla-5','02-znane-operatory','03-a-share','04-operator','04a-dwa-tory','05-zrodla-3','04a-dwa-tory-2','05-zrodla-4','04a-dwa-tory-3',
+  // Slajdy techniczne: HTTP (subscribe/next/complete) z kodem źródłowym httpGet (05b-http-kod) i Cold (jedna definicja,
+  // trzy wykonania), interval (cold: osobne wykonanie każdego odbiorcy, unsubscribe), Subject (ręczne next i complete).
+  // Potem pytania o znane operatory i share, operator oraz historia Subject + HTTP → share HTTP → Subject + interval → share + interval → późny odbiorca.
+  '05-zrodla-2','05b-http-kod','04a-dwa-tory','05-zrodla','05-zrodla-5','02-znane-operatory','03-a-share','04-operator','05-zrodla-3','04a-dwa-tory-2','05-zrodla-4','04a-dwa-tory-3',
   // Cztery *Map obok siebie, potem distinctUntilChanged przed switchMap.
   '20-sharereplay','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','11a-distinct-switchmap',
   'b04-catcherror-2','b04-catcherror','16-czas-cztery','25-podsumowanie','pytania',

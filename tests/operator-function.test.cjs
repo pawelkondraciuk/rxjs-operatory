@@ -163,7 +163,7 @@ test('custom timing preserves the storyboard and all checkpoint snapshots are de
   assert.deepEqual(history(c.snapshot(c.duration)),['"…"']);
 });
 
-test('checkpoint notes follow the stops and lead from map to Cold with the raw user$',async()=>{
+test('checkpoint notes follow the stops and lead from map to Subject + HTTP with the raw user$',async()=>{
   const {compiled:c}=await subject();
   const html=require('node:fs').readFileSync('index.html','utf8');
   const source=html.match(/<template data-checkpoint-notes="04-operator">([\s\S]*?)<\/template>/)[1];
@@ -173,7 +173,7 @@ test('checkpoint notes follow the stops and lead from map to Cold with the raw u
   assert.match(notes.mapped,/synchronicznie ją przekształca[\s\S]*każdej kolejnej emisji/);
   assert.match(notes.received,/jeden request[\s\S]*jeden string\. To nadal jedno wykonanie Observable/);
   assert.match(notes.complete,/complete przechodzi dalej do odbiorcy/);
-  assert.match(notes.finished,/trzy niezależne elementy interfejsu[\s\S]*surowego user\$/);
+  assert.match(notes.finished,/trzy niezależne elementy interfejsu[\s\S]*Prawo: Subject \+ HTTP[\s\S]*surowego user\$/);
 });
 
 // Wyświetlany kod: HTML z <wbr> jako punktami łamania, bez zmiany treści.

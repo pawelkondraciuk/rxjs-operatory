@@ -488,7 +488,7 @@ test('share slides use the cold look: pipeline code, transient subscribe/unsubsc
  assert.equal((c.snapshot(ev('stream-complete','share-B')+.1).callouts||[]).length,0,'complete bez napisu');
 });
 
-test('cold has checkpoint notes for READY, each manual stop and the handoff to Subject + HTTP',async()=>{
+test('cold has checkpoint notes for READY, each manual stop and the handoff to interval',async()=>{
  const {c}=await lanes();
  const html=fs.readFileSync('index.html','utf8');
  const source=html.match(/<template data-checkpoint-notes="04a-dwa-tory">([\s\S]*?)<\/template>/)[1];
@@ -499,7 +499,7 @@ test('cold has checkpoint notes for READY, each manual stop and the handoff to S
  assert.match(notes.error,/Drugi request się nie udał\. Czy to oznacza, że pozostałe również się zatrzymają\?/);
  assert.doesNotMatch(notes.error,/kończą się poprawnie/,'pytanie bez odpowiedzi');
  assert.match(notes.answer,/Nie\. To trzy niezależne wykonania tego samego cold Observable\. B kończy się błędem, ale A i C nadal pracują i kończą się poprawnie\./);
- assert.match(notes.finished,/Czy naprawdę musimy wykonywać trzy requesty\?[\s\S]*Prawo: Subject \+ HTTP/);
+ assert.match(notes.finished,/Czy naprawdę musimy wykonywać trzy requesty\?[\s\S]*Prawo: interval/);
  assert.doesNotMatch(source,/catchError|Angular|async pipe/);
 });
 

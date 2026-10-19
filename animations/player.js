@@ -100,9 +100,10 @@ function reopenLive(){if(!live)return;liveClosed=null;liveActs=[];liveFrom=0;liv
 // źródło) nie wymaga zamrożenia: wynik to jego koniec.
 function finishActions(){
  if(time<=0){liveActs=[...live.defaults];liveClosed=live.defaultClose;liveFrom=0;return;}
- const remaining=live.actions.length-liveActs.length;
+ const remaining=live.actions.length-liveActs.length,from=Math.max(time,live.start);
  if(!remaining&&playbackDuration<liveTo)return;
- liveActs=[...liveActs,...Array.from({length:remaining},(_,i)=>time+i*live.actionGap)];
+ // Akcje nie mogą wypaść przed startem emisji (finish w trakcie etapów przed live.start).
+ liveActs=[...liveActs,...Array.from({length:remaining},(_,i)=>from+i*live.actionGap)];
  liveClosed=remaining?liveActs.at(-1)+live.settle:time;
 }
 function seek(target){pause();stopAt=null;follow(target);time=clamp(target,0,playbackDuration);paint();}

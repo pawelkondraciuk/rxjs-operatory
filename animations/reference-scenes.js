@@ -8,7 +8,7 @@ const manual=stops=>({entry:'manual',stops,afterLastManualStop:'start-auto',fini
 // Operator to funkcja (04-operator): httpGet<User>('/api/users/42').pipe(map(user => `${…} ${…}`)). httpGet to nasz
 // klient HTTP (nie RxJS): po subskrypcji uruchamia jeden request, emituje jeden obiekt User i complete. map synchronicznie
 // zamienia User w string „Paweł Kondraciuk” — wejście i wynik projekcji mają wspólne logicalAt. Czasy (schedule)
-// wyłącznie rozciągają ilustrację; ten sam obiekt User wraca na następnym slajdzie Cold.
+// wyłącznie rozciągają ilustrację; ten sam obiekt User co na Cold wraca na następnym slajdzie Subject + HTTP.
 function mapSequence(scene) {
   const timing={pipeline:.65,handoff:.05,subscribe:3.2,request:2.6,travel:1.4,transform:2,receivedHold:.5,gap:.3,terminal:1.6,settle:1,
     reveal:.3,laneReveal:.35,...scene.timing};
@@ -567,67 +567,99 @@ export function shareReplayLateGraph(scene) {
   };
 }
 
-// interval(1000): emisje bez końca, aż do ręcznego unsubscribe. Scena jest „na żywo”: model jest analityczny
-// (emisja co 1 s od startu emisji), a player kompiluje go dla przesuwanego okna czasu (scene.live).
-// Etapy jak na HTTP: definicja → odbiorca (born) → subscribe (postój subscribed z migawką .subscribe() A) → emisje bez
-// końca od live.start → .unsubscribe() (migawka zostaje do końca sceny). Postoje przed live.start to zwykłe etapy kontrolera.
-const intervalTiming={born:.3,subscribe:1.3,connect:.8,emit:.5,period:1,travel:.8,cancel:.8,settle:.8,window:30,keep:5,demoLead:3.85};
+// interval(1000): emisje bez końca, aż do ręcznego unsubscribe. interval jest cold: każda subskrypcja to osobne
+// wykonanie z własnym licznikiem od 0. Scena „na żywo” z akcjami (scene.live.actions): model analityczny w czasie
+// ilustracji, player kompiluje go dla przesuwanego okna i wykonanych akcji.
+// Etapy: READY (interval i odbiorca A) → subscribe A (postój subscribed z migawką) → emisje A bez końca → akcja B:
+// B pojawia się i subskrybuje, dostaje własne 0, 1, 2… (drugi wiersz interval) → akcja unsubscribe A → akcja
+// unsubscribe B; po niej scena jest skończona. Migawki stoją w jednym miejscu nad diagramem: każda do następnej akcji,
+// ostatnia do końca.
+const intervalTiming={subscribe:1.3,connect:.8,emit:.5,reveal:.3,period:1,travel:.8,cancel:.8,calloutHold:.4,stopTail:1,
+  window:30,keep:5,margin:2,actionGap:1.5,settle:2.8,defaults:[6,11,15],defaultClose:19};
+const intervalActions=['B','unsub-A','unsub-B'];
 export function configureInterval(scene) {
   const t=intervalTiming,connected=t.subscribe+t.connect,start=connected+t.emit;
   Object.assign(scene,{graph:intervalGraph,playerLayout:'function',ink:'#26323B',playerClass:'rx-flat-tiles',
     title:'interval: strumień bez końca',code:'interval(1000)',
     // .subscribe(render) dopisuje się razem z migawką .subscribe() A (0,3 s przed subscribe), jak na HTTP.
-    codeFrames:[{event:{type:'subscribe',edge:'interval-observer'},offset:-.3,code:'interval(1000).subscribe(render)',fadeIn:.3}],
-    rows:[R('interval'),R('Odbiorca A')],
-    // window/keep: długość i zapas okna kompilacji (s); defaultClose: rezygnacja dla druku i „pokaż wynik” (wartości 0, 1, 2).
-    live:{start,window:t.window,keep:t.keep,margin:2,defaultClose:start+t.demoLead,variant:intervalVariant},
+    codeFrames:[{event:{type:'subscribe',edge:'interval-A'},offset:-.3,code:'interval(1000).subscribe(render)',fadeIn:.3}],
+    rows:[R('interval'),R('Odbiorca A'),R('Odbiorca B')],
+    // defaults: umowne chwile akcji (druk, hash, podgląd Notes); defaultClose: zamrożenie po nich.
+    live:{start,window:t.window,keep:t.keep,margin:t.margin,defaultClose:t.defaultClose,actions:intervalActions,defaults:t.defaults,
+      actionGap:t.actionGap,settle:t.settle,variant:intervalVariant},
+    // subscribed i live poprzedzają akcje (zwykłe etapy przed live.start); kolejne postoje to stabilne kadry akcji.
     playback:{entry:'manual',finish:'hold',live:true,stops:[
-      {id:'receiver',time:t.born+.6,caption:'Odbiorca A czeka. Bez subscribe interval nic nie emituje'},
       {id:'subscribed',time:connected+.35,caption:'.subscribe() dotarło do interval. Emisje jeszcze nie ruszyły'},
-      {id:'live',time:start,caption:'interval emituje co sekundę: 0, 1, 2… Sam się nie kończy'}]},
+      {id:'live',time:start,caption:'interval emituje co sekundę: 0, 1, 2… Sam się nie kończy'},
+      ...intervalActions.map((id,i)=>({id:{B:'join-b','unsub-A':'unsub-a','unsub-B':'unsub-b'}[id],time:t.defaults[i]+t.settle}))]},
   });
-  Object.assign(scene,intervalVariant(scene,{from:0,to:t.window,closedAt:null}));
+  Object.assign(scene,intervalVariant(scene,{from:0,to:t.window,closedAt:null,actions:[]}));
 }
 
-// Wariant sceny dla okna [from, to] i opcjonalnej chwili rezygnacji closedAt (czas ilustracji).
-// Wartość wysłana przed rezygnacją dociera do odbiorcy; dopiero potem rusza unsubscribe, a późniejsze emisje nie istnieją.
-function intervalVariant(scene,{from,to,closedAt}) {
-  const t=intervalTiming,start=scene.live.start,emitAt=k=>start+t.period*(k+1);
-  const closed=closedAt!==null&&closedAt!==undefined;
-  const last=closed?Math.ceil((closedAt-start)/t.period)-2:Infinity;
-  const unsubscribeAt=closed?Math.max(closedAt,last>=0?emitAt(last)+t.travel:closedAt):null;
-  const kFrom=Math.max(0,Math.floor((from-start)/t.period)-1),kTo=Math.min(last,Math.floor((to-start)/t.period));
-  const emitted=time=>Math.min(last+1,Math.max(0,Math.floor((time-start)/t.period)));
-  return {...scene,intervalPlan:{start,kFrom,kTo,unsubscribeAt},
-    duration:closed?unsubscribeAt+t.cancel+t.settle:to,
-    metrics:[{label:'emisje',value:emitted}],
-    captions:[[0,'interval(1000) to definicja. Bez subscribe nic nie emituje'],[t.born,'Odbiorca A czeka. Nic go jeszcze nie łączy z interval'],
-      [t.subscribe,'.subscribe() tworzy wykonanie A i łączy je z interval'],[start,'interval emituje co sekundę: 0, 1, 2… Sam się nie kończy'],
-      ...(closed?[[unsubscribeAt,'.unsubscribe() A: rezygnacja biegnie od odbiorcy do interval'],
-        [unsubscribeAt+t.cancel,'interval przestał emitować. Bez complete — to rezygnacja odbiorcy, nie koniec strumienia']]:[])]};
+// Wariant sceny dla okna [from, to], wykonanych akcji (czasy ilustracji w kolejności live.actions) i opcjonalnego
+// zamrożenia closedAt. Wykonanie X emituje k w start+(k+1)·period; przy unsubscribe wartość już wysłana dociera,
+// potem rusza impuls × (cancel), późniejsze emisje nie istnieją. Po odejściu obu odbiorców scena jest skończona.
+function intervalVariant(scene,{from,to,closedAt,actions=[]}) {
+  const t=intervalTiming,closed=closedAt!==null&&closedAt!==undefined;
+  const execution=(id,subscribe,unsubCall)=>{
+    const start=subscribe+t.connect+t.emit,emitAt=k=>start+t.period*(k+1);
+    const last=unsubCall===undefined?Infinity:Math.ceil((unsubCall-start)/t.period)-2;
+    const unsubscribeAt=unsubCall===undefined?null:Math.max(unsubCall,last>=0?emitAt(last)+t.travel:unsubCall);
+    return {id,subscribe,start,emitAt,last,calledAt:unsubCall,unsubscribeAt,doneAt:unsubscribeAt===null?null:unsubscribeAt+t.cancel+t.calloutHold};
+  };
+  const [joinB,unsubA,unsubB]=actions;
+  const runs=[execution('A',t.subscribe,unsubA),...(joinB===undefined?[]:[execution('B',joinB+t.reveal,unsubB)])];
+  const finished=runs.length===2&&runs.every(r=>r.unsubscribeAt!==null);
+  const finite=finished?Math.max(...runs.map(r=>r.doneAt))+t.stopTail:Infinity,end=closed?Math.min(closedAt,finite):Math.min(to,finite);
+  for(const r of runs){
+    r.kFrom=Math.max(0,Math.floor((from-r.start)/t.period)-3);
+    r.kTo=Math.min(r.last,Math.floor((end-r.start)/t.period)-1);
+    if(r.unsubscribeAt===null)r.last=r.kTo;
+  }
+  const emitted=r=>time=>Math.max(0,Math.min(r.kTo+1,Math.floor((time-r.start)/t.period)));
+  const active=time=>runs.filter(r=>time>=r.subscribe+t.connect&&(r.unsubscribeAt===null||time<r.unsubscribeAt+t.cancel)).length;
+  const runB=runs[1];
+  return {...scene,intervalPlan:{runs,actions,end},
+    duration:closed?Math.min(closedAt,finite):Math.min(to,finite),
+    // Akcja „trwa” do końca swojej animacji: zestawienie B albo dotarcie × do interval.
+    liveBusyUntil:[runB?runB.subscribe+t.connect+t.calloutHold:joinB,runs[0].doneAt??unsubA,runB?.doneAt??unsubB],
+    metrics:[{label:'Wykonania interval',value:active},{label:'Emisje A',value:emitted(runs[0])},
+      {label:'Emisje B',value:runB?emitted(runB):()=>0}],
+    captions:[[0,'interval(1000) to definicja. Bez subscribe nic nie emituje'],
+      [t.subscribe,'.subscribe() tworzy wykonanie A i łączy je z interval'],[runs[0].start,'interval emituje co sekundę: 0, 1, 2… Sam się nie kończy'],
+      ...(runB?[[runB.subscribe,'B subskrybuje: interval jest cold — B dostaje własne wykonanie od 0']]:[]),
+      ...runs.filter(r=>r.unsubscribeAt!==null).flatMap(r=>[[r.unsubscribeAt,`.unsubscribe() ${r.id}: rezygnacja biegnie od ${r.id} do interval`],
+        [r.unsubscribeAt+t.cancel,r===runs[0]&&runB&&runB.unsubscribeAt===null?'Wykonanie A zatrzymane. B nadal odbiera swoje wartości':
+          `Wykonanie ${r.id} zatrzymane. Bez complete — to rezygnacja odbiorcy, nie koniec strumienia`]])]};
 }
 
 export function intervalGraph(scene) {
-  const t=intervalTiming,{kFrom,kTo,unsubscribeAt}=scene.intervalPlan,start=scene.live.start;
-  const top=scene.format==='4:3'?222:146,receiver={x:910,w:400,y:laneRowY(top,0)},fill=laneSubscribers.A.fill;
-  const events=[];
-  for(let k=kFrom;k<=kTo;k++){const at=start+t.period*(k+1);events.push({...E(at,String(k),fill),logicalAt:at,arrival:at+t.travel});}
-  const edge='interval-observer',closed=unsubscribeAt!==null;
-  // .unsubscribe() zaczyna się przy odbiorcy (pod jego wierszem), nie w pasie nagłówków; zostaje do końca sceny.
-  const below={x:receiver.x,y:receiver.y+laneLook.rowH/2+48};
+  const t=intervalTiming,{runs,end}=scene.intervalPlan;
+  // Wymiary kafelków jak na Subject — ręczna emisja: interval 340/420 (dwa wiersze wykonań), odbiorcy 910/400.
+  const top=scene.format==='4:3'?178:102,pos=r=>({x:910,w:400,y:laneRowY(top,r.id==='A'?0:1)}),fill=id=>laneSubscribers[id].fill;
+  const edge=r=>'interval-'+r.id,range=(a,b)=>Array.from({length:Math.max(0,b-a+1)},(_,i)=>a+i);
+  // Migawki w jednym miejscu (x środek, y top/2), kolejno: .subscribe() A (do startu emisji), .subscribe() B,
+  // .unsubscribe() A, .unsubscribe() B; każda do następnej akcji, ostatnia do końca sceny.
+  const events=[{text:'.subscribe()',run:runs[0],from:laneEvent('subscribe',edge(runs[0]),-.3),until:laneEvent('connected',edge(runs[0]),t.emit)},
+    ...(runs[1]?[{text:'.subscribe()',run:runs[1],from:laneEvent('subscribe',edge(runs[1]),-.3)}]:[]),
+    ...runs.filter(r=>r.unsubscribeAt!==null).sort((a,b)=>a.calledAt-b.calledAt).map(r=>({text:'.unsubscribe()',run:r,from:{type:'unsubscribe-call',edge:edge(r)}}))];
+  // Poprzednia migawka znika (fade 0,3 s kończy się) dokładnie w chwili następnej akcji — bez nakładania tekstów.
+  const callouts=events.map((e,i)=>laneCallout(e.text,e.run.id,e.from,e.until??(events[i+1]?{...events[i+1].from,offset:(events[i+1].from.offset||0)-.3}:{...e.from,offset:Infinity}),{y:top/2}));
   return {layout:'fixed',formatAware:true,width:1240,height:scene.format==='4:3'?612:460,...laneGraphLook(),
-    subscribers:{A:laneSubscribers.A},
-    nodes:[{id:'interval',x:340,w:420,label:'interval',...laneTile('source',top,{A:0},1)},
-      // Odbiorca pojawia się przed subscribe już z ikoną inbox i literą A (inbox.ready).
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B},
+    nodes:[{id:'interval',x:340,w:420,label:'interval',...laneTile('source',top,{A:0,B:1},2)},
+      // A widoczny od READY (ikona inbox i litera), B pojawia się przy swojej akcji, tuż przed subscribe.
       // Status unsubscribe przy odbiorcy po dotarciu × do interval (bez complete): sam „×”, bo wiersz mieści trzy kulki.
-      laneReceiver('observer','A',receiver,{ready:false,born:t.born,laneTerminalText:{cancelled:'×'},inbox:{...laneInbox(),ready:true}})],
-    trays:[laneTray('observer',receiver,3)],
-    // Migawka .subscribe() A zostaje na postoju subscribed i gaśnie, gdy ruszają emisje.
-    callouts:[laneCallout('.subscribe()','A',laneEvent('subscribe',edge,-.3),laneEvent('connected',edge,start-t.subscribe-t.connect),{y:top/2}),
-      ...(closed?[laneCallout('.unsubscribe()','A',laneEvent('inner-unsubscribe',edge),laneEvent('disconnected',edge,Infinity),below)]:[])],
-    edges:[{id:edge,from:'interval',to:'observer',subscriber:'A',logicalStart:t.subscribe,cancelPulse:true,events:[]}],
-    schedule:{[edge]:{start:t.subscribe,connectDuration:t.connect,events,
-      ...(closed?{end:{at:unsubscribeAt,logicalAt:unsubscribeAt,kind:'unsubscribe',duration:t.cancel}}:{})}}};
+      ...runs.map(r=>laneReceiver(r.id,r.id,pos(r),{...(r.id==='A'?{ready:true}:{ready:false,born:r.subscribe-t.reveal}),
+        laneTerminalText:{cancelled:'×'},inbox:{...laneInbox(),ready:true}}))],
+    trays:runs.map(r=>laneTray(r.id,pos(r),3)),
+    callouts,
+    edges:runs.map(r=>({id:edge(r),from:'interval',to:r.id,subscriber:r.id,logicalStart:r.subscribe,cancelPulse:true,events:[]})),
+    schedule:Object.fromEntries(runs.map(r=>[edge(r),{start:r.subscribe,connectDuration:t.connect,
+      events:range(r.kFrom,r.kTo).map(k=>({...E(r.emitAt(k),String(k),fill(r.id)),logicalAt:r.emitAt(k),arrival:r.emitAt(k)+t.travel})),
+      ...(r.unsubscribeAt===null?{}:{end:{at:r.unsubscribeAt,logicalAt:r.unsubscribeAt,kind:'unsubscribe',duration:t.cancel}})}])),
+    timeline:runs.filter(r=>r.unsubscribeAt!==null).map(r=>({type:'unsubscribe-call',edge:edge(r),at:r.calledAt})),
+  };
 }
 
 // Wariant HTTP: etapy definicja → odbiorca → subscribe → request i emisja → dotarcie → complete. Subskrypcja dociera

@@ -110,5 +110,5 @@ test('speaker notes: one template entry per stage, from definition to complete',
  const note=id=>template.match(new RegExp(`data-checkpoint="${id}">([\\s\\S]*?)</div>`))[1];
  assert.match(note('ready'),/wyłącznie definicja/);assert.doesNotMatch(note('receiver'),/\.subscribe\(render\)/);
  assert.match(note('subscribed'),/\.subscribe\(\) A/);assert.match(note('response'),/wyleciała z HTTP/);
- assert.doesNotMatch(note('first'),/✓ complete/);assert.match(note('finished'),/✓ complete/);assert.match(note('finished'),/interval/);
+ assert.doesNotMatch(note('first'),/✓ complete/);assert.match(note('finished'),/✓ complete/);assert.match(note('finished'),/kod źródłowy httpGet/);
 });
