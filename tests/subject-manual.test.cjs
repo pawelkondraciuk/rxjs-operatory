@@ -193,7 +193,7 @@ test('layout keeps Subject → A/B on horizontal lanes inside the diagram in bot
  }
 });
 
-test('checkpoint notes follow the new order: question at B, answer at next(2), hot summary before the audience question about operators',async()=>{
+test('checkpoint notes follow the new order: question at B, answer at next(2), hot summary before Subject HTTP',async()=>{
  const {c}=await manual();
  const html=require('node:fs').readFileSync('index.html','utf8');
  const source=html.match(/<template data-checkpoint-notes="05-zrodla-5">([\s\S]*?)<\/template>/)[1];
@@ -204,7 +204,7 @@ test('checkpoint notes follow the new order: question at B, answer at next(2), h
  assert.doesNotMatch(notes['subscribed-b'],/Subject nie odtwarza/,'pytanie bez odpowiedzi');
  assert.match(notes['next-2'],/Nie\. Subject nie odtwarza wcześniejszych wartości\. B dostaje dopiero dwójkę, podczas gdy A otrzymał zarówno jedynkę, jak i dwójkę/);
  assert.match(notes.complete,/Complete trafia do wszystkich odbiorców i zamyka ich subskrypcje/);
- assert.match(notes.finished,/Subject jest przykładem hot Observable — rozsyła emisje do aktualnych subskrybentów\. Nowy odbiorca nie dostaje historii\. Do różnicy między hot i cold jeszcze wrócimy[\s\S]*Prawo: „Jakie znasz operatory RxJS/);
+ assert.match(notes.finished,/Subject jest przykładem hot Observable — rozsyła emisje do aktualnych subskrybentów\. Nowy odbiorca nie dostaje historii\. Do różnicy między hot i cold jeszcze wrócimy[\s\S]*Prawo: „Subject: ręczny multicast HTTP/);
  assert.doesNotMatch(source,/error\(|next\(3\)|BehaviorSubject|ReplaySubject|shareReplay/);
 });
 

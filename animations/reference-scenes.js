@@ -8,7 +8,7 @@ const manual=stops=>({entry:'manual',stops,afterLastManualStop:'start-auto',fini
 // Operator to funkcja (04-operator): httpGet<User>('/api/users/42').pipe(map(user => `${…} ${…}`)). httpGet to nasz
 // klient HTTP (nie RxJS): po subskrypcji uruchamia jeden request, emituje jeden obiekt User i complete. map synchronicznie
 // zamienia User w string „Paweł Kondraciuk” — wejście i wynik projekcji mają wspólne logicalAt. Czasy (schedule)
-// wyłącznie rozciągają ilustrację; ten sam obiekt User co na Cold wraca na następnym slajdzie Subject + HTTP.
+// wyłącznie rozciągają ilustrację; ten sam obiekt User co na Cold i Subject + HTTP wraca na share + HTTP po pytaniu „A share?”.
 function mapSequence(scene) {
   const timing={pipeline:.65,handoff:.05,subscribe:3.2,request:2.6,travel:1.4,transform:2,receivedHold:.5,gap:.3,terminal:1.6,settle:1,
     reveal:.3,laneReveal:.35,...scene.timing};
@@ -789,8 +789,8 @@ export function subjectGraph(scene) {
   };
 }
 
-// Subject — ręczna emisja (05-zrodla-5): trzeci slajd techniczny, zaraz po HTTP (subscribe, next, complete) i interval
-// (wiele next, unsubscribe). Subject jest hot: READY to sam kafelek Subject<number>; A subskrybuje i dostaje next(1),
+// Subject — ręczna emisja (05-zrodla-5): po interval (wiele next, unsubscribe), przed ręcznym multicastem HTTP.
+// Subject jest hot: READY to sam kafelek Subject<number>; A subskrybuje i dostaje next(1),
 // dopiero potem pojawia się B — bez wcześniejszej 1 (brak historii). next(2) trafia do A i B, complete() zamyka obie
 // subskrypcje (bez unsubscribe). Odbiorca pojawia się (fade-in) tuż przed swoim subscribe. Subject nie ma upstreamu ani connection.
 // Wygląd torów i wymiary kafelków jak interval (05-zrodla): Subject x/w 340/420, kompaktowi odbiorcy 910/400 z kulkami

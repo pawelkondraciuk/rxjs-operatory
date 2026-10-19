@@ -190,7 +190,7 @@ test('speaker notes template covers every checkpoint with the planned narration'
  assert.match(note('unsub-c'),/Teraz odłączamy ostatniego\. I jak myślicie, co powinno się wydarzyć ze źródłem\?/);
  assert.match(note('source'),/Wszyscy odbiorcy już się odłączyli\. Ale zobaczcie — interval nadal emituje wartości\. Subject ciągle je odbiera, chociaż nikogo już nimi nie powiadamia\./);
  assert.match(note('connection'),/Bo mamy jeszcze jedną subskrypcję, którą sami stworzyliśmy\. To połączenie interval z Subjectem\. I dopiero teraz ręcznie je odłączamy\./);
- assert.match(note('finished'),/W Subject wszyscy się odłączyli, ale interval nadal pracował[\s\S]*Zobaczmy, co zrobi share w dokładnie tej samej sytuacji\./);
+ assert.match(note('finished'),/W Subject wszyscy się odłączyli, ale interval nadal pracował[\s\S]*Do zarządzania źródłem wrócimy przy share\(\)[\s\S]*Prawo: „Jakie znasz operatory RxJS\?”/);
 });
 
 test('last next: connection.unsubscribe() — grey × from Subject to interval, interval cancelled, no more emissions, Subject without complete',async()=>{

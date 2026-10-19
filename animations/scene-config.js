@@ -3,9 +3,9 @@ import { configureFlatten, configureSubject, configureSubjectInterval, configure
 // Końcowe ID po rozwinięciu wariantów; otwarcie do tytułu pozostaje w kolejności HTML.
 export const mainOrder = [
   // Slajdy techniczne: HTTP (subscribe/next/complete) z kodem źródłowym httpGet (05b-http-kod) i Cold (jedna definicja,
-  // trzy wykonania), interval (cold: osobne wykonanie każdego odbiorcy, unsubscribe), Subject (ręczne next i complete).
-  // Potem pytania o znane operatory i share, operator oraz historia Subject + HTTP → share HTTP → Subject + interval → share + interval → późny odbiorca.
-  '05-zrodla-2','05b-http-kod','04a-dwa-tory','05-zrodla','05-zrodla-5','02-znane-operatory','03-a-share','04-operator','05-zrodla-3','04a-dwa-tory-2','05-zrodla-4','04a-dwa-tory-3',
+  // trzy wykonania), interval (cold: osobne wykonanie każdego odbiorcy, unsubscribe), Subject (ręczne next i complete), Subject + HTTP, Subject + interval.
+  // Potem pytanie o znane operatory, operator, pytanie o share oraz historia share HTTP → share + interval → późny odbiorca.
+  '05-zrodla-2','05b-http-kod','04a-dwa-tory','05-zrodla','05-zrodla-5','05-zrodla-3','05-zrodla-4','02-znane-operatory','04-operator','03-a-share','04a-dwa-tory-2','04a-dwa-tory-3',
   // Cztery *Map obok siebie, potem distinctUntilChanged przed switchMap.
   '20-sharereplay','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','11a-distinct-switchmap',
   'b04-catcherror-2','b04-catcherror','16-czas-cztery','25-podsumowanie','pytania',
@@ -45,7 +45,7 @@ export function configureScene(scene) {
   if(id==='05-zrodla'&&scene.sourceExample===2)configureSubject(scene);
   // Subject + interval: odbiorcy odchodzą, connection z interval zostaje (scena na żywo z akcjami).
   if(id==='05-zrodla'&&scene.sourceExample===3)configureSubjectInterval(scene);
-  // Subject — ręczna emisja: next(1), next(2) i complete do A/B; trzeci slajd techniczny, po interval.
+  // Subject — ręczna emisja: next(1), next(2) i complete do A/B; po interval i przed Subject + HTTP.
   if(id==='05-zrodla'&&scene.sourceExample===4)configureSubjectManual(scene);
   // shareReplay({ bufferSize: 1, refCount: false }) na interval: upstream działa także przy zerze odbiorców (EXTRAS).
   if(id==='x01-sharereplay-interval')configureShareReplayInterval(scene);

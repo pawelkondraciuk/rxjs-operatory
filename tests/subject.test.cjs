@@ -222,7 +222,7 @@ test('Subject checkpoint notes follow the stops and end with the question about 
  const source=html.match(/<template data-checkpoint-notes="05-zrodla-3">([\s\S]*?)<\/template>/)[1];
  const notes=Object.fromEntries([...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)].map(([,id,text])=>[id,text]));
  assert.deepEqual(Object.keys(notes),['ready',...Array.from(c.stops,s=>s.id),'finished']);
- assert.match(notes.ready,/Wracamy do Subjecta[\s\S]*nie wywołujemy next ręcznie — obiekt użytkownika pobierzemy z HTTP[\s\S]*trzy identyczne requesty[\s\S]*ci sami trzej odbiorcy/);
+ assert.match(notes.ready,/Kontynuujemy przykład Subjecta z poprzedniego slajdu[\s\S]*nie wywołujemy next ręcznie — obiekt użytkownika pobierzemy z HTTP[\s\S]*trzy identyczne requesty[\s\S]*ci sami trzej odbiorcy/);
  assert.match(notes.defined,/const http\$ = httpGet[\s\S]*tylko definicja: nie ma wykonania ani requestu/);
  assert.match(notes['connect-http'],/Jest również Observerem[\s\S]*http\$\.subscribe\(subject\$\)[\s\S]*Subject jest Observerem/);
  assert.doesNotMatch(notes['connect-http'],/Migawka/);
