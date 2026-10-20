@@ -31,23 +31,24 @@ test('the five HTTP slides share S1, frameless rows, palette and one response pe
  }
 });
 
-test('map + concatAll: seven manual steps separate creation, subscription, response and complete for one HTTP request',async()=>{
+test('map + concatAll: six manual steps separate creation, subscription, response and complete for one HTTP request',async()=>{
  const {scene,compile,render}=await family();
  for(const format of ['4:3','16:9']){
   const s=scene('08-map-strumienie',format),c=compile(s),ready=c.snapshot(0);
   const frames=Object.fromEntries(c.stops.map(stop=>[stop.id,c.snapshot(stop.time)]));
   const time=id=>c.stops.find(stop=>stop.id===id).time;
   assert.equal(s.code,'id$.pipe(map(id => httpGet(url(id))), concatAll())');
-  assert.deepEqual(Array.from(c.stops,stop=>stop.id),['subscribe','first','created','active','received','complete-a','complete']);
+  assert.deepEqual(Array.from(c.stops,stop=>stop.id),['first','created','active','received','complete-a','complete']);
   assert.equal(s.playback.entry,'manual');assert.equal(s.playback.afterLastManualStop,undefined);assert.equal(s.playback.finish,'hold');
   assert.equal(time('complete'),c.duration);
   assert.ok(c.stops.every((stop,i)=>!i||stop.time>c.stops[i-1].time));
   assert.deepEqual(Array.from(ready.nodes.filter(n=>n.visible),n=>n.id).sort(),['observer','op','projection','source']);
   assert.ok(ready.edges.every(edge=>!edge.visible));assert.equal(ready.innerWorkPanels[0].rows.length,0);
   assert.match(render(ready),/data-icon="inbox"/);
-  assert.ok(frames.subscribe.edges.filter(e=>e.subscriber).every(e=>e.visible&&e.phase==='subscribed'&&e.progress===1));
-  assert.equal(frames.subscribe.executionCounts.started,0);
-  assert.equal(frames.first.tokens.find(t=>t.phase==='transform').value,'A');
+  assert.ok(frames.first.edges.filter(e=>e.subscriber).every(e=>e.visible&&e.phase==='subscribed'&&e.progress===1));
+  assert.equal(frames.first.executionCounts.started,0);
+  assert.equal(frames.first.tokens.find(t=>t.phase==='transform').value,'A$');
+  assert.equal(frames.first.tokens.find(t=>t.phase==='transform').x,frames.first.nodes.find(n=>n.id==='projection').x);
   assert.equal(frames.first.innerWorkPanels[0].rows.length,0);
   const created=frames.created,row=created.innerWorkPanels[0].rows[0],html=render(created);
   assert.equal(created.executionCounts.started,0);
@@ -101,7 +102,7 @@ test('map + concatAll: seven manual steps separate creation, subscription, respo
  }
 });
 
-test('concatAll manual playback holds all eight frames, fast next finishes the current step, reset and AUTO preserve the final frame',async()=>{
+test('concatAll manual playback holds all seven frames, fast next finishes the current step, reset and AUTO preserve the final frame',async()=>{
  const {scene}=await family(),s=scene('08-map-strumienie'),h=await playbackHarness(),{player}=h.create({scene:s});
  for(const stop of player.stops){
   player.playTo(stop.time);h.advance(20000);

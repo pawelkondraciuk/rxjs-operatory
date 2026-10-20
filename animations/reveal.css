@@ -166,7 +166,8 @@
 /* catchError wewnątrz i Subject + interval: dwie linie kodu (druga ~52–54 znaki) muszą się zmieścić bez łamania. */
 .rx-player:is(.rx-catch-inside, .rx-two-lines) .rx-code { font-size:36px; }
 [data-ratio="16-9"] .rx-player:is(.rx-catch-inside, .rx-two-lines) .rx-code { font-size:24px; }
-/* Subject + HTTP: kod dopisywany linia po linii (codeLines.show). Pierwsza linia stoi dokładnie tam, gdzie zwykła
+/* Subject + HTTP, share + HTTP i oba shareReplay na interval: stała wysokość pierwszej linii kodu.
+   Kod dopisywany (codeLines.show) i stałe trzy linie zaczynają dokładnie tam, gdzie zwykła
    jednoliniowa (środek wiersza kodu), kolejne zajmują puste pasmo nad kafelkami diagramu (top 178/102 viewBox).
    Siatka i diagram są te same od READY, więc pojawienie się linii niczego nie przesuwa. */
 .rx-player.rx-code-steps .rx-code { align-self:start; padding-top:calc((108px - 1.25em) / 2); position:relative; z-index:1; }

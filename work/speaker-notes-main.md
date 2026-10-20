@@ -1,6 +1,6 @@
 # Speaker notes — RxJS: operatory, które znasz, ale bałeś się zagadać
 
-Pełny eksport notatek z [index.html](../index.html): **40 slajdów MAIN**, od powitania do pytań i feedbacku. Plan 33 tematów jest rozłożony na istniejące slajdy, warianty i checkpointy.
+Pełny eksport notatek z [index.html](../index.html): **39 slajdów MAIN**, od powitania do pytań i feedbacku. Plan 33 tematów jest rozłożony na istniejące slajdy, warianty i checkpointy.
 
 Kolejność części technicznej pochodzi z `mainOrder` w [animations/scene-config.js](../animations/scene-config.js); tytuły wariantów z `prepareSlides`. Otwarcie zachowuje kolejność HTML.
 
@@ -29,27 +29,26 @@ Pokazy symulują HTTP. Tam, gdzie rozpiska mówi o User, porównanie późnych o
 17. **Operator to funkcja** — `04-operator`
 18. **myMap od środka** — `04b-map-kod`
 19. **A share?** — `03-a-share`
-20. **share(): jedno HTTP, trzech odbiorców** — `04a-dwa-tory-2`
-21. **share: późny odbiorca uruchamia HTTP** — `20-sharereplay`
-22. **share() — kto odłączy źródło?** — `04a-dwa-tory-3`
-23. **shareReplay(1): kto zatrzyma interval?** — `20a-sharereplay-interval`
-24. **shareReplay z refCount: kiedy znika bufor?** — `20b-sharereplay-refcount`
-25. **shareReplay: późny odbiorca dostaje wynik** — `20-sharereplay-2`
-26. **A jeśli wartością jest Observable?** — `08-map-strumienie`
-27. **concatMap — Po kolei** — `09-concatmap`
-28. **mergeMap — Równocześnie** — `10-mergemap`
-29. **switchMap — Najnowsza subskrypcja** — `11-switchmap`
-30. **exhaustMap — Jestem zajęty** — `12-exhaustmap`
-31. **Zaprojektujmy wyszukiwarkę** — `12-intro-wyszukiwarka`
-32. **Źródło: skąd bierze się query$?** — `12-query-zrodlo`
-33. **Wybór operatora** — `12a-switchmap-live`
-34. **debounceTime — czekamy na ciszę** — `12b-debounce-switchmap`
-35. **distinctUntilChanged — znowu to samo?** — `11a-distinct-switchmap`
-36. **catchError — wyszukiwarka działa dalej** — `11b-catcherror-search`
-37. **catchError na zewnątrz** — `b04-catcherror`
-38. **retry — nie udało się? Spróbuj później** — `x03-retry-backoff`
-39. **To co, zagadamy do tych operatorów?** — `25-podsumowanie`
-40. **Pytania?** — `pytania`
+20. **share(): wspólny request i późny odbiorca** — `04a-dwa-tory-2`
+21. **share() — kto odłączy źródło?** — `04a-dwa-tory-3`
+22. **shareReplay(1): kto zatrzyma interval?** — `20a-sharereplay-interval`
+23. **shareReplay z refCount: kiedy znika bufor?** — `20b-sharereplay-refcount`
+24. **shareReplay: późny odbiorca dostaje wynik** — `20-sharereplay-2`
+25. **A jeśli wartością jest Observable?** — `08-map-strumienie`
+26. **concatMap — Po kolei** — `09-concatmap`
+27. **mergeMap — Równocześnie** — `10-mergemap`
+28. **switchMap — Najnowsza subskrypcja** — `11-switchmap`
+29. **exhaustMap — Jestem zajęty** — `12-exhaustmap`
+30. **Zaprojektujmy wyszukiwarkę** — `12-intro-wyszukiwarka`
+31. **Źródło: skąd bierze się query$?** — `12-query-zrodlo`
+32. **Wybór operatora** — `12a-switchmap-live`
+33. **debounceTime — czekamy na ciszę** — `12b-debounce-switchmap`
+34. **distinctUntilChanged — znowu to samo?** — `11a-distinct-switchmap`
+35. **catchError — wyszukiwarka działa dalej** — `11b-catcherror-search`
+36. **catchError na zewnątrz** — `b04-catcherror`
+37. **retry — nie udało się? Spróbuj później** — `x03-retry-backoff`
+38. **To co, zagadamy do tych operatorów?** — `25-podsumowanie`
+39. **Pytania?** — `pytania`
 
 ## 1. Społeczność
 
@@ -297,7 +296,7 @@ Stan końcowy: A — Paweł, B — Kondraciuk, C — Białystok, wszystkie compl
 
 - Cold: jeden user$, odbiorcy A: firstName, B: lastName, C: city. Trzy subscribe → trzy niezależne HTTP i trzy complete.
 - Przykład: kilka async pipe w Angularze. ❓ SALA: Ile requestów zobaczy backend?
-- share() + HTTP: ręczny Subject zastępujemy operatorem; A/B/C współdzielą jeden request.
+- share() + HTTP: A/B współdzielą request #1; po complete pytanie z sali i późny C uruchamia #2.
 - share() + interval: ostatni unsubscribe odłącza źródło. Każdy wariant ma osobne notatki checkpointów.
 
 ## 12. interval: strumień bez końca
@@ -426,47 +425,43 @@ Na ekranie: A — 1, 2, complete; B — 2, complete; C — tylko complete, bez h
 
 **0 — Wprowadzenie**
 
-Kontynuujemy przykład Subjecta z poprzedniego slajdu. Tym razem nie wywołujemy next ręcznie — obiekt użytkownika pobierzemy z HTTP. Pamiętacie Cold: trzy komponenty, trzy subskrypcje i trzy identyczne requesty. Tutaj ci sami trzej odbiorcy są już podłączeni do jednego Subjecta.
-
-Na ekranie: kod to tylko const subject$ = new Subject<User>(). Subject stoi na środku. A, B i C już subskrybują Subject, pola są puste, HTTP jeszcze nie istnieje. Requesty: 0. Prawo: definicja http$.
+Kontynuujemy przykład Subjecta: nie wywołujemy next ręcznie — obiekt użytkownika pobierzemy z HTTP. Początkowo są tylko firstName i lastName: A i B już subskrybują Subject. Dwa puste pola, Odbiorcy 2, Requesty HTTP 0. Miasto dodamy dopiero po zakończeniu HTTP i Subjecta.
 
 ### Checkpoint `defined`
 
-**1 — Definiujemy HTTP**
+**1 — Definicja HTTP**
 
-Dopisujemy const http$ = httpGet<User>('/api/users/42'). Po lewej pojawia się HTTP GET, ale to tylko definicja: nie ma wykonania ani requestu. A, B i C nadal czekają.
-
-Na ekranie: sam niebieski nagłówek HTTP GET, bez wiersza wykonania. Requesty: 0. Prawo: http$.subscribe(subject$).
+Dopisujemy const http$ = httpGet<User>('/api/users/42'). Pojawia się HTTP GET, ale to tylko definicja: nie ma wykonania ani requestu. A i B czekają.
 
 ### Checkpoint `connect-http`
 
 **2 — Podłączamy HTTP**
 
-Widzieliśmy, że Subject potrafi sam emitować wartości przez next(), ale nie musimy robić tego ręcznie. Jest również Observerem, więc możemy przekazać go bezpośrednio do subscribe innego Observable.
-
-Na ekranie: trzecia linia http$.subscribe(subject$). Subskrybujemy http$, a Subject jest Observerem. Impuls biegnie od Subjecta do HTTP — to jedna osobna subskrypcja (#1), nie subskrypcje A, B ani C. Dopiero teraz powstaje wiersz wykonania HTTP.
+Subject jest również Observerem. http$.subscribe(subject$) podłącza HTTP do Subjecta i uruchamia jedyny request. A i B nie zarządzają tym osobnym połączeniem; instrukcja zostaje w kodzie.
 
 ### Checkpoint `multicast`
 
-**3 — Jeden request, Subject rozsyła**
+**3 — Jeden User, dwa pola**
 
-HTTP pracuje — jeden request, niezależnie od liczby odbiorców Subjecta. Backend zwraca jeden obiekt użytkownika. HTTP emituje go do Subjecta, a Subject rozsyła tę samą wartość wszystkim trzem odbiorcom.
-
-Na ekranie: jedna kulka User rozdzieliła się w Subjecie na trzy — stoją przy portach A, B i C. Prawo: dotarcie do pól i complete.
+HTTP wykonuje jeden request. Jeden obiekt User trafia do Subjecta i rozdziela się na dwa identyczne powiadomienia next do A i B. Kulki stoją przy portach, pola jeszcze puste.
 
 ### Checkpoint `complete`
 
-**4 — Pola i complete**
+**4 — HTTP i Subject zakończone**
 
-Każdy odbiorca dostaje cały obiekt, ale wyświetla tylko potrzebne pole. Potem HTTP kończy się, a Subject przekazuje complete wszystkim odbiorcom.
+A wyświetla Paweł, B — Kondraciuk. HTTP emituje complete, Subject przekazuje je do A i B. HTTP i Subject są już zakończone, Odbiorcy 0, Requesty HTTP 1. ⏸ PAUZA: city jeszcze nie ma. Prawo: dodajemy pole miasta i subskrybujemy ten sam zakończony Subject.
+
+### Checkpoint `subscribed-c`
+
+**5 — City po complete**
+
+Dopiero teraz pojawia się user.city. C subskrybuje Subject, który dostał już complete. C otrzymuje tylko complete, bez żadnej wartości next i bez nowego requestu. Pole miasta pozostaje puste z ✓ complete. A i B zachowują dane i statusy, Odbiorcy cały czas 0, HTTP nadal tylko jeden.
 
 ### Checkpoint `finished`
 
-**5 — Podsumowanie**
+**6 — Podsumowanie**
 
-Ten sam efekt w widoku, ale zamiast trzech requestów mamy jeden. Subject potrafi rozesłać wynik jednego HTTP do wielu odbiorców. Ale sami musieliśmy podłączyć źródło. Czy RxJS może zrobić to za nas?
-
-Do tego pytania wrócimy przy share(). Najpierw sprawdźmy, co dzieje się z ręcznie podłączonym źródłem, gdy odbiorcy odchodzą. Prawo: „Subject — kto odłączy źródło?”.
+Jeden HTTP zasilił A i B. Późny C dostał samo complete: Subject nie odtwarza danych i po zakończeniu nie zaczyna od nowa. Ale sami musieliśmy podłączyć źródło. Czy RxJS może zrobić to za nas? Do tego wrócimy przy share(). Najpierw sprawdźmy, kto odłączy ręcznie podłączony interval. Prawo: „Subject — kto odłączy źródło?”.
 
 ### Notatki bazowe rodziny — zastępowane przez checkpointy
 
@@ -672,7 +667,7 @@ subscriber z new Observable<R>(subscriber => {...}) w linii 3 to odbiorca wyniko
 
 Na razie mamy jeden widok, który wyświetla pełne imię i nazwisko. Pamiętacie Cold: trzy niezależne elementy interfejsu uruchamiały trzy requesty. Subject pozwolił rozesłać wynik jednego HTTP, ale musieliśmy sami podłączyć źródło. Czy operator może zrobić to za nas?
 
-Prawo: „A share?”. Potem wrócimy do surowego user$ = httpGet<User>('/api/users/42'), bez map, i tych samych trzech pól (firstName, lastName, city).
+Prawo: „A share?”. Potem wrócimy do surowego user$ = httpGet<User>('/api/users/42'), bez map, i pól firstName/lastName, a po ich complete dołożymy późne city.
 
 ## 19. A share?
 
@@ -682,9 +677,9 @@ Prawo: „A share?”. Potem wrócimy do surowego user$ = httpGet<User>('/api/us
 
 - ❓ SALA: A share? Kto używa i co właściwie współdzielimy?
 - Przypomnij: Cold — trzy requesty; Subject + HTTP — jeden request, ale ręczne podłączenie.
-- Czy operator może podłączyć źródło i zarządzać nim za nas? Dalej: share(), jedno HTTP i trzech odbiorców.
+- Czy operator może podłączyć źródło i zarządzać nim za nas? Dalej: share(), wspólny request A/B i późny C.
 
-## 20. share(): jedno HTTP, trzech odbiorców
+## 20. share(): wspólny request i późny odbiorca
 
 **ID:** `04a-dwa-tory-2`
 
@@ -692,177 +687,83 @@ Prawo: „A share?”. Potem wrócimy do surowego user$ = httpGet<User>('/api/us
 
 **0 — Definicja**
 
-Ten sam przykład co w Cold: user$ = httpGet<User>('/api/users/42'). I ci sami trzej odbiorcy: imię, nazwisko i miasto.
-
-Na ekranie: sama definicja user$, nagłówek HTTP GET i trzy puste pola widoku. Nic jeszcze nie działa, Requesty HTTP: 0. Prawo: .pipe(share()). Cel: 45–60 s.
+Ten sam przykład co w Cold: user$ = httpGet<User>('/api/users/42'). Dwa puste pola: imię A i nazwisko B. Nic nie działa. Miasto pojawi się później.
 
 ### Checkpoint `share-added`
 
 **1 — Dodajemy share()**
 
-Dopisujemy jeden operator — .pipe(share()). Między HTTP a polami pojawia się share(). To nadal tylko definicja: nikt nie subskrybuje, request nie istnieje.
-
-Na ekranie: druga linia kodu i kafelek share() bez wierszy. Requesty HTTP: 0. Prawo: A subskrybuje.
-
-### Checkpoint `subscribed-a`
-
-**2 — A subskrybuje**
-
-A subskrybuje jako pierwszy. Share automatycznie subskrybuje HTTP i uruchamia request — nie podłączamy niczego ręcznie, jak przy Subjecie.
-
-Impuls .subscribe() A biegnie przez share() do HTTP; powstaje wspólne wykonanie #1 (fioletowe — uruchomił je A, zarządza nim share). Requesty HTTP: 1.
-
-### Checkpoint `joined-b`
-
-**3 — B dołącza**
-
-- ⏸ PAUZA: B dołącza; jego subscribe kończy się na share(). Jeden HTTP nadal trwa.
-
-B dołącza do istniejącego share. Nie subskrybujemy ponownie HTTP. Obaj odbiorcy korzystają z tego samego wykonania.
-
-Na ekranie: pomarańczowy impuls zatrzymał się na share(), w share() są wiersze A i B, a HTTP ma nadal jeden wiersz #1 i ten sam, wciąż rosnący postęp. C jeszcze nie subskrybuje. Requesty HTTP: 1. Możesz tu mówić dowolnie długo — request czeka.
-
-### Checkpoint `joined-c`
-
-**4 — C dołącza**
-
-C robi to samo. Zobaczcie, że wszystkie trzy subskrypcje kończą się na share. HTTP nadal wykonuje się tylko raz.
-
-W share() są trzy wiersze, HTTP ma jeden wiersz #1. Wszyscy subskrybują tę samą instancję user$ przed odpowiedzią — share() nie buforuje wartości.
-
-### Checkpoint `multicast`
-
-**5 — HTTP emituje User**
-
-Przychodzi wynik z serwera. Share rozsyła ten sam obiekt do wszystkich trzech odbiorców, dokładnie tak jak wcześniej Subject.
-
-Jedna kulka „{…}” (cały User) dociera do share() i wychodzi jako trzy identyczne kulki. Pola: Paweł, Kondraciuk, Białystok.
+Dopisujemy .pipe(share()). To nadal tylko definicja, bez requestu.
 
 ### Checkpoint `complete`
 
-**6 — Complete**
+**2 — Wspólny request A/B i complete**
 
-- ❓ SALA: Ile HTTP zobaczył backend? Jeden.
+Jeden krok: A subskrybuje, B dołącza w trakcie HTTP #1, krótki postęp 1,2 s, jeden User trafia do obu pól, a potem complete. Bez pośrednich postojów. A: Paweł, B: Kondraciuk; Odbiorcy 0, Requesty 1.
 
-I gotowe. Jeden request zamiast trzech, bez ręcznego podłączania Subjecta do HTTP.
+❓ SALA: A co, jeśli ktoś zasubskrybuje po zakończeniu requestu? ⏸ PAUZA także w AUTO. Dopiero następne prawo dodaje C.
 
-Zielony impuls complete przechodzi z HTTP przez share() do A, B i C; przy polach pojawia się ✓ complete.
+### Checkpoint `complete-c`
+
+**3 — Późny C: HTTP #2, wynik i complete**
+
+W jednym kroku pojawia się user.city, C subskrybuje po complete i uruchamia HTTP #2. Postęp 1,2 s, potem Białystok i complete — bez zatrzymania na trwającym requeście. A/B zachowują wcześniejsze wyniki. Requesty: 2, Odbiorcy: 0.
 
 ### Checkpoint `finished`
 
-**Stan końcowy**
+**Wynik**
 
-Share współdzieli request automatycznie — ale tylko z tymi, którzy przyszli, zanim się zakończył. A co, jeśli ktoś zasubskrybuje po zakończeniu requestu?
-
-Requesty HTTP: 1, odbiorcy: 3. Prawo: share — późny odbiorca.
+Share współdzieli aktywne wykonanie i resetuje się po complete. Późny odbiorca uruchamia nowy request. Prawo: share() — kto odłączy źródło?
 
 ### Notatki bazowe rodziny — zastępowane przez checkpointy
 
 - Cold: jeden user$, odbiorcy A: firstName, B: lastName, C: city. Trzy subscribe → trzy niezależne HTTP i trzy complete.
 - Przykład: kilka async pipe w Angularze. ❓ SALA: Ile requestów zobaczy backend?
-- share() + HTTP: ręczny Subject zastępujemy operatorem; A/B/C współdzielą jeden request.
+- share() + HTTP: A/B współdzielą request #1; po complete pytanie z sali i późny C uruchamia #2.
 - share() + interval: ostatni unsubscribe odłącza źródło. Każdy wariant ma osobne notatki checkpointów.
 
-## 21. share: późny odbiorca uruchamia HTTP
-
-**ID:** `20-sharereplay`
-
-### Checkpoint `ready`
-
-**0 — Definicja**
-
-Zostajemy przy HTTP. Wiemy już, że share współdzieli jedno aktywne wykonanie. Ale co stanie się, jeśli drugi odbiorca pojawi się dopiero po zakończeniu requestu?
-
-### Checkpoint `complete-a`
-
-**1 — A: request #1, 42, complete**
-
-- ⏸ PAUZA: HTTP #1 zakończone.
-- ❓ SALA: Co dostanie nowy B? Poczekaj przed kolejnym krokiem.
-
-A subskrybuje jako pierwszy, share podpina się do HTTP i startuje request #1. Odpowiedź przychodzi od razu: 42 trafia do A, potem complete. Request #1 i A są zakończone, a share domyślnie resetuje się po complete.
-
-Pytanie: co dostanie B, jeśli przyjdzie teraz?
-
-### Checkpoint `complete-b`
-
-**2 — Późny B: request #2**
-
-B subskrybuje po complete. Share nie pamięta 42 i nie ma już aktywnego upstreamu, więc subskrybuje HTTP od nowa — powstaje request #2. B dostaje nowe 42 i complete.
-
-### Checkpoint `finished`
-
-**3 — Stan końcowy**
-
-Dwa osobne wiersze HTTP: #1 dla A i #2 dla B. B nie dostał powtórki starej wartości — uruchomił własny request. Licznik: dwa requesty, zero aktywnych.
-
-HTTP kończy się samo. A co ze źródłem, które nigdy się nie kończy — kto je zatrzyma, gdy odbiorcy zrezygnują? Pamiętacie Subject + interval: źródło działało dalej po odejściu odbiorców. Prawo: share() + interval.
-
-### Notatki bazowe rodziny — zastępowane przez checkpointy
-
-- share(): A → HTTP #1 → 42 → complete. ⏸ PAUZA: zakończone połączenie.
-- ❓ SALA: Co dostanie nowy B? Domyślny reset po complete → HTTP #2; brak replay i cache.
-- shareReplay({ bufferSize: 1, refCount: true }): jedno HTTP, wartość 42 zostaje w buforze po complete.
-- Późny B → 42 z bufora i complete, bez nowego HTTP. complete ≠ unsubscribe.
-- Wariant share prowadzi do share + interval; wariant shareReplay do map + concatAll. Szczegóły w checkpointach.
-
-## 22. share() — kto odłączy źródło?
+## 21. share() — kto odłączy źródło?
 
 **ID:** `04a-dwa-tory-3`
 
 ### Checkpoint `ready`
 
-**0 — Wszyscy odbierają**
+**0 — Dwóch odbiorców**
 
-Wracamy do sytuacji z Subject + interval: trzech odbiorców i jedno wspólne źródło. Zmienia się jedna linia: const shared$ = interval(1000).pipe(share()). Nie ma ręcznego connection.
-
-Na ekranie: slajd startuje już działający — share() subskrybuje interval (tor #1), A, B i C odbierają co sekundę. Każde prawo odłącza jednego odbiorcę: A, potem B, potem C. Cel: 30–45 s.
+const shared$ = interval(1000).pipe(share()). A i B już odbierają z jednego wykonania interval #1. C jeszcze nie ma. Nie ma ręcznego connection. Kolejne kroki: unsubscribe A, unsubscribe B, a potem późny subscribe C.
 
 ### Checkpoint `unsub-a`
 
 **1 — A robi unsubscribe**
 
-subA.unsubscribe(). Tak jak w Subject — szary impuls × kończy się na share(). B i C nadal słuchają, więc share() dalej subskrybuje interval i rozsyła kolejne wartości.
-
-Odbiorcy share(): 2, licznik emisji rośnie. Prawo: B odchodzi.
+subA.unsubscribe(). Szary impuls × kończy się na share(). B nadal słucha, więc interval #1 emituje dalej. Odbiorcy share(): 1. Prawo: odchodzi B — ostatni odbiorca.
 
 ### Checkpoint `unsub-b`
 
-**2 — B robi unsubscribe**
+**2 — B odchodzi jako ostatni**
 
-- ⏸ PAUZA: C jest ostatnim odbiorcą.
-- ❓ SALA: Co z timerem po ostatnim unsubscribe?
+subB.unsubscribe(). Teraz nie ma już odbiorców, więc share() sam odłącza upstream: × biegnie do interval #1, źródło szarzeje i przestaje emitować. Bez complete. Odbiorcy: 0. Możesz poczekać: licznik emisji nie rośnie. Prawo: dodajemy późnego C.
 
-subB.unsubscribe(). Impuls znowu zatrzymuje się na share(); interval nadal emituje do C.
+### Checkpoint `subscribed-c`
 
-Pytanie do sali: C jest ostatnim odbiorcą. Czy źródło będzie dalej emitować, jeśli odejdzie ostatni odbiorca?
+**3 — Późny C: nowe interval od 0**
 
-Na ekranie emisje trwają — poczekaj na odpowiedzi. Prawo: C odchodzi.
-
-### Checkpoint `unsub-c`
-
-**3 — C, ostatni odbiorca**
-
-Nie. Tym razem impuls nie zatrzymuje się na share(): nikt już nie słucha, więc share() sam odłącza upstream i interval przestaje emitować.
-
-Szary impuls × przechodzi od C przez share() aż do interval, wiersz #1 szarzeje, licznik emisji staje. Bez complete — to unsubscribe, nie zakończenie strumienia. W Subject interval pracował dalej.
+Dopiero teraz pojawia się C i subskrybuje ten sam shared$. Share tworzy nową subskrypcję źródła: interval #2 zaczyna od 0, potem 1, 2… C nie dostaje historii A/B, a dawne wykonanie #1 zostaje odłączone. Emisje do C trwają na żywo. Odbiorcy: 1. Prawo: następny slajd.
 
 ### Checkpoint `finished`
 
-**Podsumowanie — share() sprząta sam**
+**Podsumowanie — odłączenie i ponowny start**
 
-Share umie odłączyć źródło, kiedy ostatni odbiorca odchodzi. Ale nie pamięta wartości — widzieliśmy to przy późnym B, który uruchomił HTTP #2. A gdyby operator zapamiętał ostatnią wartość?
-
-Prawo: shareReplay(1) — najpierw na interval.
+Share odłącza źródło po odejściu ostatniego odbiorcy. Późny C uruchamia nowe wykonanie interval od 0, bez poprzednich wartości. Na końcowym kadrze A/B są odłączeni, #1 zatrzymane, C odbiera z aktywnego #2. A gdyby operator pamiętał ostatnią wartość? Prawo: shareReplay(1) — najpierw na interval.
 
 ### Notatki bazowe rodziny — zastępowane przez checkpointy
 
 - Cold: jeden user$, odbiorcy A: firstName, B: lastName, C: city. Trzy subscribe → trzy niezależne HTTP i trzy complete.
 - Przykład: kilka async pipe w Angularze. ❓ SALA: Ile requestów zobaczy backend?
-- share() + HTTP: ręczny Subject zastępujemy operatorem; A/B/C współdzielą jeden request.
+- share() + HTTP: A/B współdzielą request #1; po complete pytanie z sali i późny C uruchamia #2.
 - share() + interval: ostatni unsubscribe odłącza źródło. Każdy wariant ma osobne notatki checkpointów.
 
-## 23. shareReplay(1): kto zatrzyma interval?
+## 22. shareReplay(1): kto zatrzyma interval?
 
 **ID:** `20a-sharereplay-interval`
 
@@ -922,7 +823,7 @@ Jak to naprawić? shareReplay({ bufferSize: 1, refCount: true }). Prawo: ten sam
 - B odchodzi → źródło nadal aktywne bez odbiorców.
 - Dalej: jawne refCount: true.
 
-## 24. shareReplay z refCount: kiedy znika bufor?
+## 23. shareReplay z refCount: kiedy znika bufor?
 
 **ID:** `20b-sharereplay-refcount`
 
@@ -954,19 +855,19 @@ B subskrybuje i od razu dostaje tę wartość z bufora — kulka wyjeżdża z ki
 
 **3 — Emisje wracają**
 
-- ❓ SALA: Co ze źródłem i buforem, gdy odejdzie ostatni odbiorca przed complete?
-
-interval emituje dalej, A i B dostają te same wartości, bufor trzyma ostatnią.
-
-Pytanie do sali: za chwilę odłączę A i B. Co stanie się z interval? I kiedy shareReplay wyczyści bufor — przy unsubscribe ostatniego odbiorcy, czy dopiero przy kolejnym subscribe? Prawo: odpowiedź.
+Interval emituje dalej, A i B dostają te same wartości. Prawo odłącza kolejno A i B; nowe pytanie pokażemy dopiero po B.
 
 ### Checkpoint `unsub-all`
 
-**4 — refCount = 0: reset**
+**4 — B odłączony: co zrobi interval?**
 
-subA.unsubscribe(), potem subB.unsubscribe(). Gdy odchodzi ostatni odbiorca, refCount spada do zera i shareReplay od razu robi reset: porzuca bufor — kieszeń jest pusta — i odłącza interval (× dociera do #1). Odbiorcy: 0, Upstream: 0.
+A odłączył się wcześniej, teraz B też odszedł. Odbiorcy: 0, Upstream: 1. ⏸ PAUZA: zwykłe połączenie do interval i ostatnia wartość w buforze. ❓ SALA: Co teraz zrobi interval — będzie dalej emitował czy nastąpi unsubscribe? Nic nie zdradza odpowiedzi. Prawo: pokaż reset. To zatrzymany etap ilustracji, bez dodatkowych emisji.
 
-Odpowiedź: przy unsubscribe. W RxJS 7 shareReplay z refCount: true to share() z ReplaySubject i resetOnRefCountZero: true — stary ReplaySubject przepada natychmiast, nowy powstanie dopiero przy następnej subskrypcji. Prawo: późny odbiorca C.
+### Checkpoint `reset`
+
+**5 — Odpowiedź: reset przy unsubscribe**
+
+Odpowiedź: przy unsubscribe ostatniego odbiorcy aktywnego źródła. shareReplay czyści bufor i odłącza interval: × dociera do #1. Odbiorcy: 0, Upstream: 0. W RxJS 7 resetOnRefCountZero: true porzuca stary ReplaySubject. Prawo: C zaczyna od 0.
 
 ### Checkpoint `subscribed-c`
 
@@ -998,73 +899,29 @@ Wyjątek: gdy źródło zakończyło się complete, resetu nie ma i bufor zostaj
 - Późny C → nowe wykonanie interval od 0; odejście C znów sprząta źródło.
 - Dalej: ta sama konfiguracja i zakończony HTTP — czy bufor zostanie?
 
-## 25. shareReplay: późny odbiorca dostaje wynik
+## 24. shareReplay: późny odbiorca dostaje wynik
 
 **ID:** `20-sharereplay-2`
 
 ### Checkpoint `ready`
 
-**0 — Definicja, pusty bufor**
+**0 — HTTP i pusty bufor**
 
-Wracamy do HTTP: przy zwykłym share() późny odbiorca uruchamiał nowy request. Teraz shareReplay({ bufferSize: 1, refCount: true }) — dokładnie ta sama konfiguracja co przed chwilą na interval. Różnica: HTTP sam się kończy (complete). Czy po odejściu A bufor też zniknie?
-
-### Checkpoint `subscribed-a`
-
-**1 — A subskrybuje**
-
-A subskrybuje jako pierwszy i uruchamia HTTP.
-
-### Checkpoint `request`
-
-**2 — HTTP pracuje**
-
-Request trwa, ale zwróćcie uwagę, że shareReplay ma dodatkową odpowiedzialność — potrafi zapamiętać wynik.
-
-Moment na różnicę unsubscribe vs complete: gdyby A zrobił teraz unsubscribe, z refCount: true ostatni odbiorca odłączyłby HTTP — request zostałby anulowany, a pusty bufor zresetowany. Tutaj jednak HTTP sam się zakończy (complete) i ten wynik zostanie w buforze.
-
-### Checkpoint `stored`
-
-**3 — 42 do A i do bufora**
-
-HTTP zwraca 42. Ta wartość trafia do odbiorcy A, ale jednocześnie zostaje zapisana w buforze operatora.
-
-### Checkpoint `complete-a`
-
-**4 — Complete**
-
-- complete ≠ unsubscribe. Cache zakończonego HTTP pozostaje także przy refCount: true. W tym diagramie odpowiedź oznaczamy wartością 42.
-
-Request się kończy, ale zapamiętana wartość zostaje. Po complete shareReplay nie robi resetu — refCount: true czyści bufor tylko wtedy, gdy źródło jeszcze trwa (jak interval przed chwilą).
-
-### Checkpoint `subscribed-b`
-
-**5 — Późny odbiorca B**
-
-Dopiero teraz pojawia się B. To jest późny odbiorca.
-
-### Checkpoint `replayed`
-
-**6 — 42 z bufora**
-
-B dostaje 42 bezpośrednio z bufora, a następnie complete. Nie wykonujemy drugiego requestu.
-
-Na ekranie: kulka 42 jedzie z bufora do B, za nią zielony impuls complete; kulka zostaje w buforze, licznik requestów: 1.
+Ta sama konfiguracja shareReplay({ bufferSize: 1, refCount: true }), teraz na HTTP. Jedno prawo uruchamia szybki, ciągły pokaz bez pośrednich postojów: A subskrybuje, HTTP zwraca 42 do A i bufora, potem complete; późny B dostaje 42 bezpośrednio z bufora, a następnie complete. Nie wykonujemy drugiego requestu. Obserwuj, że po complete bufor pozostaje.
 
 ### Checkpoint `finished`
 
-**7 — Stan końcowy**
+**Wynik**
 
-I to jest kluczowa różnica względem share(): jeden request, a późny odbiorca nadal dostaje wynik. Jeśli chcemy pamiętać ostatnie emisje, wtedy sięgamy po shareReplay().
+Jeden request, A i późny B dostali 42 i complete. refCount: true czyści bufor aktywnego źródła przy odejściu ostatniego odbiorcy, ale wynik zakończonego HTTP zostaje. Prawo: A jeśli wartością jest Observable?
 
 ### Notatki bazowe rodziny — zastępowane przez checkpointy
 
-- share(): A → HTTP #1 → 42 → complete. ⏸ PAUZA: zakończone połączenie.
-- ❓ SALA: Co dostanie nowy B? Domyślny reset po complete → HTTP #2; brak replay i cache.
-- shareReplay({ bufferSize: 1, refCount: true }): jedno HTTP, wartość 42 zostaje w buforze po complete.
-- Późny B → 42 z bufora i complete, bez nowego HTTP. complete ≠ unsubscribe.
-- Wariant share prowadzi do share + interval; wariant shareReplay do map + concatAll. Szczegóły w checkpointach.
+- Jeden szybki pokaz: HTTP → A i bufor → complete → późny B z bufora i complete.
+- Jeden request; bufor zakończonego HTTP zostaje także z refCount: true.
+- Dalej: map + concatAll.
 
-## 26. A jeśli wartością jest Observable?
+## 25. A jeśli wartością jest Observable?
 
 **ID:** `08-map-strumienie`
 
@@ -1074,17 +931,11 @@ I to jest kluczowa różnica względem share(): jeden request, a późny odbiorc
 
 Od razu widać id$, map, concatAll i odbiorcę S1. To definicja: nie ma jeszcze subskrypcji ani requestu HTTP. Każde następne prawo odtwarza jeden krok.
 
-### Checkpoint `subscribe`
-
-**2 — Główna subskrypcja**
-
-S1 subskrybuje concatAll, ten map, a map — id$. Mamy jeden główny tor. Żaden HTTP jeszcze nie działa. To proste wprowadzenie: jedna wartość, jeden Observable, jeden request.
-
 ### Checkpoint `first`
 
-**3 — id$ emituje A**
+**2 — Subskrypcja, emisja i A$ w map**
 
-Źródło wysłało A. Zatrzymajmy się przy wejściu do map: co zwróci funkcja id => httpGet(url(id))? Observable, czyli definicję przyszłego requestu.
+S1 subskrybuje id$ przez concatAll i map, id$ emituje A, map zamienia A w zimne Observable A$. ⏸ PAUZA: A$ stoi na środku map, jeszcze przed concatAll. To Observable, nie odpowiedź HTTP. Panel innerów jest pusty, liczniki 0/0. Następne prawo przekazuje A$ do concatAll.
 
 ### Checkpoint `created`
 
@@ -1136,7 +987,7 @@ S1 otrzymał A i complete. Jeden request HTTP: map tworzy Observable, concatAll 
 - Inner complete; outer nadal może działać. Tutaj jedna wartość i jeden request.
 - Wiele wejść i kolejka — następny slajd, concatMap.
 
-## 27. concatMap — Po kolei
+## 26. concatMap — Po kolei
 
 **ID:** `09-concatmap`
 
@@ -1203,7 +1054,7 @@ Wyniki A, B, C w kolejności wejść. Koszt: B czekało na całe A.
 - #1 complete → dopiero wtedy projekcja i start B. C w tej animacji przychodzi już po B; gdyby przyszło wcześniej, też czekałoby.
 - Kolejność zachowana, brak równoległości. Przykład: kolejne zapisy formularza.
 
-## 28. mergeMap — Równocześnie
+## 27. mergeMap — Równocześnie
 
 **ID:** `10-mergemap`
 
@@ -1254,7 +1105,7 @@ S1 dostaje wyniki w kolejności nadejścia: B, A, C. Globalne complete przyszło
 - ❓ SALA: Który request skończy pierwszy? Wyniki według odpowiedzi: B, A, C.
 - complete całości dopiero po outer i wszystkich innerach.
 
-## 29. switchMap — Najnowsza subskrypcja
+## 28. switchMap — Najnowsza subskrypcja
 
 **ID:** `11-switchmap`
 
@@ -1305,7 +1156,7 @@ S1 dostaje B i C. Anulowane A nie wraca. Pamiętaj: unsubscribe nie cofa operacj
 - unsubscribe ≠ complete. Abort klienta nie cofa operacji na serwerze.
 - Typowe zastosowanie: wyszukiwarka.
 
-## 30. exhaustMap — Jestem zajęty
+## 29. exhaustMap — Jestem zajęty
 
 **ID:** `12-exhaustmap`
 
@@ -1351,7 +1202,7 @@ A kończy się normalnie, B nie wraca. C przychodzi po zakończeniu A i dostaje 
 - Przykład: formularz i wielokrotny submit. Wyniki tej animacji: A, C.
 - Dalej: cztery strategie HTTP zastosujemy w wyszukiwarce.
 
-## 31. Zaprojektujmy wyszukiwarkę
+## 30. Zaprojektujmy wyszukiwarkę
 
 **ID:** `12-intro-wyszukiwarka`
 
@@ -1363,7 +1214,7 @@ A kończy się normalnie, B nie wraca. C przychodzi po zakończeniu A i dostaje 
 - Spacja pauzuje/wznawia, strzałki zmieniają slajd. Dane są lokalną symulacją.
 - Dalej: fromEvent → map → trim → query$, współdzielone przez share().
 
-## 32. Źródło: skąd bierze się query$?
+## 31. Źródło: skąd bierze się query$?
 
 **ID:** `12-query-zrodlo`
 
@@ -1405,7 +1256,7 @@ Druk, F i Upcoming pokazują pełny pipeline i angular u obu odbiorców. Mamy go
 - share() współdzieli jedną subskrypcję do zdarzeń i jedno wykonanie map.
 - Kolejne kroki: map → share → subskrypcje i pisanie. Dalej: wybór operatora HTTP.
 
-## 33. Wybór operatora
+## 32. Wybór operatora
 
 **ID:** `12a-switchmap-live`
 
@@ -1442,21 +1293,15 @@ switchMap odsłonięty, HTTP #3 dla rea zakończone, #4 dla re anulowane, #5 dla
 - Szybkie pisanie → mnóstwo requestów. switchMap pilnuje aktualności, nie częstotliwości.
 - ❓ SALA: Jak ograniczyć liczbę wywołań? Dalej: debounceTime.
 
-## 34. debounceTime — czekamy na ciszę
+## 33. debounceTime — czekamy na ciszę
 
 **ID:** `12b-debounce-switchmap`
 
 ### Checkpoint `ready`
 
-**0 — Czekamy na ciszę**
+**0 — Pipeline już podłączony**
 
-Drugi etap projektowania wyszukiwarki. Dodajemy debounceTime(300) przed switchMap. Ilustracja jest spowolniona 5×: litery co 0,5 s, cisza 1,5 s; timer pokazuje logiczne 300 ms. Przeloty ilustrują komunikację. Pipeline gotowy, input pusty. Ręczne etapy kończą się po wyniku HTTP #2; kolejne „dalej” uruchamia trzeci request i pokaz ciągły.
-
-### Checkpoint `subscribed`
-
-**1 — Subskrypcja**
-
-Odbiorca subskrybuje switchMap, potem debounceTime i query$. Impulsy subscribe przeszły w lewo. Input jest pusty i nie ma HTTP. Podczas odliczania pokażemy czas, poza nim lane nie ma kreski ani dodatkowego napisu.
+Cała główna subskrypcja jest już zestawiona: odbiorca, operatory i źródło mają widoczne połączenia. Nie odtwarzamy subscribe. Brak emisji i requestów HTTP; pierwsze prawo uruchamia zdarzenia przykładu.
 
 ### Checkpoint `buffered`
 
@@ -1516,15 +1361,15 @@ Druk, F i Upcoming pokazują trzy HTTP: #1 rea anulowany przez switchMap, #2 rea
 - Ilustracja jest spowolniona 5×. Po wyniku HTTP #2 kolejne „dalej” uruchamia pokaz ciągły.
 - Dalej: debounce nie porównuje fraz — distinctUntilChanged.
 
-## 35. distinctUntilChanged — znowu to samo?
+## 34. distinctUntilChanged — znowu to samo?
 
 **ID:** `11a-distinct-switchmap`
 
 ### Checkpoint `ready`
 
-**0 — Dokładamy distinctUntilChanged**
+**0 — Pipeline już podłączony**
 
-Operator i pełny kod są widoczne od wejścia, input i pamięć są puste. distinctUntilChanged pamięta jedną wartość — ostatnią, którą sam wyemitował — i odrzuca kolejną, jeśli jest identyczna. Kolejne strzałki pokazują pierwszy sukces, duplikat, trzy udane HTTP, następny aktywny HTTP, error z odłączeniem i dopiero potem pisanie bez reakcji pipeline’u. Pierwsze dalej uruchomi react i zatrzyma się po wyniku oraz complete inner.
+Cała główna subskrypcja jest już zestawiona: odbiorca, operatory i źródło mają widoczne połączenia. Nie odtwarzamy subscribe. Brak emisji i requestów HTTP; pierwsze prawo uruchamia zdarzenia przykładu.
 
 ### Checkpoint `first`
 
@@ -1576,17 +1421,15 @@ Po strzałce w prawo wpisaliśmy znowu react. Fraza przeszła przez distinctUnti
 - Ponowne react po ang przechodzi. Potem error 500 zamyka subskrypcję; dalsze pisanie zmienia tylko UI.
 - Dalej: catchError wewnątrz switchMap.
 
-## 36. catchError — wyszukiwarka działa dalej
+## 35. catchError — wyszukiwarka działa dalej
 
 **ID:** `11b-catcherror-search`
 
 ### Checkpoint `ready`
 
-**0 — Gotowa wyszukiwarka**
+**0 — Pipeline już podłączony**
 
-Poprzednio jeden HTTP zwrócił 500 i zakończył całą wyszukiwarkę. Tym razem przechwycimy błąd wewnątrz switchMap.
-
-Na ekranie: ten sam pipeline query$ → debounceTime → distinctUntilChanged → switchMap → odbiorca i cały kod, w którym httpGet(url(query)) ma własne .pipe(catchError(() => of([]))). Input jest pusty, nie ma subskrypcji ani requestów. To nowa subskrypcja, a nie przywrócenie tej zamkniętej błędem na poprzednim slajdzie. Pierwsze dalej: subscribe, wpisanie react i start HTTP #1.
+Cała główna subskrypcja jest już zestawiona: odbiorca, operatory i źródło mają widoczne połączenia. Nie odtwarzamy subscribe. Tym razem przechwycimy błąd wewnątrz switchMap. Brak emisji i requestów HTTP; pierwsze prawo uruchamia zdarzenia przykładu.
 
 ### Checkpoint `request`
 
@@ -1638,15 +1481,15 @@ Stan końcowy: HTTP #1 react — error 500, catchError dał [] i complete; HTTP 
 - Outer query$ nadal działa; angular → kolejny HTTP.
 - Błąd jednego requestu nie kończy wyszukiwarki. Dalej: catchError poza switchMap.
 
-## 37. catchError na zewnątrz
+## 36. catchError na zewnątrz
 
 **ID:** `b04-catcherror`
 
 ### Checkpoint `ready`
 
-**0 — Start**
+**0 — Pipeline już podłączony**
 
-Zobaczmy, co się stanie, gdy HTTP zwróci błąd, a catchError znajduje się na zewnątrz switchMap.
+Cała główna subskrypcja jest już zestawiona: odbiorca, operatory i źródło mają widoczne połączenia. Nie odtwarzamy subscribe. catchError znajduje się na zewnątrz switchMap. Brak emisji i requestów HTTP; pierwsze prawo uruchamia zdarzenia przykładu.
 
 ### Checkpoint `request`
 
@@ -1701,27 +1544,15 @@ W wyszukiwarce obsłużyliśmy błąd pojedynczego HTTP. CatchError na zewnątrz
 - ⏸ PAUZA: kolejne kliknięcie B → brak reakcji. Położenie catchError zmienia zachowanie aplikacji.
 - To of([]) kończy wynik; inny zastępczy Observable mógłby działać dłużej. Dalej: retry.
 
-## 38. retry — nie udało się? Spróbuj później
+## 37. retry — nie udało się? Spróbuj później
 
 **ID:** `x03-retry-backoff`
 
 ### Checkpoint `ready`
 
-**0 — Definicja**
+**0 — Pierwsza próba już podłączona**
 
-- count: 3 = jedna próba + trzy ponowienia. Każda ponowna subskrypcja to nowy HTTP.
-
-Wiemy już, że subskrypcja cold HTTP uruchamia request. Ale co zrobić, gdy request nie powiedzie się z powodu chwilowego problemu z siecią?
-
-Widać definicje HTTP GET i retry oraz kod. Nie ma jeszcze odbiorcy ani wykonania HTTP. Requesty HTTP: 0, Aktywne: 0.
-
-### Checkpoint `request-1`
-
-**1 — A subskrybuje**
-
-A pojawia się i tworzy jedną główną subskrypcję. Impuls przechodzi przez retry, a pierwsza subskrypcja źródła uruchamia HTTP #1 natychmiast.
-
-Mamy jedną subskrypcję A, ale HTTP może zostać wykonane kilka razy. Requesty HTTP: 1, Aktywne: 1.
+A jest już podłączony przez retry do HTTP #1. Widać całą subskrypcję i pierwszy request z postępem 0%; liczniki 1/1. Pierwsze prawo pokazuje pracę i błąd pierwszej próby. Retry ponownie subskrybuje cold HTTP po 1/2/4 s.
 
 ### Checkpoint `error-1`
 
@@ -1806,7 +1637,7 @@ W produkcji często dodaje się maksymalne opóźnienie i jitter, żeby wielu kl
 - Po wyczerpaniu prób error idzie dalej. Cel: mniej agresywne obciążanie backendu.
 - Dalej: trzy pytania podsumowania i puenta.
 
-## 39. To co, zagadamy do tych operatorów?
+## 38. To co, zagadamy do tych operatorów?
 
 **ID:** `25-podsumowanie`
 
@@ -1827,7 +1658,7 @@ Bo to, że działa, nie znaczy, że robi to, czego oczekujesz.
 - Operator działa ≠ operator robi to, czego oczekuję.
 - Zatrzymaj się na tej myśli. Kolejne „dalej” prowadzi do „Pytania?” z QR do feedbacku; „wstecz” ukrywa puentę.
 
-## 40. Pytania?
+## 39. Pytania?
 
 **ID:** `pytania`
 

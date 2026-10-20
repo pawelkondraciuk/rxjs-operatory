@@ -190,6 +190,7 @@ if(live?.actions)Object.defineProperties(api.live,Object.getOwnPropertyDescripto
  get stage(){return liveActs.length;},
  get busyUntil(){return liveActs.length?current.liveBusyUntil?.[liveActs.length-1]??-Infinity:-Infinity;},
  get busy(){return liveClosed===null&&time<api.live.busyUntil;},
+ get pauseAfterAction(){return Boolean(live.pauseAfterActions?.includes(live.actions[liveActs.length-1]));},
  act(){if(liveClosed!==null||liveActs.length>=live.actions.length)return false;liveActs=[...liveActs,Math.max(time,live.start)];rebuild();paint();return true;},
  // Cofnięcie akcji: kadr z chwili jej wywołania, już bez niej.
  undo(){if(!liveActs.length)return false;const at=liveActs.at(-1);liveActs=liveActs.slice(0,-1);rebuild();seek(at);return true;},

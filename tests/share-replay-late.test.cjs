@@ -1,5 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
-const {modules}=require('./v2-harness.cjs');
+const {modules,playbackHarness}=require('./v2-harness.cjs');
 // 20-sharereplay-2 (shareReplay({ bufferSize: 1, refCount: true })): HTTP GET → shareReplay(1) → A/B w wyglądzie torów
 // z kieszenią bufora. Jedno wykonanie HTTP; 42 trafia do A i do bufora; późny B dostaje 42 z bufora, bez nowego HTTP.
 async function replay(format='4:3'){
@@ -71,29 +71,19 @@ test('shareReplay: late B subscribes after complete and receives 42 from the buf
  assert.equal(pocket(c.snapshot(c.duration)).values[0].color,'#cbbff2');
 });
 
-test('shareReplay: seven checkpoints match the narration and the speaker notes',async()=>{
- const {c}=await replay(),ids=['subscribed-a','request','stored','complete-a','subscribed-b','replayed'];
- assert.deepEqual(Array.from(c.stops,s=>s.id),ids);
- const ready=c.snapshot(0);
- assert.deepEqual(Array.from(ready.nodes.filter(n=>n.visible),n=>n.id),['http','replay']);
- assert.ok(ready.nodes.every(n=>!(n.laneRows||[]).length));
- const f=Object.fromEntries(c.stops.map(s=>[s.id,c.snapshot(s.time)]));
- assert.equal(lane(f['subscribed-a'],'http','U1').state,'running');assert.equal(f['subscribed-a'].nodes.find(n=>n.id==='B').visible,false);
- assert.ok(lane(f.request,'http','U1').progress>.2&&lane(f.request,'http','U1').progress<1);assert.deepEqual(buffered(f.request),[]);
- assert.deepEqual(buffered(f.stored),['42']);assert.deepEqual(balls(f.stored,'A'),['42']);
- assert.deepEqual(buffered(f['complete-a']),['42']);assert.equal(f['complete-a'].nodes.find(n=>n.id==='B').visible,false);
- assert.equal(lane(f['subscribed-b'],'replay','B').state,'running');assert.deepEqual(balls(f['subscribed-b'],'B'),[]);
- assert.equal(f['subscribed-b'].nodes.find(n=>n.id==='http').laneRows.length,1,'bez drugiego toru HTTP');
- assert.deepEqual(balls(f.replayed,'B'),['42']);assert.equal(lane(f.replayed,'B','B').state,'completed');
- for(const frame of Object.values(f))assert.equal(frame.tokens.length,0,'postój bez lecącej kulki');
- const html=fs.readFileSync('index.html','utf8');
- const template=html.match(/<template data-checkpoint-notes="20-sharereplay-2">([\s\S]*?)<\/template>/)[1];
- assert.deepEqual([...template.matchAll(/data-checkpoint="([^"]+)"/g)].map(m=>m[1]),['ready',...ids,'finished']);
- assert.match(template,/B dostaje 42 bezpośrednio z bufora, a następnie complete\. Nie wykonujemy drugiego requestu\./);
- // Na postoju replayed B ma już oba powiadomienia z bufora: next(42) i complete, bez drugiego HTTP.
- const b=c.plan.records.get('replay-B');
- assert.ok(b.events[0].arrival<f.replayed.time&&b.end.kind==='complete'&&b.end.at+(b.end.duration||.8)<=f.replayed.time+1e-9);
- assert.equal(f.replayed.executionCounts.started,1);
+test('shareReplay: one next runs the faster HTTP, A and late B without intermediate pauses',async()=>{
+ const {scene,c}=await replay();assert.deepEqual(Array.from(c.stops),[]);
+ const request=c.plan.records.get('http-replay');
+ assert.ok(request.events[0].at-(request.start+request.connectDuration)<=1.01);
+ for(const r of c.plan.records.values())for(const e of r.events)assert.ok(e.arrival-e.at<=.401);
+ const h=await playbackHarness(),navigation=[],{player,controller}=h.create({scene,controls:{stageOptions:{onNavigate:d=>navigation.push(d)}}});
+ assert.equal(player.time,0);assert.equal(player.isPlaying,false);
+ controller.next();h.advance(30000);assert.equal(player.state,'finished');assert.equal(player.snapshot.executionCounts.started,1);
+ assert.deepEqual(balls(player.snapshot,'B'),['42']);controller.next();assert.deepEqual(navigation,[1]);
+ controller.reset();controller.next();h.advance(100);controller.next();assert.equal(player.state,'finished');
+ controller.reset();controller.setMode('manual');controller.setMode('auto');h.advance(30000);assert.equal(player.state,'finished');
+ const html=fs.readFileSync('index.html','utf8'),template=html.match(/<template data-checkpoint-notes="20-sharereplay-2">([\s\S]*?)<\/template>/)[1];
+ assert.deepEqual([...template.matchAll(/data-checkpoint="([^"]+)"/g)].map(m=>m[1]),['ready','finished']);
 });
 
 test('shareReplay: ports share Y, the buffer pocket hangs under the operator and rewind is deterministic in both formats',async()=>{
@@ -111,7 +101,7 @@ test('shareReplay: ports share Y, the buffer pocket hangs under the operator and
   const svg=render(end);
   assert.match(svg,/data-buffer="replay" data-buffer-size="1"/);
   assert.doesNotMatch(svg,/NaN|Infinity|="undefined"/);
-  const before=JSON.stringify(c.snapshot(c.stops[2].time));c.snapshot(c.duration);c.snapshot(0);
-  assert.equal(JSON.stringify(c.snapshot(c.stops[2].time)),before);
+  const before=JSON.stringify(c.snapshot(at(c,'disconnected','replay-A')));c.snapshot(c.duration);c.snapshot(0);
+  assert.equal(JSON.stringify(c.snapshot(at(c,'disconnected','replay-A'))),before);
  }
 });

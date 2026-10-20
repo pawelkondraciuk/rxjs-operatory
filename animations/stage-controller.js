@@ -40,10 +40,14 @@ export function createStageController(player,options={}) {
   // Żaden checkpoint ani tryb AUTO nie wywołuje unsubscribe samoczynnie.
   // Akcje (np. subA/subB/subC.unsubscribe()): READY → start emisji; dalej wykonuje kolejną akcję, a w trakcie jej
   // animacji tylko ją kończy; po ostatniej — następny slajd. Emisje biegną dalej, żadna akcja nie dzieje się sama.
+  function continueAction(live){
+    if(live.pauseAfterAction){if(live.busy)player.playTo(live.busyUntil);}
+    else player.playContinuously();
+  }
   function nextActions(live){
     if(player.state==='ready')player.playContinuously();
-    else if(live.busy){player.seek(live.busyUntil);player.playContinuously();}
-    else if(live.stage<live.actions.length){live.act();player.playContinuously();}
+    else if(live.busy){player.seek(live.busyUntil);continueAction(live);}
+    else if(live.stage<live.actions.length){live.act();continueAction(live);}
     else{options.onNavigate?.(1);return;}
     target=null;changed();
   }
@@ -84,7 +88,7 @@ export function createStageController(player,options={}) {
     // przed live.start (jeśli scena je ma), ostatecznie poprzedni slajd.
     if(live?.actions){
       if(live.state==='closed'){live.reopen();player.seek(0);player.playContinuously();}
-      else if(live.stage>0){live.undo();player.playContinuously();}
+      else if(live.stage>0){live.undo();continueAction(live);}
       else if(player.time>epsilon&&introStops(live).length){
         const back=[0,...introStops(live).map(stop=>stop.time)].reverse().find(time=>time<player.time-epsilon)??0;
         live.reopen();player.seek(back);
@@ -104,14 +108,14 @@ export function createStageController(player,options={}) {
     cancelResume();if(suspensions.size||player.state==='finished')return;
     if(player.isPlaying)player.pause();
     else if(startOnNext())return;
-    else if(player.live)player.playContinuously();
+    else if(player.live){if(player.live.actions)continueAction(player.live);else player.playContinuously();}
     else if(mode==='manual'&&target!==null&&target>player.time+epsilon)player.playTo(target);
     else start();changed();
   }
   function setMode(value){
     if(!['manual','auto'].includes(value)||value===mode)return;
     cancelResume();mode=value;
-    if(player.live){if(value==='auto'&&!suspensions.size&&player.state!=='finished'&&!player.isPlaying){if(!startOnNext())player.playContinuously();}}
+    if(player.live){if(value==='auto'&&!suspensions.size&&player.state!=='finished'&&!player.isPlaying){if(!startOnNext()){if(player.live.actions)continueAction(player.live);else player.playContinuously();}}}
     else if(value==='manual'){target=null;player.seek(checkpoints()[Math.max(0,reachedIndex())]);}
     else if(!suspensions.size&&player.state!=='finished'){target=nextCheckpoint();run();}
     changed();
@@ -135,7 +139,7 @@ export function createStageController(player,options={}) {
     if(!suspensions.delete(reason)||suspensions.size)return;
     const shouldResume=resumeIntent;resumeIntent=false;
     if(shouldResume&&player.state!=='finished'){
-      if(player.live)player.playContinuously();
+      if(player.live){if(player.live.actions)continueAction(player.live);else player.playContinuously();}
       else if(mode==='manual'&&target!==null&&target>player.time+epsilon)player.playTo(target);else start();
     }
     changed();

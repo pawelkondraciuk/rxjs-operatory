@@ -8,7 +8,7 @@ export const mainOrder = [
   // trzy wykonania), interval (cold: osobne wykonanie każdego odbiorcy, unsubscribe), Subject (ręczne next i complete), Subject + HTTP, Subject + interval.
   // Potem pytanie o znane operatory, operator, kod myMap, pytanie o share oraz historia share HTTP → późny odbiorca share
   // (pytanie publiczności: subskrypcja po zakończeniu requestu) → share + interval → shareReplay.
-  '05-zrodla-2','05b-http-kod','04a-dwa-tory','05-zrodla','05-zrodla-5','05-zrodla-3','05-zrodla-4','02-znane-operatory','04-operator','04b-map-kod','03-a-share','04a-dwa-tory-2','20-sharereplay','04a-dwa-tory-3',
+  '05-zrodla-2','05b-http-kod','04a-dwa-tory','05-zrodla','05-zrodla-5','05-zrodla-3','05-zrodla-4','02-znane-operatory','04-operator','04b-map-kod','03-a-share','04a-dwa-tory-2','04a-dwa-tory-3',
   // Cztery *Map obok siebie, potem plansza wyszukiwarki, źródło query$, switchMap na żywo, debounceTime, distinctUntilChanged
   // przed switchMap i catchError wewnątrz switchMap w tej samej wyszukiwarce.
   '20a-sharereplay-interval','20b-sharereplay-refcount','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12-intro-wyszukiwarka','12-query-zrodlo','12a-switchmap-live','12b-debounce-switchmap','11a-distinct-switchmap','11b-catcherror-search',
@@ -57,6 +57,25 @@ export function configureScene(scene) {
   if(id==='20b-sharereplay-refcount')configureShareReplayRefCount(scene);
   // retry({ count, delay }) z trzema ponowieniami i exponential backoff 1/2/4 s (MAIN, po catchError na zewnątrz).
   if(id==='x03-retry-backoff')configureRetryBackoff(scene);
+  const entryConnections={
+    '12b-debounce-switchmap':['source-debounce','debounce-op','op-observer'],
+    '11a-distinct-switchmap':['source-debounce','debounce-distinct','distinct-op','op-observer'],
+    '11b-catcherror-search':['source-debounce','debounce-distinct','distinct-op','op-observer'],
+    'b04-catcherror':['source-op','op-catch','catch-observer'],
+    'x03-retry-backoff':['source-retry-1','retry-observer'],
+  }[scene.id];
+  if(entryConnections&&!scene.catchInside){
+    const original=scene.graph;
+    scene.graph=current=>{
+      const graph=typeof original==='function'?original(current):original;
+      const selected=edge=>entryConnections.includes(edge.id||edge.from+'-'+edge.to);
+      const endpoints=new Set(graph.edges.filter(selected).flatMap(edge=>[edge.from,edge.to]));
+      return {...graph,nodes:graph.nodes.map(node=>endpoints.has(node.id)?{...node,ready:true,born:0}:node),
+        edges:graph.edges.map(edge=>selected(edge)?{...edge,logicalStart:0,preconnected:true}:edge),
+        ...(graph.schedule?{schedule:Object.fromEntries(Object.entries(graph.schedule).map(([id,record])=>
+          [id,entryConnections.includes(id)?{...record,start:-(record.connectDuration||.5)}:record]))}:{})};
+    };
+  }
   // Kolorowanie składni kodu na wszystkich slajdach (wspólny renderer kodu w playerze); scena może je wyłączyć (codeSyntax:false).
   scene.codeSyntax??=true;
   scene.group=extraIds.has(scene.id)?'bonus':'main';

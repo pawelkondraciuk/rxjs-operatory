@@ -276,9 +276,9 @@ test('the sequential Observable example has no interlevel wires or waiting rows 
   }
 });
 
-test('after seven manual stops the single HTTP request holds the same frame as finish()',async()=>{
+test('after six manual stops the single HTTP request holds the same frame as finish()',async()=>{
   const {player,callbacks}=await harness(),{api}=player('08-map-strumienie');
-  assert.equal(api.stops.length,7);
+  assert.equal(api.stops.length,6);
   api.seek(api.stops.at(-2).time);api.playContinuously();
   for(let now=0;now<30000;now+=50){const pending=[...callbacks.values()];callbacks.clear();pending.forEach(fn=>fn(now));}
   assert.equal(api.state,'finished');assert.equal(api.time,api.duration);assert.equal(callbacks.size,0);
@@ -286,7 +286,7 @@ test('after seven manual stops the single HTTP request holds the same frame as f
   assert.equal(api.snapshot.innerWorkPanels[0].rows.length,1);
   assert.equal(api.snapshot.innerWorkPanels[0].rows[0].receiver.state,'completed');
   const final=JSON.stringify(api.snapshot);api.seek(0);api.finish();assert.equal(JSON.stringify(api.snapshot),final);
-  api.seek(api.stops[1].time);assert.equal(api.snapshot.executionCounts.started,0);
-  assert.equal(api.snapshot.tokens.find(t=>t.phase==='transform').value,'A');
+  api.seek(api.stops[0].time);assert.equal(api.snapshot.executionCounts.started,0);
+  assert.equal(api.snapshot.tokens.find(t=>t.phase==='transform').value,'A$');
   api.seek(0);assert.equal(api.state,'ready');assert.equal(api.snapshot.executionCounts.started,0);assert.equal(callbacks.size,0);
 });

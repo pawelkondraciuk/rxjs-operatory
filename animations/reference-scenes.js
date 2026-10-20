@@ -205,11 +205,11 @@ const coldFields=[{id:'A',key:'firstName',start:1},{id:'B',key:'lastName',start:
 // kończy wykonanie B błędem w tej chwili (bez User i complete, pole pokazuje coldFieldError).
 const coldErrors={},coldFieldError='Błąd';
 const coldOutcome=f=>coldErrors[f.id]===undefined?{kind:'complete',at:f.complete}:{kind:'error',at:coldErrors[f.id]};
-// Pola widoku A/B/C wspólne dla Cold i Subject: ta sama kolumna (x/w 960/436), wiersze na torach, etykieta właściwości
+// Pola widoku A/B/C wspólne dla Cold i Subject: ta sama kolumna (x/w 960/460), wiersze na torach, etykieta właściwości
 // i miejsce na wartość (tray.field). Kulka obiektu ma ten sam rozmiar na obu slajdach.
 const viewFieldBall={r:34,font:26};
 function viewFields(top,extra={},fields=coldFields) {
-  const g={x:960,w:436},pos=f=>({x:g.x,w:g.w,y:laneRowY(top,f.slot)}),k=laneLook.textScale,inbox=laneInbox();
+  const g={x:960,w:460},pos=f=>({x:g.x,w:g.w,y:laneRowY(top,f.slot)}),k=laneLook.textScale,inbox=laneInbox();
   const fieldLeft=g.x-g.w/2+inbox.left+laneLook.icon+8*k+22*k+16;
   return {left:g.x-g.w/2,
     nodes:fields.map(f=>laneReceiver(f.id,f.id,pos(f),{ready:true,...extra})),
@@ -317,90 +317,71 @@ export function configureLanes(scene) {
   if(scene.shareScenario)Object.assign(scene,{captions:[],playback:{entry:'auto',finish:'hold'}});
 }
 
-// share() (04a-dwa-tory-2): kontynuacja Cold → Subject. Ten sam wygląd i narracja co Subject + HTTP (kolumny 177/517,
-// pola widoku A/B/C z Cold), ale bez ręcznego podłączania. READY: definicja user$ (nagłówek HTTP GET) i trzy puste pola;
-// pierwszy krok dopisuje .pipe(share()) i ujawnia kafelek share(). Pierwszy Subscriber A przez share() uruchamia jedyne
-// HTTP (tor #1 w kolorze A — wykonanie zainicjowane przez A, zarządzane przez share); B, a potem C dołączają w trakcie
-// requestu i ich subskrypcje kończą się na share(). Jedna kulka User rozdziela się na porcie share() na trzy identyczne
-// powiadomienia next (kolor wspólnego wykonania), jedno complete trafia do A, B i C. Bez map, unsubscribe i ponownego
-// requestu. Jawny harmonogram (czas ilustracji = czas modelu), jak w Subject + HTTP.
-// link 0,5 s na odcinek: od operatorów subskrypcja nie wymaga już tłumaczenia, więc animacje są krótsze.
-const shareFieldTimes={born:.3,defined:.6,a:1.3,b:3,c:4.3,link:.5,response:7,travel:1,hold:1.2,complete:11.2,terminal:.8};
+// share(): A i B współdzielą #1; dopiero po ich complete późny C otwiera #2.
+const shareFieldTimes={born:.3,defined:.6,a:1.3,b:2.7,c:11.5,link:.5,request:1.2,response:3.5,travel:1,hold:1.2,complete:7.7,terminal:.8};
 const shareFields=coldFields.map(f=>({...f,edge:'share-'+f.id,start:shareFieldTimes[f.id.toLowerCase()]}));
 function configureShareFields(scene) {
   const t=shareFieldTimes,ev=(type,edge)=>({type,edge}),during=(from,to)=>({from,to});
-  const upstreamStart=t.a+t.link,arrival=t.response+t.travel,split=arrival+t.hold,delivered=split+t.travel;
-  const upstreamEnd=t.complete+t.terminal,downstreamEnd=upstreamEnd+t.terminal;
-  const at={...t,upstreamStart,arrival,split,delivered,upstreamEnd,downstreamEnd,duration:downstreamEnd+2.2};
+  const at={...t,upstreamStart:t.a+t.link,arrival:t.response+t.travel,split:t.response+t.travel+t.hold,
+    delivered:t.response+2*t.travel+t.hold,upstreamEnd:t.complete+t.terminal,
+    downstreamEnd:t.complete+2*t.terminal,response2:t.c+2*t.link+t.request,
+    complete2:t.c+2*t.link+t.request+2*t.travel+t.hold+1,
+    duration:t.c+2*t.link+t.request+2*t.travel+t.hold+1+2*t.terminal+2.2};
   const http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},share={id:'share',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
-  const value=E(at.response,coldUserSymbol,laneSubscribers.A.fill),defined={type:'node-create',node:'share'};
-  // Kod rośnie jak w Subject + HTTP: READY — sama definicja user$ ze średnikiem; z kafelkiem share() średnik gaśnie,
-  // a w zarezerwowanej drugiej linii pojawia się .pipe(share()). httpGet świeci podczas odpowiedzi, share() — przy
-  // rozesłaniu next i complete (jak Subject).
+  const defined={type:'node-create',node:'share'},sessions=[['http-share','share-A'],['http-share-2','share-C']];
   const lines=[[{text:'const user$ = '},{text:"httpGet<User>('/api/users/42')",mark:http,
-      active:[during(ev('source-next','http-share'),ev('deliver-next','http-share'))]},{text:';',hide:defined}],
-    [{text:'  .pipe(',show:defined},{text:'share()',mark:share,show:defined,active:[during(ev('deliver-next','http-share'),ev('source-next','share-A')),
-      during(ev('disconnected','http-share'),ev('disconnected','share-A'))]},{text:');',show:defined}]];
+      active:sessions.map(([up])=>during(ev('source-next',up),ev('deliver-next',up)))},{text:';',hide:defined}],
+    [{text:'  .pipe(',show:defined},{text:'share()',mark:share,show:defined,
+      active:sessions.flatMap(([up,down])=>[during(ev('deliver-next',up),ev('source-next',down)),
+        during(ev('disconnected',up),ev('disconnected',down))])},{text:');',show:defined}]];
   Object.assign(scene,{graph:shareFieldsGraph,shareFieldTimes:at,playerLayout:'function',duration:at.duration,ink:'#26323B',
-    title:'share(): jedno HTTP, trzech odbiorców',playerClass:'rx-lanes rx-flat-tiles rx-code-steps',
+    title:'share(): wspólny request i późny odbiorca',playerClass:'rx-lanes rx-flat-tiles rx-code-steps',
     code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
-    rows:[R('HTTP #1',[value],[B(upstreamStart,at.response,'request')],{completeAt:at.complete}),
-      ...shareFields.map(f=>R(`Pole ${f.label}`,[{...value,at:split}],[],{completeAt:upstreamEnd}))],
-    captions:[[0,'user$ = httpGet(...): jedna definicja. Trzy pola czekają. Nic jeszcze nie działa'],
+    rows:[R('HTTP #1',[E(at.response,coldUserSymbol,laneSubscribers.A.fill)],[],{completeAt:at.complete}),
+      R('HTTP #2',[E(at.response2,coldUserSymbol,laneSubscribers.C.fill)],[],{completeAt:at.complete2})],
+    captions:[[0,'Jedna definicja user$. Dwa pola czekają. Nic jeszcze nie działa'],
       [at.born,'.pipe(share()) dodaje operator. Nadal nic nie działa'],
-      [at.a,'A subskrybuje. share() sam podłącza się do HTTP i uruchamia jeden request'],
-      [at.b,'B dołącza do share(). HTTP nadal wykonuje jeden request'],
-      [at.c,'C też dołącza do share(). Nadal jeden request'],
-      [at.response,'HTTP emituje jeden obiekt User. share() rozsyła go do A, B i C'],
-      [at.complete,'complete przechodzi przez share() do A, B i C']],
-    // Odbiorcy share(): subskrypcje zestawione (dotarły do share()).
-    metrics:[{label:'Odbiorcy',value:time=>shareFields.filter(f=>time>=f.start+at.link).length},{label:'Requesty HTTP',count:'started'}],
+      [at.a,'A uruchamia HTTP #1 przez share()'],[at.b,'B dołącza do tego samego wykonania'],
+      [at.response,'Jeden obiekt User trafia do A i B'],
+      [at.complete,'A i B dostają complete. share() resetuje się po zakończeniu źródła'],
+      [at.c,'Późny C uruchamia nową subskrypcję HTTP #2']],
+    metrics:[{label:'Odbiorcy',value:time=>shareFields.filter(f=>time>=f.start+at.link&&time<(f.id==='C'?at.complete2:at.complete)+2*at.terminal).length},
+      {label:'Requesty HTTP',count:'started'}],
     playback:manual([
-      {id:'share-added',event:defined,offset:at.defined,caption:'.pipe(share()): operator stoi między HTTP a polami. Nadal brak subskrypcji i requestu'},
-      {id:'subscribed-a',event:ev('connected','http-share'),offset:.35,caption:'A subskrybuje. share() podłącza się do HTTP i uruchamia request #1'},
-      // Najważniejszy kadr: A i B aktywni, C jeszcze nie, HTTP #1 nadal pracuje — jedno wykonanie upstream.
-      {id:'joined-b',event:ev('connected','share-B'),offset:.35,caption:'B dołącza do istniejącego share(). HTTP #1 trwa dalej — bez nowego requestu'},
-      {id:'joined-c',event:ev('connected','share-C'),offset:.35,caption:'C też dołącza do share(). Trzech odbiorców, nadal jeden request'},
-      {id:'multicast',event:ev('deliver-next','share-C'),offset:.35,caption:'HTTP emituje jeden obiekt User. share() rozsyła go do A, B i C'},
-      {id:'complete',event:ev('disconnected','share-C'),offset:.8,caption:'complete dociera przez share() do A, B i C. Jeden request, trzech odbiorców'},
+      {id:'share-added',event:defined,offset:at.defined,caption:'.pipe(share()): nadal tylko definicja, bez requestu'},
+      {id:'complete',event:ev('disconnected','share-B'),offset:.8,autoPause:true,
+        caption:'A co, jeśli ktoś zasubskrybuje po zakończeniu requestu?'},
+      {id:'complete-c',event:ev('disconnected','share-C'),offset:.8,caption:'C dostaje complete. Dwa requesty HTTP łącznie'},
     ]),
   });
 }
 
 export function shareFieldsGraph(scene) {
   const tall=scene.format==='4:3',top=tall?178:102,at=scene.shareFieldTimes;
-  // Kolumny jak w Subject + HTTP: HTTP GET 177/230, share() 517/230 (w miejscu Subject), pola A/B/C 960/436.
-  // Pola istnieją od READY (puste, jak na Cold); wiersze share() rosną, gdy subskrypcja dociera do kafelka.
-  const g={httpX:177,httpW:230,shareX:517,shareW:230},fields=viewFields(top,{},shareFields);
-  const complete=(end,logicalAt=end)=>({at:end,logicalAt,kind:'complete',duration:at.terminal});
-  const value={value:coldUserSymbol,color:laneSubscribers.A.fill};
+  const fields=viewFields(top,{},shareFields),complete=end=>({at:end,kind:'complete',duration:at.terminal});
+  const sessions=[{up:'http-share',lane:'U1',slot:0,start:at.a,response:at.response,end:at.complete,fields:shareFields.slice(0,2)},
+    {up:'http-share-2',lane:'U2',slot:2,start:at.c,response:at.response2,end:at.complete2,fields:shareFields.slice(2)}];
   return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball:viewFieldBall,
-    // U1: wspólne wykonanie HTTP w kolorze A, który je uruchomił (konwencja share); B ma w share() lewy pasek tego koloru.
-    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,C:laneSubscribers.C,U1:{...laneSubscribers.A,label:'#1'}},
-    nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,progressUntilNext:true,...laneTile('source',top,{U1:0},1)},
-      // share() pojawia się w pierwszym kroku (razem z .pipe(share())); geometria zarezerwowana od READY.
-      // Wejście upstreamu na wysokości wiersza A (prosty kabel z #1); splitAt:0 — kulka rozdziela się na porcie wejściowym.
-      {id:'share',x:g.shareX,w:g.shareW,label:'share()',color:'op',splitBalls:true,splitAt:0,splitGuides:false,hubFan:false,
-        ...laneTile('operator',top,{U1:0,...Object.fromEntries(shareFields.map(f=>[f.id,f.slot]))},shareFields.length),ready:false,born:at.born},
-      // Status ✓ complete przy polach po dotarciu zielonego impulsu (jak na Cold).
-      ...fields.nodes.map(n=>({...n,laneTerminalText:true}))],
-    // logicalStart upstreamu = chwila subscribe A: inicjator dołącza wtedy, gdy share() otwiera wykonanie #1 (lewy pasek
-    // wiersza A w kolorze upstreamu, jak B i C); harmonogram ilustracji startuje po dotarciu A do share().
-    edges:[{id:'http-share',from:'http',to:'share',subscriber:'U1',logicalStart:at.a,fixedStart:true,logicalEnd:complete(at.complete)},
-      ...shareFields.map(f=>({id:f.edge,from:'share',to:f.id,subscriber:f.id,logicalStart:f.start,fixedStart:true,logicalEnd:complete(at.upstreamEnd)}))],
-    // A: subscribe do share(), po zestawieniu share() subskrybuje HTTP (jedyne wykonanie). B i C kończą się na share().
-    // Trzy powiadomienia jednej emisji: wspólny czas i kolor — wychodzą z share() jednocześnie.
-    schedule:{'http-share':{start:at.upstreamStart,connectDuration:at.link,events:[{...value,at:at.response,arrival:at.arrival}],end:complete(at.complete)},
-      ...Object.fromEntries(shareFields.map(f=>[f.edge,{start:f.start,connectDuration:at.link,
-        events:[{...value,at:at.split,arrival:at.delivered,logicalAt:at.response}],end:complete(at.upstreamEnd)}]))},
-    executions:[{id:'http-1',node:'http',edge:'http-share',duration:at.response-at.upstreamStart}],
+    subscribers:{...laneSubscribers,U1:{...laneSubscribers.A,label:'#1'},U2:{...laneSubscribers.C,label:'#2'}},
+    nodes:[{id:'http',x:177,w:230,label:'HTTP GET',workLanes:true,progressUntilNext:true,...laneTile('source',top,{U1:0,U2:1},2)},
+      {id:'share',x:517,w:230,label:'share()',color:'op',splitBalls:true,splitAt:0,splitGuides:false,hubFan:false,
+        ...laneTile('operator',top,{U1:0,A:0,B:1,U2:2,C:2},3),ready:false,born:at.born},
+      ...fields.nodes.map(n=>({...n,laneTerminalText:true,...(n.id==='C'?{ready:false,born:at.c-.3}:{})}))],
+    edges:sessions.flatMap(r=>[{id:r.up,from:'http',to:'share',subscriber:r.lane,logicalStart:r.start,fixedStart:true,logicalEnd:complete(r.end)},
+      ...r.fields.map(f=>({id:f.edge,from:'share',to:f.id,subscriber:f.id,logicalStart:f.start,fixedStart:true,logicalEnd:complete(r.end+at.terminal)}))]),
+    schedule:Object.fromEntries(sessions.flatMap(r=>{
+      const value={value:coldUserSymbol,color:laneSubscribers[r.fields[0].id].fill};
+      return [[r.up,{start:r.start+at.link,connectDuration:at.link,
+        events:[{...value,at:r.response,arrival:r.response+at.travel}],end:complete(r.end)}],
+        ...r.fields.map(f=>[f.edge,{start:f.start,connectDuration:at.link,
+          events:[{...value,at:r.response+at.travel+at.hold,arrival:r.response+2*at.travel+at.hold,logicalAt:r.response}],end:complete(r.end+at.terminal)}])];
+    })),
+    executions:sessions.map((r,i)=>({id:'http-'+(i+1),node:'http',edge:r.up,duration:r.response-r.start-at.link})),
     trays:fields.trays,
-    // .subscribe() A trwa do dotarcia impulsu do HTTP, B i C — tylko do share() (upstream już działa). Pola są widoczne
-    // od READY, więc napis startuje razem z subscribe (jak na Cold).
-    callouts:[laneCallout('.subscribe()','A',laneEvent('subscribe','share-A'),laneEvent('connected','http-share'),{x:960,y:top/2}),
-      ...shareFields.slice(1).map(f=>laneCallout('.subscribe()',f.id,laneEvent('subscribe',f.edge),laneEvent('connected',f.edge),{x:960,y:top/2}))],
+    callouts:shareFields.map(f=>laneCallout('.subscribe()',f.id,laneEvent('subscribe',f.edge),
+      laneEvent('connected',f.id==='A'?'http-share':f.id==='C'?'http-share-2':f.edge),{x:960,y:top/2})),
     timeline:[{type:'share-summary',event:{type:'disconnected',edge:'share-C'},offset:1,
-      caption:'Jeden request, trzech odbiorców. Bez ręcznego podłączania Subjecta do HTTP'}],
+      caption:'A i B współdzielili HTTP #1. Późny C uruchomił HTTP #2 — share() nie przechowuje wyniku'}],
   };
 }
 
@@ -521,7 +502,7 @@ export function shareLateGraph(scene) {
 // A uruchamia jedyne wykonanie HTTP (#1); 42 trafia do A i równolegle do kieszeni bufora pod operatorem. Po complete
 // bufor zostaje (refCount nie czyści wyniku zakończonego źródła). B subskrybuje później: bez toru HTTP, kulka wyjeżdża
 // z bufora (replayHold) do B, potem complete. Kolory kulek jak w share z późnym odbiorcą: wykonanie #1/A fioletowa, B pomarańczowa.
-const shareReplayTimes={a:1,response:6,complete:7,b:8};
+const shareReplayTimes={a:.3,response:1.3,complete:1.5,b:1.8};
 export function configureShareReplayLate(scene) {
   const at=shareReplayTimes,ev=(type,edge)=>({type,edge}),during=(from,to)=>({from,to});
   const a=E(at.response,'42',laneSubscribers.A.fill),b=E(at.b,'42',laneSubscribers.B.fill);
@@ -532,7 +513,7 @@ export function configureShareReplayLate(scene) {
       active:[during(ev('deliver-next','http-replay'),ev('source-next','replay-A')),during(ev('connected','replay-B'),ev('source-next','replay-B'))]},{text:')'}]];
   Object.assign(scene,{graph:shareReplayLateGraph,shareReplayTimes:at,playerLayout:'function',duration:at.b+2,ink:'#26323B',
     playerClass:'rx-flat-tiles',code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
-    timing:{subscribe:1,travel:1,transform:1.4,terminal:.8,gap:.5},
+    timing:{subscribe:1,travel:.4,transform:.35,terminal:.4,gap:.15},
     rows:[R('HTTP #1',[a],[B(at.a,at.response,'request')],{completeAt:at.complete}),
       R('Odbiorca A',[a],[],{completeAt:at.complete}),R('Odbiorca B',[b],[],{completeAt:at.b})],
     captions:[[0,'shareReplay(1): jedna definicja HTTP i pusty bufor. Nic jeszcze nie działa'],
@@ -540,14 +521,7 @@ export function configureShareReplayLate(scene) {
       [at.response,'HTTP zwraca 42. shareReplay(1) przekazuje je do A i zapisuje w buforze'],
       [at.b,'B subskrybuje po complete. Bez nowego HTTP: 42 wychodzi z bufora']],
     metrics:[{label:'Requesty HTTP',count:'started'}],
-    playback:manual([
-      {id:'subscribed-a',event:ev('connected','http-replay'),offset:.35,caption:'A subskrybuje. shareReplay(1) uruchamia jedno HTTP'},
-      {id:'request',event:ev('connected','http-replay'),offset:2,caption:'Request trwa. Bufor shareReplay(1) jest jeszcze pusty'},
-      {id:'stored',event:ev('deliver-next','replay-A'),offset:.35,caption:'HTTP zwraca 42: A dostaje wartość, a bufor ją zapamiętuje'},
-      {id:'complete-a',event:ev('disconnected','replay-A'),offset:.8,caption:'HTTP zakończone. Bufor nadal zawiera 42'},
-      {id:'subscribed-b',event:ev('connected','replay-B'),offset:.35,caption:'B subskrybuje po complete. Nie powstaje nowe HTTP'},
-      {id:'replayed',event:ev('disconnected','replay-B'),offset:.8,caption:'B dostał 42 prosto z bufora, a potem complete'},
-    ]),
+    playback:{entry:'manual',finish:'hold',controller:'stages',stops:[]},
   });
 }
 
@@ -565,9 +539,9 @@ export function shareReplayLateGraph(scene) {
         buffer:{size:1,label:'bufor'},...laneTile('operator',top,{U1:0,A:0,B:1},2)},
       ...receivers.map(r=>laneReceiver(r.id,r.id,r.pos,{rowTint:true}))],
     edges:[{id:'http-replay',from:'http',to:'replay',subscriber:'U1',logicalStart:at.a,logicalEnd:complete(at.complete),events:scene.rows[0].events},
-      {id:'replay-A',from:'replay',to:'A',subscriber:'A',logicalStart:at.a,logicalEnd:complete(at.complete),hold:1.2,events:scene.rows[1].events},
+      {id:'replay-A',from:'replay',to:'A',subscriber:'A',logicalStart:at.a,logicalEnd:complete(at.complete),hold:.35,events:scene.rows[1].events},
       // B: odtworzenie z bufora w chwili subskrypcji (replayHold — wyjęcie z kieszeni) i complete zakończonego źródła.
-      {id:'replay-B',from:'replay',to:'B',subscriber:'B',logicalStart:at.b,logicalEnd:complete(at.b),connect:.5,replayHold:1.2,events:scene.rows[2].events}],
+      {id:'replay-B',from:'replay',to:'B',subscriber:'B',logicalStart:at.b,logicalEnd:complete(at.b),connect:.5,replayHold:.35,events:scene.rows[2].events}],
     executions:[{id:'http-1',node:'http',edge:'http-replay',duration:at.response-at.a}],
     trays:receivers.map(r=>laneTray(r.id,r.pos,1)),
     callouts:[subscribeCallout('A','replay-A','http-replay',{x:g.recvX,y:top/2}),
@@ -721,18 +695,19 @@ export function httpGraph(scene) {
       end:{at:at.complete,logicalAt:at.next,kind:'complete',duration:at.terminal}}}};
 }
 
-// Subject (05-zrodla-3): kontynuacja Cold — te same pola widoku A/B/C, ale jeden HTTP zasila je przez Subject.
-// READY: A/B/C są już subskrybentami Subject (subskrypcje zestawione przed t = 0, bez powtarzania animacji).
+// Subject (05-zrodla-3): A/B współdzielą jeden HTTP przez ręcznie podłączony Subject.
+// READY: tylko firstName i lastName, już podłączone. Po ich complete pojawia się city:
+// późny C subskrybuje zakończony Subject, dostaje samo complete, bez User i bez nowego HTTP.
 // Kod rośnie etapami: najpierw sam Subject, potem definicja http$ (nagłówek HTTP GET bez wykonania), na końcu osobna
 // linia http$.subscribe(subject$) — subskrybujemy HTTP, przekazując Subject jako Observer (tor U, #1); dopiero ona
-// uruchamia jedyny request. Subskrypcje A/B/C nim nie zarządzają.
-// Jedno next z HTTP → trzy powiadomienia Subject w tym samym kolorze emisji; jedno complete kończy Subject i odbiorców.
+// uruchamia jedyny request. Subskrypcje pól nim nie zarządzają.
+// Jedno next z HTTP → dwa powiadomienia Subject w tym samym kolorze emisji; jedno complete kończy Subject i A/B.
 // Jawny harmonogram ilustracji (schedule) zamiast planFlow: tylko on pozwala zacząć od już zestawionych subskrypcji.
 const subjectUpstream={color:'#238F83',fill:'#b4e0d9',progress:'#abdbd3',label:'#1',ink:'#17695f',tint:'#e6f4f1'};
 // born — definicja http$ (nagłówek HTTP GET i druga linia kodu), connect — linia http$.subscribe(subject$), subscribe —
 // impuls od Subjecta do HTTP po fade-in tej linii.
 // Request 2,2 s (od connected 2,1 do next 4,3) bez osobnego postoju — progress przechodzi płynnie do rozesłania.
-const subjectTimes={born:.3,defined:.6,connect:1,subscribe:1.3,link:.8,next:4.3,travel:1,hold:1.2,complete:8.5,terminal:.8,duration:12.3};
+const subjectTimes={born:.3,defined:.6,connect:1,subscribe:1.3,link:.8,next:4.3,travel:1,hold:1.2,complete:8.5,terminal:.8,late:12,duration:15.5};
 export function configureSubject(scene) {
   const at=subjectTimes,ev=(type,edge,offset=0)=>({type,edge,...(offset?{offset}:{})});
   const connected=at.subscribe+at.link,arrival=at.next+at.travel,split=arrival+at.hold,delivered=split+at.travel;
@@ -755,18 +730,19 @@ export function configureSubject(scene) {
     playerLayout:'function',duration:at.duration,ink:'#26323B',playerClass:'rx-lanes rx-flat-tiles rx-code-steps',
     title:'Subject: ręczny multicast HTTP',code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
     rows:[R('HTTP GET',[value],[B(at.subscribe,at.next,'request')],{completeAt:at.complete}),
-      ...coldFields.map(f=>R(`Pole ${f.label}`,[{...value,at:split}],[],{completeAt:upstreamEnd}))],
-    metrics:[{label:'Odbiorcy',value:()=>coldFields.length},{label:'Requesty HTTP',count:'started'}],
-    captions:[[0,'Ci sami trzej odbiorcy subskrybują Subject. HTTP jeszcze nie jest podłączony'],
+      ...coldFields.map(f=>R(`Pole ${f.label}`,f.id==='C'?[]:[{...value,at:split}],[],{completeAt:f.id==='C'?at.late+at.link:upstreamEnd}))],
+    metrics:[{label:'Odbiorcy',value:time=>time<upstreamEnd?2:0},{label:'Requesty HTTP',count:'started'}],
+    captions:[[0,'A i B subskrybują Subject. HTTP jeszcze nie jest podłączony'],
       [at.born,'const http$ = httpGet(...) to tylko definicja. Request jeszcze nie istnieje'],
       [at.connect,'http$.subscribe(subject$): subskrybujemy HTTP, a Subject jest Observerem']],
     playback:manual([
       {id:'defined',event:defined,offset:at.defined,caption:'Definicja http$: nagłówek HTTP GET bez wykonania. Request jeszcze nie istnieje'},
       {id:'connect-http',event:ev('connected','http-subject'),offset:.35,caption:'Subject jest Observerem: http$.subscribe(subject$) podłącza HTTP'},
-      // Jeden etap: request, odpowiedź i dotarcie User do Subjecta; postój, gdy Subject rozdzielił go na trzy kulki przy portach A/B/C.
-      {id:'multicast',event:ev('source-next','subject-A'),offset:-.05,caption:'Jeden request, jeden obiekt User. Subject rozsyła go do A, B i C'},
-      // Kolejny etap: kulki dolatują do pól, potem complete z HTTP przez Subject do wszystkich odbiorców.
-      {id:'complete',event:ev('disconnected','subject-C'),offset:.8,caption:'Pola wypełnione. Subject przekazał complete wszystkim odbiorcom'},
+      // Jeden etap: request, odpowiedź i dotarcie User do Subjecta; postój, gdy Subject rozdzielił go na dwie kulki przy portach A/B.
+      {id:'multicast',event:ev('source-next','subject-A'),offset:-.05,caption:'Jeden request, jeden obiekt User. Subject rozsyła go do A i B'},
+      // Kolejny etap: kulki dolatują do pól, potem complete z HTTP przez Subject do A/B.
+      {id:'complete',event:ev('disconnected','subject-B'),offset:.8,caption:'A i B mają dane i complete. HTTP oraz Subject są zakończone'},
+      {id:'subscribed-c',event:ev('disconnected','subject-C'),offset:.8,caption:'Późny C: tylko complete, bez wartości i bez nowego HTTP'},
     ]),
   });
 }
@@ -777,7 +753,7 @@ export function subjectGraph(scene) {
   const g={httpX:177,httpW:230,subjectX:517,subjectW:230};
   const complete=(end,logicalAt=end)=>({at:end,logicalAt,kind:'complete',duration:at.terminal});
   const value={value:coldUserSymbol,color:subjectUpstream.fill};
-  // Subskrypcje A/B/C zestawione przed READY: start −2, połączenie 0,8 s — w t = 0 wiersze i porty są w pełni widoczne.
+  // Subskrypcje A/B zestawione przed READY: start −2, połączenie 0,8 s — w t = 0 wiersze i porty są w pełni widoczne.
   const preconnected={start:-2,connectDuration:.8};
   return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball:viewFieldBall,
     subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,C:laneSubscribers.C,U:subjectUpstream},
@@ -788,18 +764,19 @@ export function subjectGraph(scene) {
       ...laneTile('source',top,{U:0},1),ready:false,born:at.born},
       {id:'subject',x:g.subjectX,w:g.subjectW,label:'Subject',splitBalls:true,splitAt:0,splitGuides:false,upstreamStripe:false,hubFan:false,
         ...laneTile('operator',top,{U:0,...Object.fromEntries(coldFields.map(f=>[f.id,f.slot]))},coldFields.length)},
-      ...fields.nodes],
+      ...fields.nodes.map(n=>({...n,laneTerminalText:true,...(n.id==='C'?{ready:false,born:at.late-.3}:{})}))],
     edges:[{id:'http-subject',from:'http',to:'subject',subscriber:'U',logicalStart:at.subscribe,fixedStart:true,logicalEnd:complete(at.complete)},
-      ...coldFields.map(f=>({id:'subject-'+f.id,from:'subject',to:f.id,subscriber:f.id,logicalStart:-2,logicalEnd:complete(at.upstreamEnd)}))],
+      ...coldFields.map(f=>({id:'subject-'+f.id,from:'subject',to:f.id,subscriber:f.id,logicalStart:f.id==='C'?at.late:-2,logicalEnd:complete(f.id==='C'?at.late+at.link:at.upstreamEnd)}))],
     schedule:{'http-subject':{start:at.subscribe,connectDuration:at.link,events:[{...value,at:at.next,arrival:at.arrival}],end:complete(at.complete)},
-      ...Object.fromEntries(coldFields.map(f=>['subject-'+f.id,{...preconnected,
-        events:[{...value,at:at.split,arrival:at.delivered,logicalAt:at.next}],end:complete(at.upstreamEnd)}]))},
+      ...Object.fromEntries(coldFields.map(f=>['subject-'+f.id,{...(f.id==='C'?{start:at.late,connectDuration:at.link}:preconnected),
+        events:f.id==='C'?[]:[{...value,at:at.split,arrival:at.delivered,logicalAt:at.next}],end:complete(f.id==='C'?at.late+at.link:at.upstreamEnd)}]))},
     executions:[{id:'request',node:'http',edge:'http-subject',duration:at.next-at.subscribe}],
     trays:fields.trays,
+    callouts:[laneCallout('.subscribe()','C',laneEvent('subscribe','subject-C'),laneEvent('connected','subject-C'),{x:960,y:top/2})],
     // manual-connect: chwila pojawienia się linii http$.subscribe(subject$) w kodzie (bez migawki nad diagramem).
     timeline:[{type:'manual-connect',edge:'http-subject',event:{type:'subscribe',edge:'http-subject'},offset:at.connect-at.subscribe},
       {type:'subject-summary',event:{type:'disconnected',edge:'subject-C'},offset:1.1,
-        caption:'Ten sam widok co na Cold, ale jeden request zamiast trzech. Upstream podłączyliśmy ręcznie'}],
+        caption:'Jeden request dla A/B. Późny C dostał tylko complete — Subject nie odtwarza danych po zakończeniu'}],
   };
 }
 
@@ -943,8 +920,96 @@ export function configureSubjectInterval(scene,kind='subject') {
   });
   Object.assign(scene,subjectIntervalVariant(scene,{from:0,to:t.window,closedAt:null,actions:[]}));
 }
-// share + interval (04a-dwa-tory-3): odpowiednik Subject + interval z interval(1000).pipe(share()).
-export const configureShareInterval=scene=>configureSubjectInterval(scene,'share');
+// share + interval: A/B już podłączeni → unsubscribe A → unsubscribe B i upstream → późny C, nowe #2 od 0.
+export function configureShareInterval(scene) {
+  const t=subjectIntervalTiming,defaults=[3,6,12];
+  Object.assign(scene,{intervalHub:'share',graph:shareIntervalGraph,playerLayout:'function',ink:'#26323B',
+    playerClass:'rx-lanes rx-flat-tiles',title:'share() — kto odłączy źródło?',rows:[],
+    live:{start:0,window:t.window,keep:t.keep,margin:t.margin,actions:['unsub-A','unsub-B','C'],defaults,
+      actionGap:3,settle:5,autoplay:true,variant:shareIntervalVariant}});
+  const ref=shareIntervalVariant(scene,{from:0,to:t.window,closedAt:null,actions:defaults});
+  scene.live.defaultClose=ref.shareIntervalPlan.busy[2]+.1;
+  scene.playback={entry:'manual',finish:'hold',live:true,stops:['unsub-a','unsub-b','subscribed-c'].map((id,i)=>
+    ({id,time:ref.shareIntervalPlan.busy[i]}))};
+  Object.assign(scene,shareIntervalVariant(scene,{from:0,to:t.window,closedAt:null,actions:[]}));
+}
+
+function shareIntervalVariant(scene,{from,to,closedAt,actions=[]}) {
+  const t=subjectIntervalTiming,end=closedAt??to,link=.5,reveal=.3,busy=[];
+  const [callA,callB,callC]=actions,emit=k=>t.first+k*t.period;
+  const received=at=>at+2*t.travel+t.hold;
+  const lastBefore=(time,first=t.first)=>Math.ceil((time-first)/t.period)-1;
+  const maxFirst=callB===undefined?Infinity:lastBefore(callB);
+  const runs=subjectIntervalReceivers.slice(0,2).map((r,i)=>{
+    const calledAt=actions[i],kMax=calledAt===undefined?maxFirst:Math.min(maxFirst,lastBefore(calledAt-t.travel));
+    const unsubscribeAt=calledAt===undefined?null:Math.max(calledAt,kMax>=0?received(emit(kMax)):calledAt);
+    return {...r,born:0,subscribe:-2,connected:-1.2,first:t.first,kMax,calledAt,unsubscribeAt,
+      doneAt:unsubscribeAt===null?undefined:unsubscribeAt+t.cancel+t.calloutHold};
+  });
+  if(callA!==undefined)busy.push(runs[0].doneAt);
+  const cancelAt=callB===undefined?undefined:Math.max(runs[0].unsubscribeAt+t.cancel,runs[1].unsubscribeAt+t.cancel,
+    maxFirst>=0?emit(maxFirst)+t.travel:callB);
+  const stoppedAt=cancelAt===undefined?undefined:cancelAt+t.cancel+t.calloutHold;
+  if(stoppedAt!==undefined)busy.push(stoppedAt);
+  let connectedC,firstC;
+  if(callC!==undefined){
+    const born=Math.max(callC,stoppedAt),subscribe=born+reveal,connected=subscribe+link;
+    connectedC=connected+link;firstC=connectedC+t.first;
+    runs.push({id:'C',slot:2,born,subscribe,connected,first:firstC,kMax:Infinity,unsubscribeAt:null});
+    busy.push(received(firstC)+.35);
+  }
+  const count=(time,first,max=Infinity)=>Math.max(0,Math.min(max+1,Math.floor((time-first)/t.period)+1));
+  const mark={id:'share',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
+  const lines=[[{text:'const shared$ = interval(1000).pipe('},{text:'share()',mark,
+    active:cancelAt===undefined?[]:[{from:{type:'disconnected',edge:'share-B'},to:{type:'disconnected',edge:'interval-share'}}]},{text:');'}]];
+  // F/druk musi dokończyć spóźnione subscribe C nawet w trakcie poprzedniego unsubscribe.
+  const settledEnd=closedAt!==null&&closedAt!==undefined&&runs.length===3?Math.max(end,busy[2]+.1):end;
+  return {...scene,duration:settledEnd,shareIntervalPlan:{from,end:settledEnd,runs,maxFirst,cancelAt,stoppedAt,connectedC,firstC,busy},liveBusyUntil:busy,
+    code:lines[0].map(p=>p.text).join(''),codeLines:lines,codeFrames:[],
+    metrics:[{label:'Emisje interval',value:time=>count(time,t.first,maxFirst)+(firstC===undefined?0:count(time,firstC))},
+      {label:'Odbiorcy share()',value:time=>runs.filter(r=>time>=r.connected&&(r.unsubscribeAt===null||time<r.unsubscribeAt)).length}],
+    captions:[[0,'A i B współdzielą jedno wykonanie interval #1'],
+      ...(callA===undefined?[]:[[callA,'A się odłącza. B nadal słucha — interval emituje dalej']]),
+      ...(callB===undefined?[]:[[callB,'B, ostatni odbiorca, odchodzi'],[stoppedAt,'share() odłączył interval #1. Brak odbiorców i nowych emisji']]),
+      ...(callC===undefined?[]:[[runs[2].born,'Późny C subskrybuje share(): nowe wykonanie interval #2 od zera'],
+        [received(firstC)+.3,'C odbiera nowe wartości od 0. share() nie odtwarza historii']])].sort((a,b)=>a[0]-b[0])};
+}
+
+function shareIntervalGraph(scene) {
+  const t=subjectIntervalTiming,p=scene.shareIntervalPlan,tall=scene.format==='4:3',top=tall?178:102;
+  const g={sourceX:212,sourceW:310,hubX:592,hubW:230,recvX:1000,recvW:366},C=p.runs[2];
+  const pos=r=>({x:g.recvX,w:g.recvW,y:laneRowY(top,r.slot)}),ball={r:34,font:30},fill=subjectUpstream.fill;
+  // Przesuwne okno zachowuje ostatnią wartość także u dawno odłączonego odbiorcy.
+  const values=(first,max,downstream=false)=>{
+    const high=Math.min(max,Math.floor((p.end-first)/t.period));
+    const low=Math.max(0,Math.min(Math.floor((p.from-first)/t.period)-3,high-1));
+    return Array.from({length:Math.max(0,high-low+1)},(_,i)=>{
+      const k=low+i,emitted=first+k*t.period,at=downstream?emitted+t.travel+t.hold:emitted;
+      return {value:String(k),color:fill,at,arrival:at+t.travel,logicalAt:emitted};
+    });
+  };
+  const unsubscribe=at=>at===undefined||at===null?{}:{end:{at,logicalAt:at,kind:'unsubscribe',duration:t.cancel}};
+  const preconnected={start:-2,connectDuration:.8};
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball,
+    subscribers:{...laneSubscribers,U:subjectUpstream,U2:{...subjectUpstream,label:'#2'}},
+    nodes:[{id:'interval',x:g.sourceX,w:g.sourceW,label:'interval(1000)',...laneTile('source',top,{U:0,U2:1},2)},
+      {id:'share',x:g.hubX,w:g.hubW,label:'share()',color:'op',splitBalls:true,splitAt:0,splitGuides:false,upstreamStripe:false,hubFan:false,
+        dropBalls:true,...laneTile('operator',top,{U:0,A:0,B:1,U2:2,C:2},3)},
+      ...p.runs.map(r=>laneReceiver(r.id,r.id,pos(r),{ready:r.id!=='C',...(r.id==='C'?{born:r.born}:{}),laneTerminalText:{cancelled:'×'}}))],
+    edges:[{id:'interval-share',from:'interval',to:'share',subscriber:'U',logicalStart:-2,fixedStart:true,cancelPulse:true},
+      ...(C?[{id:'interval-share-2',from:'interval',to:'share',subscriber:'U2',logicalStart:C.subscribe,fixedStart:true}]:[]),
+      ...p.runs.map(r=>({id:'share-'+r.id,from:'share',to:r.id,subscriber:r.id,logicalStart:r.subscribe,fixedStart:true,cancelPulse:true}))],
+    schedule:{'interval-share':{...preconnected,events:values(t.first,p.maxFirst),...unsubscribe(p.cancelAt)},
+      ...(C?{'interval-share-2':{start:C.connected,connectDuration:.5,events:values(p.firstC,Infinity)}}:{}),
+      ...Object.fromEntries(p.runs.map(r=>['share-'+r.id,{...(r.id==='C'?{start:r.subscribe,connectDuration:.5}:preconnected),
+        events:values(r.first,r.kMax,true),...unsubscribe(r.unsubscribeAt)}]))},
+    trays:p.runs.map(r=>({...laneTray(r.id,pos(r),1,ball),x:g.recvX+g.recvW/2-143})),
+    callouts:[...p.runs.filter(r=>r.calledAt!==undefined).map(r=>({...laneCallout(`sub${r.id}.unsubscribe()`,r.id,
+      {type:'unsubscribe-call',edge:'share-'+r.id},laneEvent('disconnected','share-'+r.id,t.calloutHold),{x:g.recvX,y:top+laneLook.defH/2}),size:34})),
+      ...(C?[laneCallout('.subscribe()','C',laneEvent('subscribe','share-C',-.3),laneEvent('connected','interval-share-2'),{x:g.recvX,y:top/2})]:[])],
+    timeline:p.runs.filter(r=>r.calledAt!==undefined).map(r=>({type:'unsubscribe-call',edge:'share-'+r.id,at:r.calledAt})),
+  };
+}
 
 // Wariant dla okna [from, to], wykonanych akcji (czasy ilustracji, w kolejności live.actions) i opcjonalnego
 // zamrożenia closedAt (druk, „pokaż wynik”: skończona scena bez nowych emisji, źródło nadal bez complete).
@@ -1067,8 +1132,8 @@ export function configureShareReplayOne(scene) {
   const t=shareReplayOneTiming,upstreamConnected=t.subscribeA+2*t.link,start=upstreamConnected+t.first;
   // Kod jak w 20-sharereplay-2: źródło w pierwszej linii, shareReplay w drugiej.
   const lines=[[{text:'interval(1000)',mark:shareReplayOneMarks.interval},{text:'.pipe('}],
-    [{text:'  '},{text:'shareReplay(1)',mark:shareReplayOneMarks.op},{text:')'}]];
-  Object.assign(scene,{graph:shareReplayOneGraph,playerLayout:'function',ink:'#26323B',playerClass:'rx-flat-tiles',
+    [{text:'  '},{text:'shareReplay(1)',mark:shareReplayOneMarks.op}],[{text:')'}]];
+  Object.assign(scene,{graph:shareReplayOneGraph,playerLayout:'function',ink:'#26323B',playerClass:'rx-flat-tiles rx-code-steps',
     title:'shareReplay(1): kto zatrzyma interval?',code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
     rows:[R('interval(1000)'),R('shareReplay(1)'),R('Odbiorca A'),R('Odbiorca B')],
     // Pierwsze „dalej” gra od READY bez postoju aż do emisji (subscribed-a = live.start, nie jest postojem przed emisją).
@@ -1165,21 +1230,22 @@ export function shareReplayOneGraph(scene) {
 // (RxJS 7.8.2: share z resetOnRefCountZero) — bufor znika i × biegnie do interval; C — nowy ReplaySubject (pusty bufor)
 // i nowa subskrypcja interval (#2) liczy od 0; unsub-C — ponownie reset i odłączenie #2, scena staje się skończona.
 // Każda akcja zaczyna się najwcześniej po animacji poprzedniej (szybkie „dalej” nie miesza etapów).
-const shareReplayRefTiming={...shareReplayOneTiming,sequence:1,resumeBusy:.3,bufferShown:.3,stopTail:1,defaults:[7,12.5,17,23,30]};
-const shareReplayRefActions=['B','resume','unsub-all','C','unsub-C'];
+const shareReplayRefTiming={...shareReplayOneTiming,sequence:1,resumeBusy:.3,bufferShown:.3,stopTail:1,defaults:[7,12.5,17,23,27,34]};
+const shareReplayRefActions=['B','resume','unsub-all','reset','C','unsub-C'];
 export function configureShareReplayRefCount(scene) {
   const t=shareReplayRefTiming,start=t.subscribeA+2*t.link+t.first;
-  Object.assign(scene,{graph:shareReplayRefGraph,playerLayout:'function',ink:'#26323B',playerClass:'rx-flat-tiles',
+  Object.assign(scene,{graph:shareReplayRefGraph,playerLayout:'function',ink:'#26323B',playerClass:'rx-flat-tiles rx-code-steps',
     title:'shareReplay z refCount: kiedy znika bufor?',
     rows:[R('interval(1000) #1'),R('interval(1000) #2'),R('shareReplay'),R('Odbiorca A'),R('Odbiorca B'),R('Odbiorca C')],
     live:{start,window:t.window,keep:t.keep,margin:t.margin,defaultClose:0,actions:shareReplayRefActions,defaults:t.defaults,
-      actionGap:t.actionGap,settle:t.settle,variant:shareReplayRefVariant}});
+      actionGap:t.actionGap,settle:t.settle,pauseAfterActions:['unsub-all'],variant:shareReplayRefVariant}});
   // Postoje to stabilne kadry umownej osi defaults (hash, notatki, druk), liczone z tego samego wariantu.
   const ref=shareReplayRefVariant(scene,{from:0,to:t.window,closedAt:null,actions:t.defaults}),p=ref.shareReplayRefPlan;
   scene.live.defaultClose=ref.duration;
   scene.playback={entry:'manual',finish:'hold',live:true,stops:[{id:'subscribed-a',time:start},
-    {id:'subscribed-b',time:p.busy[0]+.4},{id:'resumed',time:p.delivered(p.resumeAt+t.first)+.4},{id:'unsub-all',time:p.busy[2]+.4},
-    {id:'subscribed-c',time:(p.runs[2].events[0]?p.delivered(p.runs[2].events[0].at):p.busy[3])+.4},{id:'unsub-c',time:p.busy[4]}]};
+    {id:'subscribed-b',time:p.busy[0]+.4},{id:'resumed',time:p.delivered(p.resumeAt+t.first)+.4},{id:'unsub-all',time:p.busy[2]},
+    {id:'reset',time:p.busy[3]+.1},
+    {id:'subscribed-c',time:(p.runs[2].events[0]?p.delivered(p.runs[2].events[0].at):p.busy[4])+.4},{id:'unsub-c',time:p.busy[5]}]};
   Object.assign(scene,shareReplayRefVariant(scene,{from:0,to:t.window,closedAt:null,actions:[]}));
 }
 
@@ -1188,7 +1254,7 @@ function shareReplayRefVariant(scene,{from,to,closedAt,actions=[]}) {
   const horizon=allDone?Infinity:closed?closedAt:to,busy=[];
   const connectedA=t.subscribeA+t.link,up1=connectedA+t.link;
   const arrival=at=>at+t.travel,departure=at=>arrival(at)+t.hold,delivered=at=>departure(at)+t.travel;
-  const [pauseCall,resumeCall,leaveCall,joinCall,leaveCCall]=actions;
+  const [pauseCall,resumeCall,leaveCall,resetCall,joinCall,leaveCCall]=actions;
   // Emisje do pierwszego argumentu stop (wyłącznie) i horyzontu okna; emit(k) rośnie z k.
   const list=(emit,stop)=>{const out=[];for(let k=0;;k++){const at=emit(k);if(!(at<stop&&at<horizon))break;out.push({k,at});}return out;};
   const leave=(run,events,call)=>{
@@ -1216,21 +1282,23 @@ function shareReplayRefVariant(scene,{from,to,closedAt,actions=[]}) {
   if(runB)runs.push(leave(runB,e1.filter(e=>e.k>=kp&&arrival(e.at)<(callB??Infinity)),callB));
   // refCount = 0: reset, gdy × ostatniego odbiorcy dotrze do shareReplay i ostatnia wysłana wartość jest już w buforze.
   const resetAt=(leaving,events)=>Math.max(...leaving.map(r=>r.unsubscribeAt+t.cancel),events.length?departure(events.at(-1).at)+t.bufferShown:0);
-  const clear1=callB===undefined?undefined:resetAt(runs,e1);
+  const questionAt=callB===undefined?undefined:resetAt(runs,e1)+.35;
+  if(questionAt!==undefined)busy.push(questionAt);
+  const clear1=resetCall===undefined?undefined:Math.max(resetCall,questionAt+.05);
   if(clear1!==undefined)busy.push(clear1+t.cancel+t.calloutHold);
   // C: nowa subskrypcja upstream (#2) po resecie; emisje od 0 do subC.unsubscribe().
   let up2,e2=[],clear2;
-  const joinAt=joinCall===undefined?undefined:Math.max(joinCall,busy[2]);
+  const joinAt=joinCall===undefined?undefined:Math.max(joinCall,busy[3]);
   if(joinAt!==undefined){
     const subscribe=joinAt+t.reveal,connected=subscribe+t.link;up2=connected+t.link;
     busy.push(up2+.35);
-    const callC=leaveCCall===undefined?undefined:Math.max(leaveCCall,busy[3]);
+    const callC=leaveCCall===undefined?undefined:Math.max(leaveCCall,busy[4]);
     e2=list(k=>up2+t.first+t.period*k,callC??Infinity);
     const runC=leave({id:'C',slot:2,born:joinAt,subscribe,connected,upstream:2},e2.filter(e=>arrival(e.at)<(callC??Infinity)),callC);
     runs.push(runC);
     if(callC!==undefined){clear2=resetAt([runC],e2);busy.push(clear2+t.cancel+t.calloutHold);}
   }
-  const finite=clear2===undefined?Infinity:busy[4]+t.stopTail,end=allDone&&closed?finite:closed?closedAt:Math.min(to,finite);
+  const finite=clear2===undefined?Infinity:busy[5]+t.stopTail,end=allDone&&closed?finite:closed?closedAt:Math.min(to,finite);
   const live=(time,r)=>time>=r.connected&&(r.unsubscribeAt===null||time<r.unsubscribeAt+t.cancel);
   const upstreams=[{at:up1,until:clear1},...(up2===undefined?[]:[{at:up2,until:clear2}])];
   const [,B,C]=runs;
@@ -1238,18 +1306,19 @@ function shareReplayRefVariant(scene,{from,to,closedAt,actions=[]}) {
   const resetMark=(edge,at)=>at===undefined?[]:[{from:{type:'buffer-reset',edge},to:{type:'disconnected',edge}}];
   const lines=[[{text:'interval(1000)',mark:shareReplayOneMarks.interval},{text:'.pipe('}],
     [{text:'  '},{text:'shareReplay({ bufferSize: 1, refCount: true })',mark:{...shareReplayOneMarks.op,
-      active:[...resetMark('interval-replay',clear1),...resetMark('interval-replay-2',clear2)]}},{text:')'}]];
+      active:[...resetMark('interval-replay',clear1),...resetMark('interval-replay-2',clear2)]}}],[{text:')'}]];
   const caption=[[0,'shareReplay({ bufferSize: 1, refCount: true }) na interval: definicja i pusty bufor'],
     [t.subscribeA,'A subskrybuje: shareReplay podłącza się do interval (#1)'],
     [base(0),'interval emituje. shareReplay przekazuje wartość A i zapisuje ją w buforze'],
     ...(B?[[pauseCall,'Pauza animacji: interval na chwilę nie emituje'],[B.born,'B subskrybuje i od razu dostaje ostatnią wartość z bufora']]:[]),
     ...(resumeAt!==undefined?[[resumeAt,'interval znowu emituje — te same wartości trafiają do A i B']]:[]),
-    ...(callA!==undefined?[[callA,'A i B się odłączają. Co stanie się z interval i z buforem?'],
-      [clear1,'refCount = 0: shareReplay czyści bufor i odłącza interval']]:[]),
+    ...(callA!==undefined?[[callA,'A się odłącza. B nadal słucha'],[callB,'B, ostatni odbiorca, też się odłącza'],
+      [questionAt,'A i B odłączeni. Czy interval będzie dalej emitował, czy nastąpi unsubscribe?'],
+      ...(clear1===undefined?[]:[[clear1,'refCount = 0: shareReplay czyści bufor i odłącza interval']])]:[]),
     ...(C?[[C.born,'C subskrybuje: pusty bufor, nowe połączenie #2 — interval liczy od zera']]:[]),
     ...(clear2!==undefined?[[C.calledAt,'C się odłącza — znowu refCount = 0'],[clear2,'Bufor wyczyszczony, interval #2 odłączony. Nic nie pracuje w tle']]:[])];
   return {...scene,duration:end,code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
-    shareReplayRefPlan:{runs,e1,e2,from,up1,up2,connectedA,pauseCall,resumeAt,clear1,clear2,busy,arrival,departure,delivered},
+    shareReplayRefPlan:{runs,e1,e2,from,up1,up2,connectedA,pauseCall,resumeAt,clear1,clear2,questionAt,busy,arrival,departure,delivered},
     liveBusyUntil:busy,
     metrics:[{label:'Odbiorcy',value:time=>runs.filter(r=>live(time,r)).length},
       {label:'Upstream',value:time=>upstreams.filter(u=>time>=u.at&&(u.until===undefined||time<u.until+t.cancel)).length}],
@@ -1606,10 +1675,8 @@ function configureConcatAllIntro(scene) {
     concatAllIntro:{timing,runs:[a],sourceComplete,outerComplete},
     captions:[[0,'map może zwrócić Observable. Prześledźmy jedną wartość i jeden request HTTP.'],[duration,summary]],
     playback:{entry:'manual',finish:'hold',stops:[
-      {id:'subscribe',event:{type:'connected',edge:'source-projection'},offset:.15,
-        caption:'S1 subskrybuje id$ przez concatAll i map. HTTP jeszcze nie działa.'},
-      {id:'first',event:{type:'deliver-next',edge:'source-projection',value:'A'},offset:.05,
-        caption:'id$ emituje A. A dotarło do map — projekcja zwróci zimne Observable HTTP.'},
+      {id:'first',event:{type:'deliver-next',edge:'source-projection',value:'A'},offset:timing.transform*.65,
+        caption:'Subskrypcja zestawiona. map zamienił A w A$: Observable jest wartością, HTTP jeszcze nie działa.'},
       {id:'created',event:{type:'inner-create',node:'inner0'},offset:.35,
         caption:'map przekazał A$ do concatAll. To tylko Observable — HTTP jeszcze nie wystartowało.'},
       {id:'active',event:{type:'inner-subscribe',node:'inner0'},
@@ -1901,7 +1968,7 @@ const searchBurst=(values,at)=>values.map((value,i)=>{
 // Po react użytkownik kasuje frazę literami i wpisuje angular (distinct: już bez subskrypcji; catchError: HTTP #2).
 const searchRetype=['reac','rea','re','r','','a','an','ang','angu','angul','angula','angular'];
 function distinctSearchModel() {
-  const t=searchTiming,firstAt=3.3,round=searchRound,burst=searchBurst;
+  const t=searchTiming,firstAt=.3,round=searchRound,burst=searchBurst;
   // react → HTTP #1; szybkie skasowanie i dopisanie t (reac → react w < 300 ms): debounceTime odrzuca reac i emituje
   // ponownie react, distinctUntilChanged porównuje z ostatnią wyemitowaną wartością (react) i blokuje — bez HTTP.
   // Potem vue i ang; na końcu znowu react przechodzi (ostatnią wyemitowaną było ang) i kończy się błędem 500.
@@ -2069,7 +2136,7 @@ export function configureCatchSearch(scene) {
 }
 
 function catchSearchModel() {
-  const t=searchTiming,round=searchRound,firstAt=3.3;
+  const t=searchTiming,round=searchRound,firstAt=.3;
   const pass=v=>({...v,at:round(v.arrival+.6),arrival:round(v.arrival+.6+t.travel)});
   const run=(index,input,errored)=>{
     const output=debounceSearchInputs(input)[0],passed=pass(output),born=passed.arrival;
@@ -2277,12 +2344,12 @@ function debounceAuditGraph(scene) {
 // Trzy błędy kończą się na retry; okna 1/2/4 s są częścią jednego deterministycznego zegara sceny.
 // Odliczanie można pominąć („dalej” kończy etap) — scena pokazuje kolejność, a nie mierzy prawdziwy czas.
 export function configureRetryBackoff(scene) {
-  const windows=[{start:4.9,end:5.9,seconds:1},{start:9.5,end:11.5,seconds:2},{start:15.1,end:19.1,seconds:4}];
+  const windows=[{start:2.8,end:3.8,seconds:1},{start:7.4,end:9.4,seconds:2},{start:13.0,end:17.0,seconds:4}];
   const attempts=[
-    {start:1.3,connected:2.1,end:4.1,kind:'error'},
-    {start:5.9,connected:6.7,end:8.7,kind:'error'},
-    {start:11.5,connected:12.3,end:14.3,kind:'error'},
-    {start:19.1,connected:19.9,next:21.9,end:22.9,kind:'complete'},
+    {start:0,connected:0,end:2.0,kind:'error'},
+    {start:3.8,connected:4.6,end:6.6,kind:'error'},
+    {start:9.4,connected:10.2,end:12.2,kind:'error'},
+    {start:17.0,connected:17.8,next:19.8,end:20.8,kind:'complete'},
   ];
   const ev=(type,edge,offset=0)=>({type,edge,...(offset?{offset}:{})}),during=(from,to)=>({from,to});
   const httpMark={id:'retry-http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'};
@@ -2300,27 +2367,26 @@ export function configureRetryBackoff(scene) {
   ];
   const code=lines.map(line=>line.map(part=>part.text).join('')).join('\n');
   Object.assign(scene,{title:'retry — nie udało się? Spróbuj później',graph:retryBackoffGraph,playerLayout:'function',
-    playerClass:'rx-lanes rx-flat-tiles rx-two-lines',duration:26,ink:'#26323B',code,codeLines:lines,codeFrames:[],
+    playerClass:'rx-lanes rx-flat-tiles rx-two-lines',duration:23.9,ink:'#26323B',code,codeLines:lines,codeFrames:[],
     retryPlan:{windows,attempts},
     rows:[...attempts.map((attempt,i)=>R(`#${i+1} · HTTP GET`,i===3?[E(attempt.next,coldUserSymbol,'a')]:[],
       [B(attempt.connected,attempt.end,'request',attempt.kind==='error'?'error':'work')],attempt.kind==='complete'?{completeAt:attempt.end}:{})),
-      R('A',[E(22.8,coldUserSymbol,'a')],[],{completeAt:23.7})],
-    captions:[[0,'Definicja Observable. Request jeszcze nie istnieje'],[1.3,'A subskrybuje raz; retry subskrybuje źródło HTTP'],
-      [4.9,'Błąd #1 przechwycony. A nadal czeka. Backoff: 1 s'],[9.5,'Błąd #2 przechwycony. Backoff rośnie z 1 s do 2 s'],
-      [15.1,'Błąd #3 przechwycony. Teraz czekamy 4 s'],[19.1,'Po 4 s retry uruchamia czwarte wykonanie HTTP'],
-      [24.5,'Czwarty request: User i complete. A nie dostał pośrednich błędów'],
-      [25.35,'#1 error → 1 s · #2 error → 2 s · #3 error → 4 s · #4 User + complete']],
+      R('A',[E(20.7,coldUserSymbol,'a')],[],{completeAt:21.6})],
+    captions:[[0,'A jest już podłączony. HTTP #1 rozpoczyna pierwszą próbę'],
+      [2.8,'Błąd #1 przechwycony. A nadal czeka. Backoff: 1 s'],[7.4,'Błąd #2 przechwycony. Backoff rośnie z 1 s do 2 s'],
+      [13.0,'Błąd #3 przechwycony. Teraz czekamy 4 s'],[17.0,'Po 4 s retry uruchamia czwarte wykonanie HTTP'],
+      [22.4,'Czwarty request: User i complete. A nie dostał pośrednich błędów'],
+      [23.25,'#1 error → 1 s · #2 error → 2 s · #3 error → 4 s · #4 User + complete']],
     metrics:[{label:'Requesty HTTP',count:'started'},{label:'Aktywne',count:'active'}],
     playback:{entry:'manual',finish:'hold',afterLastManualStop:'start-auto',controller:'stages',resetOnExit:true,stops:[
-        {id:'request-1',time:2.45,caption:'A subskrybuje. Powstaje HTTP #1 — pierwszy request jest natychmiastowy'},
-        {id:'error-1',time:4.9,caption:'HTTP #1: error. retry go przechwytuje; A nie dostaje błędu'},
-        {id:'request-2',time:7.05,caption:'Po pełnej 1 sekundzie retry ponownie subskrybuje źródło: HTTP #2'},
-        {id:'error-2',time:9.5,caption:'HTTP #2: error. Poprzednio 1 s, teraz backoff wynosi 2 s'},
-        {id:'request-3',time:12.65,caption:'Po pełnych 2 sekundach powstaje HTTP #3'},
-        {id:'error-3',time:15.1,caption:'1, 2, 4 sekundy. Ile czekalibyśmy przy następnym ponowieniu?'},
-        {id:'request-4',time:20.25,caption:'Odpowiedź: 8 sekund, gdyby pozwalał limit. Tutaj po 4 s rusza HTTP #4'},
-        {id:'success',time:24.85,caption:'HTTP #4 wysyła User i complete. A otrzymuje dokładnie next(User) → complete'},
-        {id:'summary',time:25.35,caption:'count: 3 = maksymalnie trzy ponowienia, czyli cztery requesty HTTP łącznie'},
+        {id:'error-1',time:2.8,caption:'HTTP #1: error. retry go przechwytuje; A nie dostaje błędu'},
+        {id:'request-2',time:4.95,caption:'Po pełnej 1 sekundzie retry ponownie subskrybuje źródło: HTTP #2'},
+        {id:'error-2',time:7.4,caption:'HTTP #2: error. Poprzednio 1 s, teraz backoff wynosi 2 s'},
+        {id:'request-3',time:10.55,caption:'Po pełnych 2 sekundach powstaje HTTP #3'},
+        {id:'error-3',time:13.0,caption:'1, 2, 4 sekundy. Ile czekalibyśmy przy następnym ponowieniu?'},
+        {id:'request-4',time:18.15,caption:'Odpowiedź: 8 sekund, gdyby pozwalał limit. Tutaj po 4 s rusza HTTP #4'},
+        {id:'success',time:22.75,caption:'HTTP #4 wysyła User i complete. A otrzymuje dokładnie next(User) → complete'},
+        {id:'summary',time:23.25,caption:'count: 3 = maksymalnie trzy ponowienia, czyli cztery requesty HTTP łącznie'},
       ]},
   });
 }
@@ -2335,18 +2401,18 @@ function retryBackoffGraph(scene) {
       progressUntilNext:true,y:top+defH/2,h:defH,executionStack:{items:attempts.map((_,i)=>({id:`#${i+1}`,edge:`source-retry-${i+1}`,color})),shiftDuration:.4}})},
     {id:'retry',x:600,w:360,label:'retry',...laneTile('operator',top,{A:0},1,{...size,y:top+(defH+rowH)/2,h:defH+rowH,
       laneTimer:{kind:'countdown',label:'czekam',windows:scene.retryPlan.windows}})},
-    laneReceiver('observer','A',receiver,{ready:false,born:.2,laneTerminalText:true,h:rowH-6,top:y-rowH/2+3,rowH:rowH-6})];
+    laneReceiver('observer','A',receiver,{ready:true,laneTerminalText:true,h:rowH-6,top:y-rowH/2+3,rowH:rowH-6})];
   const edges=[],schedule={};
   attempts.forEach((attempt,i)=>{
-    const id=`source-retry-${i+1}`,events=i===3?[{...E(attempt.next,coldUserSymbol,laneSubscribers.A.fill),arrival:22.7}]:[];
+    const id=`source-retry-${i+1}`,events=i===3?[{...E(attempt.next,coldUserSymbol,laneSubscribers.A.fill),arrival:20.6}]:[];
     edges.push({id,from:'source',to:'retry',subscriber:'A',retryAttempt:true,hideAfterTerminal:true,logicalStart:attempt.start,
       logicalEnd:{at:attempt.end,kind:attempt.kind}});
     schedule[id]={start:attempt.start,connectDuration:.8,events,
       end:{at:attempt.end,logicalAt:attempt.end,kind:attempt.kind,duration:.8}};
   });
-  edges.push({id:'retry-observer',from:'retry',to:'observer',subscriber:'A',logicalStart:.5,logicalEnd:{at:23.7,kind:'complete'}});
-  schedule['retry-observer']={start:.5,connectDuration:.8,events:[{...E(22.8,coldUserSymbol,laneSubscribers.A.fill),arrival:23.6}],
-    end:{at:23.7,logicalAt:23.7,kind:'complete',duration:.8}};
+  edges.push({id:'retry-observer',from:'retry',to:'observer',subscriber:'A',logicalStart:.5,logicalEnd:{at:21.6,kind:'complete'}});
+  schedule['retry-observer']={start:.5,connectDuration:.8,events:[{...E(20.7,coldUserSymbol,laneSubscribers.A.fill),arrival:21.5}],
+    end:{at:21.6,logicalAt:21.6,kind:'complete',duration:.8}};
   return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball,
     nodes,edges,schedule,trays:[laneTray('observer',receiver,1,ball)],subscribers:{A:laneSubscribers.A},
     executions:attempts.map((attempt,i)=>({id:`http-${i+1}`,node:'source',edge:`source-retry-${i+1}`,
@@ -2796,7 +2862,7 @@ function queryInputReadout(graph,scene,value) {
 
 // Drugi etap wyszukiwarki. Litery co 100 ms i debounce 300 ms; ilustracja 5× wolniejsza.
 // Po drugiej wartości debounce pokaz działa bez końca; przeloty ilustrują komunikację.
-const searchTiming={first:2.3,key:.1,scale:5,period:.3,travel:.4,connect:.5,request:2,terminalGap:.7,terminal:.4,nextTyping:1,cancel:.4};
+const searchTiming={first:.3,key:.1,scale:5,period:.3,travel:.4,connect:.5,request:2,terminalGap:.7,terminal:.4,nextTyping:1,cancel:.4};
 // Serie: r → re → rea uruchamia długi HTTP (5 s); w trakcie użytkownik dopisuje c i t (react). HTTP rea nadal trwa,
 // dopóki debounceTime czeka na 300 ms ciszy — dopiero emisja react sprawia, że switchMap odsubskrybowuje HTTP rea
 // i uruchamia HTTP react. Dalej: kasowanie reac → rea, re → r, zamiana na a → an → ang i kasowanie an → a.
@@ -2888,7 +2954,6 @@ export function configureDebounceSwitch(scene) {
     playerLayout:'expanded',playerClass:'rx-flat-tiles rx-switchmap-live rx-debounce-search',ink:'#26323B',
     playback:{entry:'manual',finish:'hold',controller:'stages',navigation:'after-intro',resetOnExit:true,
       stillTime:debounceSearchRunAt(2).completed+.2,stops:[
-        {id:'subscribed',time:1.95},
         {id:'buffered',time:first.input.at(-1).arrival+.3},
         {id:'request-1',time:first.connected+.1},
         // react wpisane i w pamięci debounce; timer czeka na 300 ms ciszy, HTTP #1 (rea) nadal trwa.

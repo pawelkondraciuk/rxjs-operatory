@@ -172,115 +172,57 @@ test('callouts also support a manual .unsubscribe() during the cancel animation 
  assert.equal(c.snapshot(ev('stream-complete','share-B')+.1).callouts?.length||0,0,'complete B bez napisu');
 });
 
-const shareStops=['share-added','subscribed-a','joined-b','joined-c','multicast','complete'];
-test('share(): READY has HTTP GET and three empty fields; the first step reveals share() and .pipe(share()) without a request',async()=>{
+const shareStops=['share-added','complete','complete-c'];
+test('share(): A/B share HTTP #1; after complete late C appears and starts HTTP #2',async()=>{
  for(const format of ['4:3','16:9']){
-  const {c,at,render}=await lanes(format,'04a-dwa-tory-2');
-  assert.deepEqual(Array.from(c.stops,s=>s.id),shareStops);
-  const ready=c.snapshot(0);
-  assert.deepEqual(Array.from(ready.nodes.filter(n=>n.opacity>0),n=>n.id),['http','A','B','C'],'READY: HTTP GET i trzy pola, bez share()');
-  assert.ok(!ready.nodes.some(n=>n.id==='map'),'bez map');
-  assert.equal(node(ready,'share').opacity,0);
-  assert.ok(ready.nodes.every(n=>!(n.laneRows||[]).length||n.id==='A'||n.id==='B'||n.id==='C'),'bez execution lanes');
-  assert.equal(node(ready,'http').laneRows.length,0);assert.equal(node(ready,'share').laneRows.length,0);
-  assert.ok(ready.edges.every(e=>!e.visible),'bez połączeń');assert.equal(ready.tokens.length,0);
-  assert.equal(ready.metrics.find(m=>m.label==='Requesty HTTP').value,0);assert.equal(ready.metrics.find(m=>m.label==='Odbiorcy').value,0);
-  const svg=render(ready);
-  for(const [id,label] of [['A','user.firstName'],['B','user.lastName'],['C','user.city']]){
-   assert.match(fieldOf(svg,id),/data-field-state="empty"/);assert.match(fieldOf(svg,id),new RegExp(`>${label.replace('.','\\.')}</text>`));
-  }
-  const added=c.snapshot(at('share-added'));
-  assert.equal(node(added,'share').opacity,1,'share() pojawia się w pierwszym kroku');
-  assert.equal(node(added,'share').laneRows.length,0);assert.equal(node(added,'http').laneRows.length,0);
-  assert.ok(added.edges.every(e=>!e.visible),'nadal bez subskrypcji');
-  assert.equal(added.executionCounts.started,0);
-  assert.ok(c.events.filter(e=>e.type==='subscribe').every(e=>e.at>at('share-added')),'definicja nie subskrybuje');
-  for(const n of added.nodes){const r=node(ready,n.id);for(const key of ['x','top','w'])assert.equal(n[key],r[key],`${format} ${n.id}.${key} stały`);}
- }
-});
-
-test('share(): A starts the only request #1, B joins the running share() (manual pause), C joins later; one User and complete reach all three',async()=>{
- for(const format of ['4:3','16:9']){
-  const {c,at,render}=await lanes(format,'04a-dwa-tory-2');
+  const {c,at,render}=await lanes(format,'04a-dwa-tory-2'),ready=c.snapshot(0);
   const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge)?.at;
-  const a=c.snapshot(at('subscribed-a'));
-  assert.deepEqual(lanesOf(a,'http'),['work:U1:running']);assert.deepEqual(lanesOf(a,'share'),['operator:A:running']);
-  assert.equal(node(a,'http').laneStates[0].label,'#1');
-  assert.ok(ev('connected','share-A')<=ev('subscribe','http-share'),'impuls A biegnie przez share() do HTTP');
-  assert.equal(a.metrics.find(m=>m.label==='Requesty HTTP').value,1);
-  // Najważniejszy kadr: A i B aktywni, C nie, HTTP #1 nadal pracuje — jedno wykonanie upstream.
-  const b=c.snapshot(at('joined-b')),progress=f=>node(f,'http').laneStates[0].progress;
+  assert.deepEqual(Array.from(c.stops,s=>s.id),shareStops);
+  assert.deepEqual(Array.from(ready.nodes.filter(n=>n.opacity>0),n=>n.id),['http','A','B']);
+  assert.ok(ready.edges.every(e=>!e.visible));assert.equal(ready.executionCounts.started,0);
+  assert.equal(node(ready,'C').opacity,0);assert.equal(node(ready,'share').opacity,0);
+  for(const [id,label]of [['A','user.firstName'],['B','user.lastName']])assert.match(fieldOf(render(ready),id),new RegExp(label));
+  const added=c.snapshot(at('share-added'));assert.equal(node(added,'share').opacity,1);assert.equal(added.executionCounts.started,0);
+  const b=c.snapshot(ev('connected','share-B')+.05);
+  assert.deepEqual(lanesOf(b,'http'),['work:U1:running']);
   assert.deepEqual(lanesOf(b,'share'),['operator:A:running','operator:B:running']);
-  assert.deepEqual(lanesOf(b,'http'),['work:U1:running'],'B nie dodaje wiersza HTTP');
-  assert.ok(progress(b)>progress(a)&&progress(b)<.7,'ten sam request trwa, postęp widoczny');
-  assert.equal(b.edges.find(e=>e.id==='share-C').visible,false,'C jeszcze nie subskrybuje');
-  assert.deepEqual(dots(b,'share'),['inU1','outA','outB']);
-  assert.equal(b.executionCounts.started,1);assert.equal(b.executionCounts.active,1);
-  assert.equal(b.metrics.find(m=>m.label==='Odbiorcy').value,2);
-  assert.ok(ev('connected','share-B')<at('joined-b')&&at('joined-b')<ev('subscribe','share-C'),'postój po dotarciu B, przed subscribe C');
-  assert.equal(c.events.filter(e=>e.type==='subscribe'&&e.edge==='http-share').length,1,'B i C nie subskrybują HTTP');
-  const j=c.snapshot(at('joined-c'));
-  assert.deepEqual(lanesOf(j,'http'),['work:U1:running']);assert.ok(progress(j)>progress(b)&&progress(j)<1);
-  assert.deepEqual(lanesOf(j,'share'),['operator:A:running','operator:B:running','operator:C:running']);
-  assert.deepEqual(Array.from(node(j,'share').laneRows,r=>r.subscriber+':'+r.stripe),['A:#7457D9','B:#7457D9','C:#7457D9'],'lewy pasek = kolor wspólnego upstreamu');
-  assert.deepEqual(dots(j,'share'),['inU1','outA','outB','outC'],'jedno wejście, osobne wyjścia');
-  assert.ok(ev('connected','share-C')<ev('source-next','http-share'),'C dołącza przed emisją HTTP');
-  assert.equal(j.metrics.find(m=>m.label==='Requesty HTTP').value,1);assert.equal(j.metrics.find(m=>m.label==='Odbiorcy').value,3);
-  const port=(f,side,id)=>node(f,'share').socketDots.find(d=>d.side===side&&d.subscriber===id).y;
-  assert.equal(port(j,'in','U1'),port(a,'in','U1'));assert.equal(port(j,'out','A'),port(a,'out','A'));assert.equal(port(j,'out','B'),port(b,'out','B'));
-  // Jedna kulka User wchodzi do share(), trzy identyczne wychodzą jednocześnie.
-  assert.equal(c.events.filter(e=>e.type==='source-next'&&e.node==='http').length,1,'jedna emisja HTTP');
-  assert.equal(ev('source-next','share-A'),ev('source-next','share-C'),'wspólny wylot');
-  const mid=ev('source-next','share-A')+.3,balls=c.snapshot(mid).tokens.filter(t=>t.value==='{…}');
-  assert.equal(balls.length,3);assert.equal(new Set(balls.map(t=>t.color)).size,1,'ten sam kolor');
-  assert.equal(new Set(balls.map(t=>t.x.toFixed(6))).size,1,'jadą równo');
-  const m=c.snapshot(at('multicast'));
-  assert.deepEqual(Array.from(m.histories,h=>h.anchor+':'+Array.from(h.values,v=>v.value).join()),['A:{…}','B:{…}','C:{…}']);
-  const svg=render(m);
-  assert.match(fieldOf(svg,'A'),/Paweł/);assert.match(fieldOf(svg,'B'),/Kondraciuk/);assert.match(fieldOf(svg,'C'),/Białystok/);
-  const done=c.snapshot(at('complete'));
-  for(const id of ['http','share','A','B','C'])assert.ok(node(done,id).laneStates.every(l=>l.state==='completed'),id+': completed');
-  assert.ok(['http-share','share-A','share-B','share-C'].every(e=>ev('stream-complete',e)!==undefined),'complete dociera do A, B i C');
-  assert.equal(c.events.filter(e=>e.type==='inner-unsubscribe').length,0,'bez unsubscribe');
-  const doneSvg=render(done);
-  assert.equal((doneSvg.match(/data-lane-terminal="completed"[^>]*>✓ complete</g)||[]).length,3,'✓ complete przy A, B i C');
-  assert.doesNotMatch(render(c.snapshot(ev('disconnected','share-A')-.01)),/data-lane-terminal/,'status po dotarciu impulsu');
+  assert.equal(b.executionCounts.started,1);assert.equal(b.metrics.find(m=>m.label==='Odbiorcy').value,2);
+  assert.equal(node(b,'C').opacity,0);assert.ok(node(b,'http').laneStates[0].progress>0&&node(b,'http').laneStates[0].progress<1);
+  const m=c.snapshot(ev('deliver-next','share-B')+.35);assert.match(fieldOf(render(m),'A'),/Paweł/);assert.match(fieldOf(render(m),'B'),/Kondraciuk/);
+  assert.equal(ev('source-next','share-A'),ev('source-next','share-B'));
+  const split=c.snapshot(ev('source-next','share-A')+.3).tokens.filter(t=>t.value==='{…}');
+  assert.equal(split.length,2);assert.equal(new Set(split.map(t=>t.color)).size,1);
+  const question=c.snapshot(at('complete'));
+  for(const id of ['A','B'])assert.ok(node(question,id).laneStates.every(l=>l.state==='completed'));
+  assert.equal(node(question,'C').opacity,0);assert.equal(question.executionCounts.started,1);
+  assert.equal(question.metrics.find(m=>m.label==='Odbiorcy').value,0);
+  assert.equal(c.stops.find(s=>s.id==='complete').autoPause,true);
+  assert.ok(ev('disconnected','share-B')<ev('subscribe','share-C'));
+  assert.ok(ev('connected','share-C')<=ev('subscribe','http-share-2'));
+  const late=c.snapshot(ev('connected','http-share-2')+.1);
+  assert.equal(node(late,'C').opacity,1);assert.equal(late.executionCounts.started,2);assert.equal(late.executionCounts.active,1);
+  assert.equal(late.metrics.find(m=>m.label==='Odbiorcy').value,1);
+  assert.match(fieldOf(render(c.snapshot(ev('deliver-next','share-C')+.35)),'C'),/Białystok/);
+  for(const edge of ['share-A','share-B','share-C'])assert.equal(c.plan.records.get(edge).events.length,1,'one response each');
   const end=c.snapshot(c.duration);
-  assert.equal(end.metrics.find(m=>m.label==='Requesty HTTP').value,1);assert.equal(node(end,'http').laneRows.length,1);
-  assert.ok(end.nodes.every(n=>n.y+n.h/2<=end.height),format+': mieści się w ramce');
-  for(const id of ['A','B','C'])assert.ok(end.edges.find(e=>e.id==='share-'+id).points.every(p=>p[1]===node(end,id).y),'połączenia poziome');
-  // Te same pola i ta sama geometria co Cold i Subject + HTTP.
-  const cold=(await lanes(format)).c.snapshot(0);
-  for(const id of ['A','B','C']){assert.equal(node(end,id).x,node(cold,id).x);assert.equal(node(end,id).y,node(cold,id).y);}
-  // Cofanie: wcześniejszy kadr jest deterministyczny, nie zna przyszłości i nigdy nie ma drugiego requestu.
+  assert.equal(end.executionCounts.started,2);assert.equal(end.executionCounts.active,0);
+  assert.equal((render(end).match(/data-lane-terminal="completed"/g)||[]).length,3);
+  for(const n of end.nodes)assert.ok(n.y+n.h/2<=end.height,format+' '+n.id);
   for(const time of [0,...c.stops.map(s=>s.time),c.duration]){
    const expected=JSON.stringify(c.snapshot(time));c.snapshot(c.duration);c.snapshot(0);assert.equal(JSON.stringify(c.snapshot(time)),expected);
-   assert.ok(c.snapshot(time).executionCounts.started<=1);
   }
-  const back=c.snapshot(at('joined-b'));
-  assert.deepEqual(Array.from(back.histories,h=>h.values.length),[0,0,0]);assert.deepEqual(lanesOf(back,'share'),lanesOf(b,'share'));
  }
 });
 
-test('share(): MANUAL holds joined-b indefinitely without finishing HTTP; AUTO keeps A → B → C → User → complete; reset returns to READY',async()=>{
- const {scene,c}=await lanes('4:3','04a-dwa-tory-2');
- const h=await playbackHarness(),{player,controller}=h.create({scene});
- const order=[];
- for(const stop of player.stops){controller.next();h.advance(30000);assert.equal(player.time,stop.time);assert.equal(player.isPlaying,false);order.push(stop.id);
-  if(stop.id==='joined-b'){
-   const frame=JSON.stringify(player.snapshot);h.advance(120000);
-   assert.equal(JSON.stringify(player.snapshot),frame,'długa pauza nie zmienia kadru');
-   assert.equal(player.snapshot.nodes.find(n=>n.id==='http').laneStates[0].state,'running','HTTP #1 nadal trwa');
-  }}
- assert.deepEqual(order,shareStops);
- controller.next();h.advance(30000);assert.equal(player.state,'finished');assert.equal(h.frames.size,0);
- controller.previous();assert.equal(player.time,player.stops.at(-1).time);
+test('share(): MANUAL holds each step; AUTO pauses at the late-subscriber question; reset returns to READY',async()=>{
+ const {scene}=await lanes('4:3','04a-dwa-tory-2'),h=await playbackHarness(),{player,controller}=h.create({scene});
+ for(const stop of player.stops){controller.next();h.advance(30000);assert.equal(player.time,stop.time);assert.equal(player.isPlaying,false);
+  const frame=JSON.stringify(player.snapshot);h.advance(60000);assert.equal(JSON.stringify(player.snapshot),frame);}
+ controller.next();h.advance(30000);assert.equal(player.state,'finished');
  controller.reset();assert.equal(player.time,0);assert.equal(player.snapshot.executionCounts.started,0);
- controller.setMode('manual');controller.setMode('auto');h.advance(30000);assert.equal(player.state,'finished');
- assert.equal(player.snapshot.executionCounts.started,1,'AUTO: nadal jeden request');
- const ev=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at;
- assert.ok(ev('connected','share-A')<ev('connected','share-B')&&ev('connected','share-B')<ev('connected','share-C')
-  &&ev('connected','share-C')<ev('source-next','http-share')&&ev('deliver-next','share-C')<ev('stream-complete','http-share'));
+ controller.setMode('manual');controller.setMode('auto');h.advance(30000);
+ assert.equal(player.time,player.stops.find(s=>s.id==='complete').time);assert.equal(player.isPlaying,false);
+ controller.next();h.advance(30000);assert.equal(player.state,'finished');assert.equal(player.snapshot.executionCounts.started,2);
 });
 
 test('share(): code grows from user$ = httpGet<User>(...) to .pipe(share()) with marks; transient .subscribe() A to HTTP, B and C only to share()',async()=>{
@@ -300,25 +242,18 @@ test('share(): code grows from user$ = httpGet<User>(...) to .pipe(share()) with
  assert.deepEqual(active((ev('deliver-next','http-share')+ev('source-next','share-A'))/2),['share']);
  assert.deepEqual(shown((ev('subscribe','share-A')+ev('connected','http-share'))/2),['.subscribe() A']);
  assert.deepEqual(shown((ev('subscribe','share-B')+ev('connected','share-B'))/2),['.subscribe() B']);
- assert.deepEqual(shown((ev('subscribe','share-C')+ev('connected','share-C'))/2),['.subscribe() C']);
+ assert.deepEqual(shown((ev('subscribe','share-C')+ev('connected','http-share-2'))/2),['.subscribe() C']);
  for(let t=0;t<c.duration;t+=.05)assert.ok(shown(t).length<=1,'napisy subscribe nie nakładają się');
  for(const id of shareStops)assert.deepEqual(shown(at(id)),[]);
 });
 
-test('share(): checkpoint notes for READY, every manual stop and the handoff',async()=>{
- const {c}=await lanes('4:3','04a-dwa-tory-2');
- const html=fs.readFileSync('index.html','utf8');
+test('share(): checkpoint notes follow the combined story and ask before revealing C',async()=>{
+ const {c}=await lanes('4:3','04a-dwa-tory-2'),html=fs.readFileSync('index.html','utf8');
  const source=html.match(/<template data-checkpoint-notes="04a-dwa-tory-2">([\s\S]*?)<\/template>/)[1];
  const notes=Object.fromEntries([...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)].map(([,id,text])=>[id,text]));
  assert.deepEqual(Object.keys(notes),['ready',...Array.from(c.stops,s=>s.id),'finished']);
- assert.match(notes.ready,/Ten sam przykład co w Cold/);
- assert.match(notes['share-added'],/\.pipe\(share\(\)\)[\s\S]*nadal tylko definicja/);
- assert.match(notes['subscribed-a'],/Share automatycznie subskrybuje HTTP i uruchamia request/);
- assert.match(notes['joined-b'],/B dołącza do istniejącego share\. Nie subskrybujemy ponownie HTTP\. Obaj odbiorcy korzystają z tego samego wykonania/);
- assert.match(notes['joined-c'],/wszystkie trzy subskrypcje kończą się na share\. HTTP nadal wykonuje się tylko raz/);
- assert.match(notes.multicast,/ten sam obiekt do wszystkich trzech odbiorców, dokładnie tak jak wcześniej Subject/);
- assert.match(notes.complete,/Jeden request zamiast trzech/);
- assert.match(notes.finished,/Share współdzieli request automatycznie[\s\S]*A co, jeśli ktoś zasubskrybuje po zakończeniu requestu\?[\s\S]*Prawo: share — późny odbiorca/);
+ assert.match(notes.complete,/A co, jeśli ktoś zasubskrybuje po zakończeniu requestu/);
+ assert.match(notes['complete-c'],/Requesty: 2/);assert.match(notes.finished,/Prawo: share\(\) — kto odłączy źródło/);
 });
 
 test('tiles grow: a fixed definition part, then one execution row per subscription reaching the tile',async()=>{
@@ -509,18 +444,30 @@ test('cold statuses at the fields: A, B and C ✓ complete, each only after its 
   assert.equal((end.match(/data-lane-terminal/g)||[]).length,3);
   assert.doesNotMatch(render(c.snapshot(at('received'))),/data-lane-terminal/,'received: przed complete');
   assert.equal(statusOf(render(c.snapshot(ev('disconnected','http-A')-.01)),'A'),null);
-  // Status w linii wartości, po prawej od niej (bez nachodzenia); za długa „Kondraciuk” przenosi go do linii etykiety.
-  for(const [id,value,label] of [['A','Paweł'],['B','Kondraciuk','user.lastName'],['C','Białystok']]){
+  // Every field terminal is aligned with its label, independent of the value length.
+  for(const [id,label]of [['A','user.firstName'],['B','user.lastName'],['C','user.city']]){
    const field=c.snapshot(c.duration).histories.find(h=>h.anchor===id);
    const tag=nodeSvg(end,id).match(/<text x="([\d.]+)" y="([\d.]+)" font-size="([\d.]+)"[^>]*data-lane-terminal/);
    const left=Number(tag[1])-10*.56*Number(tag[3]);
-   if(label){
-    assert.ok(Math.abs(Number(tag[2])-(field.y-16*1.42))<1e-6,format+' '+id+': linia etykiety');
-    assert.ok(field.x+label.length*.6*16*1.42<left,format+' '+id+': status za etykietą');
-   }else{
-    assert.ok(Math.abs(Number(tag[2])-(field.y+14*1.42))<1e-6,format+' '+id+': linia wartości');
-    assert.ok(field.x+value.length*.52*22*1.42<left,format+' '+id+': status za wartością');
-   }
+   assert.ok(Math.abs(Number(tag[2])-(field.y-16*1.42))<1e-6,format+' '+id+': label line');
+   assert.ok(field.x+label.length*.6*16*1.42<left,format+' '+id+': after label');
   }
+ }
+});
+
+test('share HTTP: both progress bars finish in 1.2 s and no manual checkpoint interrupts either request or its result delivery',async()=>{
+ for(const format of ['4:3','16:9']){
+  const {c,scene}=await lanes(format,'04a-dwa-tory-2');
+  for(const [up,down]of [['http-share','share-B'],['http-share-2','share-C']]){
+   const r=c.plan.records.get(up),connected=r.start+r.connectDuration,response=r.events[0].at;
+   assert.ok(Math.abs(response-connected-1.2)<1e-8,up+' fast progress');
+   const progress=c.snapshot((connected+response)/2).nodes.find(n=>n.id==='http').laneStates.find(l=>l.subscriber===r.subscriber).progress;
+   assert.ok(Math.abs(progress-.5)<1e-8,up+' smooth progress');
+   const done=c.plan.records.get(down).end;assert.ok(!c.stops.some(s=>s.time>r.start&&s.time<done.at+done.duration),'no pause before complete');
+  }
+  const h=await playbackHarness(),{player,controller}=h.create({scene});
+  controller.next();h.advance(3000);assert.equal(player.time,c.stops[0].time);
+  controller.next();h.advance(30000);assert.equal(player.time,c.stops[1].time);assert.equal(player.snapshot.executionCounts.completed,1);
+  controller.next();h.advance(30000);assert.equal(player.time,c.stops[2].time);assert.equal(player.snapshot.executionCounts.completed,2);
  }
 });

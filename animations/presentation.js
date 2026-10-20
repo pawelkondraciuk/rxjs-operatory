@@ -25,16 +25,20 @@ export function prepareSlides(scenes, { format = '4:3' } = {}) {
         captions:[[],[],[[0,'Subject może emitować bez odbiorcy.'],[4,'A bez subskrypcji.'],[8,'Odbiorca subskrybuje.'],[12,'Dostaje B.'],[16,'Dostaje C. Trzy emisje, dwa odbiory.']],[],[]][i],
       }));
     } else if (original.id === '04a-dwa-tory') {
-      // Tory wykonania: cold (trzy pola widoku, trzy requesty user$), share() (HTTP GET → share() → A/B/C, jeden request)
+      // Tory wykonania: cold (trzy pola widoku, trzy requesty user$), share() (A/B współdzielą #1, późny C uruchamia #2)
       // i share + interval (odpowiednik Subject + interval: ostatni odbiorca odłącza źródło).
       variants = ['cold', 'share', 'share-interval'].map(mode => ({ ...original, lanesMode: mode,
-        title: { cold: 'Cold: jedna definicja, trzy wykonania', share: 'share(): jedno HTTP, trzech odbiorców',
+        title: { cold: 'Cold: jedna definicja, trzy wykonania', share: 'share(): wspólny request i późny odbiorca',
           'share-interval': 'share() — kto odłączy źródło?' }[mode] }));
     } else variants = [original];
 
     let previous = slide;
     variants.forEach((variant, i) => {
-      const target = i ? slide.cloneNode(true) : slide;
+      const target = i && original.id!=='20-sharereplay' ? slide.cloneNode(true) : slide;
+      if(original.id==='20-sharereplay'&&i===0){
+        byId.set(original.id,configureScene({...variant,id:original.id,rendererId:original.id,format}));
+        return;
+      }
       const id = i ? `${original.id}-${i + 1}` : original.id;
       const scene = configureScene({ ...variant, id, rendererId: original.id, format });
       byId.set(id, scene);
@@ -47,7 +51,7 @@ export function prepareSlides(scenes, { format = '4:3' } = {}) {
         `<span class="rx-title-answer" data-after-stop="${esc(scene.titleAnswerAfter)}">${esc(' — ' + answer.join(' — '))}</span>`;
       else target.querySelector('h2').textContent = scene.title;
       target.querySelector('.rx-player').setAttribute('aria-label', hidden ? lead : scene.title);
-      if (i) previous.after(target);
+      if (i && target!==slide) previous.after(target);
       previous = target;
     });
   }

@@ -14,13 +14,14 @@ const lane=(f,id)=>f.nodes.find(n=>n.id===id).laneStates[0];
 const timer=f=>lane(f,'debounce')?.timer;
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-7,`${a} ≈ ${b}`);
 
-test('subscription travels left; input resets 300 ms; only silence creates HTTP',async()=>{
+test('subscription already connected; input resets 300 ms; only silence creates HTTP',async()=>{
   const {scene,c}=await fixture(),runs=scene.debounceSearchRuns.slice(0,6),initial=c.snapshot(0);
   assert.deepEqual(metrics(initial),[0,0,0]);assert.equal(initial.readouts[0].value,'');assert.equal(rows(initial).length,0);
   const subscribed=c.events.filter(e=>e.type==='subscribe'&&!e.edge.startsWith('inner'));
-  assert.deepEqual(Array.from(subscribed,e=>e.edge),['op-observer','debounce-op','source-debounce']);
-  assert.deepEqual(Array.from(subscribed,e=>e.at).sort((a,b)=>a-b),[.3,.8,1.3]);
-  assert.deepEqual(metrics(c.snapshot(c.stops[0].time)),[0,0,0]);assert.equal(timer(c.snapshot(1.95)).text,'');
+  assert.deepEqual(Array.from(subscribed,e=>e.edge).sort(),['debounce-op','op-observer','source-debounce']);
+  assert.ok(subscribed.every(e=>e.at<0));
+  assert.ok(initial.edges.filter(e=>['op-observer','debounce-op','source-debounce'].includes(e.id)).every(e=>e.visible&&e.phase==='subscribed'));
+  assert.equal(timer(initial).text,'');
   let emitted=0;
   for(const run of runs) {
     for(let i=0;i<run.input.length;i++) {
@@ -151,7 +152,7 @@ test('manual stages end at the third emission; live runs without stopping and ri
   const {player,controller}=h.create({scene,controls:{stageOptions:{onNavigate:d=>deck.navigation.push(d)}}});
   assert.equal(player.live.autoplay,false);assert.equal(player.isPlaying,false);assert.equal(controller.mode,'manual');
   const binding=h.install(deck,{getController:()=>controller});binding.refresh();
-  assert.deepEqual(Array.from(c.stops,s=>s.id),['subscribed','buffered','request-1','typing','switched','complete-2','request-3']);
+  assert.deepEqual(Array.from(c.stops,s=>s.id),['buffered','request-1','typing','switched','complete-2','request-3']);
   near(c.stops.at(-1).time,scene.live.start);
   for(const stop of c.stops.slice(0,-1)) {
     deck.press(39);h.advance(100);assert.equal(player.isPlaying,true);
@@ -189,7 +190,7 @@ test('three code lines retain syntax and simultaneous highlights; notes describe
   assert.equal(scene.code.split('\n').length,3);assert.ok(scene.code.endsWith('))))'));
   for(const [time,mark,node] of [[2.4,'query','source'],[4,'debounce','debounce'],[5.4,'debounce','debounce'],
     [5.7,'switch','op'],[6.5,'http',null],[10,'switch','op'],[8.05,'debounce','debounce']]) {
-    player.seek(time);const html=elements.get('.rx-code').innerHTML;
+    player.seek(time-2);const html=elements.get('.rx-code').innerHTML;
     assert.match(html,new RegExp('rx-code-active[^>]*data-mark="'+mark+'"'));
     assert.match(html,/rx-tok-src">query\$/);assert.match(html,/rx-tok-op">debounceTime/);assert.match(html,/rx-tok-op">switchMap/);
     assert.match(html,/rx-tok-src">httpGet/);assert.match(html,/rx-tok-param">query/);

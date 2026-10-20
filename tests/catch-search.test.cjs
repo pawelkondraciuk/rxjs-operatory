@@ -22,7 +22,7 @@ const mainEdges=['source-debounce','debounce-distinct','distinct-op','op-observe
 const exactCode='query$.pipe(\n  debounceTime(300),\n  distinctUntilChanged(),\n  switchMap(query =>\n'+
  '    httpGet(url(query)).pipe(\n      catchError(() => of([]))\n    )\n  )\n)';
 
-test('READY: complete code with inner catchError, all blocks visible, empty input, no subscription or request',async()=>{
+test('READY: complete code with inner catchError, all blocks visible, empty input, subscription already connected, no request',async()=>{
  const {scene,c,render}=await fixture(),initial=c.snapshot(0);
  assert.equal(scene.title,'catchError — wyszukiwarka działa dalej');
  assert.equal(code(initial),exactCode);
@@ -39,7 +39,7 @@ test('READY: complete code with inner catchError, all blocks visible, empty inpu
  for(const id of ['source','debounce','distinct','op','observer','def-source','def-catch'])assert.equal(node(initial,id).visible,true,id);
  const svg=render(initial);
  assert.match(svg,/>catchError</);assert.match(svg,/>HTTP GET</);assert.match(svg,/>distinctUntil<.*>Changed</);
- assert.equal(initial.edges.filter(e=>mainEdges.includes(e.id)&&e.phase!=='idle'&&e.visible).length,0);
+ assert.equal(initial.edges.filter(e=>mainEdges.includes(e.id)&&e.phase==='subscribed'&&e.visible).length,4);
  assert.deepEqual(Array.from(c.plan.records.keys()),[...mainEdges.slice(0,3),'op-observer','inner0-catch0','catch0-op','inner1-catch1','catch1-op']);
 });
 

@@ -24,7 +24,7 @@ const buffer=f=>Array.from(node(f,'replay').bufferPocket?.values||[],v=>v.value)
 test('READY: definitions only, empty buffer pocket; same look as shareReplay on HTTP',async()=>{
  const {scene:s,compile,render}=await scene(),c=compile(s),f=c.snapshot(0);
  assert.equal(s.title,'shareReplay(1): kto zatrzyma interval?');
- assert.equal(s.code,'interval(1000).pipe(\n  shareReplay(1))');
+ assert.equal(s.code,'interval(1000).pipe(\n  shareReplay(1)\n)');
  assert.equal(s.playback.controller,'stages');assert.ok(s.live&&!s.live.autoplay);
  assert.deepEqual(Array.from(s.playback.stops,x=>x.id),['subscribed-a','unsub-a','subscribed-b','unsub-b']);
  assert.equal(s.playback.stops[0].time,s.live.start,'krok 1 to start emisji, bez postoju przed nim');

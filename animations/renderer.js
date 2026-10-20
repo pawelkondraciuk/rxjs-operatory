@@ -291,7 +291,7 @@ function inboxIcon(x,y,size) {
 // laneTerminalText (opt-in, wyłącznie odbiorca): status zakończenia subskrypcji przy prawej krawędzi wiersza odbiorcy —
 // ✓ complete, ! error albo × odłączono (unsubscribe). Pojawia się (fade-in 0,3 s) dopiero po animacji terminalnej:
 // complete/error po dotarciu impulsu, unsubscribe po dotarciu × do źródła (lane.statusAt). Tło wiersza niesie kolor stanu.
-// Pole widoku (tray.field): status stoi w linii wartości, a gdy wartość jest za długa — w linii etykiety pola.
+// Pole widoku (tray.field): stałe miejsce statusu w prawym górnym rogu, przy etykiecie.
 // laneTerminalText może nadpisać teksty stanów i offsetY, gdy kompaktowy odbiorca zachowuje poprzedni wynik.
 const laneTerminalStatus={completed:['✓ complete','#087438'],error:['! error','#9B1C28'],cancelled:['× odłączono','#5B6670']};
 function laneTerminalLabel(n,lane,k,frame,reduced) {
@@ -300,15 +300,9 @@ function laneTerminalLabel(n,lane,k,frame,reduced) {
   const status=[n.laneTerminalText[lane.state]??base[0],base[1]];
   const at=lane.statusAt??lane.since,opacity=reduced?1:clamp((frame.time-at)/.3);
   if(opacity<=0)return '';
-  // Szacunek szerokości dla Arial (pogrubiony): ~0,56 em na znak statusu, ~0,58 em na znak wartości pola (z zapasem —
-  // „Kondraciuk” ma ~5,5 em i przenosi status do linii etykiety, „Białystok” zostaje w linii wartości).
-  const size=16*k,right=n.x+n.w/2-14*k,width=Array.from(status[0]).length*.56*size;
+  const size=16*k,right=n.x+n.w/2-14*k;
   const field=frame.histories?.find(h=>h.anchor===n.id&&h.field);
-  let y=lane.y;
-  if(field) {
-    const shown=field.values?.length?field.field.value:field.failed?field.field.error:'';
-    y=field.x+Array.from(String(shown)).length*.58*22*k+12*k<=right-width?field.y+14*k:field.y-16*k;
-  }
+  const y=field?field.y-16*k:lane.y;
   return text(right,y+(n.laneTerminalText.offsetY??0),status[0],size,
     `data-lane-terminal="${lane.state}" opacity="${opacity.toFixed(3)}" style="font-weight:700;fill:${status[1]};text-anchor:end"`);
 }

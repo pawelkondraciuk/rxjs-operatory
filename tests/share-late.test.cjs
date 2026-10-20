@@ -86,9 +86,7 @@ test('late share: two quick steps (A done, then B with HTTP #2) match the speake
  assert.equal(callout.text,'nowy request HTTP');assert.equal(callout.color,'#D8840F');
  assert.deepEqual(Array.from(during.metrics,m=>m.value),[2,1]);
  const html=fs.readFileSync('index.html','utf8');
- const template=html.match(/<template data-checkpoint-notes="20-sharereplay">([\s\S]*?)<\/template>/)[1];
- assert.deepEqual([...template.matchAll(/data-checkpoint="([^"]+)"/g)].map(m=>m[1]),['ready',...ids,'finished']);
- assert.match(template,/Prawo: share\(\) \+ interval/);
+ assert.doesNotMatch(html,/<template data-checkpoint-notes="20-sharereplay">/,'old standalone share is QA only');
 });
 
 test('late share: ports share Y per lane, geometry is fixed and rewind is deterministic in both formats',async()=>{

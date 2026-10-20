@@ -5,7 +5,7 @@ const values=(frame,id)=>Array.from(frame.histories.find(h=>h.anchor===id).value
 const node=(frame,id)=>frame.nodes.find(n=>n.id===id);
 const lanes=(frame,id)=>Array.from(node(frame,id).laneStates,l=>`${l.role}:${l.subscriber}:${l.state}`);
 const fieldOf=(svg,id)=>svg.slice(svg.indexOf(`data-field="${id}"`),svg.indexOf('</g>',svg.indexOf(`data-field="${id}"`)));
-const stopIds=['defined','connect-http','multicast','complete'];
+const stopIds=['defined','connect-http','multicast','complete','subscribed-c'];
 const fields=[['A','user.firstName','Paweł'],['B','user.lastName','Kondraciuk'],['C','user.city','Białystok']];
 const codeText=['const subject$ = new Subject<User>();',"const http$ = httpGet<User>('/api/users/42');",'','http$.subscribe(subject$);'];
 // Krycie i aktywność fragmentów kodu w klatce: linia → [opacity…].
@@ -22,7 +22,7 @@ async function subject(format='4:3'){
  return {scene,m,c,ev,render:m.renderer.renderScene,at:id=>c.stops.find(s=>s.id===id).time};
 }
 
-test('READY: A/B/C already subscribe to Subject, fields are empty, HTTP is not connected; code shows only the Subject',async()=>{
+test('READY: only A/B already subscribe to Subject, fields are empty, HTTP is not connected; code shows only the Subject',async()=>{
  const {scene,c,ev,render}=await subject(),ready=c.snapshot(0);
  assert.equal(scene.code,codeText.join('\n'),'kod rośnie do trzech instrukcji (miejsce zarezerwowane od READY)');
  assert.deepEqual(Array.from(ready.codeView,line=>line.map(part=>part.text).join('')),codeText);
@@ -31,26 +31,27 @@ test('READY: A/B/C already subscribe to Subject, fields are empty, HTTP is not c
  assert.deepEqual(Array.from(c.stops,s=>s.id),stopIds);
  assert.equal(node(ready,'subject').visible,true);
  assert.equal(node(ready,'http').opacity,0,'HTTP GET pojawia się dopiero z definicją http$');
- assert.deepEqual(lanes(ready,'subject'),['operator:A:running','operator:B:running','operator:C:running']);
+ assert.deepEqual(lanes(ready,'subject'),['operator:A:running','operator:B:running']);
  assert.ok(node(ready,'subject').laneStates.every(l=>l.opacity===1),'wiersze Subject w pełni widoczne od READY');
  assert.ok(node(ready,'subject').laneRows.every(r=>r.growth===1));
- for(const [id] of fields){
+ for(const [id] of fields.slice(0,2)){
   assert.deepEqual(lanes(ready,id),[`receiver:${id}:running`]);
   const edge=ready.edges.find(e=>e.id==='subject-'+id);
   assert.ok(edge.visible&&edge.progress===1,'subskrypcja '+id+' zestawiona przed READY');
  }
  assert.equal(ready.edges.find(e=>e.id==='http-subject').visible,false);
  assert.equal(ready.metrics.find(m=>m.label==='Requesty HTTP').value,0);
- assert.equal(ready.metrics.find(m=>m.label==='Odbiorcy').value,3);
+ assert.equal(ready.metrics.find(m=>m.label==='Odbiorcy').value,2);
  assert.equal((ready.callouts||[]).length,0);
+ assert.equal(node(ready,'C').opacity,0);assert.equal(ready.edges.find(e=>e.id==='subject-C').visible,false);
  const svg=render(ready);
- for(const [id,label] of fields){
+ for(const [id,label] of fields.slice(0,2)){
   assert.match(fieldOf(svg,id),/data-field-state="empty"/);
   assert.match(fieldOf(svg,id),new RegExp(`>${label.replace('.','\\.')}</text>`));
  }
- // Subskrypcje A/B/C nie są animowane w trakcie slajdu.
- assert.ok(['A','B','C'].every(id=>ev('connected','subject-'+id)<0));
- assert.equal(c.events.filter(e=>e.type==='subscribe'&&e.at>=0).length,1,'jedyne subscribe w slajdzie to HTTP');
+ // Subskrypcje A/B nie są animowane w trakcie slajdu.
+ assert.ok(['A','B'].every(id=>ev('connected','subject-'+id)<0));
+ assert.equal(c.events.filter(e=>e.type==='subscribe'&&e.at>=0).length,2,'HTTP i późny C subskrybują podczas slajdu');
 });
 
 test('defined: the http$ line and the HTTP GET header appear without an execution, request or value',async()=>{
@@ -66,7 +67,7 @@ test('defined: the http$ line and the HTTP GET header appear without an executio
  assert.equal(f.executionCounts.started,0);assert.equal(f.metrics.find(m=>m.label==='Requesty HTTP').value,0);
  assert.ok(c.events.filter(e=>e.type==='subscribe'&&e.at>=0).every(e=>e.at>at('defined')),'sama definicja nie subskrybuje');
  assert.equal(f.tokens.length,0);assert.ok(f.histories.every(h=>!h.values.length),'A/B/C nadal czekają');
- assert.deepEqual(lanes(f,'subject'),['operator:A:running','operator:B:running','operator:C:running']);
+ assert.deepEqual(lanes(f,'subject'),['operator:A:running','operator:B:running']);
  const ready=c.snapshot(0);
  for(const n of f.nodes)if(n.id!=='http'){const r=node(ready,n.id);for(const key of ['x','y','w','h'])assert.equal(n[key],r[key],`${n.id}.${key} bez przesunięcia`);}
  assert.doesNotMatch(render(f),/data-callout|NaN|Infinity/);
@@ -110,25 +111,25 @@ test('code marks match share(): Subject purple, httpGet turquoise; subscribe has
  assert.equal(JSON.stringify(codeOpacity(end)),'[[1,1,1],[1,1,1],[],[1,1,1]]');
 });
 
-test('request: no stop while one HTTP execution makes progress (A/B/C wait); a short request goes straight to the multicast stop',async()=>{
+test('request: no stop while one HTTP execution makes progress (A/B wait); a short request goes straight to the multicast stop',async()=>{
  const {c,at,ev}=await subject(),connected=ev('connected','http-subject'),response=ev('source-next','http-subject');
  assert.ok(response-connected<=2.5,'krótki request');
  assert.ok(!c.stops.some(s=>s.time>at('connect-http')&&s.time<response),'bez postoju podczas requestu');
  const f=c.snapshot((connected+response)/2);
  assert.ok(node(f,'http').laneStates[0].progress>.3&&node(f,'http').laneStates[0].progress<.7);
  assert.equal(f.executionCounts.started,1);assert.equal(f.executionCounts.active,1);
- assert.deepEqual(lanes(f,'subject'),['operator:A:running','operator:B:running','operator:C:running']);
+ assert.deepEqual(lanes(f,'subject'),['operator:A:running','operator:B:running']);
  assert.ok(f.histories.every(h=>!h.values.length));
  assert.equal(c.events.filter(e=>e.type==='subscribe'&&e.edge==='http-subject').length,1);
  assert.equal(c.plan.records.size,4,'jedno połączenie HTTP i trzy wyjścia Subject');
 });
 
-test('one User from HTTP reaches Subject, then splits into three identical next notifications of one colour',async()=>{
+test('one User from HTTP reaches Subject, then splits into two identical next notifications of one colour',async()=>{
  const {c,at,render}=await subject();
  assert.equal(c.events.filter(e=>e.type==='source-next'&&e.node==='http').length,1,'jedna emisja źródła');
  const input=c.plan.records.get('http-subject').events[0];
- const outs=['A','B','C'].map(id=>c.plan.records.get('subject-'+id).events[0]);
- assert.ok(outs.every(o=>o.at===outs[0].at&&o.arrival===outs[0].arrival),'trzy powiadomienia jednocześnie');
+ const outs=['A','B'].map(id=>c.plan.records.get('subject-'+id).events[0]);
+ assert.ok(outs.every(o=>o.at===outs[0].at&&o.arrival===outs[0].arrival),'dwa powiadomienia jednocześnie');
  assert.ok(outs.every(o=>o.value==='{…}'&&o.color===input.color),'kulki tej samej emisji mają wspólny kolor');
  const received=c.snapshot(input.arrival+.35);
  assert.equal(received.tokens.length,1);assert.equal(received.tokens[0].phase,'split-in');assert.equal(received.tokens[0].value,'{…}');
@@ -138,19 +139,19 @@ test('one User from HTTP reaches Subject, then splits into three identical next 
  assert.ok(cable.points.every(p=>p[1]===cable.points[0][1]),'prosty kabel HTTP → Subject, bez załamania');
  assert.ok(received.histories.every(h=>!h.values.length));
  const split=c.snapshot(input.arrival+(outs[0].at-input.arrival)*.7);
- assert.equal(split.tokens.length,3);assert.ok(split.tokens.every(t=>t.phase==='split-out'&&t.color===input.color));
- assert.equal(new Set(split.tokens.map(t=>t.y)).size,3);
+ assert.equal(split.tokens.length,2);assert.ok(split.tokens.every(t=>t.phase==='split-out'&&t.color===input.color));
+ assert.equal(new Set(split.tokens.map(t=>t.y)).size,2);
  const flying=c.snapshot((outs[0].at+outs[0].arrival)/2);
- assert.deepEqual(Array.from(flying.tokens,t=>t.edge).sort(),['subject-A','subject-B','subject-C']);
- // Postój multicast: jedna kulka rozdzieliła się na trzy przy portach A/B/C, pola jeszcze puste; Subject świeci.
+ assert.deepEqual(Array.from(flying.tokens,t=>t.edge).sort(),['subject-A','subject-B']);
+ // Postój multicast: jedna kulka rozdzieliła się na dwa przy portach A/B, pola jeszcze puste; Subject świeci.
  const multicast=c.snapshot(at('multicast'));
- assert.equal(multicast.tokens.length,3);assert.ok(multicast.tokens.every(t=>t.phase==='split-out'&&t.value==='{…}'));
- assert.equal(new Set(multicast.tokens.map(t=>t.y)).size,3);
+ assert.equal(multicast.tokens.length,2);assert.ok(multicast.tokens.every(t=>t.phase==='split-out'&&t.value==='{…}'));
+ assert.equal(new Set(multicast.tokens.map(t=>t.y)).size,2);
  assert.ok(multicast.histories.every(h=>!h.values.length),'pola jeszcze puste');
  assert.ok(multicast.codeView.flat().find(p=>p.mark?.id==='subject').active,'Subject świeci podczas rozsyłania');
  // Kolejny etap: kulki dolatują do pól (pełny obiekt, pole pokazuje swoją część), potem complete.
  const delivered=c.snapshot(outs[0].arrival+.35),svg=render(delivered);
- for(const [id,,value] of fields){
+ for(const [id,,value] of fields.slice(0,2)){
   assert.deepEqual(values(delivered,id),['{…}'],id+': cały obiekt');
   assert.match(fieldOf(svg,id),new RegExp(`data-field-value="${value}" opacity="1.000"`));
  }
@@ -160,9 +161,9 @@ test('one User from HTTP reaches Subject, then splits into three identical next 
  assert.doesNotMatch(render(split),/data-split-guide|data-hub-link|NaN|Infinity/);
 });
 
-test('complete goes from HTTP to Subject, then to all three receivers; fields keep their values, the counter stays at 1',async()=>{
+test('complete goes from HTTP to Subject, then to A/B, before late C subscribes; fields keep their values, the counter stays at 1',async()=>{
  const {c,at,render}=await subject();
- const upstream=c.plan.records.get('http-subject'),outs=['A','B','C'].map(id=>c.plan.records.get('subject-'+id));
+ const upstream=c.plan.records.get('http-subject'),outs=['A','B'].map(id=>c.plan.records.get('subject-'+id));
  assert.ok(upstream.end.kind==='complete'&&upstream.end.at>outs[0].events[0].arrival);
  assert.ok(outs.every(o=>o.end.kind==='complete'&&o.end.at===upstream.end.at+upstream.end.duration),'Subject przekazuje complete po jego dotarciu');
  const pulse=c.snapshot(upstream.end.at+.3).edges.find(e=>e.id==='http-subject').pulse;
@@ -175,9 +176,9 @@ test('complete goes from HTTP to Subject, then to all three receivers; fields ke
  assert.equal(done.executionCounts.started,1);assert.equal(done.executionCounts.completed,1);
  assert.equal(done.metrics.find(m=>m.label==='Requesty HTTP').value,1);
  const end=c.snapshot(c.duration),svg=render(end);
- for(const [id,,value] of fields)assert.match(fieldOf(svg,id),new RegExp(`data-field-value="${value}"`),'pole zachowuje wartość');
+ for(const [id,,value] of fields.slice(0,2))assert.match(fieldOf(svg,id),new RegExp(`data-field-value="${value}"`),'pole zachowuje wartość');
  assert.ok(end.edges.every(e=>e.done&&!e.pulse));
- assert.match(end.caption,/jeden request zamiast trzech/);
+ assert.match(end.caption,/Późny C dostał tylko complete/);
  assert.equal(c.events.some(e=>e.type==='inner-unsubscribe'),false,'bez unsubscribe');
 });
 
@@ -224,21 +225,41 @@ test('all Subject checkpoints and split frames rewind deterministically; manual 
  controller.previous();assert.equal(player.time,player.stops.at(-1).time);
  controller.reset();assert.equal(player.time,0);assert.equal(player.snapshot.executionCounts.started,0);
  controller.setMode('manual');controller.setMode('auto');h.advance(30000);assert.equal(player.state,'finished');
- for(const [id] of fields)assert.deepEqual(values(player.snapshot,id),['{…}']);
+ for(const [id] of fields)assert.deepEqual(values(player.snapshot,id),id==='C'?[]:['{…}']);
 });
 
-test('Subject checkpoint notes follow the stops and end with the question about who keeps the upstream connection',async()=>{
- const {c}=await subject();
- const html=require('node:fs').readFileSync('index.html','utf8');
+test('Subject checkpoint notes explain A/B completion before the late city subscriber',async()=>{
+ const {c}=await subject(),html=require('node:fs').readFileSync('index.html','utf8');
  const source=html.match(/<template data-checkpoint-notes="05-zrodla-3">([\s\S]*?)<\/template>/)[1];
  const notes=Object.fromEntries([...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)].map(([,id,text])=>[id,text]));
  assert.deepEqual(Object.keys(notes),['ready',...Array.from(c.stops,s=>s.id),'finished']);
- assert.match(notes.ready,/Kontynuujemy przykład Subjecta z poprzedniego slajdu[\s\S]*nie wywołujemy next ręcznie — obiekt użytkownika pobierzemy z HTTP[\s\S]*trzy identyczne requesty[\s\S]*ci sami trzej odbiorcy/);
- assert.match(notes.defined,/const http\$ = httpGet[\s\S]*tylko definicja: nie ma wykonania ani requestu/);
- assert.match(notes['connect-http'],/Jest również Observerem[\s\S]*http\$\.subscribe\(subject\$\)[\s\S]*Subject jest Observerem/);
- assert.doesNotMatch(notes['connect-http'],/Migawka/);
- assert.match(notes.multicast,/jeden request, niezależnie od liczby odbiorców Subjecta[\s\S]*HTTP emituje go do Subjecta/);
- assert.match(notes.complete,/wyświetla tylko potrzebne pole/);
- assert.match(notes.complete,/Subject przekazuje complete wszystkim odbiorcom/);
- assert.match(notes.finished,/zamiast trzech requestów mamy jeden[\s\S]*Czy RxJS może zrobić to za nas\?/);
+ assert.match(notes.ready,/firstName[\s\S]*lastName/);assert.match(notes.complete,/Subject.*zakończon/);
+ assert.match(notes['subscribed-c'],/tylko complete[\s\S]*bez.*wartości[\s\S]*bez nowego requestu/);
+ assert.match(notes.finished,/Ale sami musieliśmy podłączyć źródło\. Czy RxJS może zrobić to za nas\?/);
+});
+
+test('late city appears only on the next step after complete; subscribing to a completed Subject delivers no User and starts no HTTP',async()=>{
+ for(const format of ['4:3','16:9']){
+  const {scene,c,at,ev,render}=await subject(format),completed=c.snapshot(at('complete'));
+  assert.equal(node(completed,'C').opacity,0);assert.equal(completed.edges.find(e=>e.id==='subject-C').visible,false);
+  assert.equal(completed.executionCounts.completed,1);assert.equal(completed.metrics.find(m=>m.label==='Odbiorcy').value,0);
+  assert.ok(ev('subscribe','subject-C')>at('complete'));
+  const late=c.plan.records.get('subject-C');assert.equal(late.events.length,0);
+  assert.equal(late.end.kind,'complete');assert.equal(late.end.at,late.start+late.connectDuration,'complete immediately upon reaching Subject');
+  const during=c.snapshot(late.start+.4);assert.equal(node(during,'C').opacity,1);
+  assert.ok(during.callouts.some(c=>c.text==='.subscribe()'&&c.label==='C'));
+  assert.equal(during.metrics.find(m=>m.label==='Odbiorcy').value,0,'Subject remains closed');
+  const end=c.snapshot(at('subscribed-c')),svg=render(end);
+  assert.deepEqual(values(end,'C'),[]);assert.deepEqual(values(end,'A'),['{…}']);assert.deepEqual(values(end,'B'),['{…}']);
+  assert.equal(end.executionCounts.started,1);assert.equal(end.executionCounts.active,0);
+  assert.equal(node(end,'http').laneStates.length,1);assert.ok(end.nodes.every(n=>n.laneStates.every(l=>l.state==='completed')));
+  assert.match(fieldOf(svg,'C'),/data-field-state="empty"/);assert.doesNotMatch(svg,/data-field-value="Białystok"/);
+  assert.equal((svg.match(/data-lane-terminal="completed"/g)||[]).length,3);
+  assert.equal(c.events.filter(e=>e.type==='source-next'&&e.node==='http').length,1);
+  const h=await playbackHarness(),{player,controller}=h.create({scene});
+  controller.seekCheckpoint(at('complete'));controller.next();h.advance(100);controller.next();
+  assert.equal(player.time,at('subscribed-c'));assert.equal(player.isPlaying,false);
+  controller.previous();assert.equal(player.time,at('complete'));assert.equal(node(player.snapshot,'C').opacity,0);
+  controller.reset();assert.equal(node(player.snapshot,'C').opacity,0);
+ }
 });

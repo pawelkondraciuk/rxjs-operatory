@@ -15,10 +15,10 @@ const frame=(c,id)=>c.snapshot(at(c,id));
 
 test('count: 3 creates four sequential HTTP executions but only one subscription of A',async()=>{
  const {c}=await deck(),records=c.plan.records;
- assert.deepEqual(Array.from(c.stops,s=>s.id),['request-1','error-1','request-2','error-2','request-3','error-3','request-4','success','summary']);
+ assert.deepEqual(Array.from(c.stops,s=>s.id),['error-1','request-2','error-2','request-3','error-3','request-4','success','summary']);
  assert.equal([...records.keys()].filter(key=>key.startsWith('source-retry-')).length,4);
  assert.equal([...records.keys()].filter(key=>key==='retry-observer').length,1);
- const expected=[1,1,2,2,3,3,4,4,4];
+ const expected=[1,2,2,3,3,4,4,4];
  c.stops.forEach((stop,index)=>assert.equal(frame(c,stop.id).executionCounts.started,expected[index],stop.id));
  assert.deepEqual({...c.snapshot(c.duration).executionCounts},{started:4,active:0,completed:1,cancelled:0,error:3});
 });
@@ -53,8 +53,8 @@ test('one pipeline and a newest-first HTTP execution stack fit both formats',asy
  for(const format of ['4:3','16:9']){
   const {scene,c,render}=await deck(format),ready=c.snapshot(0),end=c.snapshot(c.duration),svg=render(end);
   assert.equal(scene.title,'retry — nie udało się? Spróbuj później');
-  assert.equal(ready.nodes.find(n=>n.id==='source').executionRows.length,0);
-  assert.equal(ready.nodes.find(n=>n.id==='observer').visible,false);
+  assert.equal(ready.nodes.find(n=>n.id==='source').executionRows.length,1);
+  assert.equal(ready.nodes.find(n=>n.id==='observer').visible,true);
   assert.equal(end.panels.length,0);
   assert.equal(end.innerWorkPanels,undefined);
   const source=end.nodes.find(n=>n.id==='source'),rows=[...source.executionRows].sort((a,b)=>a.rank-b.rank);
@@ -115,6 +115,6 @@ test('MANUAL: next during a countdown finishes the stage; rewind/reset are deter
  assert.ok(!m['scene-config'].extraIds.has(id));
  assert.equal(scene.group,'main');
  const html=fs.readFileSync('index.html','utf8');
- for(const checkpoint of ['ready','request-1','error-1','request-2','error-2','request-3','error-3','request-4','success','summary','finished'])
+ for(const checkpoint of ['ready','error-1','request-2','error-2','request-3','error-3','request-4','success','summary','finished'])
   assert.match(html,new RegExp(`data-checkpoint="${checkpoint}"`));
 });
