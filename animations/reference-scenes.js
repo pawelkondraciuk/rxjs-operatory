@@ -186,14 +186,14 @@ function laneCodeLines(plan) {
 }
 // Cold (04a-dwa-tory): trzy pola widoku potrzebują danych tego samego użytkownika. Każde subskrybuje ten sam zimny
 // user$ (kolejno, co 0,25 s czasu modelu), więc powstają trzy niezależne, identyczne requesty, które trwają jednocześnie.
-// HTTP B kończy się błędem (error w 2,8 s), gdy A i C nadal pracują: bez User i bez complete; pole B pokazuje „Błąd”.
-// A i C emitują cały obiekt User — kulka „{…}”, bez rozbijania na pola; odbiorca wyświetla tylko swoją właściwość.
+// Wszystkie trzy kończą się poprawnie: każde emituje cały obiekt User — kulka „{…}”, bez rozbijania na pola; odbiorca wyświetla tylko swoją właściwość.
 // complete 1 s po next (jak w Subject i share), żeby odbiór i zakończenie były osobnymi etapami.
 const coldUser={firstName:'Paweł',lastName:'Kondraciuk',city:'Białystok'},coldUserSymbol='{…}';
 const coldFields=[{id:'A',key:'firstName',start:1},{id:'B',key:'lastName',start:1.25},{id:'C',key:'city',start:1.5}]
   .map((f,slot)=>({...f,slot,edge:`http-${f.id}`,label:`user.${f.key}`,value:coldUser[f.key],response:f.start+3,complete:f.start+4}));
-// Scenariusz Cold: wykonanie B kończy się błędem przed odpowiedziami A i C (pozostałe slajdy używają coldFields bez zmian).
-const coldErrors={B:2.8},coldFieldError='Błąd';
+// Scenariusz Cold: bez błędów — wszystkie wykonania kończą się complete. Mechanizm zostaje na później: wpis {B:2.8}
+// kończy wykonanie B błędem w tej chwili (bez User i complete, pole pokazuje coldFieldError).
+const coldErrors={},coldFieldError='Błąd';
 const coldOutcome=f=>coldErrors[f.id]===undefined?{kind:'complete',at:f.complete}:{kind:'error',at:coldErrors[f.id]};
 // Pola widoku A/B/C wspólne dla Cold i Subject: ta sama kolumna (x/w 960/436), wiersze na torach, etykieta właściwości
 // i miejsce na wartość (tray.field). Kulka obiektu ma ten sam rozmiar na obu slajdach.
@@ -208,7 +208,7 @@ function viewFields(top,extra={},fields=coldFields) {
 function configureColdFields(scene) {
   const ev=(type,edge)=>({type,edge}),during=(from,to)=>({from,to}),user=f=>E(f.response,coldUserSymbol,laneSubscribers[f.id].fill);
   const http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},last=coldFields.at(-1);
-  const ok=coldFields.filter(f=>coldOutcome(f).kind==='complete'),failed=coldFields.filter(f=>coldOutcome(f).kind==='error');
+  const ok=coldFields.filter(f=>coldOutcome(f).kind==='complete');
   // Jedna definicja; httpGet świeci, gdy któreś udane wykonanie wysyła odpowiedź.
   const lines=[[{text:'const user$ = '},{text:"httpGet<User>('/api/users/42')",mark:http,
     active:ok.map(f=>during(ev('source-next',f.edge),ev('deliver-next',f.edge)))},{text:';'}]];
@@ -224,14 +224,13 @@ function configureColdFields(scene) {
       [coldFields[0].start,'A (user.firstName) subskrybuje user$ i uruchamia HTTP #1'],
       [coldFields[1].start,'B (user.lastName) subskrybuje ten sam user$ i uruchamia HTTP #2'],
       [coldFields[2].start,'C (user.city) robi to samo: HTTP #3. Trzy requesty trwają jednocześnie'],
-      [ok[0].response,'A dostaje cały obiekt User i pokazuje imię'],
-      [ok.at(-1).response,'C dostaje cały obiekt User i pokazuje miasto']],
+      [ok[0].response,'Odpowiedzi wracają osobno: każde pole dostaje własny obiekt User'],
+      [ok.at(-1).complete,'Każde wykonanie kończy się własnym complete']],
     metrics:[{label:'Observable',value:()=>1},{label:'Requesty HTTP',count:'started'}],
     playback:manual([
       {id:'requests',event:ev('connected',last.edge),offset:.35,caption:'A, B i C subskrybują ten sam user$. Trzy requesty HTTP trwają jednocześnie'},
-      // Pytanie: błąd B dotarł do pola, A i C nadal pracują — czy też się zatrzymają?
-      {id:'error',event:ev('disconnected',failed[0].edge),offset:.35,caption:'HTTP #2 kończy się błędem. Czy pozostałe requesty też się zatrzymają?'},
-      {id:'answer',event:ev('disconnected',ok.at(-1).edge),offset:.5,caption:'Nie: A i C kończą się poprawnie — User i complete. Każde wykonanie ma własny cykl życia'},
+      {id:'received',event:ev('deliver-next',ok.at(-1).edge),offset:.35,caption:'Trzy odpowiedzi, trzy identyczne obiekty User — każde pole pokazuje swoją właściwość'},
+      {id:'complete',event:ev('disconnected',ok.at(-1).edge),offset:.5,caption:'A, B i C kończą się complete. Każde wykonanie ma własny cykl życia'},
     ]),
   });
 }
@@ -1753,7 +1752,8 @@ function catchInsideGraph(scene) {
 // error przechodzi przez inbox inner i switchMap do zewnętrznego catchError. catchError odłącza pierwotny strumień
 // (teardown switchMap i klik$, szary impuls ×, bez complete), dopiero potem subskrybuje of([]): [] i complete trafiają do S1.
 // Klik B pojawia się w odłączonym klik$ i gaśnie: nie dociera do switchMap, nie ma projekcji ani HTTP.
-const outsideTimes={subscribe:.3,a:1,error:4,teardown:4.2,fallback:5.5,done:6,b:7.3};
+// Końcowy slajd: szybki klik A i krótki HTTP (1 s) — liczy się to, co dzieje się po błędzie.
+const outsideTimes={subscribe:.3,a:.6,error:1.6,teardown:1.8,fallback:2.3,done:2.6,b:3.4};
 export function configureCatchOutside(scene) {
   const at=outsideTimes;
   const jobs=[{value:'A',at:at.a,start:at.a,end:at.error,dur:at.error-at.a,errored:true}];
@@ -1764,9 +1764,9 @@ export function configureCatchOutside(scene) {
   const lines=[[{text:'klik$.pipe('},{text:'switchMap',mark:op,active:[during(ev('deliver-next','source-op',{value:'A'}),ev('inner-subscribe','inner0-op'))]},{text:'(id =>'}],
     [{text:'  '},{text:'httpGet(url(id))',mark:http,active:[during(ev('inner-subscribe','inner0-op'),ev('stream-error','inner0-op'))]},
       {text:'), '},{text:'catchError(() => of([]))',mark:{...op,id:'catch'},active:[during(ev('disconnected','op-catch'),ev('disconnected','catch-observer'))]},{text:')'}]];
-  Object.assign(scene,{jobs,operatorName:'switchMap',catchTimes:at,graph:catchOutsideGraph,duration:at.b+2.5,
+  Object.assign(scene,{jobs,operatorName:'switchMap',catchTimes:at,graph:catchOutsideGraph,duration:at.b+2,
     title:'catchError na zewnątrz',playerLayout:'expanded',playerClass:'rx-flat-tiles rx-catch-inside',
-    timing:{subscribe:1.5,travel:1,transform:1.4,terminal:.8,gap:.5},
+    timing:{subscribe:.9,travel:.6,transform:1.4,terminal:.5,gap:.3},
     code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
     rows:[R('klik$',[E(at.a,'A')]),
       R('HTTP A',[],[{start:at.a,end:at.error,label:'HTTP A',kind:'error',color:'http'}]),
@@ -1779,7 +1779,6 @@ export function configureCatchOutside(scene) {
       [at.done,'of([]) kończy się: S1 dostaje complete. Wynikowy strumień zakończony']],
     metrics:[{label:'requesty HTTP',count:'started'},{label:'aktywne',count:'active'}],
     playback:{entry:'manual',finish:'hold',afterLastManualStop:'start-auto',stops:[
-      {id:'click-a',event:ev('inner-subscribe','inner0-op'),offset:.5,caption:'Klik A: switchMap tworzy inner #1 i uruchamia HTTP'},
       {id:'error',event:ev('disconnected','op-catch'),offset:.1,caption:'HTTP A: error przeszedł przez switchMap do zewnętrznego catchError'},
       {id:'caught',event:ev('disconnected','source-op'),offset:.35,caption:'catchError przechwycił błąd i odłączył klik$. Do S1 nie dotarł error'},
       {id:'fallback',event:ev('disconnected','catch-observer'),offset:.35,caption:'catchError subskrybował of([]): S1 dostał [] i complete'},
@@ -1805,21 +1804,22 @@ function catchOutsideGraph(scene) {
   const graph={layout:'fixed',formatAware:true,width:1240,height:frame.height,illustratedWork:true,nodes,edges,
     executions:[{id:job.value,node:'inner0',edge:'inner0-op',panel:'jobs',value:job.value,label:'HTTP '+job.value,duration:job.dur}],
     timeline:[{at:at.b,type:'source-unobserved',node:'source',value:'B'},
-      {type:'catch-summary',event:{type:'source-unobserved',node:'source'},offset:1.8,
+      {type:'catch-summary',event:{type:'source-unobserved',node:'source'},offset:1.2,
         caption:'Błąd A zastąpił cały strumień: of([]) i complete. Kolejne kliknięcia nie uruchamiają HTTP'}]};
   // Cztery kafelki u góry jak map + concatAll: klik$, switchMap, catchError i S1 na tej samej osi portów.
   configureHttpWorkPanel(graph,scene,frame,{
     tiles:[['source',145,190,'#8FC9D4'],['op',400,230,'#D8B3E6'],['catch',677.5,235,'#D8B3E6']]});
   // Odłączony klik$ nadal może emitować: B pojawia się w jego wierszu przy porcie wyjścia i gaśnie bez kabla do switchMap.
   const source=nodes[0];
-  graph.tokens=[{at:at.b,until:at.b+1.4,modelTime:true,fade:true,value:'B',color:'#B85D05',phase:'unobserved',
+  graph.tokens=[{at:at.b,until:at.b+1.2,modelTime:true,fade:true,value:'B',color:'#B85D05',phase:'unobserved',
     x:source.x+source.w/2-graph.ball.r-18,y:source.top+source.defH+source.rowH/2}];
   // switchMap nie kończy się czerwienią w górnym torze: jego pierwotne wykonanie zamyka teardown.
   nodes[1].teardownEdge='source-op';
   return graph;
 }
 
-// Trzeci etap wyszukiwarki: distinct od READY → trzy sukcesy → po kliknięciu nieobsłużony error.
+// Trzeci etap wyszukiwarki: distinct od READY → trzy sukcesy → po kliknięciu nieobsłużony error dla react;
+// potem UI kasuje react i wpisuje angular bez reakcji pipeline'u.
 // UI po błędzie jest niezależne od zdarzeń zamkniętej subskrypcji.
 export function configureDistinctSwitch(scene) {
   const model=distinctSearchModel();
@@ -1836,12 +1836,18 @@ export function configureDistinctSwitch(scene) {
   });
 }
 
+// Seria zmian inputa co 100 ms modelu (ilustracja 5×); wspólna dla distinct i catchError.
+const searchRound=n=>+n.toFixed(6);
+const searchBurst=(values,at)=>values.map((value,i)=>{
+  const t=searchTiming,emit=at+i*t.key*t.scale;
+  return {value,color:queryColor(value),at:searchRound(emit),arrival:searchRound(emit+t.travel),logicalAt:searchRound(emit/t.scale)};
+});
+// Po react użytkownik kasuje frazę literami i wpisuje angular (distinct: już bez subskrypcji; catchError: HTTP #2).
+const searchRetype=['reac','rea','re','r','','a','an','ang','angu','angul','angula','angular'];
 function distinctSearchModel() {
-  const t=searchTiming,firstAt=3.3,round=n=>+n.toFixed(6);
-  const burst=(values,at)=>values.map((value,i)=>({value,color:queryColor(value),at:round(at+i*t.key*t.scale),
-    arrival:round(at+i*t.key*t.scale+t.travel),logicalAt:round((at+i*t.key*t.scale)/t.scale)}));
+  const t=searchTiming,firstAt=3.3,round=searchRound,burst=searchBurst;
   const bursts=[burst(['r','re','rea'],firstAt),burst(['re','rea'],11.8),
-    burst(['','a','an','ang'],16.5),burst(['','v','vu','vue'],25.5),burst(['','s','sv','sve'],34.6)];
+    burst(['','a','an','ang'],16.5),burst(['','v','vu','vue'],25.5),burst(['','r','re','rea','reac','react'],34.6)];
   const inputs=bursts.flat();
   const outputs=debounceSearchInputs(inputs).map((v,i,all)=>({...v,at:round(v.at),arrival:round(v.arrival),
     duplicate:i>0&&v.value===all[i-1].value}));
@@ -1856,7 +1862,7 @@ function distinctSearchModel() {
   const error=runs.at(-1).end,resultError=round(error+t.terminal+.15),receiverError=round(resultError+t.terminal);
   const teardown=[receiverError,round(receiverError+t.terminal),round(receiverError+2*t.terminal)];
   const detached=round(teardown[2]+t.terminal),uiStart=round(detached+.65);
-  const unobserved=burst(['','r','rx','rxj'],uiStart);
+  const unobserved=burst(searchRetype,uiStart);
   const successStop=round(runs.at(-2).completed+.35);
   const duration=round(unobserved.at(-1).at+1);
   const source={id:'query',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},http={...source,id:'http'};
@@ -1886,12 +1892,12 @@ function distinctSearchModel() {
       [bursts[2][0].at,'ang różni się od rea — distinctUntilChanged przepuszcza nowe zapytanie.'],
       [bursts[3][0].at,'vue różni się od ang — kolejny HTTP dostarczy wynik i complete inner.'],
       [runs.at(-2).completed,'Trzy udane HTTP: rea, ang, vue. Dalej uruchomi kolejne zapytanie, które zakończy się błędem.'],
-      [bursts[4][0].at,'Nowe zapytanie sve — distinctUntilChanged przepuszcza je do switchMap.'],
-      [runs.at(-1).connected,'HTTP #4 dla sve pracuje. Dalej pokaże błąd tego requestu.'],
-      [error,'HTTP #4 dla sve: error 500. Nieobsłużony błąd przechodzi przez switchMap.'],
+      [bursts[4][0].at,'Nowe zapytanie react — distinctUntilChanged przepuszcza je do switchMap.'],
+      [runs.at(-1).connected,'HTTP #4 dla react pracuje. Dalej pokaże błąd tego requestu.'],
+      [error,'HTTP #4 dla react: error 500. Nieobsłużony błąd przechodzi przez switchMap.'],
       [receiverError,'Odbiorca dostał error. Cała subskrypcja wyszukiwarki zostaje zamknięta.'],
       [detached,'query$ odłączone. Dalej pokaże zmiany inputa, na które pipeline już nie reaguje.'],
-      [uiStart,'Input nadal działa. Pipeline jest odłączony — brak emisji i requestu dla rxj.'],
+      [uiStart,'Input nadal działa. Pipeline jest odłączony — brak emisji i requestu dla angular.'],
       [duration-.3,'Jeden nieobsłużony błąd HTTP zakończył całą wyszukiwarkę.']],
     metrics:[{label:'zmiany inputa',value:time=>seen(inputs,time)+seen(unobserved,time)},
       {label:'wejścia query$',value:time=>seen(inputs,time)},
@@ -1943,10 +1949,22 @@ function distinctSearchGraph(scene) {
       ...runs.flatMap((run,i)=>[{node:'op',at:s.passed[i].arrival,until:run.connected},
         {node:'op',at:run.response+t.travel,until:run.errored?s.receiverError:run.received}])],
   };
+  searchPipelineLook(graph,scene,frame,runs,[...s.inputs,...s.unobserved],
+    {stages:i=>[{column:'source',edge:'inner'+i+'-op',progress:true,errorLabel:'error 500'}]});
+  graph.callouts=[{text:'duplikat',label:'',subscriber:'S1',x:620,y:frame.height===612?187:140,size:18,
+      from:{type:'distinct-reject'},to:{type:'distinct-reject',offset:.35}}];
+  return graph;
+}
+
+// Szerokość kapsułki jak w rendererze (shape:'pill': pełny tekst przy stałym foncie).
+const ballWidthOf=(value,size)=>size.shape==='pill'?Math.max(size.r*2,Array.from(String(value)).length*size.font*.6+2*(size.padding??14)):size.r*2;
+// Górny pipeline wyszukiwarki z distinctUntilChanged (11a i 11b): te same kafelki, tory S1, input, timer i pamięć,
+// dolny panel instancji HTTP z konfigurowalnymi etapami.
+function searchPipelineLook(graph,scene,frame,runs,ui,{panelOptions={},...panel}={}) {
   configureHttpWorkPanel(graph,{...scene,rows:[{events:[]}],operatorName:'switchMap',jobs:runs.map(run=>({...run,dur:run.duration}))},frame,{
     tiles:[['source',115,190,'#8FC9D4'],['debounce',355,230,'#D8B3E6'],
       ['distinct',620,240,'#D8B3E6'],['op',875,210,'#D8B3E6']],
-    stages:i=>[{column:'source',edge:'inner'+i+'-op',progress:true,errorLabel:'error 500'}],panelOptions:{maxVisibleRows:3}});
+    ...panel,panelOptions:{maxVisibleRows:3,...panelOptions}});
   configureQueryWorkLook(graph,scene,frame,runs);
   const receiver=graph.nodes.find(n=>n.id==='observer');
   Object.assign(receiver,{x:1125,w:230,laneTerminalText:{offsetY:-receiver.rowH*.85}});receiver.inbox.label='';
@@ -1958,13 +1976,154 @@ function distinctSearchGraph(scene) {
   // Nagłówek w dwóch liniach; mniejszy font mieści pełne nazwy w kompaktowych kolumnach.
   graph.nodes.find(n=>n.id==='debounce').labelSize=scene.format==='4:3'?30:28;
   const d=graph.nodes.find(n=>n.id==='distinct');if(d)d.labelSize=scene.format==='4:3'?30:28;
+  // Pamięć distinct mieści najdłuższą frazę (angular) przed portem wyjścia.
+  if(d?.memory)d.memory.x=d.x+d.w/2-Math.max(...ui.map(v=>ballWidthOf(v.value,graph.ball)))/2-14;
   Object.assign(graph.nodes.find(n=>n.id==='debounce').laneTimer,{memoryX:405,textSize:22});
-  graph.callouts=[{text:'duplikat',label:'',subscriber:'S1',x:620,y:frame.height===612?187:140,size:18,
-      from:{type:'distinct-reject'},to:{type:'distinct-reject',offset:.35}}];
   graph.trays=[{anchor:'observer',x:receiver.x+15,y:receiver.y,w:80,balls:true,max:1,ball:graph.ball}];
-  const ui=[...s.inputs,...s.unobserved];
   graph.readouts=[{...queryInputReadout(graph,scene,time=>ui.filter(v=>v.at<=time).at(-1)?.value||''),
     x:graph.nodes.find(n=>n.id==='source').x+6,w:140}];
+}
+
+// catchError — wyszukiwarka działa dalej (11b, po distinct): ten sam górny pipeline i input, nowa instancja subskrypcji.
+// Dolny pipeline każdego innera: HTTP GET → catchError → inner subscriber. react: HTTP #1 kończy się error 500,
+// catchError subskrybuje of([]) — [] trafia przez switchMap do odbiorcy, inner kończy się complete. Potem input
+// kasuje react i wpisuje angular: HTTP #2 zwraca [#2], który przechodzi przez catchError bez zmian. Główny pipeline
+// nie dostaje error, complete ani teardown. Czasy ilustracji jak w distinct (300 ms debounce, ilustracja 5×).
+export function configureCatchSearch(scene) {
+  const model=catchSearchModel(),{stops}=model.search;
+  Object.assign(scene,model,{
+    title:'catchError — wyszukiwarka działa dalej',
+    playerLayout:'expanded',playerClass:'rx-flat-tiles rx-switchmap-live rx-distinct-search rx-catch-search',ink:'#26323B',
+    playback:{entry:'manual',finish:'hold',controller:'stages',resetOnExit:true,stops:[
+      {id:'error',time:stops.error,autoPause:true},
+      {id:'fallback',time:stops.fallback,autoPause:true},
+      {id:'success',time:stops.success,autoPause:true},
+    ]},
+  });
+}
+
+function catchSearchModel() {
+  const t=searchTiming,round=searchRound,firstAt=3.3;
+  const pass=v=>({...v,at:round(v.arrival+.6),arrival:round(v.arrival+.6+t.travel)});
+  const run=(index,input,errored)=>{
+    const output=debounceSearchInputs(input)[0],passed=pass(output),born=passed.arrival;
+    const catchConnected=round(born+t.connect),connected=round(catchConnected+t.connect),response=round(connected+t.request);
+    return {id:'#'+(index+1),index,value:passed.value,color:passed.color,input,output,passed,born,catchConnected,connected,
+      response,duration:t.request,errored};
+  };
+  const first=run(0,searchBurst(['r','re','rea','reac','react'],firstAt),true);
+  // Błąd dociera do catchError po terminalu; of([]) pojawia się w catchError, potem [] i complete zastępczego strumienia.
+  first.caught=round(first.response+t.terminal);
+  first.next=round(first.caught+.7);first.nextArrival=round(first.next+t.travel);
+  first.complete=round(first.nextArrival+t.terminalGap);first.completed=round(first.complete+t.terminal);
+  const fallbackStop=round(first.completed+.35);
+  const second=run(1,searchBurst(searchRetype,round(fallbackStop+.4)),false);
+  // Sukces: [#2] z HTTP do catchError, catchError przekazuje bez zmian; complete HTTP dociera, potem complete catchError.
+  Object.assign(second,{httpArrival:round(second.response+t.travel),httpComplete:round(second.response+t.terminalGap)});
+  second.next=round(second.httpArrival+.15);second.nextArrival=round(second.next+t.travel);
+  second.complete=round(second.httpComplete+t.terminal+.05);second.completed=round(second.complete+t.terminal);
+  const runs=[first,second];
+  for(const r of runs){r.result=r.errored?'[]':searchResultValue(r);r.delivered=round(r.nextArrival+.15);r.received=round(r.delivered+t.travel);}
+  const duration=round(second.completed+.5);
+  const inputs=runs.flatMap(r=>r.input),outputs=runs.map(r=>r.output),passed=runs.map(r=>r.passed);
+  const stops={error:first.caught,fallback:fallbackStop,success:duration};
+  const source={id:'query',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},http={...source,id:'http'};
+  const op={id:'switch',bg:'rgba(216,179,230,.45)',line:'#b384c6'},debounce={...op,id:'debounce'};
+  const clock=at=>({type:'search-clock',logicalAt:at}),during=(from,to)=>({from:clock(from),to:clock(to)});
+  const codeLines=[
+    [{text:'query$',mark:source,active:inputs.map(v=>during(v.at,v.arrival))},{text:'.pipe('}],
+    [{text:'  '},{text:'debounceTime(300)',mark:debounce,active:runs.map(r=>during(r.input[0].arrival,r.output.arrival))},{text:','}],
+    [{text:'  '},{text:'distinctUntilChanged()',mark:{...op,id:'distinct'},active:runs.map(r=>during(r.output.arrival,r.passed.arrival))},{text:','}],
+    [{text:'  '},{text:'switchMap',mark:op,active:runs.flatMap(r=>[during(r.passed.arrival,r.catchConnected),during(r.nextArrival,r.received)])},
+      {text:'(query =>'}],
+    [{text:'    '},{text:'httpGet(url(query))',mark:http,active:runs.map(r=>during(r.connected,r.response))},{text:'.pipe('}],
+    [{text:'      '},{text:'catchError(() => of([]))',mark:{...op,id:'catch'},
+      active:[during(first.response,first.completed),during(second.httpArrival,second.nextArrival)]}],
+    [{text:'    )'}],[{text:'  )'}],[{text:')'}],
+  ];
+  const code=codeLines.map(line=>line.map(part=>part.text).join('')).join('\n');
+  const clocks=[...new Set(codeLines.flat().flatMap(part=>(part.active||[]).flatMap(v=>[v.from.logicalAt,v.to.logicalAt])))];
+  const seen=(values,time)=>values.filter(v=>v.at<=time+1e-9).length;
+  return {code,codeLines,codeFrames:[],rows:[],checkpoints:[],duration,graph:catchSearchGraph,
+    search:{inputs,outputs,passed,runs,stops,clocks},
+    captions:[[0,'Ta sama wyszukiwarka, nowa subskrypcja. catchError stoi wewnątrz switchMap, za httpGet.'],
+      [.8,'Odbiorca subskrybuje pipeline. Subskrypcja przechodzi przez wszystkie operatory do query$.'],
+      [firstAt,'Użytkownik wpisuje react. debounceTime czeka na 300 ms ciszy.'],
+      [first.born,'distinctUntilChanged przepuszcza react, switchMap tworzy HTTP #1.'],
+      [first.connected,'HTTP #1 dla react: subskrypcja przeszła przez catchError do httpGet.'],
+      [first.response,'HTTP #1: error 500. Czerwony impuls trafia do catchError, nie do odbiorcy.'],
+      [first.caught+.3,'catchError subskrybuje of([]): pusta tablica zamiast błędu.'],
+      [first.nextArrival,'[] przechodzi przez switchMap do odbiorcy wyników.'],
+      [first.completed,'of([]) kończy się complete. HTTP #1 pozostaje błędem, główna subskrypcja działa.'],
+      [second.input[0].at,'Użytkownik kasuje react i wpisuje angular. query$ nadal emituje.'],
+      [second.born,'angular różni się od react — switchMap uruchamia HTTP #2.'],
+      [second.response,'HTTP #2 zwraca wyniki. catchError przekazuje je bez zmian.'],
+      [second.completed,'Błąd jednego requestu nie musi kończyć całego strumienia.']],
+    metrics:[{label:'wejścia query$',value:time=>seen(inputs,time)},
+      {label:'emisje po debounce',value:time=>seen(outputs,time)},
+      {label:'requesty HTTP',count:'started'},
+      {label:'błędy HTTP',value:time=>runs.filter(r=>r.errored&&time>=r.response-1e-9).length},
+      {label:'aktywne HTTP',count:'active'},
+      {label:'główna subskrypcja',value:time=>time<.8?'nieuruchomiona':'aktywna'}],
+  };
+}
+
+function catchSearchGraph(scene) {
+  const {search:s}=scene,t=searchTiming,base=frameFor(scene),runs=s.runs,large=scene.format==='4:3';
+  // Dwa wykonania: dwa sloty panelu; ramka krótsza o trzeci slot, więc kafelki i wiersze mają skalę slajdu distinct.
+  const frame={...base,height:large?478:356};
+  const end=(at,kind)=>({at,logicalAt:at,kind,duration:t.terminal});
+  const inputEdges=[{id:'source-debounce',from:'source',to:'debounce',start:2.3,events:s.inputs},
+    {id:'debounce-distinct',from:'debounce',to:'distinct',start:1.8,events:s.outputs},
+    {id:'distinct-op',from:'distinct',to:'op',start:1.3,events:s.passed}];
+  const value=(r,at,arrival,extra={})=>({at,arrival,logicalAt:r.response/t.scale,value:r.result,color:r.color,execution:r.id,...extra});
+  const graph={layout:'fixed',formatAware:true,width:1240,height:frame.height,illustratedWork:true,
+    nodes:[{id:'source',label:'query$',ready:true},
+      {id:'debounce',label:'debounceTime',color:'op',ready:true,
+        laneTimer:{kind:'debounce',period:t.period,timeScale:t.scale,unit:'ms',label:'',empty:'',ball:true}},
+      {id:'distinct',label:'distinctUntil Changed',color:'op',ready:true,memory:{ball:true},transformBalls:true},
+      {id:'op',label:'switchMap',color:'op',ready:true},{id:'observer',label:'',ready:true},
+      ...runs.flatMap((r,i)=>['inner','catch'].map(kind=>({id:kind+i,label:kind==='inner'?'HTTP GET':'catchError',born:r.born,
+        inner:true,workRow:i+1,panel:'jobs',slot:i})))],
+    edges:[...inputEdges.map(e=>({id:e.id,from:e.from,to:e.to,events:[],logicalStart:.3,logicalEnd:null})),
+      {id:'op-observer',from:'op',to:'observer',events:[],logicalStart:.3,logicalEnd:null},
+      ...runs.flatMap((r,i)=>[
+        {id:`inner${i}-catch${i}`,from:'inner'+i,to:'catch'+i,internal:true,gateWork:true,fixedStart:true,events:[],
+          logicalStart:r.born,logicalEnd:{at:r.errored?r.response:r.httpComplete,kind:r.errored?'error':'complete'}},
+        {id:`catch${i}-op`,from:'catch'+i,to:'op',internal:true,gateWork:true,fixedStart:true,events:[],
+          logicalStart:r.born,logicalEnd:{at:r.complete,kind:'complete'}}])],
+    executions:runs.map((r,i)=>({id:r.id,node:'inner'+i,edge:`inner${i}-catch${i}`,panel:'jobs',value:r.value,duration:r.duration})),
+    schedule:{...Object.fromEntries(inputEdges.map(e=>[e.id,{start:e.start,connectDuration:.5,events:e.events}])),
+      'op-observer':{start:.8,connectDuration:.5,events:runs.map(r=>value(r,r.delivered,r.received))},
+      ...Object.fromEntries(runs.flatMap((r,i)=>[
+        // switchMap subskrybuje catchError, a catchError — httpGet: kable inner zestawiają się od prawej.
+        [`catch${i}-op`,{start:r.born,connectDuration:t.connect,events:[value(r,r.next,r.nextArrival)],end:end(r.complete,'complete')}],
+        [`inner${i}-catch${i}`,{start:r.catchConnected,connectDuration:t.connect,
+          events:r.errored?[]:[value(r,r.response,r.httpArrival)],
+          end:r.errored?end(r.response,'error'):end(r.httpComplete,'complete')}]])),
+    },
+    timeline:[...s.clocks.map(at=>({type:'search-clock',at})),
+      ...s.inputs.map(v=>({type:'input-change',at:v.at,value:v.value,observed:true})),
+      {type:'http-error',at:runs[0].response,execution:runs[0].id,status:500},
+      {type:'fallback-subscribe',at:runs[0].caught+.3,execution:runs[0].id,value:'of([])'}],
+    activities:[...s.inputs.map(v=>({node:'source',at:v.at,until:v.arrival})),
+      ...runs.flatMap((r,i)=>[{node:'debounce',at:r.input[0].arrival,until:r.output.arrival},
+        {node:'distinct',at:r.output.arrival,until:r.passed.arrival},
+        {node:'op',at:r.passed.arrival,until:r.catchConnected},{node:'op',at:r.nextArrival,until:r.received}])],
+  };
+  searchPipelineLook(graph,scene,frame,runs,s.inputs,{
+    columns:[{id:'source',label:'HTTP GET',fill:'#8FC9D4',runtime:'#E3F0F3'},{id:'catch',label:'catchError',fill:'#D8B3E6',runtime:'#F1E7F6'}],
+    edge:i=>`catch${i}-op`,
+    stages:i=>[{column:'source',edge:`inner${i}-catch${i}`,progress:true,errorLabel:'error 500'},
+      {column:'catch',edge:`catch${i}-op`,handles:{edge:`inner${i}-catch${i}`,label:'of([])'}}],
+    panelOptions:{minRows:2}});
+  // Kolumny wierszy: pełna fraza (angular), HTTP GET → catchError i inner subscriber z wynikiem i statusem.
+  const panel=Object.assign(graph.panels[0],{ballX:182,stagesLeft:280,stageXs:[280,510],stageWs:[190,220],stageGap:40,
+    receiverX:770,receiverW:440,receiverValueOffset:234});
+  // READY: definicje etapów innera (same nagłówki) w miejscu pierwszego wiersza; ustępują wierszowi #1 po jego fade-in.
+  panel.columns.forEach((column,i)=>graph.nodes.push({id:'def-'+column.id,label:column.label,ready:true,until:runs[0].born+.3,
+    x:panel.stageXs[i]+panel.stageWs[i]/2,y:panel.rowsTop+panel.headerH/2,w:panel.stageWs[i],h:panel.headerH,
+    headerFill:column.fill,terminalBadge:true,detail:'',rx:0}));
   return graph;
 }
 
@@ -2357,7 +2516,7 @@ export function configureQuerySource(scene) {
   const last=querySourceInputs(0,22)[querySourceWord.length-1];
   Object.assign(scene,{
     title:'Źródło: skąd bierze się query$?',
-    code:"const query$ = fromEvent(inputEl, 'input').pipe(\n  map(() => inputEl.value.trim()),\n  share()\n);",
+    code:"const query$ = fromEvent(inputEl, 'input').pipe(\n  map(event => (event.target as HTMLInputElement).value.trim()),\n  share()\n);",
     graph:querySourceGraph,rows:[],codeFrames:[],checkpoints:[],metrics:[],
     playerLayout:'function',playerClass:'rx-flat-tiles rx-query-source',ink:'#26323B',
     playback:{entry:'manual',finish:'hold',controller:'stages',navigation:'after-intro',resetOnExit:true,cleanupOnExit:true,
@@ -2376,7 +2535,7 @@ export function querySourceVariant(scene,{from=0,to=32,closedAt=null}) {
   const result={...scene,duration:closedAt===null?to:closedAt+.5,querySourceInputs:input,querySourceClosedAt:closedAt,
     captions:[[0,'fromEvent tworzy strumień ze zdarzeń input, map wyciąga tekst, a share pozwala współdzielić jedno źródło dalej.']],
     codeLines:[[{text:'const query$ = '},{text:"fromEvent(inputEl, 'input')",mark:source,active:input.map(v=>during(v.at,v.arrival))},{text:'.pipe(',show:showMap}],
-      [{text:'  ',show:showMap},{text:'map(() => inputEl.value.trim())',show:showMap,mark:map,active:input.map(v=>during(v.arrival,v.arrival+querySourceTiming.transform))},{text:',',show:showShare}],
+      [{text:'  ',show:showMap},{text:'map(event => (event.target as HTMLInputElement).value.trim())',show:showMap,mark:map,active:input.map(v=>during(v.arrival,v.arrival+querySourceTiming.transform))},{text:',',show:showShare}],
       [{text:'  ',show:showShare},{text:'share()',show:showShare,mark:share,active:input.map(v=>during(v.arrival+querySourceTiming.transform+querySourceTiming.travel,querySourceOutputAt(v))) }],
       [{text:');',show:showMap}]],
   };
@@ -2424,29 +2583,36 @@ function querySourceGraph(scene) {
 
 // Czas ilustracji jest jedynym czasem tej sceny. Okno live ogranicza liczbę requestów w kompilacji;
 // globalny indeks pochodzi z czasu, więc przewinięcie okna nie zeruje numerów ani liczników.
-const timing={reveal:.3,first:.9,short:1.4,long:4.8,travel:.4,cancel:.25,connect:.25,request:2,terminalGap:.7,terminal:.4};
+const timing={reveal:.3,first:.9,fast:.9,long:4.8,travel:.4,cancel:.25,connect:.25,request:2,terminalGap:.7,terminal:.4};
 // Paleta i starszy zestaw fraz są współdzielone z pokazem debounceTime.
 const queries=['r','re','rea','reac','react'];
 const colors=['#6D4CD3','#B85D05','#087FAD','#B73770','#287D68'];
-const switchQueries=['r','re','rea','react','reac','rea','re','red','redu','redux','redu','red','re','r','rx','rxj','rxjs','rxj','rx','r'];
-const switchPeriod=timing.short+timing.long;
-const emittedAt=index=>timing.first+Math.floor(index/2)*switchPeriod+(index%2?timing.short:0);
-// Licznik analityczny: dwie emisje na okres, bez przechodzenia po całej historii.
-const countAt=(time,first=timing.first,second=timing.short)=>{
-  if(time<first-1e-9)return 0;
-  const elapsed=Math.max(0,time-first),cycle=Math.floor((elapsed+1e-9)/switchPeriod);
-  return cycle*2+1+(elapsed-cycle*switchPeriod>=second-1e-9?1:0);
-};
+// Cykl: szybko r → re → rea, kasowanie re → r, zamiana na a → an → ang i kasowanie an → a. Szybka zmiana (fast)
+// przerywa trwający request; po ostatniej wartości serii jest cisza (long), więc jej HTTP kończy się wynikiem.
+const switchQueries=['r','re','rea','re','r','a','an','ang','an','a'];
+const switchFast=[true,true,false,true,false,true,true,false,true,false];
+const switchGaps=switchFast.map(fast=>fast?timing.fast:timing.long);
+const switchOffsets=switchGaps.reduce((times,gap)=>[...times,times.at(-1)+gap],[0]);
+const switchPeriod=switchOffsets.pop();
+const switchSize=switchQueries.length;
+const emittedAt=index=>timing.first+Math.floor(index/switchSize)*switchPeriod+switchOffsets[index%switchSize];
+// Chwile cyklu 0 są okresowe (pierwsza wartość cyklu zawsze po ciszy), więc licznik jest analityczny:
+// tyle wykonań, ile chwil base[k] + n·okres nie przekracza czasu.
+const countBy=(time,base)=>base.reduce((sum,at)=>sum+Math.max(0,Math.floor((time-at+1e-9)/switchPeriod)+1),0);
 const runAt=index=>{
-  const emitted=emittedAt(index),arrived=emitted+timing.travel,cancelled=index%2===0;
-  const born=arrived+(index%2?timing.cancel:0),connected=born+timing.connect;
+  const slot=index%switchSize,emitted=emittedAt(index),arrived=emitted+timing.travel,cancelled=switchFast[slot];
+  const replaces=index>0&&switchFast[(slot+switchSize-1)%switchSize];
+  const born=arrived+(replaces?timing.cancel:0),connected=born+timing.connect;
   const response=connected+timing.request,complete=response+timing.terminalGap;
   const end=cancelled?emittedAt(index+1)+timing.travel:complete;
-  return {index,id:'#'+(index+1),value:switchQueries[index?1+(index-1)%(switchQueries.length-1):0],
+  return {index,id:'#'+(index+1),value:switchQueries[slot],
     color:colors[index%colors.length],emitted,arrived,born,connected,response,complete,cancelled,end,
     completed:end+(cancelled?timing.cancel:timing.terminal),received:response+timing.travel+.15+timing.travel};
 };
-export const switchMapLiveStillTime=runAt(3).connected+.4;
+const switchCycle=Array.from({length:switchSize},(_,i)=>runAt(i));
+const countAt=time=>countBy(time,switchCycle.map(run=>run.emitted));
+const requestsAt=time=>countBy(time,switchCycle.map(run=>run.connected));
+export const switchMapLiveStillTime=runAt(4).connected+.4;
 const hiddenSwitchName='         ';
 const switchCode=name=>`query$.pipe(\n  ${name}(query => httpGet(url(query)))\n)`;
 
@@ -2480,9 +2646,9 @@ export function switchMapLiveVariant(scene,{from=0,to=24}) {
           to:event(run.cancelled?'inner-unsubscribe':'stream-complete',run)}))},{text:')'}],
       [{text:')'}]],
     metrics:[{label:'wejścia',value:time=>countAt(time)},
-      {label:'requesty HTTP',value:time=>countAt(time,runAt(0).connected,runAt(1).connected-runAt(0).connected)},
+      {label:'requesty HTTP',value:time=>requestsAt(time)},
       {label:'aktywne',value:time=>{
-        const index=countAt(time,runAt(0).connected,runAt(1).connected-runAt(0).connected)-1;
+        const index=requestsAt(time)-1;
         return index>=0&&time<runAt(index).end?1:0;
       }}],
   };
@@ -2562,9 +2728,12 @@ function queryInputReadout(graph,scene,value) {
 // Drugi etap wyszukiwarki. Litery co 100 ms i debounce 300 ms; ilustracja 5× wolniejsza.
 // Po drugiej wartości debounce pokaz działa bez końca; przeloty ilustrują komunikację.
 const searchTiming={first:2.3,key:.1,scale:5,period:.3,travel:.4,connect:.5,request:2,terminalGap:.7,terminal:.4,nextTyping:1};
-const searchBursts=[['r','re','rea'],['reac','react'],['','r','re','rea'],['','a','an','ang','angu'],['angul','angula','angular']];
-const searchRepeatBursts=searchBursts.map((values,i)=>i?values:['',...values]);
-const searchValues=[...new Set(searchBursts.flat())];
+// Serie jak na switchMap: r → re → rea, powrót re → rea (ta sama fraza drugi raz uruchamia HTTP), kasowanie re → r,
+// zamiana na a → an → ang i kasowanie an → a. Cykl powtarza się od r.
+const searchBursts=[['r','re','rea'],['re','rea'],['re','r'],['a','an','ang'],['an','a']];
+const searchRepeatBursts=searchBursts;
+// Stała kolejność kolorów fraz, wspólna z pokazem distinctUntilChanged.
+const searchValues=['r','re','rea','reac','react','','a','an','ang','angu','angul','angula','angular'];
 const queryColor=value=>colors[Math.max(0,searchValues.indexOf(value))%colors.length];
 const searchStep=values=>(values.length-1)*searchTiming.key*searchTiming.scale+2*searchTiming.travel+
   searchTiming.period*searchTiming.scale+searchTiming.connect+searchTiming.nextTyping;
@@ -2619,7 +2788,7 @@ export function configureDebounceSwitch(scene) {
     graph:debounceSwitchGraph,rows:[],codeFrames:[],checkpoints:[],
     playerLayout:'expanded',playerClass:'rx-flat-tiles rx-switchmap-live rx-debounce-search',ink:'#26323B',
     playback:{entry:'manual',finish:'hold',controller:'stages',navigation:'after-intro',resetOnExit:true,
-      stillTime:debounceSearchRunAt(2).completed+.9,stops:[
+      stillTime:debounceSearchRunAt(2).completed+.2,stops:[
         {id:'subscribed',time:1.95},
         {id:'buffered',time:first.input.at(-1).arrival+.3},
         {id:'request-1',time:first.connected+.1},

@@ -38,8 +38,11 @@ test('subscription travels left; input resets 300 ms; only silence creates HTTP'
     assert.equal(timer(c.snapshot(run.output.at+.001)).active,false);assert.equal(timer(c.snapshot(run.output.at+.001)).text,'');
     assert.equal(c.events.filter(e=>e.type==='inner-create'&&e.at<run.output.arrival).length,run.index);
   }
-  assert.equal(emitted,17);
-  assert.deepEqual(Array.from(c.events.filter(e=>e.type==='source-next'&&e.edge==='debounce-op').slice(0,5),e=>e.value),['rea','react','rea','angu','angular']);
+  assert.equal(emitted,12);
+  assert.deepEqual(Array.from(runs,r=>Array.from(r.input,v=>v.value)),[['r','re','rea'],['re','rea'],['re','r'],['a','an','ang'],['an','a']]);
+  assert.deepEqual(Array.from(c.events.filter(e=>e.type==='source-next'&&e.edge==='debounce-op').slice(0,5),e=>e.value),['rea','rea','r','ang','a']);
+  // Powrót re → rea po wyniku dla rea: debounceTime nie pamięta poprzedniej frazy, więc HTTP #2 dotyczy tej samej rea.
+  assert.equal(runs[1].value,runs[0].value);assert.ok(c.events.some(e=>e.type==='inner-subscribe'&&e.edge==='inner-1'));
 });
 
 test('every HTTP succeeds and completes while the main subscription keeps running; typing overlaps work',async()=>{
@@ -62,8 +65,9 @@ test('every HTTP succeeds and completes while the main subscription keeps runnin
   assert.equal(c.events.some(e=>e.type==='stream-complete'&&!e.edge.startsWith('inner-')),false);
   assert.ok([...c.plan.records.values()].filter(r=>r.gateWork).every(r=>r.end.kind==='complete'));
   const still=c.snapshot(scene.playback.stillTime);
-  assert.deepEqual(metrics(still),[14,3,0]);assert.equal(still.readouts[0].value,'angu');
-  assert.deepEqual(Array.from(rows(still),r=>[r.id,r.state]),[['#1','completed'],['#2','completed'],['#3','completed']]);
+  assert.deepEqual(metrics(still),[10,3,0]);assert.equal(still.readouts[0].value,'ang');
+  assert.deepEqual(Array.from(rows(still),r=>[r.id,r.value,r.state]),[['#1','rea','completed'],['#2','rea','completed'],['#3','r','completed']]);
+  assert.equal(timer(still).active,true);assert.equal(lane(still,'debounce').memory.value,'ang');
   assert.equal(still.histories.find(h=>h.anchor==='observer').values.at(-1).value,'[#3]');
 });
 
@@ -105,7 +109,7 @@ test('bounded live windows keep global query, HTTP IDs, metrics and history thro
   }
   const old=variant(scene,{from:1396,to:1428}),c=compile(old),f=c.snapshot(1400);
   assert.ok(old.debounceSearchRuns.length<16);assert.ok(c.events.length<350);
-  assert.ok(metrics(f)[0]>900);assert.ok(metrics(f)[1]>250);assert.ok(rows(f).every(r=>Number(r.id.slice(1))>250));
+  assert.ok(metrics(f)[0]>700);assert.ok(metrics(f)[1]>250);assert.ok(rows(f).every(r=>Number(r.id.slice(1))>250));
   assert.equal(c.events.some(e=>['stream-error','inner-unsubscribe'].includes(e.type)),false);
   for(const run of old.debounceSearchRuns.filter(r=>r.connected<=1400)) {
     assert.equal(c.events.find(e=>e.type==='inner-next'&&e.execution===run.id).value,'['+run.id+']');
@@ -138,7 +142,7 @@ test('manual stages end at the second emission; live runs without stopping and r
   assert.equal(player.time,0);assert.equal(player.isPlaying,false);assert.deepEqual(metrics(player.snapshot),[0,0,0]);
   controller.next();h.advance(100);controller.reset();assert.equal(player.time,0);assert.equal(h.frames.size,0);
   m['checkpoint-notes'].showNotesPreviewFrame(stage,player);near(player.time,scene.playback.stillTime);
-  assert.equal(h.frames.size,0);assert.deepEqual(metrics(player.snapshot),[14,3,0]);
+  assert.equal(h.frames.size,0);assert.deepEqual(metrics(player.snapshot),[10,3,0]);
   deck.press(39);assert.deepEqual(deck.navigation,[1,1,1]);binding.destroy();
 });
 
@@ -147,7 +151,7 @@ test('AUTO passes through the intro and keeps running; still preview and reset r
   controller.setMode('auto');h.advance(45000);assert.ok(player.time>44);assert.equal(player.isPlaying,true);
   const n=metrics(player.snapshot)[1];h.advance(6000);assert.ok(metrics(player.snapshot)[1]>n);
   assert.equal(h.frames.size,1);controller.finish();near(player.time,scene.playback.stillTime);assert.equal(h.frames.size,0);
-  assert.deepEqual(metrics(player.snapshot),[14,3,0]);controller.reset();assert.equal(player.time,0);assert.equal(h.frames.size,0);
+  assert.deepEqual(metrics(player.snapshot),[10,3,0]);controller.reset();assert.equal(player.time,0);assert.equal(h.frames.size,0);
 });
 
 test('three code lines retain syntax and simultaneous highlights; notes describe only the intro and live',async()=>{

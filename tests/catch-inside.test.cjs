@@ -1,4 +1,4 @@
-const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
+const {test}=require('node:test'),assert=require('node:assert/strict');
 const {modules}=require('./v2-harness.cjs');
 // b04-catcherror-2: catchError wewnątrz switchMap w wyglądzie MAIN switchMap. Góra klik$ → switchMap → S1, dół
 // dolna część z etapami HTTP GET → catchError. Błąd A zostaje w inner A, of([]) emituje [], klik B działa dalej.
@@ -69,7 +69,7 @@ test('catchError inside: the next click B starts a new HTTP whose result reaches
  assert.equal(row(c.snapshot(at(c,'source-next','source-op','B')-.01),'#2'),undefined,'#2 dopiero po kliknięciu B');
 });
 
-test('catchError inside: checkpoints follow the narration and speaker notes, and rewind is deterministic',async()=>{
+test('catchError inside: QA model checkpoints follow the scenario, and rewind is deterministic',async()=>{
  const {c,render}=await deck(),ids=['subscribe','click-a','request','error','fallback','click-b'];
  assert.deepEqual(Array.from(c.stops,s=>s.id),ids);
  const f=Object.fromEntries(c.stops.map(s=>[s.id,c.snapshot(s.time)]));
@@ -80,9 +80,6 @@ test('catchError inside: checkpoints follow the narration and speaker notes, and
  assert.equal(row(f.error,'#1').stages[0].state,'errored');
  assert.deepEqual(received(f.fallback),['[]']);assert.equal(row(f.fallback,'#1').state,'completed');
  assert.equal(row(f['click-b'],'#2').stages[0].state,'active');
- const html=fs.readFileSync('index.html','utf8');
- const template=html.match(/<template data-checkpoint-notes="b04-catcherror-2">([\s\S]*?)<\/template>/)[1];
- assert.deepEqual([...template.matchAll(/data-checkpoint="([^"]+)"/g)].map(m=>m[1]),['ready',...ids,'finished']);
  for(const time of [0,...c.stops.map(s=>s.time),c.duration]){
   const frame=JSON.stringify(c.snapshot(time));c.snapshot(c.duration);c.snapshot(0);
   assert.equal(JSON.stringify(c.snapshot(time)),frame);

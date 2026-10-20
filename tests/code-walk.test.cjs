@@ -20,7 +20,7 @@ const marked=(markup,n)=>[...markup.matchAll(new RegExp(`<span class="cw-m${n}">
 
 test('full httpGet slide shows only the short Observable body; four steps mark subscriber, fetch + r.json(), next and complete',async()=>{
  const {w,model}=await walk();
- assert.match(attrs,/data-code-walk/);assert.match(attrs,/data-code-walk-mode="full"/);assert.match(body,/<h2>httpGet od środka<\/h2>/);
+ assert.match(attrs,/data-code-walk/);assert.match(attrs,/data-code-walk-mode="full"/);assert.match(attrs,/data-line-numbers/);assert.match(body,/<h2>httpGet od środka<\/h2>/);
  assert.equal(model.lines.join('\n'),`return new Observable(subscriber => {
   fetch(url)
     .then(r => r.json())
@@ -84,7 +84,7 @@ test('CSS drives every step from .current-fragment and fits both formats',()=>{
  assert.match(css,/prefers-reduced-motion[^}]*cw-m/);
  const lines=source.trim().split('\n'),longest=Math.max(...lines.map(l=>l.length));
  for(const [size,lh,pad,title,height] of [[37,1.5,44,90,960],[36,1.34,36,64,720]]){
-  assert.ok(longest*.602*size+48<=1280,`${size}px mieści najdłuższą linię`);
+  assert.ok((longest+3)*.602*size+48<=1280,`${size}px mieści najdłuższą linię z numerem`);
   assert.ok(title+lines.length*lh*size+pad<=height,`${size}px mieści cały kod`);
  }
 });
@@ -105,13 +105,15 @@ test('full myMap slide preserves all code and highlights only upstream subscribe
  const section=html.match(/<section id="04b-map-kod"[^>]*>([\s\S]*?)<\/section>/)[0];
  assert.match(section,/data-code-walk-mode="full"/);
  const source=section.match(/<script type="text\/plain" class="code-walk-source">([\s\S]*?)<\/script>/)[1];
- const steps=[...section.matchAll(/<span class="fragment code-walk-step" data-focus="(\d+)">([\s\S]*?)<\/span>/g)]
-  .map(([,focus,notes])=>({focus,notes}));
+ const unesc=t=>t.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+ const steps=[...section.matchAll(/<span class="fragment code-walk-step" data-focus="([\d-]+)" data-mark="([^"]*)">([\s\S]*?)<\/span>/g)]
+  .map(([,focus,mark,notes])=>({focus,mark:unesc(mark),notes}));
+ assert.match(section,/<section id="04b-map-kod"[^>]*data-line-numbers/);
  let holder;
  const classes=steps.map(()=>[]);
  const model=w.prepareCodeWalk({dataset:{codeWalkMode:'full'},
   querySelector:()=>({textContent:source,replaceWith:n=>{holder=n;}}),
-  querySelectorAll:()=>steps.map((s,i)=>({dataset:{focus:s.focus},classList:{add:c=>classes[i].push(c)}})),
+  querySelectorAll:()=>steps.map((s,i)=>({dataset:{focus:s.focus,mark:s.mark},classList:{add:c=>classes[i].push(c)}})),
   ownerDocument:{createElement:()=>({style:{props:{},setProperty(k,v){this.props[k]=v;}}})}});
  assert.equal(model.lines.join('\n'),`function myMap<T, R>(fn: (value: T) => R) {
   return (source$: Observable<T>) =>
@@ -130,8 +132,11 @@ test('full myMap slide preserves all code and highlights only upstream subscribe
  assert.doesNotMatch(holder.innerHTML,/cw-fold|cw-viewport|cw-track|cw-mid|cw-fixed/);
  const lines=[...holder.innerHTML.matchAll(/<div class="cw-line ([^"]*)">([\s\S]*?)<\/div>/g)];
  assert.deepEqual(lines.map(([,cls,line])=>text(line)),Array.from(model.lines));
- assert.deepEqual(lines.filter(([,cls])=>/cw-f\d/.test(cls)).map(([,cls,line])=>text(line).trim()),
-  ['return source$.subscribe({','next: value => subscriber.next(fn(value)),']);
+ assert.deepEqual(lines.filter(([,cls])=>/cw-f\d/.test(cls)),[],'bez tła całych linii');
+ assert.deepEqual(marked(holder.innerHTML,1),['source$: Observable<T>','source$.subscribe({']);
+ assert.deepEqual(marked(holder.innerHTML,2),['subscriber','subscriber.next(fn(value))']);
+ const css=fs.readFileSync('animations/reveal.css','utf8');
+ assert.match(css,/\[data-line-numbers\] \.cw-full-line::before \{[^}]*content:counter\(cw-line\)/);
  assert.match(holder.innerHTML,/<span class="cw-tok-next">next<\/span>/);
  assert.match(holder.innerHTML,/<span class="cw-tok-complete">complete<\/span>/);
  assert.match(holder.innerHTML,/<span class="cw-tok-error">error<\/span>/);
@@ -139,7 +144,7 @@ test('full myMap slide preserves all code and highlights only upstream subscribe
  assert.match(steps[1].notes,/Emisja idzie w prawo[\s\S]*Prawo: „A share\?”/);
  assert.throws(()=>w.codeWalkModel(source,{mode:'full',steps:[{focus:'13'}]}),/poza oknem/);
  for(const [size,lh,pad,title,height] of [[37,1.5,44,90,960],[36,1.34,36,64,720]]){
-  assert.ok(Math.max(...model.lines.map(l=>l.length))*.602*size+48<=1280);
+  assert.ok((Math.max(...model.lines.map(l=>l.length))+3)*.602*size+48<=1280,'najdłuższa linia z numerem');
   assert.ok(title+model.lines.length*lh*size+pad<=height);
  }
 });

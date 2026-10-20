@@ -1,4 +1,4 @@
-import { configureQuerySource, configureDebounceSwitch, configureSwitchMapLive, configureFlatten, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureDebounceAudit, configureShareReplayOne, configureShareReplayRefCount, configureCombineLatestWithLatestFrom, configureRetryBackoff, configureDefer } from './reference-scenes.js';
+import { configureQuerySource, configureDebounceSwitch, configureSwitchMapLive, configureFlatten, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureCatchSearch, configureShareReplayOne, configureShareReplayRefCount, configureCombineLatestWithLatestFrom, configureRetryBackoff, configureDefer } from './reference-scenes.js';
 
 import { configureSearchDemo } from './search-demo.js';
 
@@ -8,9 +8,10 @@ export const mainOrder = [
   // trzy wykonania), interval (cold: osobne wykonanie każdego odbiorcy, unsubscribe), Subject (ręczne next i complete), Subject + HTTP, Subject + interval.
   // Potem pytanie o znane operatory, operator, kod myMap, pytanie o share oraz historia share HTTP → share + interval → późny odbiorca.
   '05-zrodla-2','05b-http-kod','04a-dwa-tory','05-zrodla','05-zrodla-5','05-zrodla-3','05-zrodla-4','02-znane-operatory','04-operator','04b-map-kod','03-a-share','04a-dwa-tory-2','04a-dwa-tory-3',
-  // Cztery *Map obok siebie, potem plansza wyszukiwarki, źródło query$, switchMap na żywo, debounceTime i distinctUntilChanged przed switchMap.
-  '20-sharereplay','20a-sharereplay-interval','20b-sharereplay-refcount','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12-intro-wyszukiwarka','12-query-zrodlo','12a-switchmap-live','12b-debounce-switchmap','11a-distinct-switchmap',
-  'b04-catcherror','b04-catcherror-2','16-czas-cztery','25-podsumowanie','pytania',
+  // Cztery *Map obok siebie, potem plansza wyszukiwarki, źródło query$, switchMap na żywo, debounceTime, distinctUntilChanged
+  // przed switchMap i catchError wewnątrz switchMap w tej samej wyszukiwarce.
+  '20-sharereplay','20a-sharereplay-interval','20b-sharereplay-refcount','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12-intro-wyszukiwarka','12-query-zrodlo','12a-switchmap-live','12b-debounce-switchmap','11a-distinct-switchmap','11b-catcherror-search',
+  'b04-catcherror','25-podsumowanie','pytania',
 ];
 export const extraOrder = [
   'x02-combinelatest-withlatestfrom',
@@ -40,9 +41,9 @@ export function configureScene(scene) {
     '09-concatmap':'concatMap','10-mergemap':'mergeMap','12-exhaustmap':'exhaustMap'}[id]);
   // Wyszukiwarka: distinct od READY usuwa duplikat → trzy sukcesy → po kliknięciu HTTP error.
   if(id==='11a-distinct-switchmap')configureDistinctSwitch(scene);
-  // debounceTime i auditTime (MAIN): dwa potoki z timerami w wierszach operatorów.
-  if(scene.id==='16-czas-cztery')configureDebounceAudit(scene);
-  // Oba warianty catchError w wyglądzie MAIN switchMap: wewnątrz (-2) i na zewnątrz (za switchMap).
+  // Ta sama wyszukiwarka z catchError wewnątrz switchMap: error HTTP #1 → of([]) → angular działa (HTTP #2).
+  if(id==='11b-catcherror-search')configureCatchSearch(scene);
+  // MAIN: catchError na zewnątrz; wariant wewnętrzny zachowany jako model QA.
   if(id==='b04-catcherror')(scene.catchInside?configureCatchInside:configureCatchOutside)(scene);
   if(id==='05-zrodla'&&scene.sourceExample===0)configureInterval(scene);
   if(id==='05-zrodla'&&scene.sourceExample===1)configureHttp(scene);

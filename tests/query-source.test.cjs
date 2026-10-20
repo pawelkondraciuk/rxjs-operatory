@@ -17,7 +17,7 @@ test('READY shows only fromEvent, the empty input and two receivers; map and sha
   assert.equal(ready.readouts[0].value,'');assert.equal(ready.tokens.length,0);
   assert.ok(ready.nodes.every(n=>!n.socketDots.length));assert.ok(ready.edges.every(e=>!e.visible));
   const map=c.snapshot(scene.playback.stops[0].time),share=c.snapshot(scene.playback.stops[1].time);
-  assert.equal(codeText(map),"const query$ = fromEvent(inputEl, 'input').pipe(\n  map(() => inputEl.value.trim())\n);");
+  assert.equal(codeText(map),"const query$ = fromEvent(inputEl, 'input').pipe(\n  map(event => (event.target as HTMLInputElement).value.trim())\n);");
   assert.equal(map.nodes.find(n=>n.id==='map').visible,true);assert.equal(map.nodes.find(n=>n.id==='share').visible,false);
   assert.equal(codeText(share),scene.code);assert.equal(share.nodes.find(n=>n.id==='share').visible,true);
   for(const f of [map,share]){assert.equal(f.tokens.length,0);assert.ok(f.edges.every(e=>!e.visible));assert.equal(f.readouts[0].value,'');}
@@ -154,7 +154,7 @@ test('exit cleanup finishes unsubscribe without RAF, drops in-flight values and 
 
 test('code uses the player syntax and source/map/share marks with matching tile activity',async()=>{
   const {scene}=await fixture(),h=await playbackHarness(),{player,elements}=h.create({scene});
-  assert.equal(scene.code,"const query$ = fromEvent(inputEl, 'input').pipe(\n  map(() => inputEl.value.trim()),\n  share()\n);");
+  assert.equal(scene.code,"const query$ = fromEvent(inputEl, 'input').pipe(\n  map(event => (event.target as HTMLInputElement).value.trim()),\n  share()\n);");
   for(const [time,id,node] of [[3,'source','source'],[3.8,'map','map'],[4.9,'share','share']]) {
     player.seek(time);const html=elements.get('.rx-code').innerHTML;
     assert.match(html,new RegExp(`rx-code-active[^>]*data-mark="${id}"`));

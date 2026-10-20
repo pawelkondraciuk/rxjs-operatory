@@ -1,7 +1,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules,playbackHarness}=require('./v2-harness.cjs');
 // Wspólny standard dolnych pipeline'ów (instances) i kolorowania kodu na ośmiu slajdach z inner Observable.
-const ids=['08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','11a-distinct-switchmap','b04-catcherror-2','b04-catcherror'];
+const ids=['08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','11a-distinct-switchmap','11b-catcherror-search','b04-catcherror'];
 async function deck(format='4:3'){
  class Slide{constructor(id){this.id=id;this.dataset={animation:id};this.heading={};this.player={setAttribute(){}};}
   querySelector(s){return s==='h2'?this.heading:this.player;}cloneNode(){return new Slide(this.id);}after(){}}
@@ -27,7 +27,9 @@ test('every checkpoint of the eight slides uses the same columns; texts stay ins
      // ID (font panelu) kończy się przed kulką, kulka przed kolumną etapów.
      const font=panel.font,r=(panel.ball||f.ball).r;
      assert.ok(panel.idX+row.id.length*.62*font<panel.ballX-r,`${id}: ID nie nachodzi na kulkę`);
-     assert.ok(panel.ballX+r<panel.stagesLeft,`${id}: kulka przed HTTP GET`);
+     const ball=panel.ball||f.ball,half=ball.shape==='pill'?Math.max(ball.r,(String(row.value).length*ball.font*.6+28)/2):r;
+     assert.ok(panel.ballX+half<panel.stagesLeft,`${id}: kulka przed HTTP GET`);
+     assert.ok(panel.idX+row.id.length*.62*font<panel.ballX-half,`${id}: ID nie nachodzi na kapsułkę`);
      // Napis placeholdera mieści się w nim (bez nachodzenia na ID).
      const label=part.match(/data-inner-placeholder="(\w+)"[^>]*>.*?<text x="([\d.]+)"[^>]*font-size="([\d.]+)"[^>]*>([^<]*)</);
      if(label){const width=label[4].length*.62*Number(label[3]);assert.ok(Number(label[2])-width/2>panel.stagesLeft,`${id}: „${label[4]}” w placeholderze`);}
@@ -77,7 +79,7 @@ test('exhaustMap: skipped B keeps #2 and its ball with a dimmed POMINIĘTE place
 
 test('catchError inside: HTTP GET → catchError → inner subscriber gets [] and ✓ complete; outside: HTTP GET → inner subscriber gets ! error',async()=>{
  const {compile,render}=await deck();
- const inside=compile('b04-catcherror-2'),inSvg=rowSvg(render(inside.snapshot(at(inside,'fallback'))),'#1');
+ const inside=compile('11b-catcherror-search'),inSvg=rowSvg(render(inside.snapshot(at(inside,'fallback'))),'#1');
  assert.match(inSvg,/data-inner-header="source"[\s\S]*data-inner-header="catch"[\s\S]*data-inner-receiver="#1"/);
  assert.match(inSvg,/data-inner-received="\[\]"/);assert.match(inSvg,/data-lane-terminal="completed"[^>]*>✓ complete</);
  const outside=compile('b04-catcherror'),outSvg=rowSvg(render(outside.snapshot(outside.duration)),'#1');
@@ -105,10 +107,10 @@ test('code syntax: tokens are coloured on every slide as a layer independent of 
  const late="klik$.pipe(withLatestFrom(filtry$))",lk=codeTokens(late);assert.equal(lk[late.indexOf('withLatestFrom')],'op');
  const ng="@if (user$ | async; as user) { … }",nk=codeTokens(ng);assert.equal(nk[ng.indexOf('async')],'op');assert.equal(nk[ng.indexOf('user$')],'src');
  // Player: tokeny wewnątrz pastelowego wyróżnienia (obie warstwy), tekst kodu bez zmian.
- const h=await playbackHarness(),{elements}=h.create({scene:scenes.get('b04-catcherror-2')}),html=elements.get('.rx-code').innerHTML;
+ const h=await playbackHarness(),{elements}=h.create({scene:scenes.get('b04-catcherror')}),html=elements.get('.rx-code').innerHTML;
  assert.match(html,/<span class="rx-code-mark[^"]*"[^>]*data-mark="switch"[^>]*><span class="rx-tok rx-tok-op">switchMap<\/span><\/span>/);
  assert.match(html,/<span class="rx-tok rx-tok-src">klik\$<\/span>/);
- assert.equal(html.replace(/<[^>]+>/g,'').replace(/&gt;/g,'>'),scenes.get('b04-catcherror-2').code);
+ assert.equal(html.replace(/<[^>]+>/g,'').replace(/&gt;/g,'>'),scenes.get('b04-catcherror').code);
  // Każdy slajd: tekst kodu po zdjęciu znaczników jest identyczny z kodem sceny (także dopisywane fragmenty).
  for(const [id,scene]of scenes){
   if(!scene.code)continue;

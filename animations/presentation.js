@@ -29,8 +29,6 @@ export function prepareSlides(scenes, { format = '4:3' } = {}) {
       variants = ['cold', 'share', 'share-interval'].map(mode => ({ ...original, lanesMode: mode,
         title: { cold: 'Cold: jedna definicja, trzy wykonania', share: 'share(): jedno HTTP, trzech odbiorców',
           'share-interval': 'share() — kto odłączy źródło?' }[mode] }));
-    } else if (original.id === 'b04-catcherror') {
-      variants = [false,true].map(inside => ({ ...original, catchInside:inside }));
     } else variants = [original];
 
     let previous = slide;

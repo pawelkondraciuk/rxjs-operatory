@@ -62,11 +62,11 @@ function mapping(mode){
 });
 // Model, graf i postoje distinctUntilChanged: configureDistinctSwitch (reference-scenes.js).
 add("11a-distinct-switchmap","distinctUntilChanged — znowu to samo?","",1,[],[],"");
+add("11b-catcherror-search","catchError — wyszukiwarka działa dalej","",1,[],[],"");
 add("12-intro-wyszukiwarka","Zaprojektujmy wyszukiwarkę","",1,[],[],"");
 add("12-query-zrodlo","Źródło: skąd bierze się query$?","",1,[],[],"");
 add("12a-switchmap-live","switchMap — nowe zapytanie anuluje poprzednie","",1,[],[],"");
 add("12b-debounce-switchmap","debounceTime — czekamy na ciszę","",1,[],[],"");
-add("16-czas-cztery","debounceTime i auditTime: cisza czy okno?","",1,[],[],"");
 add("20-sharereplay","Co dostaje spóźniony odbiorca?","share() vs shareReplay({ bufferSize: 1, refCount: true })",22,[
  R("subskrypcje",[E(1,"A+","a"),E(10,"B+","b")]),
  R("share · HTTP",[E(6,"dane","http"),E(15,"dane","http")],[B(1,6,"HTTP #1"),B(10,15,"HTTP #2")]),

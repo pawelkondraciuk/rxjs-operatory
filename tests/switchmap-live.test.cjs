@@ -29,10 +29,13 @@ test('READY asks for the operator; the reveal changes code and tile together wit
   assert.deepEqual(Array.from(c.stops,s=>s.id),['revealed']);
 });
 
-test('typing cancels #1/#3 and completes #2/#4, delivering each successful result before inner complete',async()=>{
+test('fast typing cancels r/re, rea completes; fast deleting cancels re and completes r, delivering results before inner complete',async()=>{
   const {scene,c}=await fixture(),runs=scene.switchMapLiveRuns;
-  assert.deepEqual(Array.from(runs.slice(0,4),r=>r.value),['r','re','rea','react']);
-  for(const run of runs.slice(0,6)) {
+  assert.deepEqual(Array.from(runs.slice(0,10),r=>[r.value,r.cancelled]),[['r',true],['re',true],['rea',false],['re',true],['r',false],
+    ['a',true],['an',true],['ang',false],['an',true],['a',false]]);
+  const checked=runs.slice(0,10).filter(run=>run.completed<c.duration);
+  assert.ok(checked.length>=9);
+  for(const run of checked) {
     const edge='inner-'+run.index,next=runs[run.index+1];
     const started=c.events.find(e=>e.type==='inner-subscribe'&&e.edge===edge);
     const end=c.events.find(e=>e.type==='disconnected'&&e.edge===edge);
@@ -61,14 +64,14 @@ test('typing cancels #1/#3 and completes #2/#4, delivering each successful resul
   assert.equal(c.events.some(e=>e.type==='stream-complete'&&!e.edge.startsWith('inner-')),false);
   assert.equal(c.events.some(e=>e.type==='stream-error'),false);
   const still=c.snapshot(scene.playback.stillTime);
-  assert.deepEqual(Array.from(rows(still),r=>[r.id,r.state]),[['#2','completed'],['#3','cancelled'],['#4','active']]);
-  assert.deepEqual(metrics(still),[4,4,1]);assert.equal(still.histories[0].values.at(-1).value,'[#2]');
+  assert.deepEqual(Array.from(rows(still),r=>[r.id,r.value,r.state]),[['#3','rea','completed'],['#4','re','cancelled'],['#5','r','active']]);
+  assert.deepEqual(metrics(still),[5,5,1]);assert.equal(still.histories[0].values.at(-1).value,'[#3]');assert.equal(still.readouts[0].value,'r');
 });
 
-test('the continuous edit sequence deletes letters, changes words and keeps request IDs growing',async()=>{
+test('the repeating cycle types and deletes rea, then ang, and keeps request IDs growing',async()=>{
   const {scene,compile}=await fixture(),long=scene.live.variant(scene,{from:0,to:80}),c=compile(long),runs=long.switchMapLiveRuns;
-  assert.deepEqual(Array.from(runs.slice(0,22),r=>r.value),[
-    'r','re','rea','react','reac','rea','re','red','redu','redux','redu','red','re','r','rx','rxj','rxjs','rxj','rx','r','re','rea']);
+  const cycle=['r','re','rea','re','r','a','an','ang','an','a'];
+  assert.deepEqual(Array.from(runs.slice(0,22),r=>r.value),[...cycle,...cycle,'r','re']);
   runs.slice(0,22).forEach((run,i)=>{
     assert.equal(run.id,'#'+(i+1));assert.equal(c.snapshot(run.emitted+.001).readouts[0].value,run.value);
     assert.equal(metrics(c.snapshot(run.emitted+.001))[0],i+1);
@@ -100,7 +103,7 @@ test('three-row eviction preserves ordering, full queries and stable main geomet
       assert.doesNotMatch(svg,/NaN|Infinity/);assert.equal(render(c.snapshot(t)),svg,'seeking is deterministic');
     }
     const html=render(c.snapshot(scene.playback.stillTime));
-    assert.match(html,/data-inner-ball="react"[^]*?>react<\/text>/);
+    assert.match(html,/data-inner-ball="rea"[^]*?>rea<\/text>/);
     assert.match(html,/anulowane/);assert.match(html,/w trakcie/);assert.match(html,/✓ complete/);
     assert.match(html,/data-readout="query-input"/);assert.match(html,/>wyniki<\/text>/);assert.doesNotMatch(html,/>S1</);
   }
@@ -112,10 +115,10 @@ test('moving compilation windows keep results, counts and IDs with a bounded mod
   for(const t of [23,29,35,40])assert.equal(render(a.snapshot(t)),render(b.snapshot(t)),String(t));
   const longScene=variant(scene,{from:1396,to:1426}),long=compile(longScene),f=long.snapshot(1400);
   assert.ok(longScene.switchMapLiveRuns.length<25);assert.ok(long.events.length<300);
-  assert.ok(rows(f).every(r=>Number(r.id.slice(1))>440));
-  assert.deepEqual(metrics(f),[452,452,1]);
-  assert.equal(f.histories[0].values.at(-1).value,'[#450]');
-  assert.equal(rows(f).find(r=>r.id==='#450').receiver.value,'[#450]');assert.doesNotMatch(render(f),/NaN|Infinity|inner #…/);
+  assert.ok(rows(f).every(r=>Number(r.id.slice(1))>560));
+  assert.deepEqual(metrics(f),[570,570,1]);
+  assert.equal(f.histories[0].values.at(-1).value,'[#568]');
+  assert.equal(rows(f).find(r=>r.id==='#568').receiver.value,'[#568]');assert.doesNotMatch(render(f),/NaN|Infinity|inner #…/);
 });
 
 test('first next reveals and starts; later next navigates even while paused; reset restores the question',async()=>{
@@ -138,7 +141,7 @@ test('first next reveals and starts; later next navigates even while paused; res
   controller.reset();assert.equal(player.time,0);assert.equal(player.isPlaying,false);
   assert.equal(player.snapshot.nodes.find(n=>n.id==='op').label,'');
   player.finish();assert.equal(player.time,scene.playback.stillTime);assert.equal(player.isPlaying,false);
-  assert.deepEqual(metrics(player.snapshot),[4,4,1]);
+  assert.deepEqual(metrics(player.snapshot),[5,5,1]);
 });
 
 test('Reveal fragment, pilot, Notes and restored hashes all use the revealed frame without a second RAF',async()=>{
@@ -190,8 +193,8 @@ test('search HTTP responses identify their execution inside the array and input 
         if(event.edge==='op-observer'||event.edge.startsWith('inner-'))assert.match(event.value,/^\[#\d+\]$/);
       }
       const runs=scene.switchMapLiveRuns||scene.debounceSearchRuns;
-      // Wariant live zawiera również przyszły zapas; wybieramy angular wewnątrz skompilowanego okna.
-      const run=id==='12a-switchmap-live'?runs[3]:runs.find(r=>r.value==='angular');
+      // Wariant live zawiera również przyszły zapas; wybieramy ang wewnątrz skompilowanego okna.
+      const run=id==='12a-switchmap-live'?runs[3]:runs.find(r=>r.value==='ang');
       if(id==='12b-debounce-switchmap') {
         const sample=run.input.at(-1).arrival+.6;
         assert.ok(sample<c.duration);

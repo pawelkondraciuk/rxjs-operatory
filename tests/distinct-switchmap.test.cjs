@@ -55,10 +55,12 @@ test('distinct rejects a duplicate, then three different queries each deliver a 
  assert.deepEqual(Array.from(events.filter(e=>e.type==='inner-next'),e=>e.value),['[#1]','[#2]','[#3]']);
  assert.equal(events.filter(e=>e.type==='stream-complete'&&e.edge.startsWith('inner')).length,3);
  assert.equal(events.some(e=>e.type==='inner-unsubscribe'||e.type==='stream-error'),false);
- assert.equal(events.some(e=>e.type==='source-next'&&e.value==='sve'),false);
+ assert.equal(events.some(e=>e.type==='source-next'&&e.value==='react'),false);
  assert.ok(c.events.find(e=>e.type==='inner-subscribe'&&e.execution==='#4').at>stop(c,'successes'));
  assert.equal(scene.live,undefined);
- for(const e of c.events.filter(e=>e.type==='source-next'&&e.edge==='source-debounce'))assert.ok(e.value.length<=3);
+ const observedValues=Array.from(c.events.filter(e=>e.type==='source-next'&&e.edge==='source-debounce'),e=>e.value);
+ assert.ok(observedValues.slice(0,-6).every(v=>v.length<=3));
+ assert.deepEqual(observedValues.slice(-6),['','r','re','rea','reac','react']);
 });
 
 test('error 500 travels HTTP → switchMap → receiver before full upstream teardown; no complete or response',async()=>{
@@ -85,22 +87,22 @@ test('error 500 travels HTTP → switchMap → receiver before full upstream tea
  for(const n of ['source','debounce','distinct'])assert.equal(lane(end,n).state,'cancelled',n);
  for(const n of ['op','observer'])assert.equal(lane(end,n).state,'error',n);
  assert.ok(node(end,'observer').laneTerminalText.offsetY<-node(end,'observer').rowH/2,'error label above the retained result');
- assert.equal(rows(end).at(-1).state,'errored');assert.equal(rows(end).at(-1).value,'sve');
+ assert.equal(rows(end).at(-1).state,'errored');assert.equal(rows(end).at(-1).value,'react');
  assert.match(render(end),/! error/);
  const failed=render(end).split('data-inner-work="#4"')[1];assert.doesNotMatch(failed,/✓ complete/);
  assert.equal(end.histories[0].values.at(-1).value,'[#3]');
 });
 
-test('after detach UI clears and types rxj; only UI count grows, no RxJS events, timer, HTTP or results',async()=>{
+test('after detach UI erases react and types angular; only UI count grows, no RxJS events, timer, HTTP or results',async()=>{
  const {c,render}=await fixture(),events=c.events;
  const detached=events.find(e=>e.type==='disconnected'&&e.edge==='source-debounce').at;
  const ui=events.filter(e=>e.type==='input-change'&&!e.observed);
- assert.deepEqual(Array.from(ui,e=>e.value),['','r','rx','rxj']);
+ assert.deepEqual(Array.from(ui,e=>e.value),['reac','rea','re','r','','a','an','ang','angu','angul','angula','angular']);
  assert.ok(ui[0].at>detached);
  assert.equal(events.filter(e=>e.at>detached&&!['input-change'].includes(e.type)).length,0);
  for(let i=0;i<ui.length;i++) {
   const f=c.snapshot(ui[i].at+.01);
-  assert.equal(f.readouts[0].value,ui[i].value);assert.deepEqual(metrics(f),[18+i,17,5,4,0,'zakończona błędem']);
+  assert.equal(f.readouts[0].value,ui[i].value);assert.deepEqual(metrics(f),[20+i,19,5,4,0,'zakończona błędem']);
   assert.equal(f.tokens.length,0);assert.equal(lane(f,'debounce').timer.active,false);
   assert.equal(f.executionCounts.started,4);assert.equal(rows(f).length,3);assert.equal(f.histories[0].values.at(-1).value,'[#3]');
   assert.doesNotMatch(render(f),/data-lane-timer="|data-callout=/);
@@ -124,21 +126,21 @@ test('MANUAL and AUTO pause at each semantic step; fast next cannot skip error o
    if(id==='duplicate')assert.deepEqual(metrics(f),[5,5,2,1,0,'aktywna']);
    if(id==='successes')assert.deepEqual(metrics(f),[13,13,4,3,0,'aktywna']);
    if(id==='request-error'){
-    assert.deepEqual(metrics(f),[17,17,5,4,1,'aktywna']);assert.equal(rows(f).at(-1).state,'active');
+    assert.deepEqual(metrics(f),[19,19,5,4,1,'aktywna']);assert.equal(rows(f).at(-1).state,'active');
    }
    if(id==='error'){
-    assert.deepEqual(metrics(f),[17,17,5,4,0,'zakończona błędem']);assert.equal(f.readouts[0].value,'sve');
+    assert.deepEqual(metrics(f),[19,19,5,4,0,'zakończona błędem']);assert.equal(f.readouts[0].value,'react');
     assert.equal(lane(f,'source').state,'cancelled');assert.equal(lane(f,'observer').state,'error');
    }
    controller.next();
   }
-  h.advance(60000);assert.equal(player.state,'finished');assert.equal(player.snapshot.readouts[0].value,'rxj');
+  h.advance(60000);assert.equal(player.state,'finished');assert.equal(player.snapshot.readouts[0].value,'angular');
   assert.deepEqual(navigation,[]);
-  controller.previous();near(player.time,player.stops.at(-1).time);assert.equal(player.snapshot.readouts[0].value,'sve');
+  controller.previous();near(player.time,player.stops.at(-1).time);assert.equal(player.snapshot.readouts[0].value,'react');
   controller.reset();assert.equal(player.time,0);assert.equal(player.isPlaying,false);assert.equal(h.frames.size,0);
   // Każde dwa szybkie kliki: odtwórz etap, dokończ wyłącznie ten etap — bez nawigacji.
   for(const stop of player.stops){controller.next();controller.next();near(player.time,stop.time);assert.equal(player.isPlaying,false);assert.deepEqual(navigation,[]);}
-  controller.next();controller.next();assert.equal(player.state,'finished');assert.equal(player.snapshot.readouts[0].value,'rxj');
+  controller.next();controller.next();assert.equal(player.state,'finished');assert.equal(player.snapshot.readouts[0].value,'angular');
   controller.next();assert.deepEqual(navigation,[1]);
   controller.reset();controller.next();h.advance(100);controller.suspend('slide');h.advance(5000);assert.equal(player.isPlaying,false);
   controller.reset();assert.equal(player.time,0);assert.equal(h.frames.size,0);
@@ -159,8 +161,8 @@ test('Reveal keyboard and native fragments keep the error step on the same slide
    next();h.advance(50);next();near(player.time,c.stops[i].time);assert.equal(stage.markers.filter(m=>m.visible).length,i+1);
    assert.deepEqual(navigation,[]);
   }
-  assert.equal(player.snapshot.readouts[0].value,'sve');assert.equal(lane(player.snapshot,'source').state,'cancelled');
-  next();h.advance(50);next();assert.equal(player.state,'finished');assert.equal(player.snapshot.readouts[0].value,'rxj');
+  assert.equal(player.snapshot.readouts[0].value,'react');assert.equal(lane(player.snapshot,'source').state,'cancelled');
+  next();h.advance(50);next();assert.equal(player.state,'finished');assert.equal(player.snapshot.readouts[0].value,'angular');
   assert.deepEqual(navigation,[]);deck.press(39);assert.deepEqual(navigation,[1]);
   controller.reset();assert.equal(player.time,0);assert.equal(deck.fragmentIndex,-1);
   for(const s of c.stops){bridge.restore(()=>controller.seekCheckpoint(s.time));near(player.time,s.time);assert.equal(player.isPlaying,false);}
@@ -194,5 +196,5 @@ test('stable compact geometry, old input styling, code marks and notes, determin
  }
  const template=fs.readFileSync('index.html','utf8').match(/<template data-checkpoint-notes="11a-distinct-switchmap">([\s\S]*?)<\/template>/)[1];
  assert.deepEqual([...template.matchAll(/data-checkpoint="([^"]+)"/g)].map(m=>m[1]),['ready',...stopIds,'finished']);
- assert.match(template,/500/);assert.match(template,/21 zmian inputa/);
+ assert.match(template,/500/);assert.match(template,/31 zmian inputa/);
 });

@@ -333,7 +333,8 @@ export function compileScene(scene) {
     });
   }
   // Środek kulki pamięci: tuż przed portem wyjścia, w odległości jak kulka czekająca przy porcie.
-  function memorySlot(n){return n.laneTimer?.memoryX??n.x+n.w/2-(graph.ball?.r??25)-18;}
+  // memory.x (opt-in): stały środek kulki pamięci, np. gdy szeroka kapsułka (pill) nie mieści się przy porcie.
+  function memorySlot(n){return n.memory?.x??n.laneTimer?.memoryX??n.x+n.w/2-(graph.ball?.r??25)-18;}
   // Ułamek przejazdu transformBalls, w którym kulka mija x: wyjazd od środka do prawej krawędzi w ostatnich 30%
   // (smoothstep), więc odwracamy smoothstep: u = 1/2 − sin(asin(1 − 2f)/3).
   function transformPassAt(n,x) {

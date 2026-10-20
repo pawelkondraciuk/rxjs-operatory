@@ -77,7 +77,7 @@ function lineMarks(model,n) {
   model.steps.forEach((s,i)=>{
     if(n<s.focus[0]||n>s.focus[1])return;
     for(const m of s.marks)for(let at=text.indexOf(m);at>=0;at=text.indexOf(m,at+m.length))
-      for(let k=at;k<at+m.length;k++)(marks[k]||=[]).push(`cw-m${i+1}`);
+      for(let k=at;k<at+m.length;k++){const c=`cw-m${i+1}`,list=(marks[k]||=[]);if(!list.includes(c))list.push(c);}
   });
   return marks;
 }

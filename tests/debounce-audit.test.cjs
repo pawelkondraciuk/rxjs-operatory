@@ -1,10 +1,11 @@
-const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
+const {test}=require('node:test'),assert=require('node:assert/strict');
 const {modules}=require('./v2-harness.cjs');
-// 16-czas-cztery (MAIN): dwa potoki jeden pod drugim — zdarzenia$ → debounceTime → S1 i zdarzenia$ → auditTime → S2.
+// Model QA debounce/audit (poza prezentacją): dwa potoki jeden pod drugim — zdarzenia$ → debounceTime → S1 i zdarzenia$ → auditTime → S2.
 // Te same zdarzenia A 0, B 1, C 2, D 4, E 5 (s scenariusza); timery w wierszach operatorów, czas modelu.
 async function deck(format='4:3'){
- const m=await modules(['catalog','scene-config','engine','renderer']);
- const scene=m['scene-config'].configureScene({...m.catalog.scenes.find(s=>s.id==='16-czas-cztery'),seriesIndices:[1,2],format});
+ const m=await modules(['reference-scenes','engine','renderer']);
+ const scene={id:'qa-debounce-audit',format};
+ m['reference-scenes'].configureDebounceAudit(scene);
  return {scene,c:m.engine.compileScene(scene),render:m.renderer.renderScene};
 }
 const stop=(c,id)=>c.snapshot(c.stops.find(s=>s.id===id).time);
@@ -92,10 +93,7 @@ test('debounce restarts its lane timer on every value, audit keeps the window; c
  assert.doesNotMatch(render(f.c),/NaN|Infinity|="undefined"/);
 });
 
-test('speaker notes follow the checkpoints; rewind and reset restore values and timers in both formats',async()=>{
- const html=fs.readFileSync('index.html','utf8');
- const template=html.match(/<template data-checkpoint-notes="16-czas-cztery">([\s\S]*?)<\/template>/)[1];
- assert.deepEqual([...template.matchAll(/data-checkpoint="([^"]+)"/g)].map(m=>m[1]),['ready','a','b','c','audit-c','d','e','audit-e','finished']);
+test('QA model rewind and reset restore values and timers in both formats',async()=>{
  for(const format of ['4:3','16:9']){
   const {c,render}=await deck(format);
   for(const time of [0,...c.stops.map(s=>s.time),c.duration]){

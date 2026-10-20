@@ -5,8 +5,8 @@ const {modules}=require('./v2-harness.cjs');
 
 // Cold → Subject → share (HTTP, interval, późny odbiorca); cztery *Map obok siebie, potem jeden distinctUntilChanged.
 const expectedMain=['05-zrodla-2','05b-http-kod','04a-dwa-tory','05-zrodla','05-zrodla-5','05-zrodla-3','05-zrodla-4','02-znane-operatory','04-operator','04b-map-kod','03-a-share','04a-dwa-tory-2','04a-dwa-tory-3',
- '20-sharereplay','20a-sharereplay-interval','20b-sharereplay-refcount','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12-intro-wyszukiwarka','12-query-zrodlo','12a-switchmap-live','12b-debounce-switchmap','11a-distinct-switchmap',
- 'b04-catcherror','b04-catcherror-2','16-czas-cztery','25-podsumowanie','pytania'];
+ '20-sharereplay','20a-sharereplay-interval','20b-sharereplay-refcount','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12-intro-wyszukiwarka','12-query-zrodlo','12a-switchmap-live','12b-debounce-switchmap','11a-distinct-switchmap','11b-catcherror-search',
+ 'b04-catcherror','25-podsumowanie','pytania'];
 const openingLength=8;
 const mainEnd=openingLength+expectedMain.length;
 
@@ -92,8 +92,8 @@ test('print includes every expanded slide once, with main narration before extra
  assert.deepEqual(container.children.slice(openingLength,mainEnd).map(s=>s.id),expectedMain);
 });
 
-test('removed extras stay absent from MAIN, EXTRAS, print and direct hashes',async()=>{
- const removed=['06a-cold-hot','06a-cold-hot-2','07-hot-cold','07-hot-cold-2','12a-complete','13-limit','14-distinct','18-async','28-resolver-batch'];
+test('removed slides stay absent from MAIN, EXTRAS, print and direct hashes',async()=>{
+ const removed=['06a-cold-hot','06a-cold-hot-2','07-hot-cold','07-hot-cold-2','12a-complete','13-limit','14-distinct','18-async','28-resolver-batch','b04-catcherror-2','16-czas-cztery'];
  for(const options of [{},{extras:true},{printMode:true},...removed.map(requestedId=>({requestedId}))]){
   const {container,scenes,prepared,compile}=await presentation(options);
   for(const id of removed){
@@ -109,10 +109,8 @@ test('removed extras stay absent from MAIN, EXTRAS, print and direct hashes',asy
  }
 });
 
-test('combined time operators stay in MAIN without generated extra variants',async()=>{
- const {scenes}=await presentation(),scene=scenes.get('16-czas-cztery');
- assert.equal(scene.playback.entry,'manual');assert.equal(scene.playback.finish,'hold');
- assert.equal(scenes.has('16-czas-cztery-2'),false);
+test('remaining scenes keep their playback controllers',async()=>{
+ const {scenes}=await presentation();
  for(const id of ['08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap'])assert.notEqual(scenes.get(id).playback.controller,'stages',id);
  for(const id of ['x04-defer','04-operator','04a-dwa-tory-2','04a-dwa-tory-3','05-zrodla','05-zrodla-2','05-zrodla-3','05-zrodla-4','05-zrodla-5','20-sharereplay','20a-sharereplay-interval','20b-sharereplay-refcount','20-sharereplay-2'])assert.equal(scenes.get(id).playback.controller,'stages',id);
 });

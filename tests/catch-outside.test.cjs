@@ -93,18 +93,22 @@ test('catchError outside: click B appears in the detached klik$, never reaches s
 });
 
 test('catchError outside: checkpoints follow the narration and speaker notes, code marks and rewind are deterministic',async()=>{
- const {scene,c,render}=await deck(),ids=['click-a','error','caught','fallback','click-b'];
+ const {scene,c,render}=await deck(),ids=['error','caught','fallback','click-b'];
  assert.deepEqual(Array.from(c.stops,s=>s.id),ids);
  assert.equal(scene.code,'klik$.pipe(switchMap(id =>\n  httpGet(url(id))), catchError(() => of([])))');
  const f=Object.fromEntries(c.stops.map(s=>[s.id,c.snapshot(s.time)]));
- assert.equal(lane(f['click-a'],'observer').state,'running');assert.equal(row(f['click-a']).stages[0].state,'active');
- assert.ok(row(f['click-a']).stages[0].progress>0);assert.equal(f['click-a'].executionCounts.started,1);
+ // Końcowy slajd: pierwsze dalej od razu przechodzi klik A, krótki HTTP i błąd.
+ const working=c.snapshot(at(c,'inner-subscribe','inner0-op')+.3);
+ assert.equal(lane(working,'observer').state,'running');assert.equal(row(working).stages[0].state,'active');
+ assert.ok(row(working).stages[0].progress>0);assert.equal(f.error.executionCounts.started,1);
+ assert.ok(at(c,'stream-error','inner0-op')-at(c,'inner-subscribe','inner0-op')<=1.05,'HTTP trwa ok. 1 s');
+ assert.ok(c.duration<11,'krótki slajd końcowy');
  assert.equal(row(f.error).stages[0].state,'errored');assert.equal(lane(f.error,'source').state,'running');
  assert.equal(lane(f.caught,'source').state,'cancelled');assert.deepEqual(received(f.caught),[]);
  assert.deepEqual(received(f.fallback),['[]']);assert.equal(lane(f.fallback,'observer').state,'completed');
  assert.ok(f['click-b'].tokens.some(t=>t.phase==='unobserved'&&t.value==='B'));
  const marks=frame=>Array.from(frame.codeView.flat().filter(p=>p.active),p=>p.mark.id);
- assert.deepEqual(marks(f['click-a']),['http']);
+ assert.deepEqual(marks(working),['http']);
  assert.deepEqual(marks(c.snapshot(at(c,'source-next','catch-observer','[]'))),['catch']);
  const html=fs.readFileSync('index.html','utf8');
  const template=html.match(/<template data-checkpoint-notes="b04-catcherror">([\s\S]*?)<\/template>/)[1];

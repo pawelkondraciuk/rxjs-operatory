@@ -119,6 +119,11 @@
 [data-ratio="16-9"] .rx-player.rx-distinct-search .rx-caption { font-size:20px; }
 [data-ratio="16-9"] .rx-player.rx-distinct-search .rx-metric { font-size:15px; }
 [data-ratio="16-9"] .rx-player.rx-distinct-search .rx-metric:last-child b { font-size:21px; }
+/* catchError w wyszukiwarce: dziewięć linii kodu; dwa sloty wykonań w tej samej skali co distinct. */
+.rx-player.rx-catch-search { grid-template-rows:296px 430px 124px; }
+.rx-player.rx-catch-search .rx-code { font-size:28px; line-height:1.15; }
+[data-ratio="16-9"] .rx-player.rx-catch-search { grid-template-rows:226px 294px 92px; }
+[data-ratio="16-9"] .rx-player.rx-catch-search .rx-code { font-size:21px; line-height:1.18; }
 .rx-stepped .rx-scrub { min-width:160px; }
 .rx-stepped .rx-hide { margin-left:auto; }
 .reveal.overview .rx-step-mode { display:none; }
@@ -208,6 +213,9 @@
 .code-walk-slide:has(.cw-step-4.current-fragment) .code-walk .cw-m4,
 .code-walk-slide:has(.cw-step-5.current-fragment) .code-walk .cw-m5,
 .code-walk-slide:has(.cw-step-6.current-fragment) .code-walk .cw-m6 { background:rgba(255,193,92,.3); box-shadow:inset 0 -5px 0 #FFC15C; }
+/* data-line-numbers (sekcja): numery linii po lewej z licznika CSS — tekst linii bez zmian, bez JS. */
+.code-walk-slide[data-line-numbers] .code-walk-full { counter-reset:cw-line; }
+.code-walk-slide[data-line-numbers] .cw-full-line::before { counter-increment:cw-line; content:counter(cw-line); display:inline-block; width:2ch; margin-right:1ch; text-align:right; color:#5E6B77; user-select:none; }
 .code-walk .cw-tok-kw { color:#FF7AC6; }
 .code-walk .cw-tok-type { color:#4EC9B0; }
 .code-walk .cw-tok-fn { color:#F2E58F; }
