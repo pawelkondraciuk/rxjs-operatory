@@ -75,6 +75,14 @@
 .reveal .rx-search-footer { display:flex; align-items:center; margin:0; border-top:2px solid #cabfaa; font-size:28px; line-height:1.3; }
 [data-ratio="16-9"] .rx-search-intro-content { height:calc(100% - 80px); grid-template-rows:1fr 82px; }
 [data-ratio="16-9"] .reveal .rx-search-footer { font-size:26px; }
+/* Źródło query$: cztery linie kodu odtwarzacza i te same kafelki torów co wcześniej. */
+.reveal .animation-slide.rx-slide-navigation.rx-query-source-slide h2 { height:96px; font-size:60px; }
+.rx-player.rx-query-source { grid-template-rows:220px 520px 110px; height:850px; }
+.rx-player.rx-query-source .rx-code { font-size:32px; line-height:1.45; white-space:pre; }
+.rx-player.rx-query-source [data-node][data-active="true"] > rect:first-of-type { stroke:#805095; stroke-width:3; }
+[data-ratio="16-9"] .rx-player.rx-query-source { grid-template-rows:176px 364px 72px; height:612px; }
+[data-ratio="16-9"] .rx-player.rx-query-source .rx-code { font-size:30px; line-height:1.35; }
+[data-ratio="16-9"] .reveal .animation-slide.rx-slide-navigation.rx-query-source-slide h2 { height:76px; font-size:44px; }
 .reveal .rx-stepped h2 { padding-right:230px; }
 .reveal .animation-slide.rx-slide-navigation h2 { height:150px; white-space:normal; font-size:60px; font-family:'Palatino Linotype','Book Antiqua',Palatino,Georgia,'Times New Roman','Liberation Serif',serif; }
 .rx-player.rx-switchmap-live { grid-template-rows:132px 568px 100px; height:800px; }

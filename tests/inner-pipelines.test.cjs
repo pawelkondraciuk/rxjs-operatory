@@ -94,6 +94,12 @@ test('code syntax: tokens are coloured on every slide as a layer independent of 
  assert.equal(kinds[code.indexOf('url')],null,'pomocnicza funkcja bez koloru');assert.equal(kinds[code.indexOf('pipe')],null);
  const typed="const user$ = httpGet<User>('/api/users/42');",tk=codeTokens(typed);
  assert.equal(tk[typed.indexOf('User')],'type');assert.equal(tk[typed.indexOf("'/api")],'str');assert.equal(tk[0],'kw');
+ const query="const query$ = fromEvent(inputEl, 'input').pipe(\n  map(event => (event.target as HTMLInputElement).value.trim()),\n  share()\n);";
+ const qk=codeTokens(query),queryKind=word=>qk[query.indexOf(word)];
+ for(const word of ['query$','fromEvent'])assert.equal(queryKind(word),'src',word);
+ for(const word of ['map','share'])assert.equal(queryKind(word),'op',word);
+ assert.equal(queryKind('event =>'),'param');assert.equal(queryKind('HTMLInputElement'),'type');assert.equal(queryKind('as '),'kw');
+ assert.equal(queryKind("'input'"),'str');assert.equal(queryKind('inputEl'),null);
  // Każdy slajd z kodem (01-tytul nie jest podpięty do HTML, 25-podsumowanie nie ma kodu).
  for(const [id,scene]of scenes)if(scene.code)assert.equal(scene.codeSyntax,true,id);
  const late="klik$.pipe(withLatestFrom(filtry$))",lk=codeTokens(late);assert.equal(lk[late.indexOf('withLatestFrom')],'op');

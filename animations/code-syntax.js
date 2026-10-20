@@ -5,7 +5,7 @@ const operators=new Set(['map','concatMap','mergeMap','switchMap','exhaustMap','
   'catchError','retry','distinctUntilChanged','debounceTime','auditTime','throttleTime','sampleTime','filter','take','first','finalize',
   'share','shareReplay','of','from','interval','timer','forkJoin','zip','merge','combineLatest','pairwise','bufferTime','defer',
   'withLatestFrom']);
-const keywords=new Set(['const','let','var','new','return','function','async','await']);
+const keywords=new Set(['const','let','var','new','return','function','async','await','as']);
 const identifier=/[A-Za-z_$][\w$]*/g;
 
 export function codeTokens(code) {
@@ -28,9 +28,9 @@ export function codeTokens(code) {
     // Pipe szablonu Angulara (user$ | async) — jak operator, nie słowo kluczowe.
     const templatePipe=/\|\s*$/.test(code.slice(Math.max(0,i-3),i));
     const kind=templatePipe?'op':keywords.has(word)?'kw':
-      code[i-1]==='<'&&code[end]==='>'?'type':
+      code[i-1]==='<'&&code[end]==='>'||!property&&/\bas\s+$/.test(code.slice(0,i))?'type':
       !property&&call&&operators.has(word)?'op':
-      word.endsWith('$')||!property&&word==='httpGet'?'src':
+      word.endsWith('$')||!property&&(word==='httpGet'||word==='fromEvent'&&call)?'src':
       !property&&params.has(word)?'param':null;
     if(kind)mark(i,end,kind);
   }

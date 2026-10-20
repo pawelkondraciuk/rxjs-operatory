@@ -4,7 +4,7 @@ Polska prezentacja Pawła Kondraciuka o sterowaniu pracą, kolejnością, subskr
 
 Ten README jest mapą treści: opisuje slajdy, zawartość bloczków i speaker notes. Implementację animacji, mapę plików i używane API znajdziesz w [AGENTS.md](AGENTS.md).
 
-Pełny eksport notatek do weryfikacji dla 24 slajdów technicznych MAIN znajduje się w [work/speaker-notes-main.md](work/speaker-notes-main.md). Dokument uwzględnia aktualną kolejność, końcowe tytuły wariantów i wszystkie notatki checkpointów, od slajdu po „A share?” do podsumowania przed „Pytania?”.
+Pełny eksport notatek do weryfikacji dla 25 slajdów technicznych MAIN znajduje się w [work/speaker-notes-main.md](work/speaker-notes-main.md). Dokument uwzględnia aktualną kolejność, końcowe tytuły wariantów i wszystkie notatki checkpointów, od slajdu po „A share?” do podsumowania przed „Pytania?”.
 
 ## Uruchomienie i obsługa
 
@@ -19,11 +19,11 @@ Sceny MAIN z pytaniami zaczynają od nieruchomego READY. Prawo / Page Down uruch
 
 W oknie prelegenta (`S`) podgląd następnego slajdu domyślnie pokazuje dużą nazwę, np. **switchMap**, i krótki podtytuł. Wskazuje kolejny slajd, także podczas ręcznych postojów bieżącej animacji. Przełącznik **Podgląd: Tytuł / Slajd** w prawym dolnym rogu tego pola przywraca standardowy podgląd. Wybór jest zapamiętywany w przeglądarce. Notatki pozostają w standardowym polu Notes. Opcjonalne `data-speaker-title` na sekcji ustawia własny podpis wyłącznie dla prelegenta.
 
-Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 42 slajdy dają 60 stron PDF (także pięć stanów kodu `05b-http-kod`: bez wyróżnienia i cztery wyróżnione fragmenty, oraz trzy stany pełnego kodu `04b-map-kod`: bez wyróżnienia i dwa kolejne wyróżnienia).
+Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 43 slajdy dają 61 stron PDF (także pięć stanów kodu `05b-http-kod`: bez wyróżnienia i cztery wyróżnione fragmenty, oraz trzy stany pełnego kodu `04b-map-kod`: bez wyróżnienia i dwa kolejne wyróżnienia).
 
 Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przywraca ekran panoramiczny 1280×720. `W` przeładowuje stronę w drugim formacie, zostając na tym samym slajdzie i fragmencie; animacja wraca do stanu tego fragmentu. Linki do EXTRAS i powrót do pytań zachowują wybrany format. Druk działa w obu: `?print-pdf` (4:3) lub `?print-pdf&ratio=16:9`. W 4:3 slajdy wykorzystują pełną wysokość: większe zdjęcia i kody QR, wyższe diagramy, większy tekst i kapsułki w animacjach (×1,15), etykiety kafelków do ×1,3 oraz większy tytuł (64 px; za długi zmniejsza się, by został w jednej linii), kod (42 px, długi łańcuch przechodzi do nowej linii przed .pipe/.subscribe) i podpis.
 
-Wyjątek MAIN: `12a-switchmap-live` po planszy „Zaprojektujmy wyszukiwarkę” startuje sam i bez końca pokazuje pisanie query oraz anulowanie HTTP. „Ręczny · M” dotyczy ręcznego przejścia między slajdami: prawo/Page Down/pilot przechodzą od razu do debounceTime, lewo wraca do planszy wprowadzającej wyszukiwarkę. Spacja pauzuje/wznawia, R restartuje pokaz; powrót na slajd zaczyna od #1. Druk, F i podgląd Upcoming pokazują nieruchomy kadr #3/#4 anulowane i #5 aktywny.
+Wyjątek MAIN: `12a-switchmap-live` po slajdzie źródła query$ startuje sam i bez końca pokazuje pisanie query oraz anulowanie HTTP. „Ręczny · M” dotyczy ręcznego przejścia między slajdami: prawo/Page Down/pilot przechodzą od razu do debounceTime, lewo wraca do slajdu źródła query$. Spacja pauzuje/wznawia, R restartuje pokaz; powrót na slajd zaczyna od #1. Druk, F i podgląd Upcoming pokazują nieruchomy kadr #3/#4 anulowane i #5 aktywny.
 
 `12b-debounce-switchmap` kontynuuje wyszukiwarkę: także startuje sam i działa do ręcznego przejścia dalej. Pokazuje pisanie z pauzami, odliczanie 300 ms (ilustracja spowolniona 5×) i udane HTTP, w tym kolejne requesty dla tej samej frazy. Prawo prowadzi do distinctUntilChanged, lewo do switchMap na żywo. Spacja, R i reset po powrocie działają jak na poprzednim pokazie. Druk, F i Upcoming pokazują dwa zakończone HTTP dla `rea`, liczniki 5/2/0.
 
@@ -39,13 +39,13 @@ Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorz
 
 Otwarcie do tytułu pozostaje bez zmian: społeczność, historia meet.js, fotografie i autor. Po tytule pokazujemy HTTP, Cold, interval, Subject — ręczną emisję, ręczny multicast HTTP i odłączanie źródła interval, a dopiero potem pytania o znane operatory i share. Budżet **30–35 minut dotyczy tylko części właściwej**; otwarcie, pytania i dogrywka są dodatkowo.
 
-MAIN ma **39 slajdów (25 animowanych)**. EXTRAS zawiera **3 slajdy animowane**. Całość obejmuje 34 bazowe slajdy HTML i 42 slajdy po rozwinięciu wariantów. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
+MAIN ma **40 slajdów (26 animowanych)**. EXTRAS zawiera **3 slajdy animowane**. Całość obejmuje 35 bazowych slajdów HTML i 43 slajdy po rozwinięciu wariantów. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
 
 Kolejność po slajdzie tytułowym:
 
 1. Pierwsze slajdy techniczne pokazują komplet podstawowych zachowań Observable: HTTP — subscribe, next, complete (`05-zrodla-2`) → kod źródłowy httpGet krok po kroku (`05b-http-kod`) → Cold: jedna definicja, trzy wykonania, error (`04a-dwa-tory`) → interval na żywo — cold, osobne wykonanie każdego odbiorcy, unsubscribe (`05-zrodla`) → Subject — ręczne next, późny subskrybent bez historii i complete (`05-zrodla-5`) → Subject: ręczny multicast HTTP (`05-zrodla-3`) → Subject — kto odłączy źródło? (`05-zrodla-4`). Po nich „Jakie znasz operatory RxJS?” (`02-znane-operatory`) → HTTP GET + map: obiekt User → „Paweł Kondraciuk” (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`), wstęp do share + HTTP.
 2. Jedna historia Cold → Subject → share na tych samych przykładach: cold — trzy subskrypcje, trzy HTTP, B kończy się błędem (`04a-dwa-tory`) → Subject + HTTP: jeden HTTP, trzech odbiorców (`05-zrodla-3`) → Subject + interval: odbiorcy odchodzą, źródło nadal działa (`05-zrodla-4`) → pytanie o znane operatory → HTTP GET + map (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`) → share + HTTP: jeden HTTP, trzech odbiorców (`04a-dwa-tory-2`) → share + interval: ostatni odbiorca odłącza źródło (`04a-dwa-tory-3`) → share + HTTP: późny odbiorca uruchamia nowy request (`20-sharereplay`) → shareReplay(1) na interval: odbiorcy odchodzą, źródło pracuje dalej (`20a-sharereplay-interval`) → shareReplay z refCount: true na interval: ostatni odbiorca czyści bufor i odłącza źródło, późny C zaczyna od zera (`20b-sharereplay-refcount`) → shareReplay z refCount: true + HTTP: późny odbiorca dostaje wynik z bufora (`20-sharereplay-2`). Powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
-3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap (cztery *Map obok siebie) → „Zaprojektujmy wyszukiwarkę” (`12-intro-wyszukiwarka`) → switchMap na żywo (`12a-switchmap-live`) → debounceTime + switchMap (`12b-debounce-switchmap`) → distinctUntilChanged przed switchMap (`11a-distinct-switchmap`, jedyny distinctUntilChanged w MAIN).
+3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap (cztery *Map obok siebie) → „Zaprojektujmy wyszukiwarkę” (`12-intro-wyszukiwarka`) → źródło query$ (`12-query-zrodlo`) → switchMap na żywo (`12a-switchmap-live`) → debounceTime + switchMap (`12b-debounce-switchmap`) → distinctUntilChanged przed switchMap (`11a-distinct-switchmap`, jedyny distinctUntilChanged w MAIN).
 4. catchError na zewnątrz → catchError wewnątrz → wspólne porównanie debounceTime i auditTime (`16-czas-cztery`).
 5. Cztery pytania podsumowania → „Pytania?” → rozmowa z salą albo dodatkowy przykład.
 
@@ -520,7 +520,7 @@ Góra bez zmian: id$ → operator → kompaktowy Odbiorca, jeden główny tor S1
 
 ### Zaprojektujmy wyszukiwarkę — `12-intro-wyszukiwarka`
 
-**MAIN — bezpośrednio po exhaustMap, przed switchMap na żywo.** Statyczna plansza otwierająca historię wyszukiwarki, zaprojektowana dla 16:9 i dopasowana także do 4:3.
+**MAIN — bezpośrednio po exhaustMap, przed źródłem query$.** Statyczna plansza otwierająca historię wyszukiwarki, zaprojektowana dla 16:9 i dopasowana także do 4:3.
 
 **Na ekranie:** kremowe tło, duży serifowy tytuł i badge „Ręczny · M”. Trzy płaskie bloczki połączone strzałkami: turkusowy „input / klawiatura” → jasnofioletowy „query$” → bardzo jasnofioletowy „HTTP / wyniki”. Podpisy: „użytkownik wpisuje kolejne znaki”, „powstaje strumień zapytań” i „dobieramy operatory i pobieramy dane”. Całość widoczna od wejścia; strzałki i pilot przechodzą bezpośrednio do sąsiednich slajdów.
 
@@ -530,11 +530,38 @@ Góra bez zmian: id$ → operator → kompaktowy Odbiorca, jeden główny tor S1
 
 > Zaprojektujmy wyszukiwarkę. Użytkownik wpisuje kolejne znaki, z których powstaje strumień query$. Dobierzemy operatory, które przeprowadzą nas od tych zdarzeń do wyników HTTP.
 >
-> Zaczniemy od switchMap: na następnym slajdzie zobaczymy na żywo, co dzieje się z poprzednim requestem, gdy pojawia się nowa fraza.
+> Najpierw ustalmy, skąd bierze się query$: na następnym slajdzie przejdziemy od zdarzenia input do tekstu współdzielonego przez dwóch odbiorców.
+
+### Źródło: skąd bierze się query$? — `12-query-zrodlo`
+
+**MAIN — po „Zaprojektujmy wyszukiwarkę”, przed switchMap na żywo.** Pokaz działa w pętli od wejścia, w 16:9 i 4:3. Badge „Ręczny · M” dotyczy przejścia między slajdami; prawo prowadzi do switchMap, lewo do planszy wyszukiwarki. Spacja pauzuje, R restartuje.
+
+```ts
+const query$ = fromEvent(inputEl, 'input').pipe(
+  map(event => (event.target as HTMLInputElement).value.trim()),
+  share()
+);
+```
+
+**Na ekranie:** wspólne kafelki z nagłówkiem, wierszem wykonania i portami jak na wcześniejszych slajdach: `fromEvent(input)` → `map` → `share` → dwóch odbiorców „podgląd query” i „wyszukiwarka”. W wierszu źródła jest ten sam input z kursorem co w pokazach wyszukiwarki. Automatycznie wpisuje `a → an → ang → angu → angul → angula → angular`, czeka, kasuje litery do pustego tekstu i zaczyna od nowa. Zdarzenie `{…}` wjeżdża do map, zmienia się w pełny tekst, a share rozdziela jedną kulkę do obu odbiorców. Pusty string ma oznaczenie `""`. Jedna wspólna subskrypcja upstream przez map, bez HTTP i liczników.
+
+Kod rysuje standardowy odtwarzacz: kolory składni, pastelowe marki źródła/map/share i aktywne wyróżnienia zsynchronizowane z kafelkami. Źródła `fromEvent` i `query$`, operatory `map` i `share`, parametr `event`, typ `HTMLInputElement` i literał `'input'` korzystają ze wspólnej palety. Druk, F i Upcoming pokazują `angular` u obu odbiorców.
+
+**Stopka:** fromEvent tworzy strumień ze zdarzeń input, map wyciąga tekst, a share pozwala współdzielić jedno źródło dalej.
+
+**Speaker notes:**
+
+> Skąd bierze się query$? fromEvent nasłuchuje zdarzeń input z pola inputEl. Zdarzenie to jeszcze nie tekst: map pobiera value z elementu i usuwa białe znaki z obu końców przez trim(). Rzutowanie as HTMLInputElement jest informacją o typie w TypeScript.
+>
+> Obaj odbiorcy już subskrybują. share współdzieli jedną subskrypcję do źródła i jedno wykonanie map. Ta sama emisja trafia do podglądu query i do wyszukiwarki. To rozdzielenie jednej emisji, bez historii dla późnego odbiorcy.
+>
+> Pokaz sam wpisuje a → an → ang → angu → angul → angula → angular, czeka, kasuje litery aż do pustego inputa i zaczyna od nowa. Każde zdarzenie przechodzi przez map i share do obu odbiorców; pusta wartość jest oznaczona jako "". Przeloty spowalniają ilustrację synchronicznych map i share, nie dodają opóźnienia RxJS. Spacja pauzuje, R restartuje, strzałki zmieniają slajd. Druk, F i Upcoming pokazują angular u obu odbiorców.
+>
+> Mamy gotowy strumień tekstu. Na następnym slajdzie podłączymy wyszukiwarkę do switchMap i zobaczymy na żywo, jak nowa fraza anuluje poprzedni request.
 
 ### switchMap na żywo — `12a-switchmap-live`
 
-**MAIN — po planszy „Zaprojektujmy wyszukiwarkę”, przed debounceTime + switchMap.** Tytuł: **switchMap — nowe zapytanie anuluje poprzednie**.
+**MAIN — po slajdzie źródła query$, przed debounceTime + switchMap.** Tytuł: **switchMap — nowe zapytanie anuluje poprzednie**.
 
 ```ts
 query$.pipe(

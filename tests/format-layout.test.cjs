@@ -16,7 +16,7 @@ async function deck(format){
 
 test('4:3 diagrams fill the taller stage and keep every block inside the viewBox',async()=>{
  const {scenes,compile,render}=await deck('4:3');
- assert.equal(scenes.length,28);
+ assert.equal(scenes.length,29);
  for(const scene of scenes){
   const c=compile(scene);
   for(const time of [0,...c.stops.map(s=>s.time),c.duration]){
@@ -42,7 +42,7 @@ test('16:9 keeps the previous geometry and SVG of every variant',async()=>{
    assert.equal(render(wide.snapshot(time)),render(legacy.snapshot(time)),scene.id+' @'+time);
   // Slajdy torów (04a-dwa-tory(-2,-3), 04-operator, cała rodzina 05-zrodla, para 20-sharereplay(-2), 20a, 20b, x03 i x04) mają w obu formatach wspólne,
   // powiększone wymiary pod projektor (graph.textScale).
-  if(!/^(04a-dwa-tory|04-operator$|05-zrodla(-[2345])?$|20-sharereplay(-2)?$|20a-sharereplay-interval$|20b-sharereplay-refcount$|x03-retry-backoff$|x04-defer$)/.test(scene.id))assert.equal(wide.snapshot(0).textScale,1);
+  if(!/^(04a-dwa-tory|04-operator$|05-zrodla(-[2345])?$|12-query-zrodlo$|20-sharereplay(-2)?$|20a-sharereplay-interval$|20b-sharereplay-refcount$|x03-retry-backoff$|x04-defer$)/.test(scene.id))assert.equal(wide.snapshot(0).textScale,1);
  }
 });
 

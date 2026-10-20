@@ -641,7 +641,12 @@ return new Observable(subscriber => {
                         </ol>
                         <p class="rx-search-footer">Od zdarzeń z inputa do stabilnego pipeline’u zapytań HTTP.</p>
                     </div>
-                    <aside class="notes"><p>Zaprojektujmy wyszukiwarkę. Użytkownik wpisuje kolejne znaki, z których powstaje strumień query$. Dobierzemy operatory, które przeprowadzą nas od tych zdarzeń do wyników HTTP.</p><p>Zaczniemy od switchMap: na następnym slajdzie zobaczymy na żywo, co dzieje się z poprzednim requestem, gdy pojawia się nowa fraza.</p></aside>
+                    <aside class="notes"><p>Zaprojektujmy wyszukiwarkę. Użytkownik wpisuje kolejne znaki, z których powstaje strumień query$. Dobierzemy operatory, które przeprowadzą nas od tych zdarzeń do wyników HTTP.</p><p>Najpierw ustalmy, skąd bierze się query$: na następnym slajdzie przejdziemy od zdarzenia input do tekstu współdzielonego przez dwóch odbiorców.</p></aside>
+                </section>
+				<section id="12-query-zrodlo" class="animation-slide rx-query-source-slide" data-animation="12-query-zrodlo">
+                    <h2>Źródło: skąd bierze się query$?</h2>
+                    <div class="rx-player" aria-label="Źródło: skąd bierze się query$?"></div>
+                    <aside class="notes"><p>Skąd bierze się query$? fromEvent nasłuchuje zdarzeń input z pola inputEl. Zdarzenie to jeszcze nie tekst: map pobiera value z elementu i usuwa białe znaki z obu końców przez trim(). Rzutowanie as HTMLInputElement jest informacją o typie w TypeScript.</p><p>Obaj odbiorcy już subskrybują. share współdzieli jedną subskrypcję do źródła i jedno wykonanie map. Ta sama emisja trafia do podglądu query i do wyszukiwarki. To rozdzielenie jednej emisji, bez historii dla późnego odbiorcy.</p><p>Pokaz sam wpisuje a → an → ang → angu → angul → angula → angular, czeka, kasuje litery aż do pustego inputa i zaczyna od nowa. Każde zdarzenie przechodzi przez map i share do obu odbiorców; pusta wartość jest oznaczona jako &quot;&quot;. Przeloty spowalniają ilustrację synchronicznych map i share, nie dodają opóźnienia RxJS. Spacja pauzuje, R restartuje, strzałki zmieniają slajd. Druk, F i Upcoming pokazują angular u obu odbiorców.</p><p>Mamy gotowy strumień tekstu. Na następnym slajdzie podłączymy wyszukiwarkę do switchMap i zobaczymy na żywo, jak nowa fraza anuluje poprzedni request.</p></aside>
                 </section>
 				<section id="12a-switchmap-live" class="animation-slide rx-slide-navigation" data-animation="12a-switchmap-live">
 					<h2>switchMap — nowe zapytanie anuluje poprzednie</h2>

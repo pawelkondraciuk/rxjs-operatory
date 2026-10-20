@@ -62,6 +62,7 @@ function mapping(mode){
 });
 // Model, graf i postoje distinctUntilChanged: configureDistinctSwitch (reference-scenes.js).
 add("11a-distinct-switchmap","distinctUntilChanged — czy coś się zmieniło?","",1,[],[],"");
+add("12-query-zrodlo","Źródło: skąd bierze się query$?","",1,[],[],"");
 add("12a-switchmap-live","switchMap — nowe zapytanie anuluje poprzednie","",1,[],[],"");
 add("12b-debounce-switchmap","debounceTime — czekamy na ciszę","",1,[],[],"");
 add("16-czas-cztery","debounceTime i auditTime: cisza czy okno?","",1,[],[],"");

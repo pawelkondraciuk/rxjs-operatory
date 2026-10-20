@@ -2273,6 +2273,86 @@ function combineLatestWithLatestFromGraph(scene) {
 }
 
 
+// fromEvent → map → share: ten sam wygląd torów, jeden upstream i dwóch stałych odbiorców.
+// Wpisanie i kasowanie angular jest cyklem zdarzeń input, nie resetem subskrypcji.
+const querySourceTiming={first:.8,key:1.6,hold:4,erase:1.1,empty:2,travel:.6,transform:.75,split:.6};
+const querySourceWord='angular';
+const querySourceDelete=(querySourceWord.length-1)*querySourceTiming.key+querySourceTiming.hold;
+const querySourceCycle=querySourceDelete+(querySourceWord.length-1)*querySourceTiming.erase+querySourceTiming.empty;
+const querySourceValue=(step)=>step<querySourceWord.length?querySourceWord.slice(0,step+1):querySourceWord.slice(0,querySourceWord.length-1-(step-querySourceWord.length));
+const querySourceStep=step=>step<querySourceWord.length?step*querySourceTiming.key:querySourceDelete+(step-querySourceWord.length)*querySourceTiming.erase;
+const querySourceInputs=(from,to)=>{
+  const first=Math.max(0,Math.floor((from-querySourceTiming.first)/querySourceCycle)-1),last=Math.max(0,Math.ceil((to-querySourceTiming.first)/querySourceCycle));
+  const input=[];
+  for(let cycle=first;cycle<=last;cycle++)for(let step=0;step<querySourceWord.length*2;step++) {
+    const at=querySourceTiming.first+cycle*querySourceCycle+querySourceStep(step),value=querySourceValue(step);
+    input.push({at,logicalAt:at,value,color:laneSubscribers.A.fill,arrival:at+querySourceTiming.travel});
+  }
+  return input.filter(value=>value.at>=from-12&&value.at<=to);
+};
+const querySourceTextAt=time=>{
+  if(time<querySourceTiming.first)return '';
+  const local=(time-querySourceTiming.first+1e-9)%querySourceCycle;
+  let value='';
+  for(let step=0;step<querySourceWord.length*2;step++)if(local>=querySourceStep(step))value=querySourceValue(step);
+  return value;
+};
+const querySourceOutputAt=value=>value.arrival+querySourceTiming.transform+querySourceTiming.travel+querySourceTiming.split+querySourceTiming.travel;
+
+export function configureQuerySource(scene) {
+  const last=querySourceInputs(0,22)[querySourceWord.length-1];
+  Object.assign(scene,{
+    title:'Źródło: skąd bierze się query$?',
+    code:"const query$ = fromEvent(inputEl, 'input').pipe(\n  map(event => (event.target as HTMLInputElement).value.trim()),\n  share()\n);",
+    graph:querySourceGraph,rows:[],codeFrames:[],checkpoints:[],metrics:[],
+    playerLayout:'function',playerClass:'rx-flat-tiles rx-query-source',ink:'#26323B',
+    playback:{entry:'manual',finish:'hold',controller:'stages',navigation:'slide',resetOnExit:true,stillTime:querySourceOutputAt(last)+.35,stops:[]},
+    live:{start:0,window:32,keep:8,margin:3,autoplay:true,variant:querySourceVariant},
+  });
+  Object.assign(scene,querySourceVariant(scene,{from:0,to:scene.live.window}));
+}
+
+export function querySourceVariant(scene,{from=0,to=32}) {
+  const input=querySourceInputs(from,to),source={id:'source',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},
+    map={id:'map',bg:'rgba(216,179,230,.45)',line:'#b384c6'},share={...map,id:'share'};
+  const during=(a,b)=>({from:{at:a},to:{at:b}});
+  return {...scene,duration:to,querySourceInputs:input,
+    captions:[[0,'fromEvent tworzy strumień ze zdarzeń input, map wyciąga tekst, a share pozwala współdzielić jedno źródło dalej.']],
+    codeLines:[[{text:'const query$ = '},{text:"fromEvent(inputEl, 'input')",mark:source,active:input.map(v=>during(v.at,v.arrival))},{text:'.pipe('}],
+      [{text:'  '},{text:'map(event => (event.target as HTMLInputElement).value.trim())',mark:map,active:input.map(v=>during(v.arrival,v.arrival+querySourceTiming.transform))},{text:','}],
+      [{text:'  '},{text:'share()',mark:share,active:input.map(v=>during(v.arrival+querySourceTiming.transform+querySourceTiming.travel,querySourceOutputAt(v))) }],
+      [{text:');'}]],
+  };
+}
+
+function querySourceGraph(scene) {
+  const tall=scene.format==='4:3',top=tall?100:50,y=laneRowY(top,0),secondTop=top+210;
+  const input=scene.querySourceInputs,t=querySourceTiming,ball={...laneLook.ball,r:32,font:30,fitText:true};
+  const output=input.map(v=>({...v,value:v.value||'""',at:v.arrival+t.transform,arrival:v.arrival+t.transform+t.travel}));
+  const shared=output.map(v=>({...v,at:v.arrival+t.split,arrival:v.arrival+t.split+t.travel}));
+  const receiver=(id,label,receiverTop)=>({id,label,x:1060,w:320,subscriber:id,
+    ...laneTile('receiver',receiverTop,{[id]:0},1,{growRows:false,labelOffset:-laneLook.rowH/2}),inbox:{...laneInbox(),ready:true},labelSize:32});
+  const graph={layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball,
+    subscribers:{U:{...laneSubscribers.A,label:''},A:laneSubscribers.A,B:laneSubscribers.B},
+    nodes:[{id:'source',label:'fromEvent(input)',x:190,w:340,labelSize:32,...laneTile('source',top,{U:0},1)},
+      {id:'map',label:'map',x:500,w:180,color:'op',transformBalls:true,...laneTile('operator',top,{U:0},1)},
+      {id:'share',label:'share',x:750,w:200,color:'op',splitBalls:true,hubFan:false,splitGuides:false,
+        ...laneTile('operator',top,{U:0,A:0,B:1},2)},
+      receiver('A','podgląd query',top),receiver('B','wyszukiwarka',secondTop)],
+    edges:[{id:'source-map',from:'source',to:'map',subscriber:'U',logicalStart:-1},
+      {id:'map-share',from:'map',to:'share',subscriber:'U',logicalStart:-1},
+      ...['A','B'].map(id=>({id:'share-'+id,from:'share',to:id,subscriber:id,logicalStart:-1}))],
+    schedule:{'source-map':{start:-1,connectDuration:.5,events:input.map(v=>({...v,value:'{…}'}))},
+      'map-share':{start:-1,connectDuration:.5,events:output},
+      ...Object.fromEntries(['A','B'].map(id=>['share-'+id,{start:-1,connectDuration:.5,events:shared}]))},
+    trays:['A','B'].map((id,i)=>({anchor:id,x:1110,y:laneRowY(i?secondTop:top,0),w:90,balls:true,max:1,ball})),
+    activities:input.flatMap(v=>[{node:'source',at:v.at,until:v.arrival},{node:'map',at:v.arrival,until:v.arrival+t.transform},
+      {node:'share',at:v.arrival+t.transform+t.travel,until:querySourceOutputAt(v)}]),
+  };
+  graph.readouts=[{...queryInputReadout(graph,scene,querySourceTextAt),x:190,y:y,w:210}];
+  return graph;
+}
+
 // Czas ilustracji jest jedynym czasem tej sceny. Okno live ogranicza liczbę requestów w kompilacji;
 // globalny indeks pochodzi z czasu, więc przewinięcie okna nie zeruje numerów ani liczników.
 const timing={first:.4,period:1.4,travel:.4,cancel:.25,connect:.25,request:5};

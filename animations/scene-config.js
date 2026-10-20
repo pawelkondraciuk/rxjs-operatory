@@ -1,4 +1,4 @@
-import { configureDebounceSwitch, configureSwitchMapLive, configureFlatten, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureDebounceAudit, configureShareReplayOne, configureShareReplayRefCount, configureCombineLatestWithLatestFrom, configureRetryBackoff, configureDefer } from './reference-scenes.js';
+import { configureQuerySource, configureDebounceSwitch, configureSwitchMapLive, configureFlatten, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureDebounceAudit, configureShareReplayOne, configureShareReplayRefCount, configureCombineLatestWithLatestFrom, configureRetryBackoff, configureDefer } from './reference-scenes.js';
 
 // Końcowe ID po rozwinięciu wariantów; otwarcie do tytułu pozostaje w kolejności HTML.
 export const mainOrder = [
@@ -6,8 +6,8 @@ export const mainOrder = [
   // trzy wykonania), interval (cold: osobne wykonanie każdego odbiorcy, unsubscribe), Subject (ręczne next i complete), Subject + HTTP, Subject + interval.
   // Potem pytanie o znane operatory, operator, kod myMap, pytanie o share oraz historia share HTTP → share + interval → późny odbiorca.
   '05-zrodla-2','05b-http-kod','04a-dwa-tory','05-zrodla','05-zrodla-5','05-zrodla-3','05-zrodla-4','02-znane-operatory','04-operator','04b-map-kod','03-a-share','04a-dwa-tory-2','04a-dwa-tory-3',
-  // Cztery *Map obok siebie, potem plansza wyszukiwarki, switchMap na żywo, debounceTime i distinctUntilChanged przed switchMap.
-  '20-sharereplay','20a-sharereplay-interval','20b-sharereplay-refcount','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12-intro-wyszukiwarka','12a-switchmap-live','12b-debounce-switchmap','11a-distinct-switchmap',
+  // Cztery *Map obok siebie, potem plansza wyszukiwarki, źródło query$, switchMap na żywo, debounceTime i distinctUntilChanged przed switchMap.
+  '20-sharereplay','20a-sharereplay-interval','20b-sharereplay-refcount','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12-intro-wyszukiwarka','12-query-zrodlo','12a-switchmap-live','12b-debounce-switchmap','11a-distinct-switchmap',
   'b04-catcherror','b04-catcherror-2','16-czas-cztery','25-podsumowanie','pytania',
 ];
 export const extraOrder = [
@@ -30,6 +30,7 @@ function trimTail(scene) {
 // Applies AFTER variants are resolved, so a variant never inherits stale stop times.
 export function configureScene(scene) {
   const id=scene.rendererId||scene.id;
+  if(id==='12-query-zrodlo')configureQuerySource(scene);
   if(id==='12a-switchmap-live')configureSwitchMapLive(scene);
   if(id==='12b-debounce-switchmap')configureDebounceSwitch(scene);
   if(['09-concatmap','10-mergemap','12-exhaustmap'].includes(id))configureFlatten(scene,{
