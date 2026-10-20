@@ -722,7 +722,7 @@ return new Observable(subscriber => {
 				<section id="x03-retry-backoff" class="animation-slide" data-animation="x03-retry-backoff">
 					<h2>retry — nie udało się? Spróbuj później</h2>
 					<div class="rx-player" aria-label="retry — nie udało się? Spróbuj później"></div>
-					<aside class="notes"><ul><li>Błąd → ponowna subskrypcja upstream; każda próba to nowy cold HTTP.</li><li>count: 3 → pierwsza próba + maksymalnie trzy ponowienia.</li><li>Wykładnicze opóźnienia: 1 s → 2 s → 4 s; podczas oczekiwania brak aktywnego requestu.</li><li>Błędy zatrzymane wewnątrz retry. Sukces próby #4 → User i complete.</li><li>Po wyczerpaniu prób error idzie dalej. Cel: mniej agresywne obciążanie backendu.</li><li>Dalej: trzy pytania podsumowania i puenta.</li></ul></aside>
+					<aside class="notes"><ul><li>Błąd → ponowna subskrypcja upstream; każda próba to nowy cold HTTP.</li><li>count: 3 → pierwsza próba + maksymalnie trzy ponowienia.</li><li>Wykładnicze opóźnienia: 1 s → 2 s → 4 s; podczas oczekiwania brak aktywnego requestu.</li><li>Błędy zatrzymane wewnątrz retry. Sukces próby #4 → User i complete.</li><li>Po wyczerpaniu prób error idzie dalej. Cel: mniej agresywne obciążanie backendu.</li><li>Dalej: RxJS w liczbach, potem trzy pytania podsumowania i puenta.</li></ul></aside>
 					<template data-checkpoint-notes="x03-retry-backoff">
                         <div data-checkpoint="ready"><p><strong>0 — Pierwsza próba już podłączona</strong></p><p>A jest już podłączony przez retry do HTTP #1. Widać całą subskrypcję i pierwszy request z postępem 0%; liczniki 1/1. Pierwsze prawo pokazuje pracę i błąd pierwszej próby. Retry ponownie subskrybuje cold HTTP po 1/2/4 s.</p></div>
 
@@ -735,6 +735,19 @@ return new Observable(subscriber => {
                         <div data-checkpoint="success"><p><strong>8 — Sukces</strong></p><p>Wreszcie czwarty request się udaje. Odbiorca A dostaje jeden User i complete. Wszystkie poprzednie błędy zostały obsłużone wewnątrz retry.</p><p>#4 pozostaje zielone na szczycie stosu, a trzy wcześniejsze wykonania pozostają czerwone. Requesty HTTP: 4, Aktywne: 0.</p></div>
                         <div data-checkpoint="summary"><p><strong>9 — Podsumowanie</strong></p><ul><li>Cel backoff: mniej agresywne obciążanie backendu podczas chwilowej awarii.</li></ul><p>Jeden HTTP GET ma historię czterech wykonań: #1 error → 1 s; #2 error → 2 s; #3 error → 4 s; #4 User + complete. A otrzymał next(User) → complete i nie otrzymał trzech pośrednich błędów.</p><p>retry ponownie subskrybuje to samo źródło; exponential backoff (wykładniczy, nie logarytmiczny: 1000 · 2^(retryCount − 1)) wydłuża oczekiwanie przed kolejną próbą.</p></div>
                         <div data-checkpoint="finished"><p><strong>Warto dopowiedzieć</strong></p><p>Jeśli również ostatnia dozwolona próba się nie uda, retry przekaże terminalny error do A.</p><p>W produkcji często dodaje się maksymalne opóźnienie i jitter, żeby wielu klientów nie ponawiało requestów jednocześnie. Nie każdy błąd powinien być ponawiany — zwykle interesują nas błędy przejściowe, a nie walidacyjne.</p></div>
+                    </template>
+				</section>
+				<section id="24-rxjs-liczby" class="animation-slide rx-usage-stats-slide" data-animation="24-rxjs-liczby">
+					<h2>RxJS w prawdziwym kodzie — kto wygrywa?</h2>
+					<div class="rx-player" aria-label="RxJS w prawdziwym kodzie — kto wygrywa?"></div>
+					<aside class="notes"><ul><li>Dane z zestawienia rxjs-usage: liczba wywołań w kodzie wybranego zbioru, nie wykonań w runtime.</li><li>Cztery *Map: switchMap 1418 (79,1%), mergeMap 251 (14,0%), concatMap 96 (5,4%), exhaustMap 28 (1,6%); razem 1793.</li><li>map 4282; shareReplay 926 vs share 252 (≈3,7×); concatAll 1.</li><li>Około minuty; dalej: podsumowanie.</li></ul></aside>
+					<template data-checkpoint-notes="24-rxjs-liczby">
+                        <div data-checkpoint="ready"><p><strong>0 — Pytanie</strong></p><p>Przez ostatnie kilkadziesiąt minut poznawaliśmy różne operatory. A jak myślicie, którego z czterech Map używa się najczęściej w tym zestawieniu?</p><p>Na ekranie kolejność z prezentacji: concatMap, mergeMap, switchMap, exhaustMap. Daj sali chwilę na odpowiedź; pierwsze „dalej” odsłoni paski i wartości bez zmiany kolejności wierszy.</p></div>
+                        <div data-checkpoint="ranking"><p><strong>1 — Ranking</strong></p><p>SwitchMap odpowiada za prawie 80% wywołań wśród tej czwórki. MergeMap ma 14%, concatMap nieco ponad 5%, a exhaustMap mniej niż 2%.</p></div>
+                        <div data-checkpoint="map"><p><strong>2 — map</strong></p><p>A najczęściej wykorzystywanym operatorem w całym zestawieniu jest zwykły map — ponad cztery tysiące wywołań.</p></div>
+                        <div data-checkpoint="share-replay"><p><strong>3 — shareReplay</strong></p><p>ShareReplay pojawia się niemal cztery razy częściej niż zwykły share. Widać, że zapamiętywanie wyniku bywa bardzo przydatne.</p></div>
+                        <div data-checkpoint="concat-all"><p><strong>4 — concatAll</strong></p><p>A concatAll, które pokazywaliśmy jako fundament działania concatMap? W tym zbiorze użyto go bezpośrednio tylko jeden raz.</p></div>
+                        <div data-checkpoint="finished"><p><strong>5 — Finał</strong></p><p>Te liczby pochodzą z konkretnego zestawu kodu, więc nie traktujmy ich jako rankingu całego świata. Ale pokazują jedną rzecz: nie wszystkich operatorów używamy równie często. Najważniejsze to rozumieć ich zachowanie i umieć wybrać właściwy.</p><p><strong>Przejście:</strong> „To co, zagadamy do tych operatorów?”</p></div>
                     </template>
 				</section>
                 <section id="25-podsumowanie" class="closing-slide">
@@ -759,6 +772,7 @@ return new Observable(subscriber => {
 
 					<section id="pytania" class="questions-slide">
                         <h2>Pytania?</h2>
+                        <a class="questions-website" href="https://pawelkondraciuk.github.io/">pawelkondraciuk.github.io</a>
                         <a class="feedback-qr" href="https://crossweb.pl/feedback/aks-lwt/" aria-label="Otwórz formularz feedbacku">
                             <img src="/feedback-qr.svg" width="380" height="380" alt="Kod QR do formularza feedbacku na Crossweb">
                         </a>

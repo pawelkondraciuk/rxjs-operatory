@@ -1,6 +1,7 @@
 import { configureQuerySource, configureDebounceSwitch, configureSwitchMapLive, configureFlatten, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureCatchSearch, configureShareReplayOne, configureShareReplayRefCount, configureRetryBackoff } from './reference-scenes.js';
 
 import { configureSearchDemo } from './search-demo.js';
+import { configureUsageStats } from './usage-stats.js';
 
 // Końcowe ID po rozwinięciu wariantów; otwarcie do tytułu pozostaje w kolejności HTML.
 export const mainOrder = [
@@ -12,7 +13,8 @@ export const mainOrder = [
   // Cztery *Map obok siebie, potem plansza wyszukiwarki, źródło query$, switchMap na żywo, debounceTime, distinctUntilChanged
   // przed switchMap i catchError wewnątrz switchMap w tej samej wyszukiwarce.
   '20a-sharereplay-interval','20b-sharereplay-refcount','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12-intro-wyszukiwarka','12-query-zrodlo','12a-switchmap-live','12b-debounce-switchmap','11a-distinct-switchmap','11b-catcherror-search',
-  'b04-catcherror','x03-retry-backoff','25-podsumowanie','pytania',
+    // Statystyki wywołań operatorów (lekkie przejście) przed podsumowaniem.
+  'b04-catcherror','x03-retry-backoff','24-rxjs-liczby','25-podsumowanie','pytania',
 ];
 // Dawne adresy ?extras nie dodają już żadnych slajdów.
 export const extraOrder = [];
@@ -32,6 +34,8 @@ function trimTail(scene) {
 export function configureScene(scene) {
   const id=scene.rendererId||scene.id;
   if(id==='12-intro-wyszukiwarka')configureSearchDemo(scene);
+  // RxJS w liczbach: wykres czterech *Map i trzy ciekawostki; postój (także w AUTO) po każdym odsłonięciu.
+  if(id==='24-rxjs-liczby')configureUsageStats(scene);
   if(id==='12-query-zrodlo')configureQuerySource(scene);
   if(id==='12a-switchmap-live')configureSwitchMapLive(scene);
   if(id==='12b-debounce-switchmap')configureDebounceSwitch(scene);

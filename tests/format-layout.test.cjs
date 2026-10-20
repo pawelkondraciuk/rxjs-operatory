@@ -16,13 +16,14 @@ async function deck(format){
 
 test('4:3 diagrams fill the taller stage and keep every block inside the viewBox',async()=>{
  const {scenes,compile,render}=await deck('4:3');
- assert.equal(scenes.length,26);
+ assert.equal(scenes.length,27);
  for(const scene of scenes){
   const c=compile(scene);
   for(const time of [0,...c.stops.map(s=>s.time),c.duration]){
    const f=c.snapshot(time);
    // 11b ma dwa sloty wykonań zamiast trzech: ramka krótsza o jeden slot, ta sama skala kafelków co 11a.
-   assert.equal(f.height,scene.id==='11b-catcherror-search'?478:scene.playerLayout?612:535,scene.id);
+   // 24 (statystyki) bez kodu zajmuje całe pasmo diagramu, jak plansza wyszukiwarki.
+   assert.equal(f.height,scene.id==='11b-catcherror-search'?478:scene.id==='24-rxjs-liczby'?690:scene.playerLayout?612:535,scene.id);
    assert.ok(f.textScale>=1.15,scene.id);
    for(const n of f.nodes.filter(n=>n.visible)){
     assert.ok(n.x-n.w/2>=-1&&n.x+n.w/2<=f.width+1,scene.id+' '+n.id+' poziomo');

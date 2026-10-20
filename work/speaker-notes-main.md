@@ -1,6 +1,6 @@
 # Speaker notes — RxJS: operatory, które znasz, ale bałeś się zagadać
 
-Pełny eksport notatek z [index.html](../index.html): **39 slajdów MAIN**, od powitania do pytań i feedbacku. Plan 33 tematów jest rozłożony na istniejące slajdy, warianty i checkpointy.
+Pełny eksport notatek z [index.html](../index.html): **40 slajdów MAIN**, od powitania do pytań i feedbacku. Plan 33 tematów jest rozłożony na istniejące slajdy, warianty i checkpointy.
 
 Kolejność części technicznej pochodzi z `mainOrder` w [animations/scene-config.js](../animations/scene-config.js); tytuły wariantów z `prepareSlides`. Otwarcie zachowuje kolejność HTML.
 
@@ -47,8 +47,9 @@ Pokazy symulują HTTP. Tam, gdzie rozpiska mówi o User, porównanie późnych o
 35. **catchError — wyszukiwarka działa dalej** — `11b-catcherror-search`
 36. **catchError na zewnątrz** — `b04-catcherror`
 37. **retry — nie udało się? Spróbuj później** — `x03-retry-backoff`
-38. **To co, zagadamy do tych operatorów?** — `25-podsumowanie`
-39. **Pytania?** — `pytania`
+38. **RxJS w prawdziwym kodzie — kto wygrywa?** — `24-rxjs-liczby`
+39. **To co, zagadamy do tych operatorów?** — `25-podsumowanie`
+40. **Pytania?** — `pytania`
 
 ## 1. Społeczność
 
@@ -1635,9 +1636,60 @@ W produkcji często dodaje się maksymalne opóźnienie i jitter, żeby wielu kl
 - Wykładnicze opóźnienia: 1 s → 2 s → 4 s; podczas oczekiwania brak aktywnego requestu.
 - Błędy zatrzymane wewnątrz retry. Sukces próby #4 → User i complete.
 - Po wyczerpaniu prób error idzie dalej. Cel: mniej agresywne obciążanie backendu.
-- Dalej: trzy pytania podsumowania i puenta.
+- Dalej: RxJS w liczbach, potem trzy pytania podsumowania i puenta.
 
-## 38. To co, zagadamy do tych operatorów?
+## 38. RxJS w prawdziwym kodzie — kto wygrywa?
+
+**ID:** `24-rxjs-liczby`
+
+### Checkpoint `ready`
+
+**0 — Pytanie**
+
+Przez ostatnie kilkadziesiąt minut poznawaliśmy różne operatory. A jak myślicie, którego z czterech Map używa się najczęściej w tym zestawieniu?
+
+Na ekranie kolejność z prezentacji: concatMap, mergeMap, switchMap, exhaustMap. Daj sali chwilę na odpowiedź; pierwsze „dalej” odsłoni paski i wartości bez zmiany kolejności wierszy.
+
+### Checkpoint `ranking`
+
+**1 — Ranking**
+
+SwitchMap odpowiada za prawie 80% wywołań wśród tej czwórki. MergeMap ma 14%, concatMap nieco ponad 5%, a exhaustMap mniej niż 2%.
+
+### Checkpoint `map`
+
+**2 — map**
+
+A najczęściej wykorzystywanym operatorem w całym zestawieniu jest zwykły map — ponad cztery tysiące wywołań.
+
+### Checkpoint `share-replay`
+
+**3 — shareReplay**
+
+ShareReplay pojawia się niemal cztery razy częściej niż zwykły share. Widać, że zapamiętywanie wyniku bywa bardzo przydatne.
+
+### Checkpoint `concat-all`
+
+**4 — concatAll**
+
+A concatAll, które pokazywaliśmy jako fundament działania concatMap? W tym zbiorze użyto go bezpośrednio tylko jeden raz.
+
+### Checkpoint `finished`
+
+**5 — Finał**
+
+Te liczby pochodzą z konkretnego zestawu kodu, więc nie traktujmy ich jako rankingu całego świata. Ale pokazują jedną rzecz: nie wszystkich operatorów używamy równie często. Najważniejsze to rozumieć ich zachowanie i umieć wybrać właściwy.
+
+**Przejście:** „To co, zagadamy do tych operatorów?”
+
+### Notatki bazowe rodziny — zastępowane przez checkpointy
+
+- Dane z zestawienia rxjs-usage: liczba wywołań w kodzie wybranego zbioru, nie wykonań w runtime.
+- Cztery *Map: switchMap 1418 (79,1%), mergeMap 251 (14,0%), concatMap 96 (5,4%), exhaustMap 28 (1,6%); razem 1793.
+- map 4282; shareReplay 926 vs share 252 (≈3,7×); concatAll 1.
+- Około minuty; dalej: podsumowanie.
+
+## 39. To co, zagadamy do tych operatorów?
 
 **ID:** `25-podsumowanie`
 
@@ -1658,7 +1710,7 @@ Bo to, że działa, nie znaczy, że robi to, czego oczekujesz.
 - Operator działa ≠ operator robi to, czego oczekuję.
 - Zatrzymaj się na tej myśli. Kolejne „dalej” prowadzi do „Pytania?” z QR do feedbacku; „wstecz” ukrywa puentę.
 
-## 39. Pytania?
+## 40. Pytania?
 
 **ID:** `pytania`
 

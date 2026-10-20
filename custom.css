@@ -726,12 +726,22 @@
   .reveal .closing-takeaway.fragment { transition: none; }
 }
 
-/* Końcowy slajd: pytania do sali i formularz feedbacku. */
+/* Końcowy slajd: pytania do sali, strona prelegenta i formularz feedbacku. */
 .reveal .questions-slide h2 {
   font-size: 150px;
   line-height: 1.1;
   text-transform: none;
-  margin: 0 0 48px;
+  margin: 0 0 24px;
+}
+.reveal .questions-slide .questions-website {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 32px;
+  font-size: 36px;
+  line-height: 1.3;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 .reveal .questions-slide .feedback-qr {
   display: block;
@@ -750,7 +760,11 @@
 }
 [data-ratio="16-9"] .reveal .questions-slide h2 {
   font-size: 130px;
-  margin-bottom: 32px;
+  margin-bottom: 16px;
+}
+[data-ratio="16-9"] .reveal .questions-slide .questions-website {
+  margin-bottom: 24px;
+  font-size: 30px;
 }
 [data-ratio="16-9"] .reveal .questions-slide .feedback-qr,
 [data-ratio="16-9"] .reveal .questions-slide .feedback-qr img {

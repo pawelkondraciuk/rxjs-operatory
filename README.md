@@ -4,7 +4,7 @@ Polska prezentacja Pawła Kondraciuka o sterowaniu pracą, kolejnością, subskr
 
 Ten README jest mapą treści: opisuje slajdy, zawartość bloczków i speaker notes. Implementację animacji, mapę plików i używane API znajdziesz w [AGENTS.md](AGENTS.md).
 
-Pełny eksport notatek dla **39 slajdów MAIN**, od powitania do pytań i feedbacku, znajduje się w [work/speaker-notes-main.md](work/speaker-notes-main.md). Uwzględnia plan 33 tematów, aktualną kolejność wariantów oraz wszystkie notatki checkpointów i fragmentów. Źródłem notatek wyświetlanych przez Reveal pozostaje `index.html`.
+Pełny eksport notatek dla **40 slajdów MAIN**, od powitania do pytań i feedbacku, znajduje się w [work/speaker-notes-main.md](work/speaker-notes-main.md). Uwzględnia plan 33 tematów, aktualną kolejność wariantów oraz wszystkie notatki checkpointów i fragmentów. Źródłem notatek wyświetlanych przez Reveal pozostaje `index.html`.
 
 ## Uruchomienie i obsługa
 
@@ -19,7 +19,7 @@ Sceny MAIN z pytaniami zaczynają od nieruchomego READY. Prawo / Page Down uruch
 
 W oknie prelegenta (`S`) podgląd następnego slajdu domyślnie pokazuje dużą nazwę, np. **switchMap**, i krótki podtytuł. Wskazuje kolejny slajd, także podczas ręcznych postojów bieżącej animacji. Przełącznik **Podgląd: Tytuł / Slajd** w prawym dolnym rogu tego pola przywraca standardowy podgląd. Wybór jest zapamiętywany w przeglądarce. Notatki pozostają w standardowym polu Notes. Opcjonalne `data-speaker-title` na sekcji ustawia własny podpis wyłącznie dla prelegenta.
 
-Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 39 slajdów daje 58 stron PDF (także pięć stanów kodu `05b-http-kod`: bez wyróżnienia i cztery wyróżnione fragmenty, trzy stany pełnego kodu `04b-map-kod`: bez wyróżnienia i dwa kolejne wyróżnienia, oraz dwa checkpointy zakończenia `25-podsumowanie`).
+Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 40 slajdów daje 59 stron PDF (także pięć stanów kodu `05b-http-kod`: bez wyróżnienia i cztery wyróżnione fragmenty, trzy stany pełnego kodu `04b-map-kod`: bez wyróżnienia i dwa kolejne wyróżnienia, oraz dwa checkpointy zakończenia `25-podsumowanie`).
 
 Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przywraca ekran panoramiczny 1280×720. `W` przeładowuje stronę w drugim formacie, zostając na tym samym slajdzie i fragmencie; animacja wraca do stanu tego fragmentu. Druk działa w obu: `?print-pdf` (4:3) lub `?print-pdf&ratio=16:9`. W 4:3 slajdy wykorzystują pełną wysokość: większe zdjęcia i kody QR, wyższe diagramy, większy tekst i kapsułki w animacjach (×1,15), etykiety kafelków do ×1,3 oraz większy tytuł (64 px; za długi zmniejsza się, by został w jednej linii), kod (42 px, długi łańcuch przechodzi do nowej linii przed .pipe/.subscribe) i podpis.
 
@@ -43,14 +43,14 @@ Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorz
 
 Otwarcie do tytułu pozostaje bez zmian: społeczność, historia meet.js, fotografie i autor. Po tytule pokazujemy HTTP, Cold, interval, Subject — ręczną emisję, ręczny multicast HTTP i odłączanie źródła interval, a dopiero potem pytania o znane operatory i share. Budżet **30–35 minut dotyczy tylko części właściwej**; otwarcie i pytania są dodatkowo.
 
-Prezentacja ma **39 slajdów (25 scen odtwarzacza)**, z 33 bazowych sekcji HTML po rozwinięciu wariantów. Nie ma slajdów EXTRAS. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
+Prezentacja ma **40 slajdów (26 scen odtwarzacza)**, z 34 bazowych sekcji HTML po rozwinięciu wariantów. Nie ma slajdów EXTRAS. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
 
 Kolejność po slajdzie tytułowym:
 
 1. Pierwsze slajdy techniczne pokazują komplet podstawowych zachowań Observable: HTTP — subscribe, next, complete (`05-zrodla-2`) → kod źródłowy httpGet krok po kroku (`05b-http-kod`) → Cold: jedna definicja, trzy wykonania, trzy complete (`04a-dwa-tory`) → interval na żywo — cold, osobne wykonanie każdego odbiorcy, unsubscribe (`05-zrodla`) → Subject — ręczne next, późny subskrybent bez historii, complete, subskrypcja po zakończeniu i ignorowane next(3) (`05-zrodla-5`) → Subject: ręczny multicast HTTP (`05-zrodla-3`) → Subject — kto odłączy źródło? (`05-zrodla-4`). Po nich „Jakie znasz operatory RxJS?” (`02-znane-operatory`) → HTTP GET + map: obiekt User → „Paweł Kondraciuk” (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`), wstęp do share + HTTP.
 2. Jedna historia Cold → Subject → share na tych samych przykładach: cold — trzy subskrypcje, trzy HTTP, trzy complete (`04a-dwa-tory`) → Subject + HTTP: jeden request dla A/B, późny C dostaje tylko complete (`05-zrodla-3`) → Subject + interval: odbiorcy odchodzą, źródło nadal działa (`05-zrodla-4`) → pytanie o znane operatory → HTTP GET + map (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`) → share + HTTP: A/B współdzielą request #1, po complete pytanie z sali i późny C uruchamia request #2 (`04a-dwa-tory-2`) → share + interval: A/B odchodzą, późny C uruchamia nowe interval od 0 (`04a-dwa-tory-3`) → shareReplay(1) na interval: odbiorcy odchodzą, źródło pracuje dalej (`20a-sharereplay-interval`) → shareReplay z refCount: true na interval: ostatni odbiorca czyści bufor i odłącza źródło, późny C zaczyna od zera (`20b-sharereplay-refcount`) → shareReplay z refCount: true + HTTP: późny odbiorca dostaje wynik z bufora (`20-sharereplay-2`). Powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
 3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap (cztery *Map obok siebie) → „Zaprojektujmy wyszukiwarkę” (`12-intro-wyszukiwarka`) → źródło query$ (`12-query-zrodlo`) → switchMap na żywo (`12a-switchmap-live`) → debounceTime + switchMap (`12b-debounce-switchmap`) → distinctUntilChanged przed switchMap (`11a-distinct-switchmap`, jedyny distinctUntilChanged w MAIN) → catchError wewnątrz switchMap w tej samej wyszukiwarce (`11b-catcherror-search`).
-4. catchError na zewnątrz (`b04-catcherror`) → retry z backoff 1/2/4 s (`x03-retry-backoff`) → podsumowanie. Osobny wariant „catchError wewnątrz” i porównanie debounce/audit zostały usunięte; lokalną obsługę błędu pokazuje wyszukiwarka (`11b-catcherror-search`).
+4. catchError na zewnątrz (`b04-catcherror`) → retry z backoff 1/2/4 s (`x03-retry-backoff`) → RxJS w liczbach (`24-rxjs-liczby`) → podsumowanie. Osobny wariant „catchError wewnątrz” i porównanie debounce/audit zostały usunięte; lokalną obsługę błędu pokazuje wyszukiwarka (`11b-catcherror-search`).
 5. „To co, zagadamy do tych operatorów?” z odsłanianą puentą → „Pytania?” z kodem QR do feedbacku → rozmowa z salą.
 
 | Część właściwa | Budżet |
@@ -59,9 +59,10 @@ Kolejność po slajdzie tytułowym:
 | map + concatAll, cztery operatory *Map i distinctUntilChanged przed switchMap | 13,5 min |
 | catchError i retry | 5 min |
 | debounceTime w wyszukiwarce | w bloku wyszukiwarki |
+| RxJS w liczbach | 1 min (60–90 s) |
 | Podsumowanie | 1,5 min |
 | Rezerwa na interakcję i przejścia | 2 min |
-| **Łącznie** | **32 min** |
+| **Łącznie** | **33 min** |
 
 Na map + concatAll i przejście do concatMap przewidziano około 3 minut z bloku flatteningu. Czasy są planem prelegenta, nie pomiarem odtwarzacza.
 
@@ -758,7 +759,7 @@ Kolejne prawo (`reset`) pokazuje odpowiedź: reset bufora i × do interval, Odbi
 
 ### retry — nie udało się? Spróbuj później — `x03-retry-backoff`
 
-**MAIN — bezpośrednio po catchError na zewnątrz, przed podsumowaniem.** Kod używa współczesnego API `retry({ count, delay })`: `count: 3` pozwala na trzy ponowienia poza pierwszym wykonaniem, czyli maksymalnie cztery requesty HTTP. Funkcja `delay` zwraca `timer(1000 * 2 ** (retryCount - 1))`, dlatego kolejne odstępy wynoszą 1, 2 i 4 sekundy.
+**MAIN — bezpośrednio po catchError na zewnątrz, przed RxJS w liczbach i podsumowaniem.** Kod używa współczesnego API `retry({ count, delay })`: `count: 3` pozwala na trzy ponowienia poza pierwszym wykonaniem, czyli maksymalnie cztery requesty HTTP. Funkcja `delay` zwraca `timer(1000 * 2 ** (retryCount - 1))`, dlatego kolejne odstępy wynoszą 1, 2 i 4 sekundy.
 
 **Na bloczkach:** jeden niezmienny pipeline HTTP GET → retry → pełny odbiorca A, bez dolnego panelu. A jest widoczny i podłączony od READY; subskrybuje tylko raz. Pod jednym niebieskim nagłówkiem HTTP GET rośnie stos wykonań tego samego cold Observable: najnowsze jest zawsze na górze, a wcześniejsze płynnie przesuwają się niżej i pozostają jako historia. Pierwsze trzy wiersze `#1–#3` kończą się czerwonym error; `#4` pokazuje User i complete. Tylko górne wykonanie ma aktywny port i przewód do jednego operatora retry; historyczne wiersze nie mają własnych odbiorców ani przewodów.
 
@@ -766,9 +767,39 @@ Po każdym z trzech błędów czerwony impuls kończy się na retry i nie docier
 
 READY ma A i HTTP #1 już podłączone (0% pracy, 1/1). Checkpointy: error-1, request-2, error-2, request-3, error-3 (pytanie o następne 8 s), request-4, success i summary. Finał: Requesty HTTP 4, Aktywne 0; A otrzymał `next(User) → complete`, bez trzech pośrednich błędów. Notatki przypominają o terminalnym error po wyczerpaniu prób, maksymalnym opóźnieniu, jitterze i ponawianiu wyłącznie odpowiednich błędów przejściowych.
 
+### RxJS w prawdziwym kodzie — kto wygrywa? — `24-rxjs-liczby`
+
+**MAIN — po retry, przed podsumowaniem.** Lekki finał części technicznej (60–90 s): ciekawostki z zestawienia rxjs-usage — liczba wywołań w kodzie wybranego zbioru, nie wykonań w runtime i nie ranking całego ekosystemu.
+
+**Na ekranie:** tytuł serif, nagłówek **„Cztery Map. Jeden zdecydowany zwycięzca.”** i płaski wykres poziomy bez osi, siatki i legendy. Paski na wspólnej skali 100% (jasne tło toru = 100%):
+
+| Operator | Wywołania | Udział w czwórce | Kolor |
+| --- | ---: | ---: | --- |
+| concatMap | 96 | 5,4% | pomarańczowy |
+| mergeMap | 251 | 14,0% | niebieski |
+| switchMap | 1418 | 79,1% | fiolet |
+| exhaustMap | 28 | 1,6% | zielony |
+
+Wiersze od wejścia do finału zachowują kolejność z prezentacji: concatMap → mergeMap → switchMap → exhaustMap. Pierwsze „dalej” odsłania paski i wartości bez przestawiania operatorów według popularności.
+
+Suma 1793; procenty zaokrąglone. Pod wykresem trzy duże liczby bez kart: **4282** `map()` „Najczęściej używany”, **3,7×** `shareReplay vs share` „926 kontra 252”, **1** `concatAll()` „Tylko jedno wywołanie!”. Stopka: „Źródło: analiza wybranego zbioru kodu RxJS · liczba wywołań w kodzie, nie wykonań w runtime”.
+
+| Checkpoint | Na ekranie |
+| --- | --- |
+| 0 `ready` | Tytuł, nagłówek, nazwy operatorów i puste tory; bez pasków, wartości i liczb. ❓ SALA: który *Map wygrywa? |
+| 1 `ranking` | Paski rosną razem (0,6 s), procenty i liczby wywołań pojawiają się (0,3 s). |
+| 2 `map` | 4282 · map() (0,3 s). |
+| 3 `share-replay` | 3,7× · shareReplay vs share (0,3 s). |
+| 4 `concat-all` | 1 · concatAll() (0,3 s). |
+| 5 `finished` | Bez zmian na ekranie; notatka końcowa. Następne „dalej” → podsumowanie. |
+
+MANUAL i AUTO zatrzymują się po każdym odsłonięciu (tempo z pilota); szybkie „dalej” kończy bieżący etap, „wstecz” cofa o etap, wyjście ze slajdu resetuje go. Przy ograniczeniu ruchu odsłonięcia są natychmiastowe. Druk i podgląd Notes pokazują pełny finał.
+
+**Speaker notes:** pytanie o najczęstszy *Map; ranking („prawie 80%…”); map („ponad cztery tysiące wywołań”); shareReplay („niemal cztery razy częściej niż zwykły share”); concatAll („tylko jeden raz”); finał — to konkretny zbiór kodu, nie ranking świata; najważniejsze to rozumieć zachowanie operatorów i umieć wybrać właściwy. Przejście: „To co, zagadamy do tych operatorów?”.
+
 ### To co, zagadamy do tych operatorów? — `25-podsumowanie`
 
-**Temat:** minimalistyczne zakończenie wracające do żartu z tytułu prezentacji. Po retry, przed „Pytania?” z QR.
+**Temat:** minimalistyczne zakończenie wracające do żartu z tytułu prezentacji. Po RxJS w liczbach, przed „Pytania?” z QR.
 
 **Na ekranie:** kremowe tło, duży czarny tytuł serif u góry i dużo wolnego miejsca. Środek rezerwuje trzy równe wiersze na przyszłe pytania z niewielkimi fioletowymi ikonami; obecnie wszystkie są puste, bez placeholderów. Pod subtelną linią pojawia się wyśrodkowana puenta: **„Bo to, że działa, nie znaczy, że robi to, czego oczekujesz.”**
 
@@ -785,7 +816,7 @@ Natywny fragment Reveal: kolejne „dalej” prowadzi do „Pytania?”, „wste
 
 ### Pytania? — `pytania`
 
-**Ostatni slajd prezentacji.** Duże „Pytania?” (150 px w 4:3, 130 px w 16:9), pod nim czarno-biały kod QR (380/320 px) do [formularza feedbacku na Crossweb](https://crossweb.pl/feedback/aks-lwt/). QR jest również klikalnym linkiem. Bez linków do dodatków i dalszych slajdów. Gotowy SVG z białym marginesem znajduje się w `public/feedback-qr.svg` i działa także offline oraz w druku.
+**Ostatni slajd prezentacji.** Duże „Pytania?” (150 px w 4:3, 130 px w 16:9), bezpośrednio pod nim klikalny adres [pawelkondraciuk.github.io](https://pawelkondraciuk.github.io/) (36/30 px), a niżej czarno-biały kod QR (380/320 px) do [formularza feedbacku na Crossweb](https://crossweb.pl/feedback/aks-lwt/). QR jest również klikalnym linkiem. Bez linków do dodatków i dalszych slajdów. Gotowy SVG z białym marginesem znajduje się w `public/feedback-qr.svg` i działa także offline oraz w druku.
 
 **Speaker notes:** zaproś do pytań o przykłady i operatory, poproś o feedback przez QR, przypomnij konkurs WebStorm i podziękuj za udział.
 

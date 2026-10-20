@@ -720,6 +720,12 @@ export function compileScene(scene) {
       ...(graph.ball?{ball:graph.ball}:{}),
       ...(graph.readouts?{readouts:graph.readouts.map(readout=>({...readout,value:evaluate(readout.value,time)}))}:{}),
       ...(graph.searchPanels?{searchPanels:graph.searchPanels.map(({state,...panel})=>({...panel,...evaluate(state,time)}))}:{}),
+      // Wykres poziomy i duże liczby (opt-in): postęp odsłonięcia z jedynego zegara; długość paska = share % wspólnej skali 100.
+      ...(graph.barCharts?{barCharts:graph.barCharts.map(chart=>{
+        const grow=clamp((time-chart.from)/chart.duration);
+        return {...chart,progress:1-(1-grow)**3,valuesOpacity:clamp((time-(chart.valuesFrom??chart.from))/(chart.valuesDuration??chart.duration))};
+      })}:{}),
+      ...(graph.bigStats?{bigStats:graph.bigStats.map(stat=>({...stat,opacity:clamp((time-stat.at)/stat.duration)}))}:{}),
       ...(callouts.length?{callouts:callouts.flatMap(callout=>{
         const opacity=Math.min(clamp((time-callout.from)/.25),1-clamp((time-callout.to)/.3));
         if(time<callout.from||opacity<=0)return [];

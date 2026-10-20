@@ -357,6 +357,36 @@ function searchPanel(panel,time,reduced) {
   return svg+'</g>';
 }
 
+// Wykres poziomy (opt-in graph.barCharts): nazwa, pasek na wspólnej skali 100%, procent i liczba w stałych kolumnach.
+// Płaski, bez osi i siatki; przy ograniczonym ruchu odsłonięcie jest natychmiastowe.
+const serif="'Palatino Linotype','Book Antiqua',Palatino,Georgia,'Times New Roman','Liberation Serif',serif";
+function barChart(chart,reduced) {
+  const progress=reduced?(chart.progress>0?1:0):chart.progress,values=reduced?(chart.valuesOpacity>0?1:0):chart.valuesOpacity;
+  let svg=`<g data-bar-chart="${esc(chart.id)}" data-progress="${+progress.toFixed(4)}">`;
+  svg+=text(chart.labelX-222,chart.titleY,chart.title,40,`data-chart-title="true" style="text-anchor:start;font-family:${serif};font-weight:700;fill:#26323B"`);
+  chart.rows.forEach((row,index)=>{
+    const cy=chart.rowTop+index*chart.rowStep,width=chart.barW*row.share/100*progress;
+    svg+=`<g data-bar="${esc(row.label)}" data-share="${row.share}" data-count="${row.count}">`;
+    svg+=text(chart.labelX,cy+1,row.label,34,'style="text-anchor:end;font-family:Consolas,ui-monospace,monospace;font-weight:700;fill:#26323B"');
+    svg+=`<rect data-bar-track="true" x="${chart.barX}" y="${cy-chart.barH/2}" width="${chart.barW}" height="${chart.barH}" fill="#ECE6DA" opacity=".55"/>`;
+    if(width>0)svg+=`<rect data-bar-fill="true" x="${chart.barX}" y="${cy-chart.barH/2}" width="${+width.toFixed(3)}" height="${chart.barH}" fill="${row.fill}"/>`;
+    if(values>0)svg+=`<g data-bar-values="true" opacity="${+values.toFixed(3)}">`+
+      text(chart.percentX,cy+1,row.percent,38,`style="text-anchor:end;font-weight:700;fill:${row.ink}"`)+
+      text(chart.countX,cy+2,row.calls,26,'style="text-anchor:end;fill:#43525B"')+'</g>';
+    svg+='</g>';
+  });
+  return svg+'</g>';
+}
+// Duże liczby (opt-in graph.bigStats): liczba, nazwa operatora i krótki opis, bez kart i ramek.
+function bigStat(stat,reduced) {
+  const opacity=reduced?(stat.opacity>0?1:0):stat.opacity;
+  if(opacity<=0)return '';
+  return `<g data-big-stat="${esc(stat.id)}" opacity="${+opacity.toFixed(3)}">`+
+    text(stat.x,stat.y,stat.value,stat.size,`style="font-family:${serif};font-weight:700;fill:${stat.ink}"`)+
+    text(stat.x,stat.y+stat.size*.68,stat.label,30,'style="font-family:Consolas,ui-monospace,monospace;font-weight:700;fill:#26323B"')+
+    text(stat.x,stat.y+stat.size*.68+44,stat.note,27,'style="font-style:italic;fill:#43525B"')+'</g>';
+}
+
 export function renderScene(frame,options={}) {
   const reduced=Boolean(options.reducedMotion||frame.reducedMotion);
   // Skala tekstu i kapsułek (4:3 > 1); geometria węzłów i paneli pochodzi z grafu.
@@ -696,6 +726,8 @@ export function renderScene(frame,options={}) {
     svg+='</g>';
   }
   for(const panel of frame.searchPanels||[])svg+=searchPanel(panel,frame.time,reduced);
+  for(const chart of frame.barCharts||[])svg+=barChart(chart,reduced);
+  for(const stat of frame.bigStats||[])svg+=bigStat(stat,reduced);
   for(const readout of frame.readouts||[]) {
     const size=readout.font||26,value=String(readout.value);
     svg+=`<g data-readout="${esc(readout.id)}"><rect x="${readout.x-readout.w/2}" y="${readout.y-readout.h/2}" width="${readout.w}" height="${readout.h}" rx="6" fill="${readout.fill||'#fff'}" stroke="${readout.stroke||'#43525b'}" stroke-width="2"/>`;
