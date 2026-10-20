@@ -10,14 +10,18 @@ const manual=stops=>({entry:'manual',stops,afterLastManualStop:'start-auto',fini
 // zamienia User w string „Paweł Kondraciuk” — wejście i wynik projekcji mają wspólne logicalAt. Czasy (schedule)
 // wyłącznie rozciągają ilustrację; ten sam obiekt User co na Cold i Subject + HTTP wraca na share + HTTP po pytaniu „A share?”.
 function mapSequence(scene) {
-  const timing={pipeline:.65,handoff:.05,subscribe:1,request:2.6,travel:1.4,transform:2,receivedHold:.5,gap:.3,terminal:1.6,settle:1,
+  const timing={pipeline:.65,handoff:.05,subscribe:1,mapHold:.6,request:2.6,travel:1.4,transform:2,receivedHold:.5,gap:.3,terminal:1.6,settle:1,
     reveal:.3,laneReveal:.35,...scene.timing};
   for(const [key,value] of Object.entries(timing)) {
     if(!Number.isFinite(value)||value<=0)throw new Error(`${scene.id}: nieprawidłowy czas ilustracji ${key}`);
   }
   const seconds=value=>Math.round(value*1e9)/1e9;
   // subscribe rusza krótko po etapie pipeline (handoff + reveal); odbiorca jest widoczny od READY.
-  const born=seconds(timing.pipeline+timing.handoff),subscribe=seconds(born+timing.reveal),connected=seconds(subscribe+timing.subscribe);
+  // Subskrypcja idzie od odbiorcy do źródła: A → map (połowa subscribe), postój mapHold na map (checkpoint
+  // subscribed-map), dopiero potem map → HTTP (druga połowa). Request rusza po zestawieniu połączenia z HTTP.
+  const born=seconds(timing.pipeline+timing.handoff),subscribe=seconds(born+timing.reveal);
+  const mapConnected=seconds(subscribe+timing.subscribe/2),sourceStart=seconds(mapConnected+timing.mapHold);
+  const connected=seconds(sourceStart+timing.subscribe/2);
   // laneReveal: wiersz HTTP (litera, port, początek postępu) wchodzi po zestawieniu subskrypcji; postój subscribed czeka na niego.
   const subscribed=seconds(connected+timing.laneReveal);
   // Request trwa od zestawienia subskrypcji do odpowiedzi; jedna wartość User, potem complete.
@@ -25,18 +29,20 @@ function mapSequence(scene) {
   const received=seconds(output+timing.travel),held=seconds(received+timing.receivedHold);
   // settle: cisza po dotarciu complete, żeby rozbłysk wierszy wygasł przed FINISHED.
   const complete=seconds(held+timing.gap),finished=seconds(complete+timing.terminal),duration=seconds(finished+timing.settle);
-  return {timing,seconds,pipeline:timing.pipeline,born,subscribe,connected,subscribed,
+  return {timing,seconds,pipeline:timing.pipeline,born,subscribe,mapConnected,sourceStart,connected,subscribed,
     value:{response,arrival,output,received,held},complete,finished,duration};
 }
 // Kulki: „{…}” — cały obiekt User (jak na Cold), „"…"” — string po projekcji; pełny wynik pokazuje pole odbiorcy.
 const operatorBalls={user:'{…}',text:'"…"'};
 
 export function configureOperator(scene) {
-  const sequence=mapSequence(scene),{timing,pipeline,value,complete,finished,duration}=sequence;
+  const sequence=mapSequence(scene),{timing,pipeline,value,complete,finished,duration,mapConnected,subscribed}=sequence;
   const fill=laneSubscribers.A.fill,example="httpGet<User>('/api/users/42')";
   const captions={
     pipeline:'pipe składa definicję: map zamieni User na imię i nazwisko. HTTP nadal nie działa',
-    arrived:'subscribe A uruchomił jeden request. HTTP wyemitował User — wartość dotarła do map',
+    'subscribed-map':'A subskrybuje map. Subskrypcja idzie od odbiorcy w stronę źródła — HTTP jeszcze nie działa',
+    request:'map subskrybuje HTTP. Dopiero teraz startuje request',
+    arrived:'HTTP wyemitował User — wartość wraca w przeciwnym kierunku i dotarła do map',
     mapped:'map synchronicznie zamienia User w string „Paweł Kondraciuk”',
     received:'A dostaje jeden string: Paweł Kondraciuk',
     complete:'HTTP wysyła complete. map przekazuje je dalej do A',
@@ -58,7 +64,11 @@ export function configureOperator(scene) {
     metrics:[{label:'Requesty HTTP',count:'started'}],
     playback:{...manual([
       {id:'pipeline',time:pipeline,caption:captions.pipeline},
-      // Jeden etap: subscribe A przez map do HTTP, request i emisja User aż do portu map.
+      // Impuls subscribe A dotarł do map i stoi (mapHold); map jeszcze nie subskrybuje HTTP, Requesty HTTP: 0.
+      {id:'subscribed-map',time:sequence.seconds(mapConnected+.3),caption:captions['subscribed-map']},
+      // map → HTTP zestawione, request trwa (postęp widoczny, odpowiedź jeszcze nie wyszła).
+      {id:'request',time:sequence.seconds(subscribed+.8),caption:captions.request},
+      // Odpowiedź: User leci z HTTP do wejścia map.
       {id:'arrived',time:value.arrival,caption:captions.arrived},
       // Kulka stoi na środku wiersza map i ma już nową wartość (zmiana w połowie projekcji).
       {id:'mapped',time:sequence.seconds(value.arrival+timing.transform*.62),caption:captions.mapped},
@@ -71,7 +81,7 @@ export function configureOperator(scene) {
 // Wygląd torów jak w 04a: HTTP GET → map → A w jednym rzędzie (ta sama pojedyncza subskrypcja A co w HTTP i interval).
 // Kulka User wjeżdża do map, staje i zmienia się w string; A pokazuje pełny wynik w polu widoku i ✓ complete.
 export function mapGraph(scene) {
-  const {timing,seconds,subscribe,value,complete,finished}=mapSequence(scene);
+  const {timing,seconds,subscribe,sourceStart,value,complete,finished}=mapSequence(scene);
   const halfSubscribe=timing.subscribe/2,halfTerminal=timing.terminal/2,fill=laneSubscribers.A.fill;
   const top=scene.format==='4:3'?222:146,y=laneRowY(top,0),receiver={x:960,w:480,y};
   // Kolumny wyśrodkowane (40…1200): HTTP GET, map i szerszy odbiorca, który mieści pełne „Paweł Kondraciuk”.
@@ -83,7 +93,7 @@ export function mapGraph(scene) {
   ];
   // Pole wyniku za inboxem i literą A (jak pola Cold): nazwa wyniku w monospace, po dotarciu — pełny string.
   const k=laneLook.textScale,inbox=laneInbox(),fieldLeft=receiver.x-receiver.w/2+inbox.left+laneLook.icon+8*k+22*k+16;
-  const travelResponse=seconds(subscribe+halfSubscribe);
+  const travelResponse=sourceStart;
   return {layout:'fixed',formatAware:true,width:1240,height:scene.format==='4:3'?612:460,...laneGraphLook(),ball:viewFieldBall,
     subscribers:{A:laneSubscribers.A},nodes,
     // Wywołanie subscribe to jedna chwila modelu dla całego łańcucha; harmonogram rozciąga tylko ilustrację.
@@ -511,7 +521,7 @@ export function shareLateGraph(scene) {
 // A uruchamia jedyne wykonanie HTTP (#1); 42 trafia do A i równolegle do kieszeni bufora pod operatorem. Po complete
 // bufor zostaje (refCount nie czyści wyniku zakończonego źródła). B subskrybuje później: bez toru HTTP, kulka wyjeżdża
 // z bufora (replayHold) do B, potem complete. Kolory kulek jak w share z późnym odbiorcą: wykonanie #1/A fioletowa, B pomarańczowa.
-const shareReplayTimes={a:1,response:5,complete:6,b:7};
+const shareReplayTimes={a:1,response:6,complete:7,b:8};
 export function configureShareReplayLate(scene) {
   const at=shareReplayTimes,ev=(type,edge)=>({type,edge}),during=(from,to)=>({from,to});
   const a=E(at.response,'42',laneSubscribers.A.fill),b=E(at.b,'42',laneSubscribers.B.fill);
@@ -891,13 +901,14 @@ const subjectIntervalTiming={first:.5,period:1,travel:.8,hold:.4,cancel:.8,callo
 const subjectIntervalReceivers=[{id:'A',slot:0},{id:'B',slot:1},{id:'C',slot:2}];
 // Dwa huby tej samej sceny: Subject (ręczne connection, akcje source i connection) i share() (bez ręcznego połączenia —
 // gdy odchodzi ostatni odbiorca, share() sam odłącza upstream; impuls × C biegnie przez share() aż do interval).
-// sequence: jedna akcja wywołuje subA/subB/subC.unsubscribe() po kolei co sequence s (okres interval), więc każdy
-// kolejny odbiorca dostaje jeszcze jedną wartość.
+// share: każde „dalej” to osobne subX.unsubscribe() (A, B, C); po odejściu B interval dalej emituje do C i scena czeka
+// na kolejne „dalej” — miejsce na pytanie, czy źródło przestanie emitować po odejściu ostatniego odbiorcy.
+// sequence (opcjonalne): jedna akcja wywołuje subA/subB/subC.unsubscribe() po kolei co sequence s.
 const intervalHubs={
   subject:{label:'Subject',title:'Subject — kto odłączy źródło?',actions:['A','B','C','source','connection'],defaults:[3,6,9,12,15],
     defaultClose:17.9,playerClass:'rx-lanes rx-flat-tiles rx-two-lines',receiversLabel:'Odbiorcy Subject'},
-  share:{label:'share()',title:'share() — kto odłączy źródło?',actions:['unsub-all'],defaults:[3],sequence:1,
-    defaultClose:8.5,playerClass:'rx-lanes rx-flat-tiles',receiversLabel:'Odbiorcy share()'},
+  share:{label:'share()',title:'share() — kto odłączy źródło?',actions:['A','B','C'],defaults:[3,6,9],
+    defaultClose:13.5,playerClass:'rx-lanes rx-flat-tiles',receiversLabel:'Odbiorcy share()'},
 };
 const intervalHubOf=scene=>scene.intervalHub||'subject';
 export function configureSubjectInterval(scene,kind='subject') {
@@ -906,6 +917,11 @@ export function configureSubjectInterval(scene,kind='subject') {
   // Na żywo kontroler liczy etap z liczby wykonanych akcji, nie z czasu.
   const tail=hub.sequence?hub.sequence*(subjectIntervalReceivers.length-1):0;
   const settled=hub.defaults.map((at,i)=>at+tail+({source:.5,connection:2.2}[hub.actions[i]]??t.settle));
+  // share: ostatni odbiorca zatrzymuje interval — postój dopiero po dotarciu × do interval (koniec migawki).
+  if(kind==='share'){
+    const plan=subjectIntervalVariant({...scene,intervalHub:kind},{from:0,to:t.window,closedAt:null,actions:hub.defaults}).subjectIntervalPlan;
+    settled[settled.length-1]=Math.max(settled.at(-1),plan.connection.doneAt);
+  }
   Object.assign(scene,{intervalHub:kind,graph:subjectIntervalGraph,playerLayout:'function',ink:'#26323B',playerClass:hub.playerClass,
     title:hub.title,
     rows:[R('interval(1000)'),...subjectIntervalReceivers.map(r=>R('Odbiorca '+r.id))],
@@ -960,7 +976,9 @@ function subjectIntervalVariant(scene,{from,to,closedAt,actions=[]}) {
       [{text:'const connection = '},{text:'interval(1000).subscribe(subject$)',mark:connectionMark,
         active:sourceAt===undefined?[]:[{from:{type:'connection-focus'},to:{type:'connection-focus-end'}}]},{text:';'}]];
   const unsubscribed=receivers.filter(r=>r.unsubscribeAt!==null);
-  const leaving=share?{A:'A, B i C odłączają się po kolei. Dopóki ktoś słucha, share() subskrybuje interval'}:{A:'A się odłącza. B i C nadal odbierają',B:'B się odłącza. Odbiera już tylko C',
+  const leaving=share?{A:'A się odłącza. B i C nadal słuchają, więc share() dalej subskrybuje interval',
+    B:'B się odłącza. Został tylko C — interval nadal emituje. Co się stanie, gdy odejdzie ostatni?',
+    C:'C, ostatni odbiorca, robi unsubscribe'}:{A:'A się odłącza. B i C nadal odbierają',B:'B się odłącza. Odbiera już tylko C',
     C:'Odłącza się ostatni odbiorca. Co stanie się z interval?'};
   return {...scene,subjectIntervalPlan:{kFrom,kTo,receivers,sourceAt,connection,end},
     duration:closed?closedAt:Math.min(to,finite),
@@ -1480,14 +1498,19 @@ function overlapTail(scene) {
 // zakończeniu A. Dane, kolory i tempo są identyczne; zmienia się tylko operator. B po dotarciu do operatora czeka
 // (decide, czas ilustracji) na pytanie, zanim operator pokaże reakcję.
 const comparisonSlides=new Set(['09-concatmap','10-mergemap','11-switchmap','12-exhaustmap']);
-const comparison={input:[{at:.6,value:'A',dur:3},{at:2.1,value:'B',dur:1.2},{at:5.2,value:'C',dur:1.2}],sourceComplete:5.6,decide:.6};
+const comparison={input:[{at:.6,value:'A',dur:3},{at:2.1,value:'B',dur:1.2},{at:5.2,value:'C',dur:1.2}],sourceComplete:5.6,decide:.6,
+  // switchMap: po anulowaniu A i starcie B finał jest krótszy — C przychodzi zaraz po zakończeniu B (nadal po nim,
+  // więc nic nie trzeba anulować), a przeloty i terminale ogona trwają 0,5 s. Pytanie i odpowiedź jak w pozostałych.
+  switchTail:{C:4.1,sourceComplete:4.5,travel:.5,terminal:.5,edges:['inner1-op','inner2-op','op-observer','source-op']}};
+const comparisonInput=mode=>mode==='switchMap'?comparison.input.map(v=>v.value==='C'?{...v,at:comparison.switchTail.C}:v):comparison.input;
+const comparisonComplete=mode=>mode==='switchMap'?comparison.switchTail.sourceComplete:comparison.sourceComplete;
 
 export function configureFlatten(scene,mode) {
   const all=mode==='concatAll',httpWork=httpWorkSlides.has(scene.id),compare=comparisonSlides.has(scene.id)&&!all;
   const intro=httpWork&&all;
   const concatHttp=scene.id==='09-concatmap'&&mode==='concatMap'&&!compare;
   // Wspólne wejście i potencjalny czas pracy dla czterech strategii.
-  const input=compare?comparison.input.map((v,i)=>({...v,color:['a','b','c'][i]})):
+  const input=compare?comparisonInput(mode).map((v,i)=>({...v,color:['a','b','c'][i]})):
     (intro?[1]:all?[1,1.2,1.4]:[1,1.45,1.9,2.7]).map((at,i)=>({at,value:'ABCD'[i],dur:1.2,color:['a','b','c','a'][i]}));
   let end=0;
   const jobs=input.map((v,i)=>{
@@ -1497,7 +1520,7 @@ export function configureFlatten(scene,mode) {
     return {...v,start,end,cancelled:end<natural};
   });
   const result=[],rows=[R('wejście',input.map(v=>({...E(v.at,v.value,v.color),...(compare&&v.value==='B'?{decide:comparison.decide}:{})})),[],
-    {completeAt:compare?comparison.sourceComplete:3})];
+    {completeAt:compare?comparisonComplete(mode):3})];
   if(all)rows.push(R('map',input.map(v=>E(v.at,v.value+'$',v.color)),[],{completeAt:3}));
   for(const job of jobs) {
     const ev=httpWork?(job.ignored||job.cancelled?[]:[E(job.end,job.value,job.color)]):job.ignored?[]:(mode==='switchMap'?[1.1]:[.65,1.05]).filter(offset=>job.start+offset<job.end).map((offset,i)=>E(job.start+offset,job.value+(mode==='switchMap'?'':i+1),job.color));
@@ -1542,8 +1565,9 @@ export function configureFlatten(scene,mode) {
   }
 }
 
-// Jeden główny tor, dwa kolejne HTTP. Harmonogram rozdziela pojawienie się definicji innera,
-// subscribe, next i complete na ręczne kroki, bez zmiany synchronicznej semantyki map.
+// Proste wprowadzenie: jedna wartość A, jeden inner Observable (A$) i jeden HTTP #1, bez kolejki. Harmonogram
+// rozdziela pojawienie się definicji innera, subscribe, next i complete na ręczne kroki, bez zmiany synchronicznej
+// semantyki map. id$ kończy się dopiero po complete innera, więc complete S1 następuje bez aktywnych innerów.
 function configureConcatAllIntro(scene) {
   const timing={subscribe:.4,travel:.6,transform:.6,request:.8,terminal:.4,reveal:.3,hold:.2};
   const seconds=value=>Math.round(value*1e9)/1e9;
@@ -1556,51 +1580,49 @@ function configureConcatAllIntro(scene) {
     return {emitted,arrived,mapped,created,subscribe,connected,response,innerReceived,received,complete,completed};
   };
   const subscribed=after(.3,3*timing.subscribe),a=sequence(after(subscribed,.3));
-  const b=sequence(after(a.completed,.45)),sourceComplete=after(b.completed,.55);
-  const duration=after(sourceComplete,3*timing.terminal,.35),outerComplete=5.5;
-  const jobs=[{at:1,value:'A',color:'a'},{at:4,value:'B',color:'b'}].map(v=>({...v,start:v.at,end:v.at+timing.request,dur:timing.request}));
+  const sourceComplete=after(a.completed,.55);
+  const duration=after(sourceComplete,3*timing.terminal,.35),outerComplete=2.5;
+  const jobs=[{at:1,value:'A',color:'a'}].map(v=>({...v,start:v.at,end:v.at+timing.request,dur:timing.request}));
   const results=jobs.map(job=>E(job.end,job.value,job.color));
   const rows=[R('wejście',jobs.map(job=>E(job.at,job.value,job.color)),[],{completeAt:outerComplete}),
     R('map',jobs.map(job=>E(job.at,job.value+'$',job.color)),[],{completeAt:outerComplete}),
     ...jobs.map((job,i)=>R(job.value+'$',[results[i]],[B(job.start,job.end,job.value,'work',{duration:job.dur})],{completeAt:job.end})),
     R('wynik',results,[],{completeAt:outerComplete})];
-  const summary='map tworzy Observable. concatAll subskrybuje je po kolei i przekazuje wyniki do S1.';
+  const summary='map tworzy Observable, concatAll go subskrybuje. id$ i inner zakończone — S1 dostaje complete.';
   Object.assign(scene,{rows,jobs,duration,timing,
     graph:concatAllIntroGraph,
-    concatAllIntro:{timing,a,b,sourceComplete,outerComplete},
-    captions:[[0,'map może zwrócić Observable. Prześledźmy dwie wartości i dwa kolejne requesty HTTP.'],[duration,summary]],
+    concatAllIntro:{timing,runs:[a],sourceComplete,outerComplete},
+    captions:[[0,'map może zwrócić Observable. Prześledźmy jedną wartość i jeden request HTTP.'],[duration,summary]],
     playback:{entry:'manual',finish:'hold',stops:[
       {id:'subscribe',event:{type:'connected',edge:'source-projection'},offset:.15,
         caption:'S1 subskrybuje id$ przez concatAll i map. HTTP jeszcze nie działa.'},
       {id:'first',event:{type:'deliver-next',edge:'source-projection',value:'A'},offset:.05,
-        caption:'A dotarło do map. Projekcja zwróci zimne Observable HTTP.'},
+        caption:'id$ emituje A. A dotarło do map — projekcja zwróci zimne Observable HTTP.'},
       {id:'created',event:{type:'inner-create',node:'inner0'},offset:.35,
-        caption:'A$ dotarło do concatAll. HTTP GET i inner #1 są gotowe, ale request jeszcze nie działa.'},
+        caption:'map przekazał A$ do concatAll. To tylko Observable — HTTP jeszcze nie wystartowało.'},
       {id:'active',event:{type:'inner-subscribe',node:'inner0'},
-        caption:'Inner #1 subskrybuje HTTP GET. Rozpoczyna się pierwszy request.'},
+        caption:'concatAll subskrybuje A$. Dopiero teraz rusza HTTP #1.'},
       {id:'received',event:{type:'deliver-next',edge:'op-observer',value:'A'},offset:.35,
-        caption:'HTTP przekazuje A do inner #1, a concatAll do S1. HTTP nie wysłał jeszcze complete.'},
+        caption:'HTTP #1 emituje wynik A, concatAll przekazuje go do S1. HTTP nie wysłał jeszcze complete.'},
       {id:'complete-a',event:{type:'disconnected',edge:'inner0-op'},offset:.15,
-        caption:'HTTP #1 zakończony. Główna subskrypcja nadal czeka na kolejne wartości źródła.'},
-      {id:'complete-b',event:{type:'disconnected',edge:'inner1-op'},offset:.15,
-        caption:'B → B$ → drugi request HTTP → B do S1 → complete inner #2. Oba wyniki są u odbiorcy.'},
+        caption:'HTTP #1 kończy inner przez complete. Główna subskrypcja nadal czeka na id$.'},
       {id:'complete',time:duration,caption:summary},
     ]},timeline:[]});
 }
 
 function concatAllIntroGraph(scene) {
-  const graph=flattenGraph(scene),{timing,a,b,sourceComplete,outerComplete}=scene.concatAllIntro;
+  const graph=flattenGraph(scene),{timing,runs,sourceComplete,outerComplete}=scene.concatAllIntro;
   const end=(at,logicalAt)=>({at,logicalAt,kind:'complete',duration:timing.terminal});
   const next=(at,arrival,logicalAt,value,color)=>({at,arrival,logicalAt,value,color});
   const colors=graph.panels[0].works.map(work=>work.color);
   graph.schedule={
     'source-projection':{start:1.1,connectDuration:timing.subscribe,end:end(sourceComplete,outerComplete),
-      events:[a,b].map((p,i)=>next(p.emitted,p.arrived,scene.jobs[i].at,scene.jobs[i].value,colors[i]))},
+      events:runs.map((p,i)=>next(p.emitted,p.arrived,scene.jobs[i].at,scene.jobs[i].value,colors[i]))},
     'projection-op':{start:.7,connectDuration:timing.subscribe,end:end(sourceComplete+timing.terminal,outerComplete),
-      events:[a,b].map((p,i)=>next(p.mapped,p.created,scene.jobs[i].at,scene.jobs[i].value+'$',colors[i]))},
+      events:runs.map((p,i)=>next(p.mapped,p.created,scene.jobs[i].at,scene.jobs[i].value+'$',colors[i]))},
     'op-observer':{start:.3,connectDuration:timing.subscribe,end:end(sourceComplete+2*timing.terminal,outerComplete),
-      events:[a,b].map((p,i)=>next(p.innerReceived,p.received,scene.jobs[i].end,scene.jobs[i].value,colors[i]))},
-    ...Object.fromEntries([a,b].map((p,i)=>['inner'+i+'-op',{
+      events:runs.map((p,i)=>next(p.innerReceived,p.received,scene.jobs[i].end,scene.jobs[i].value,colors[i]))},
+    ...Object.fromEntries(runs.map((p,i)=>['inner'+i+'-op',{
       start:p.subscribe,connectDuration:timing.subscribe,end:end(p.complete,scene.jobs[i].end),
       events:[next(p.response,p.innerReceived,scene.jobs[i].end,scene.jobs[i].value,colors[i])],
     }])),
@@ -1608,12 +1630,12 @@ function concatAllIntroGraph(scene) {
   const receiver=graph.nodes.find(node=>node.id==='observer');
   Object.assign(receiver,{ready:true,inbox:{...receiver.inbox,ready:true}});
   // schedule używa czasu ilustracji: lokalny stan pracy węzła ma te same granice co jego połączenie.
-  for(const [i,p] of [a,b].entries()) {
+  for(const [i,p] of runs.entries()) {
     const job=scene.jobs[i];
     graph.nodes.find(node=>node.id==='inner'+i).lifecycleRow={...scene.rows[i+2],
       spans:[B(p.connected,p.complete,job.value,'work')],completeAt:p.complete};
   }
-  // Nie ma kolejki: B nadchodzi dopiero po complete A. Utworzone A$ czeka tylko na ilustrację subscribe.
+  // Nie ma kolejki: jedna wartość. Utworzone A$ czeka tylko na ilustrację subscribe.
   for(const work of graph.panels[0].works)delete work.queueObservable;
   return graph;
 }
@@ -1634,7 +1656,7 @@ function configureComparison(scene,mode) {
     captions:[[0,first?'Projekcja zwraca Observable; concatMap decyduje, kiedy go zasubskrybować.':`Ten sam problem, inny operator: S1 już subskrybuje id$ przez ${mode}.`],
       [comparison.input[0].at,'A: projekcja tworzy inner, HTTP A startuje.'],
       [comparison.input[1].at,question],
-      [comparison.input[2].at,{concatMap:'C przychodzi, gdy nic nie czeka: od razu nowy HTTP.',mergeMap:'C uruchamia kolejny HTTP.',
+      [comparisonInput(mode)[2].at,{concatMap:'C przychodzi, gdy nic nie czeka: od razu nowy HTTP.',mergeMap:'C uruchamia kolejny HTTP.',
         switchMap:'C uruchamia nowy HTTP; nic nie trzeba anulować.',exhaustMap:'A skończone: exhaustMap przyjmuje C i uruchamia nowy HTTP.'}[mode]],
       [scene.rows.at(-1).completeAt,'id$ i wszystkie inner zakończone. Wynik: complete.']],
     playback:manual([
@@ -1644,9 +1666,26 @@ function configureComparison(scene,mode) {
         {id:'active',event:ev('inner-subscribe',{node:'inner0'}),offset:.05,caption:'concatMap subskrybuje inner A: HTTP A startuje.'}]:[]),
       {id:'question',event:arrivedB,offset:.35,caption:question},
       answer,
+      // mergeMap: wynik C u S1 to osobny kadr; complete inner C i complete S1 dopiero po kolejnym „dalej”.
+      ...(mode==='mergeMap'?[{id:'c-result',event:ev('deliver-next',{edge:'op-observer',value:'C'}),offset:.35,
+        caption:'Wynik C dotarł do S1. Inner C jeszcze się nie zakończył — complete przyjdzie osobno'}]:[]),
       ...(mode==='switchMap'?[{id:'started',event:ev('inner-subscribe',{node:'inner1'}),offset:.05,caption:'Projekcja B: nowy inner i nowy HTTP. Wynik B trafi do S1'}]:[]),
     ]),
   });
+  // mergeMap: każdy inner najpierw dostarcza wynik do S1, dopiero potem kończy się complete; complete S1 rusza
+  // z przerwą po dotarciu complete ostatniego inner (osobne kadry zamiast jednoczesnego zakończenia).
+  if(mode==='mergeMap')scene.timing={...scene.timing,valueTerminalGap:.5,terminalGap:.4};
+  if(mode==='switchMap'){
+    const tail=comparison.switchTail,base=scene.graph;
+    scene.graph=current=>{
+      const graph=base(current);
+      for(const edge of graph.edges)if(tail.edges.includes(edge.id||edge.from+'-'+edge.to)){
+        edge.terminal=tail.terminal;
+        if(edge.from!=='source')edge.travel=tail.travel;
+      }
+      return graph;
+    };
+  }
   const after={concatMap:'A complete: dopiero teraz projekcja B i HTTP B.',mergeMap:'B wróciło przed A: wyniki w kolejności odpowiedzi.',
     switchMap:'Wynik B trafia do S1. Anulowane A nie wysłało complete.',exhaustMap:'A kończy się normalnie. B nie wraca — exhaustMap nie ma kolejki.'}[mode];
   const selector={concatMap:ev('inner-subscribe',{node:'inner1'}),mergeMap:ev('deliver-next',{edge:'op-observer',value:'B'}),
@@ -1754,7 +1793,8 @@ function catchInsideGraph(scene) {
 // (teardown switchMap i klik$, szary impuls ×, bez complete), dopiero potem subskrybuje of([]): [] i complete trafiają do S1.
 // Klik B pojawia się w odłączonym klik$ i gaśnie: nie dociera do switchMap, nie ma projekcji ani HTTP.
 // Końcowy slajd: szybki klik A i krótki HTTP (1 s) — liczy się to, co dzieje się po błędzie.
-const outsideTimes={subscribe:.3,a:.6,error:1.6,teardown:1.8,fallback:2.3,done:2.6,b:3.4};
+// HTTP A trwa 1,8 s modelu (widoczny postęp i postój request), błąd i teardown mają osobne kadry.
+const outsideTimes={subscribe:.3,a:.6,error:2.4,teardown:2.6,fallback:3.1,done:3.4,b:4.2};
 export function configureCatchOutside(scene) {
   const at=outsideTimes;
   const jobs=[{value:'A',at:at.a,start:at.a,end:at.error,dur:at.error-at.a,errored:true}];
@@ -1767,7 +1807,7 @@ export function configureCatchOutside(scene) {
       {text:'), '},{text:'catchError(() => of([]))',mark:{...op,id:'catch'},active:[during(ev('disconnected','op-catch'),ev('disconnected','catch-observer'))]},{text:')'}]];
   Object.assign(scene,{jobs,operatorName:'switchMap',catchTimes:at,graph:catchOutsideGraph,duration:at.b+2,
     title:'catchError na zewnątrz',playerLayout:'expanded',playerClass:'rx-flat-tiles rx-catch-inside',
-    timing:{subscribe:.9,travel:.6,transform:1.4,terminal:.5,gap:.3},
+    timing:{subscribe:.9,travel:.6,transform:1.4,terminal:.7,gap:.3},
     code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
     rows:[R('klik$',[E(at.a,'A')]),
       R('HTTP A',[],[{start:at.a,end:at.error,label:'HTTP A',kind:'error',color:'http'}]),
@@ -1780,6 +1820,9 @@ export function configureCatchOutside(scene) {
       [at.done,'of([]) kończy się: S1 dostaje complete. Wynikowy strumień zakończony']],
     metrics:[{label:'requesty HTTP',count:'started'},{label:'aktywne',count:'active'}],
     playback:{entry:'manual',finish:'hold',afterLastManualStop:'start-auto',stops:[
+      {id:'request',event:ev('inner-subscribe','inner0-op'),offset:.8,caption:'Klik A: switchMap uruchomił HTTP A. Request trwa'},
+      // Błąd opuścił HTTP A, ale jeszcze nie dotarł do switchMap: pozostałe kafelki bez zmian.
+      {id:'http-error',event:ev('stream-error','inner0-op'),offset:.3,caption:'HTTP A zwraca error 500. Wewnątrz nie ma catchError'},
       {id:'error',event:ev('disconnected','op-catch'),offset:.1,caption:'HTTP A: error przeszedł przez switchMap do zewnętrznego catchError'},
       {id:'caught',event:ev('disconnected','source-op'),offset:.35,caption:'catchError przechwycił błąd i odłączył klik$. Do S1 nie dotarł error'},
       {id:'fallback',event:ev('disconnected','catch-observer'),offset:.35,caption:'catchError subskrybował of([]): S1 dostał [] i complete'},
@@ -1847,8 +1890,11 @@ const searchBurst=(values,at)=>values.map((value,i)=>{
 const searchRetype=['reac','rea','re','r','','a','an','ang','angu','angul','angula','angular'];
 function distinctSearchModel() {
   const t=searchTiming,firstAt=3.3,round=searchRound,burst=searchBurst;
-  const bursts=[burst(['r','re','rea'],firstAt),burst(['re','rea'],11.8),
-    burst(['','a','an','ang'],16.5),burst(['','v','vu','vue'],25.5),burst(['','r','re','rea','reac','react'],34.6)];
+  // react → HTTP #1; szybkie skasowanie i dopisanie t (reac → react w < 300 ms): debounceTime odrzuca reac i emituje
+  // ponownie react, distinctUntilChanged porównuje z ostatnią wyemitowaną wartością (react) i blokuje — bez HTTP.
+  // Potem vue i ang; na końcu znowu react przechodzi (ostatnią wyemitowaną było ang) i kończy się błędem 500.
+  const bursts=[burst(['r','re','rea','reac','react'],firstAt),burst(['reac','react'],12.8),
+    burst(['','v','vu','vue'],17.5),burst(['','a','an','ang'],26.5),burst(['','r','re','rea','reac','react'],35.6)];
   const inputs=bursts.flat();
   const outputs=debounceSearchInputs(inputs).map((v,i,all)=>({...v,at:round(v.at),arrival:round(v.arrival),
     duplicate:i>0&&v.value===all[i-1].value}));
@@ -1886,14 +1932,16 @@ function distinctSearchModel() {
   const seen=(values,time)=>values.filter(v=>v.at<=time+1e-9).length;
   return {code,codeLines,codeFrames:[],rows:[],checkpoints:[],duration,
     graph:distinctSearchGraph,search:{bursts,inputs,outputs,passed,runs,unobserved,successStop,error,resultError,receiverError,teardown,detached,clocks},
-    captions:[[0,'distinctUntilChanged porównuje kolejne wartości po debounceTime.'],
-      [firstAt,'Pierwsze rea przejdzie przez debounceTime i zostanie w pamięci distinctUntilChanged.'],
-      [runs[0].completed,'Pierwsze rea: HTTP #1 dostarczył wynik i complete inner. Główna subskrypcja działa.'],
-      [outputs[1].arrival+.8,'rea === rea — duplikat. Nie powstaje zbędny request.'],
-      [bursts[2][0].at,'ang różni się od rea — distinctUntilChanged przepuszcza nowe zapytanie.'],
-      [bursts[3][0].at,'vue różni się od ang — kolejny HTTP dostarczy wynik i complete inner.'],
-      [runs.at(-2).completed,'Trzy udane HTTP: rea, ang, vue. Dalej uruchomi kolejne zapytanie, które zakończy się błędem.'],
-      [bursts[4][0].at,'Nowe zapytanie react — distinctUntilChanged przepuszcza je do switchMap.'],
+    captions:[[0,'distinctUntilChanged porównuje wartość z ostatnią, którą sam wyemitował.'],
+      [firstAt,'Użytkownik wpisuje react. Po 300 ms ciszy react przejdzie przez debounceTime i distinctUntilChanged.'],
+      [runs[0].completed,'react: HTTP #1 dostarczył wynik i complete inner. distinctUntilChanged pamięta react.'],
+      [bursts[1][0].at,'Szybko: reac, a po chwili znowu react — zanim minie 300 ms. debounceTime odrzuca reac.'],
+      [outputs[1].arrival,'debounceTime ponownie emituje react. distinctUntilChanged porównuje je z ostatnim react.'],
+      [outputs[1].arrival+.8,'react === react — duplikat. Nie powstaje drugi request.'],
+      [bursts[2][0].at,'vue różni się od react — distinctUntilChanged przepuszcza nowe zapytanie.'],
+      [bursts[3][0].at,'ang różni się od vue — kolejny HTTP dostarczy wynik i complete inner.'],
+      [runs.at(-2).completed,'Trzy udane HTTP: react, vue, ang. Dalej uruchomi kolejne zapytanie, które zakończy się błędem.'],
+      [bursts[4][0].at,'Znowu react — ostatnio wyemitowano ang, więc distinctUntilChanged przepuszcza je do switchMap.'],
       [runs.at(-1).connected,'HTTP #4 dla react pracuje. Dalej pokaże błąd tego requestu.'],
       [error,'HTTP #4 dla react: error 500. Nieobsłużony błąd przechodzi przez switchMap.'],
       [receiverError,'Odbiorca dostał error. Cała subskrypcja wyszukiwarki zostaje zamknięta.'],
@@ -1923,7 +1971,7 @@ function distinctSearchGraph(scene) {
       {id:'debounce',label:'debounceTime',color:'op',ready:true,
         laneTimer:{kind:'debounce',period:t.period,timeScale:t.scale,unit:'ms',label:'',empty:'',ball:true}},
       {id:'distinct',label:'distinctUntil Changed',color:'op',ready:true,memory:{ball:true},
-        rejectBalls:true,rejectAt:.24,transformBalls:true},
+        rejectBalls:true,rejectAt:.22,transformBalls:true},
       {id:'op',label:'switchMap',color:'op',ready:true},{id:'observer',label:'',ready:true},
       ...runs.map((run,i)=>({id:'inner'+i,label:'HTTP GET',born:run.born,inner:true,workRow:i+1,panel:'jobs',slot:i%3}))],
     edges:[...inputEdges.map(e=>({id:e.id,from:e.from,to:e.to,events:[],logicalStart:.3,logicalEnd:e.end,
@@ -1943,7 +1991,7 @@ function distinctSearchGraph(scene) {
     timeline:[...s.clocks.map(at=>({type:'search-clock',at})),
       ...[...s.inputs,...s.unobserved].map(v=>({type:'input-change',at:v.at,value:v.value,observed:v.at<s.detached})),
       {type:'http-error',at:s.error,execution:runs.at(-1).id,status:500},
-        {type:'distinct-reject',at:s.outputs[1].arrival+.8,node:'distinct',value:'rea'}],
+        {type:'distinct-reject',at:s.outputs[1].arrival+.8,node:'distinct',value:s.outputs[1].value}],
     activities:[...s.inputs.map(v=>({node:'source',at:v.at,until:v.arrival})),
       ...s.outputs.map((v,i)=>({node:'debounce',at:s.bursts[i][0].arrival,until:v.arrival})),
       ...s.outputs.map(v=>({node:'distinct',at:v.arrival,until:v.duplicate?v.arrival+.8:s.passed.find(p=>p.logicalAt===v.logicalAt).arrival})),
@@ -1952,6 +2000,10 @@ function distinctSearchGraph(scene) {
   };
   searchPipelineLook(graph,scene,frame,runs,[...s.inputs,...s.unobserved],
     {stages:i=>[{column:'source',edge:'inner'+i+'-op',progress:true,errorLabel:'error 500'}]});
+  // Pamięć distinct mieści najdłuższą wartość, która do niej trafia (react); angular jest tu tylko w inpucie po błędzie.
+  // Dzięki temu odrzucana kulka react przy wejściu nie nachodzi na kulkę pamięci react.
+  const d=graph.nodes.find(n=>n.id==='distinct');
+  d.memory.x=d.x+d.w/2-Math.max(...s.outputs.map(v=>ballWidthOf(v.value,graph.ball)))/2-14;
   graph.callouts=[{text:'duplikat',label:'',subscriber:'S1',x:620,y:frame.height===612?187:140,size:18,
       from:{type:'distinct-reject'},to:{type:'distinct-reject',offset:.35}}];
   return graph;
@@ -1996,6 +2048,7 @@ export function configureCatchSearch(scene) {
     title:'catchError — wyszukiwarka działa dalej',
     playerLayout:'expanded',playerClass:'rx-flat-tiles rx-switchmap-live rx-distinct-search rx-catch-search',ink:'#26323B',
     playback:{entry:'manual',finish:'hold',controller:'stages',resetOnExit:true,stops:[
+      {id:'request',time:stops.request,autoPause:true},
       {id:'error',time:stops.error,autoPause:true},
       {id:'fallback',time:stops.fallback,autoPause:true},
       {id:'success',time:stops.success,autoPause:true},
@@ -2013,9 +2066,11 @@ function catchSearchModel() {
       response,duration:t.request,errored};
   };
   const first=run(0,searchBurst(['r','re','rea','reac','react'],firstAt),true);
-  // Błąd dociera do catchError po terminalu; of([]) pojawia się w catchError, potem [] i complete zastępczego strumienia.
-  first.caught=round(first.response+t.terminal);
-  first.next=round(first.caught+.7);first.nextArrival=round(first.next+t.travel);
+  // Błąd dociera do catchError po wolniejszym impulsie (errorTerminal, czytelna propagacja); postój error, potem
+  // dłuższa pauza i dopiero of([]) w catchError, [] i complete zastępczego strumienia.
+  first.errorTerminal=.8;
+  first.caught=round(first.response+first.errorTerminal);
+  first.next=round(first.caught+1);first.nextArrival=round(first.next+t.travel);
   first.complete=round(first.nextArrival+t.terminalGap);first.completed=round(first.complete+t.terminal);
   const fallbackStop=round(first.completed+.35);
   const second=run(1,searchBurst(searchRetype,round(fallbackStop+.4)),false);
@@ -2027,7 +2082,8 @@ function catchSearchModel() {
   for(const r of runs){r.result=r.errored?'[]':searchResultValue(r);r.delivered=round(r.nextArrival+.15);r.received=round(r.delivered+t.travel);}
   const duration=round(second.completed+.5);
   const inputs=runs.flatMap(r=>r.input),outputs=runs.map(r=>r.output),passed=runs.map(r=>r.passed);
-  const stops={error:first.caught,fallback:fallbackStop,success:duration};
+  // request: HTTP #1 dla react trwa (catchError subskrybowany, odpowiedź jeszcze nie przyszła).
+  const stops={request:round(first.connected+.8),error:first.caught,fallback:fallbackStop,success:duration};
   const source={id:'query',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},http={...source,id:'http'};
   const op={id:'switch',bg:'rgba(216,179,230,.45)',line:'#b384c6'},debounce={...op,id:'debounce'};
   const clock=at=>({type:'search-clock',logicalAt:at}),during=(from,to)=>({from:clock(from),to:clock(to)});
@@ -2101,7 +2157,7 @@ function catchSearchGraph(scene) {
         [`catch${i}-op`,{start:r.born,connectDuration:t.connect,events:[value(r,r.next,r.nextArrival)],end:end(r.complete,'complete')}],
         [`inner${i}-catch${i}`,{start:r.catchConnected,connectDuration:t.connect,
           events:r.errored?[]:[value(r,r.response,r.httpArrival)],
-          end:r.errored?end(r.response,'error'):end(r.httpComplete,'complete')}]])),
+          end:r.errored?{...end(r.response,'error'),duration:r.errorTerminal}:end(r.httpComplete,'complete')}]])),
     },
     timeline:[...s.clocks.map(at=>({type:'search-clock',at})),
       ...s.inputs.map(v=>({type:'input-change',at:v.at,value:v.value,observed:true})),
@@ -2728,27 +2784,46 @@ function queryInputReadout(graph,scene,value) {
 
 // Drugi etap wyszukiwarki. Litery co 100 ms i debounce 300 ms; ilustracja 5× wolniejsza.
 // Po drugiej wartości debounce pokaz działa bez końca; przeloty ilustrują komunikację.
-const searchTiming={first:2.3,key:.1,scale:5,period:.3,travel:.4,connect:.5,request:2,terminalGap:.7,terminal:.4,nextTyping:1};
-// Serie jak na switchMap: r → re → rea, powrót re → rea (ta sama fraza drugi raz uruchamia HTTP), kasowanie re → r,
-// zamiana na a → an → ang i kasowanie an → a. Cykl powtarza się od r.
-const searchBursts=[['r','re','rea'],['re','rea'],['re','r'],['a','an','ang'],['an','a']];
+const searchTiming={first:2.3,key:.1,scale:5,period:.3,travel:.4,connect:.5,request:2,terminalGap:.7,terminal:.4,nextTyping:1,cancel:.4};
+// Serie: r → re → rea uruchamia długi HTTP (5 s); w trakcie użytkownik dopisuje c i t (react). HTTP rea nadal trwa,
+// dopóki debounceTime czeka na 300 ms ciszy — dopiero emisja react sprawia, że switchMap odsubskrybowuje HTTP rea
+// i uruchamia HTTP react. Dalej: kasowanie reac → rea, re → r, zamiana na a → an → ang i kasowanie an → a.
+// Cykl powtarza się od r (także z anulowaniem rea przez react).
+const searchBursts=[{values:['r','re','rea'],request:5},{values:['reac','react']},{values:['reac','rea']},
+  {values:['re','r']},{values:['a','an','ang']},{values:['an','a']}];
 const searchRepeatBursts=searchBursts;
 // Stała kolejność kolorów fraz, wspólna z pokazem distinctUntilChanged.
 const searchValues=['r','re','rea','reac','react','','a','an','ang','angu','angul','angula','angular'];
 const queryColor=value=>colors[Math.max(0,searchValues.indexOf(value))%colors.length];
-const searchStep=values=>(values.length-1)*searchTiming.key*searchTiming.scale+2*searchTiming.travel+
-  searchTiming.period*searchTiming.scale+searchTiming.connect+searchTiming.nextTyping;
-const searchOffsets=bursts=>bursts.reduce((times,values)=>[...times,times.at(-1)+searchStep(values)],[0]);
-const searchInitialOffsets=searchOffsets(searchBursts),searchRepeatOffsets=searchOffsets(searchRepeatBursts);
+// Od zestawienia HTTP poprzedniej serii do dotarcia wyjścia debounce tej serii do switchMap.
+const searchOutputAfter=values=>searchTiming.nextTyping+(values.length-1)*searchTiming.key*searchTiming.scale+
+  2*searchTiming.travel+searchTiming.period*searchTiming.scale;
+// Seria anuluje poprzedni HTTP, gdy jej wyjście z debounce dociera do switchMap przed odpowiedzią poprzedniego.
+const searchCancels=bursts=>bursts.map((burst,i)=>{
+  const previous=bursts[(i+bursts.length-1)%bursts.length];
+  return searchOutputAfter(burst.values)<(previous.request??searchTiming.request)-1e-9;
+});
+const searchBurstCancels=searchCancels(searchBursts),searchRepeatCancels=searchCancels(searchRepeatBursts);
+// Przy anulowaniu nowy inner rodzi się po unsubscribe poprzedniego (cancel).
+const searchStep=(burst,cancels)=>(burst.values.length-1)*searchTiming.key*searchTiming.scale+2*searchTiming.travel+
+  searchTiming.period*searchTiming.scale+(cancels?searchTiming.cancel:0)+searchTiming.connect+searchTiming.nextTyping;
+const searchOffsets=(bursts,cancels)=>bursts.reduce((times,burst,i)=>[...times,times.at(-1)+searchStep(burst,cancels[i])],[0]);
+const searchInitialOffsets=searchOffsets(searchBursts,searchBurstCancels),searchRepeatOffsets=searchOffsets(searchRepeatBursts,searchRepeatCancels);
 const searchRepeatAt=searchTiming.first+searchInitialOffsets.at(-1),searchRepeatDuration=searchRepeatOffsets.at(-1);
-const searchInitialInputs=searchBursts.reduce((counts,values)=>[...counts,counts.at(-1)+values.length],[0]);
-const searchRepeatInputs=searchRepeatBursts.reduce((counts,values)=>[...counts,counts.at(-1)+values.length],[0]);
+const searchInitialInputs=searchBursts.reduce((counts,burst)=>[...counts,counts.at(-1)+burst.values.length],[0]);
+const searchRepeatInputs=searchRepeatBursts.reduce((counts,burst)=>[...counts,counts.at(-1)+burst.values.length],[0]);
 
 // Numer i czas serii są analityczne, niezależne od długości pokazu i bieżącego okna kompilacji.
 function searchSeriesAt(index) {
-  if(index<searchBursts.length)return {values:searchBursts[index],first:searchTiming.first+searchInitialOffsets[index],before:searchInitialInputs[index]};
+  if(index<searchBursts.length){
+    const burst=searchBursts[index];
+    return {values:burst.values,request:burst.request??searchTiming.request,cancels:index>0&&searchBurstCancels[index],
+      first:searchTiming.first+searchInitialOffsets[index],before:searchInitialInputs[index]};
+  }
   const cycle=Math.floor((index-searchBursts.length)/searchRepeatBursts.length),slot=(index-searchBursts.length)%searchRepeatBursts.length;
-  return {values:searchRepeatBursts[slot],first:searchRepeatAt+cycle*searchRepeatDuration+searchRepeatOffsets[slot],
+  const burst=searchRepeatBursts[slot];
+  return {values:burst.values,request:burst.request??searchTiming.request,cancels:searchRepeatCancels[slot],
+    first:searchRepeatAt+cycle*searchRepeatDuration+searchRepeatOffsets[slot],
     before:searchInitialInputs.at(-1)+cycle*searchRepeatInputs.at(-1)+searchRepeatInputs[slot]};
 }
 function searchIndexAt(time) {
@@ -2764,16 +2839,27 @@ function debounceSearchInputs(input) {
     .map(v=>({...v,logicalAt:v.logicalAt+searchTiming.period,at:v.arrival+searchTiming.period*searchTiming.scale,
       arrival:v.arrival+searchTiming.period*searchTiming.scale+searchTiming.travel}));
 }
-function debounceSearchRunAt(index) {
-  const {values,first}=searchSeriesAt(index);
-  const input=values.map((value,i)=>{
-    const at=first+i*searchTiming.key*searchTiming.scale;
+function debounceSearchSeries(index) {
+  const series=searchSeriesAt(index);
+  const input=series.values.map((value,i)=>{
+    const at=series.first+i*searchTiming.key*searchTiming.scale;
     return {value,color:queryColor(value),at,logicalAt:at/searchTiming.scale,arrival:at+searchTiming.travel};
   });
-  const output=debounceSearchInputs(input)[0],born=output.arrival,connected=born+searchTiming.connect;
-  const response=connected+searchTiming.request,complete=response+searchTiming.terminalGap;
-  return {index,id:'#'+(index+1),value:output.value,color:output.color,input,output,born,connected,duration:searchTiming.request,
-    response,complete,end:complete,completed:complete+searchTiming.terminal,received:response+searchTiming.travel+.15+searchTiming.travel};
+  return {series,input,output:debounceSearchInputs(input)[0]};
+}
+function debounceSearchRunAt(index) {
+  const {series,input,output}=debounceSearchSeries(index),t=searchTiming;
+  // Przy anulowaniu switchMap najpierw odsubskrybowuje poprzedni HTTP (cancel), dopiero potem tworzy nowy inner.
+  const born=output.arrival+(series.cancels?t.cancel:0),connected=born+t.connect;
+  const next=debounceSearchSeries(index+1);
+  const base={index,id:'#'+(index+1),value:output.value,color:output.color,input,output,arrived:output.arrival,born,connected,duration:series.request};
+  // Następna wartość dotarła do switchMap przed odpowiedzią: unsubscribe (bez wyniku i complete).
+  if(next.series.cancels){
+    const end=next.output.arrival;
+    return {...base,cancelled:true,end,completed:end+t.cancel};
+  }
+  const response=connected+series.request,complete=response+t.terminalGap;
+  return {...base,response,complete,end:complete,completed:complete+t.terminal,received:response+t.travel+.15+t.travel};
 }
 const searchStartedAt=time=>{
   const index=searchIndexAt(time);
@@ -2781,8 +2867,8 @@ const searchStartedAt=time=>{
 };
 
 export function configureDebounceSwitch(scene) {
-  const first=debounceSearchRunAt(0),second=debounceSearchRunAt(1);
-  const start=second.connected+.1;
+  const first=debounceSearchRunAt(0),second=debounceSearchRunAt(1),third=debounceSearchRunAt(2);
+  const start=third.connected+.1;
   Object.assign(scene,{
     title:'debounceTime — czekamy na ciszę',
     code:'query$.pipe(\n  debounceTime(300),\n  switchMap(query => httpGet(url(query))))',
@@ -2793,9 +2879,12 @@ export function configureDebounceSwitch(scene) {
         {id:'subscribed',time:1.95},
         {id:'buffered',time:first.input.at(-1).arrival+.3},
         {id:'request-1',time:first.connected+.1},
-        {id:'typing',time:second.input.at(-1).arrival+.05},
-        {id:'complete-1',time:first.completed+.15},
-        {id:'request-2',time:start},
+        // react wpisane i w pamięci debounce; timer czeka na 300 ms ciszy, HTTP #1 (rea) nadal trwa.
+        {id:'typing',time:second.input.at(-1).arrival+.5},
+        // debounceTime wyemitował react: switchMap odsubskrybował HTTP #1 (× bez complete) i zestawił HTTP #2.
+        {id:'switched',time:second.connected+.1},
+        {id:'complete-2',time:second.completed+.15},
+        {id:'request-3',time:start},
       ]},
     live:{start,window:32,keep:24,margin:3,autoplay:false,variant:debounceSwitchVariant},
   });
@@ -2810,11 +2899,11 @@ export function debounceSwitchVariant(scene,{from=0,to=32}) {
   const op={id:'switch',bg:'rgba(216,179,230,.45)',line:'#b384c6'},debounce={...op,id:'debounce'};
   const during=(from,to)=>({from:{at:from},to:{at:to}});
   return {...scene,duration:to,debounceSearchRuns:runs,
-    captions:[[0,'debounceTime przepuszcza wartość dopiero po chwili ciszy. Ta sama fraza może uruchomić request ponownie.']],
+    captions:[[0,'debounceTime przepuszcza wartość dopiero po chwili ciszy. Samo naciśnięcie klawisza nie przerywa requestu.']],
     codeLines:[[{text:'query$',mark:source,active:inputs.map(v=>during(v.at,v.arrival))},{text:'.pipe('}],
       [{text:'  '},{text:'debounceTime(300)',mark:debounce,active:runs.map(run=>during(run.input[0].arrival,run.output.arrival))},{text:','}],
       [{text:'  '},{text:'switchMap',mark:op,active:runs.flatMap(run=>[during(run.output.arrival,run.connected),
-        during(run.response+searchTiming.travel,run.received)])},
+        ...(run.cancelled?[]:[during(run.response+searchTiming.travel,run.received)])])},
         {text:'(query => '},{text:'httpGet(url(query))',mark:http,active:runs.map(run=>during(run.connected,run.end))},{text:'))'}]],
     metrics:[{label:'wejścia',value:time=>{
       const index=searchIndexAt(time),series=searchSeriesAt(index);
@@ -2838,20 +2927,21 @@ function debounceSwitchGraph(scene) {
       {id:'debounce-op',from:'debounce',to:'op',events:[],logicalStart:.3,logicalEnd:null},
       {id:'op-observer',from:'op',to:'observer',events:[],logicalStart:.3,logicalEnd:null},
       ...runs.map((run,i)=>({id:'inner-'+run.index,from:'inner'+i,to:'op',events:[],internal:true,gateWork:true,fixedStart:true,
-        logicalStart:run.born,logicalEnd:{at:run.end,kind:'complete'}}))],
+        logicalStart:run.born,logicalEnd:{at:run.end,kind:run.cancelled?'unsubscribe':'complete'}}))],
     executions:runs.map((run,i)=>({id:run.id,node:'inner'+i,edge:'inner-'+run.index,panel:'jobs',value:run.value,duration:run.duration})),
     trays:[],schedule:{
-      'op-observer':{start:.3,connectDuration:.5,events:runs.map(run=>({at:run.response+searchTiming.travel+.15,arrival:run.received,
+      'op-observer':{start:.3,connectDuration:.5,events:runs.filter(run=>!run.cancelled).map(run=>({at:run.response+searchTiming.travel+.15,arrival:run.received,
         logicalAt:run.response/searchTiming.scale,value:searchResultValue(run),color:run.color,execution:run.id}))},
       'debounce-op':{start:.8,connectDuration:.5,events:outputs},
       'source-debounce':{start:1.3,connectDuration:.5,events:inputs},
       ...Object.fromEntries(runs.map(run=>['inner-'+run.index,{start:run.born,connectDuration:searchTiming.connect,
-        events:[{at:run.response,arrival:run.response+searchTiming.travel,logicalAt:run.response/searchTiming.scale,value:searchResultValue(run),color:run.color}],
-        end:{at:run.end,logicalAt:run.end,kind:'complete',duration:searchTiming.terminal}}])),
+        // Anulowany HTTP: bez wyniku i complete — switchMap odsubskrybowuje go, gdy nowa fraza wyjdzie z debounceTime.
+        events:run.cancelled?[]:[{at:run.response,arrival:run.response+searchTiming.travel,logicalAt:run.response/searchTiming.scale,value:searchResultValue(run),color:run.color}],
+        end:{at:run.end,logicalAt:run.end,kind:run.cancelled?'unsubscribe':'complete',duration:run.cancelled?searchTiming.cancel:searchTiming.terminal}}])),
     },
     activities:[...inputs.map(v=>({node:'source',at:v.at,until:v.arrival})),
       ...runs.flatMap(run=>[{node:'debounce',at:run.input[0].arrival,until:run.output.arrival},
-        {node:'op',at:run.output.arrival,until:run.connected},{node:'op',at:run.response+searchTiming.travel,until:run.received}])],
+        {node:'op',at:run.output.arrival,until:run.connected},...(run.cancelled?[]:[{node:'op',at:run.response+searchTiming.travel,until:run.received}])])],
   };
   configureHttpWorkPanel(graph,{...scene,rows:[{events:[]}],operatorName:'switchMap',jobs:runs.map(run=>({...run,dur:run.duration}))},frame,
     {tiles:[['source',175,310,'#8FC9D4'],['debounce',525,326,'#D8B3E6'],['op',837.5,235,'#D8B3E6']],

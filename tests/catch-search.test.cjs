@@ -17,7 +17,7 @@ const rows=f=>f.innerWorkPanels[0].rows;
 const code=f=>f.codeView.map(line=>line.filter(p=>p.opacity>0).map(p=>p.text).join('')).join('\n');
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-7,`${a} ≈ ${b}`);
 const at=(c,type,edge,value)=>c.events.find(e=>e.type===type&&e.edge===edge&&(value===undefined||e.value===value)).at;
-const stopIds=['error','fallback','success'];
+const stopIds=['request','error','fallback','success'];
 const mainEdges=['source-debounce','debounce-distinct','distinct-op','op-observer'];
 const exactCode='query$.pipe(\n  debounceTime(300),\n  distinctUntilChanged(),\n  switchMap(query =>\n'+
  '    httpGet(url(query)).pipe(\n      catchError(() => of([]))\n    )\n  )\n)';
@@ -111,7 +111,7 @@ test('second search: erase react, type angular, HTTP #2 succeeds through catchEr
  assert.doesNotMatch(svg,/! error|NaN|Infinity/);
 });
 
-test('MANUAL and AUTO stop at error, fallback and success; long pauses frozen, fast next finishes only the stage',async()=>{
+test('MANUAL and AUTO stop at request, error, fallback and success; long pauses frozen, fast next finishes only the stage',async()=>{
  for(const mode of ['manual','auto']) {
   const {scene}=await fixture(),h=await playbackHarness(),navigation=[];
   const {player,controller}=h.create({scene,controls:{stageOptions:{onNavigate:d=>navigation.push(d)}}});
@@ -125,7 +125,7 @@ test('MANUAL and AUTO stop at error, fallback and success; long pauses frozen, f
    if(id!=='success')controller.next();
   }
   controller.next();assert.deepEqual(navigation,[1]);
-  controller.previous();near(player.time,player.stops[1].time);
+  controller.previous();near(player.time,player.stops.at(-2).time);
   controller.reset();assert.equal(player.time,0);assert.equal(player.isPlaying,false);assert.equal(h.frames.size,0);
   assert.equal(player.snapshot.readouts[0].value,'');
   for(const s of player.stops){controller.next();controller.next();near(player.time,s.time);assert.equal(player.isPlaying,false);}
@@ -201,4 +201,17 @@ test('placed directly after distinctUntilChanged in MAIN',async()=>{
  const {m}=await fixture(),order=m['scene-config'].mainOrder;
  assert.equal(order[order.indexOf('11a-distinct-switchmap')+1],id);
  assert.match(fs.readFileSync('index.html','utf8'),/<section id="11b-catcherror-search"[^>]*data-animation="11b-catcherror-search"/);
+});
+
+test('request stop: HTTP #1 for react is running before the error; error stop comes before of([]) with a visible pause',async()=>{
+ for(const format of ['4:3','16:9']){
+  const {c}=await fixture(format),f=frame(c,'request'),r=rows(f)[0];
+  assert.equal(r.value,'react');assert.equal(r.stages[0].state,'active');
+  assert.ok(r.stages[0].progress>.1&&r.stages[0].progress<.9,'request trwa');
+  assert.deepEqual(metrics(f),[5,1,1,0,1,'aktywna']);
+  assert.ok(mainEdges.every(id=>f.edges.find(e=>e.id===id).phase==='subscribed'));
+  const e=frame(c,'error');assert.equal(rows(e)[0].stages[0].state,'errored');assert.equal(rows(e)[0].stages[1].state,'active');
+  assert.ok(at(c,'inner-next','catch0-op')-stop(c,'error')>=.9,'pauza przed of([])');
+  assert.ok(mainEdges.every(id=>e.edges.find(x=>x.id===id).phase==='subscribed'),'switchMap nadal podłączony');
+ }
 });

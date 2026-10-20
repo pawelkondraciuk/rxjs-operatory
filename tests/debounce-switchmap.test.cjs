@@ -15,7 +15,7 @@ const timer=f=>lane(f,'debounce')?.timer;
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-7,`${a} ≈ ${b}`);
 
 test('subscription travels left; input resets 300 ms; only silence creates HTTP',async()=>{
-  const {scene,c}=await fixture(),runs=scene.debounceSearchRuns.slice(0,5),initial=c.snapshot(0);
+  const {scene,c}=await fixture(),runs=scene.debounceSearchRuns.slice(0,6),initial=c.snapshot(0);
   assert.deepEqual(metrics(initial),[0,0,0]);assert.equal(initial.readouts[0].value,'');assert.equal(rows(initial).length,0);
   const subscribed=c.events.filter(e=>e.type==='subscribe'&&!e.edge.startsWith('inner'));
   assert.deepEqual(Array.from(subscribed,e=>e.edge),['op-observer','debounce-op','source-debounce']);
@@ -38,16 +38,40 @@ test('subscription travels left; input resets 300 ms; only silence creates HTTP'
     assert.equal(timer(c.snapshot(run.output.at+.001)).active,false);assert.equal(timer(c.snapshot(run.output.at+.001)).text,'');
     assert.equal(c.events.filter(e=>e.type==='inner-create'&&e.at<run.output.arrival).length,run.index);
   }
-  assert.equal(emitted,12);
-  assert.deepEqual(Array.from(runs,r=>Array.from(r.input,v=>v.value)),[['r','re','rea'],['re','rea'],['re','r'],['a','an','ang'],['an','a']]);
-  assert.deepEqual(Array.from(c.events.filter(e=>e.type==='source-next'&&e.edge==='debounce-op').slice(0,5),e=>e.value),['rea','rea','r','ang','a']);
-  // Powrót re → rea po wyniku dla rea: debounceTime nie pamięta poprzedniej frazy, więc HTTP #2 dotyczy tej samej rea.
-  assert.equal(runs[1].value,runs[0].value);assert.ok(c.events.some(e=>e.type==='inner-subscribe'&&e.edge==='inner-1'));
+  assert.equal(emitted,14);
+  assert.deepEqual(Array.from(runs,r=>Array.from(r.input,v=>v.value)),[['r','re','rea'],['reac','react'],['reac','rea'],['re','r'],['a','an','ang'],['an','a']]);
+  assert.deepEqual(Array.from(c.events.filter(e=>e.type==='source-next'&&e.edge==='debounce-op').slice(0,6),e=>e.value),['rea','react','rea','r','ang','a']);
+  assert.ok(c.events.some(e=>e.type==='inner-subscribe'&&e.edge==='inner-1'));
 });
 
-test('every HTTP succeeds and completes while the main subscription keeps running; typing overlaps work',async()=>{
+test('typing during HTTP #1 does not cancel it; only the debounced react makes switchMap unsubscribe it and start HTTP #2',async()=>{
+  const {scene,c}=await fixture(),[first,second]=scene.debounceSearchRuns,stop=id=>c.stops.find(s=>s.id===id).time;
+  assert.equal(first.value,'rea');assert.equal(second.value,'react');assert.equal(first.cancelled,true);
+  // Postój typing: react wpisane i w pamięci debounce, timer odlicza, HTTP #1 nadal trwa.
+  const typing=c.snapshot(stop('typing'));
+  assert.equal(typing.readouts[0].value,'react');assert.equal(timer(typing).active,true);assert.equal(lane(typing,'debounce').memory.value,'react');
+  assert.deepEqual(Array.from(rows(typing),r=>[r.id,r.value,r.state]),[['#1','rea','active']]);
+  assert.ok(rows(typing)[0].stages[0].progress>.2&&rows(typing)[0].stages[0].progress<.8);
+  assert.deepEqual(metrics(typing),[5,1,1]);
+  // Każdy klawisz przed emisją z debounceTime: HTTP #1 nadal aktywny.
+  for(const v of second.input)assert.equal(rows(c.snapshot(v.arrival+.01))[0].state,'active',v.value);
+  const unsubscribe=c.events.find(e=>e.type==='inner-unsubscribe'&&e.edge==='inner-0');
+  const arrived=c.events.find(e=>e.type==='deliver-next'&&e.edge==='debounce-op'&&e.value==='react');
+  near(unsubscribe.at,arrived.at);
+  assert.ok(c.events.find(e=>e.type==='inner-create'&&e.node==='inner1').at>=unsubscribe.at+.4-1e-9,'nowy inner po unsubscribe');
+  assert.equal(c.events.some(e=>['inner-next','stream-complete'].includes(e.type)&&e.edge==='inner-0'),false,'anulowany HTTP bez wyniku i complete');
+  const switched=c.snapshot(stop('switched'));
+  assert.deepEqual(Array.from(rows(switched),r=>[r.id,r.value,r.state]),[['#1','rea','cancelled'],['#2','react','active']]);
+  assert.equal(rows(switched)[0].receiver.state,'cancelled');assert.ok(rows(switched)[0].stages[0].progress<1);
+  assert.deepEqual(metrics(switched),[5,2,1]);
+  const done=c.snapshot(stop('complete-2'));
+  assert.equal(rows(done)[1].state,'completed');assert.equal(done.histories.find(h=>h.anchor==='observer').values.at(-1).value,'[#2]');
+  assert.equal(lane(done,'observer').state,'running');
+});
+
+test('successful HTTP requests complete while the main subscription keeps running; typing overlaps work',async()=>{
   const {scene,c}=await fixture(),runs=scene.debounceSearchRuns;
-  for(let i=0;i<5;i++) {
+  for(let i=1;i<6;i++) {
     const run=runs[i],next=runs[i+1];near(next.input[0].at,run.connected+1);
     const f=c.snapshot(next.input[0].arrival+.001);
     assert.equal(f.executionCounts.active,1);assert.equal(f.executions.find(e=>e.id===run.id).state,'running');
@@ -61,13 +85,18 @@ test('every HTTP succeeds and completes while the main subscription keeps runnin
     const pulse=rows(c.snapshot(run.complete+.1)).find(r=>r.id===run.id).wires[0].pulse;
     assert.equal(pulse.color,'#26804E');
   }
-  assert.equal(c.events.some(e=>['stream-error','inner-unsubscribe','http-error','input-unobserved'].includes(e.type)),false);
+  assert.equal(c.events.some(e=>['stream-error','http-error','input-unobserved'].includes(e.type)),false);
   assert.equal(c.events.some(e=>e.type==='stream-complete'&&!e.edge.startsWith('inner-')),false);
-  assert.ok([...c.plan.records.values()].filter(r=>r.gateWork).every(r=>r.end.kind==='complete'));
+  // Jedyne unsubscribe innera to anulowanie długiego rea przez react (w każdym cyklu).
+  for(const r of [...c.plan.records.values()].filter(r=>r.gateWork)){
+    const run=runs.find(x=>'inner-'+x.index===r.id);
+    assert.equal(r.end.kind,run.cancelled?'unsubscribe':'complete',r.id);
+    if(run.cancelled)assert.equal(run.value,'rea');
+  }
   const still=c.snapshot(scene.playback.stillTime);
-  assert.deepEqual(metrics(still),[10,3,0]);assert.equal(still.readouts[0].value,'ang');
-  assert.deepEqual(Array.from(rows(still),r=>[r.id,r.value,r.state]),[['#1','rea','completed'],['#2','rea','completed'],['#3','r','completed']]);
-  assert.equal(timer(still).active,true);assert.equal(lane(still,'debounce').memory.value,'ang');
+  assert.deepEqual(metrics(still),[9,3,0]);assert.equal(still.readouts[0].value,'r');
+  assert.deepEqual(Array.from(rows(still),r=>[r.id,r.value,r.state]),[['#1','rea','cancelled'],['#2','react','completed'],['#3','rea','completed']]);
+  assert.equal(timer(still).active,true);assert.equal(lane(still,'debounce').memory.value,'r');
   assert.equal(still.histories.find(h=>h.anchor==='observer').values.at(-1).value,'[#3]');
 });
 
@@ -110,18 +139,19 @@ test('bounded live windows keep global query, HTTP IDs, metrics and history thro
   const old=variant(scene,{from:1396,to:1428}),c=compile(old),f=c.snapshot(1400);
   assert.ok(old.debounceSearchRuns.length<16);assert.ok(c.events.length<350);
   assert.ok(metrics(f)[0]>700);assert.ok(metrics(f)[1]>250);assert.ok(rows(f).every(r=>Number(r.id.slice(1))>250));
-  assert.equal(c.events.some(e=>['stream-error','inner-unsubscribe'].includes(e.type)),false);
-  for(const run of old.debounceSearchRuns.filter(r=>r.connected<=1400)) {
+  assert.equal(c.events.some(e=>e.type==='stream-error'),false);
+  for(const e of c.events.filter(e=>e.type==='inner-unsubscribe'))assert.equal(old.debounceSearchRuns.find(r=>'inner-'+r.index===e.edge).value,'rea');
+  for(const run of old.debounceSearchRuns.filter(r=>r.connected<=1400&&!r.cancelled)) {
     assert.equal(c.events.find(e=>e.type==='inner-next'&&e.execution===run.id).value,'['+run.id+']');
   }
 });
 
-test('manual stages end at the second emission; live runs without stopping and right immediately navigates',async()=>{
+test('manual stages end at the third emission; live runs without stopping and right immediately navigates',async()=>{
   const {scene,c,m}=await fixture(),h=await playbackHarness(),{deck,stage}=revealMock();stage.markers=[];
   const {player,controller}=h.create({scene,controls:{stageOptions:{onNavigate:d=>deck.navigation.push(d)}}});
   assert.equal(player.live.autoplay,false);assert.equal(player.isPlaying,false);assert.equal(controller.mode,'manual');
   const binding=h.install(deck,{getController:()=>controller});binding.refresh();
-  assert.deepEqual(Array.from(c.stops,s=>s.id),['subscribed','buffered','request-1','typing','complete-1','request-2']);
+  assert.deepEqual(Array.from(c.stops,s=>s.id),['subscribed','buffered','request-1','typing','switched','complete-2','request-3']);
   near(c.stops.at(-1).time,scene.live.start);
   for(const stop of c.stops.slice(0,-1)) {
     deck.press(39);h.advance(100);assert.equal(player.isPlaying,true);
@@ -142,7 +172,7 @@ test('manual stages end at the second emission; live runs without stopping and r
   assert.equal(player.time,0);assert.equal(player.isPlaying,false);assert.deepEqual(metrics(player.snapshot),[0,0,0]);
   controller.next();h.advance(100);controller.reset();assert.equal(player.time,0);assert.equal(h.frames.size,0);
   m['checkpoint-notes'].showNotesPreviewFrame(stage,player);near(player.time,scene.playback.stillTime);
-  assert.equal(h.frames.size,0);assert.deepEqual(metrics(player.snapshot),[10,3,0]);
+  assert.equal(h.frames.size,0);assert.deepEqual(metrics(player.snapshot),[9,3,0]);
   deck.press(39);assert.deepEqual(deck.navigation,[1,1,1]);binding.destroy();
 });
 
@@ -151,14 +181,14 @@ test('AUTO passes through the intro and keeps running; still preview and reset r
   controller.setMode('auto');h.advance(45000);assert.ok(player.time>44);assert.equal(player.isPlaying,true);
   const n=metrics(player.snapshot)[1];h.advance(6000);assert.ok(metrics(player.snapshot)[1]>n);
   assert.equal(h.frames.size,1);controller.finish();near(player.time,scene.playback.stillTime);assert.equal(h.frames.size,0);
-  assert.deepEqual(metrics(player.snapshot),[10,3,0]);controller.reset();assert.equal(player.time,0);assert.equal(h.frames.size,0);
+  assert.deepEqual(metrics(player.snapshot),[9,3,0]);controller.reset();assert.equal(player.time,0);assert.equal(h.frames.size,0);
 });
 
 test('three code lines retain syntax and simultaneous highlights; notes describe only the intro and live',async()=>{
   const {scene,c}=await fixture(),h=await playbackHarness(),{player,elements}=h.create({scene});
   assert.equal(scene.code.split('\n').length,3);assert.ok(scene.code.endsWith('))))'));
   for(const [time,mark,node] of [[2.4,'query','source'],[4,'debounce','debounce'],[5.4,'debounce','debounce'],
-    [5.7,'switch','op'],[6.5,'http',null],[8.7,'switch','op'],[8.05,'debounce','debounce']]) {
+    [5.7,'switch','op'],[6.5,'http',null],[10,'switch','op'],[8.05,'debounce','debounce']]) {
     player.seek(time);const html=elements.get('.rx-code').innerHTML;
     assert.match(html,new RegExp('rx-code-active[^>]*data-mark="'+mark+'"'));
     assert.match(html,/rx-tok-src">query\$/);assert.match(html,/rx-tok-op">debounceTime/);assert.match(html,/rx-tok-op">switchMap/);

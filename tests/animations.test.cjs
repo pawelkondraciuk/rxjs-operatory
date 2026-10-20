@@ -203,8 +203,10 @@ test('every variant has deterministic READY, question, FINISHED and fixed geomet
 test('flatten strategies use identical inputs, queue values before projection and never create ignored inner',async()=>{
   const {scenes,player}=await harness();
   const ids=['09-concatmap','10-mergemap','11-switchmap','12-exhaustmap'];
-  const input=JSON.stringify(scenes.get(ids[0]).rows[0].events);
-  for(const id of ids)assert.equal(JSON.stringify(scenes.get(id).rows[0].events),input,id);
+  // A i B identyczne we wszystkich czterech (pytanie); switchMap ma krótszy finał — C przychodzi wcześniej.
+  const input=JSON.stringify(scenes.get(ids[0]).rows[0].events.slice(0,2));
+  for(const id of ids)assert.equal(JSON.stringify(scenes.get(id).rows[0].events.slice(0,2)),input,id);
+  for(const id of ids.filter(id=>id!=='11-switchmap'))assert.equal(JSON.stringify(scenes.get(id).rows[0].events),JSON.stringify(scenes.get(ids[0]).rows[0].events),id);
   const concat=player(ids[0]).api;concat.seek(concat.stops.at(-1).time);
   assert.equal(concat.snapshot.nodes.find(n=>n.id==='inner1').visible,false);
   const exhaust=player(ids[3]).api;exhaust.finish();
@@ -212,10 +214,11 @@ test('flatten strategies use identical inputs, queue values before projection an
   assert.deepEqual(Array.from(exhaust.snapshot.histories.find(h=>h.anchor==='observer').values,v=>v.value),['A','C']);
 });
 
-test('concatAll reveals each inner after the Observable leaves map and arrives at concatAll',async()=>{
+test('concatAll reveals the inner after the Observable leaves map and arrives at concatAll',async()=>{
   const {scenes,engine:{compileScene}}=await harness();
   const model=compileScene(scenes.get('08-map-strumienie'));
-  for(const [i,value] of ['A','B'].entries()) {
+  assert.equal(model.events.filter(e=>e.type==='inner-create').length,1,'jeden inner');
+  for(const [i,value] of ['A'].entries()) {
     const creation=model.events.find(e=>e.type==='inner-create'&&e.node==='inner'+i);
     const mapped=model.events.find(e=>e.type==='deliver-next'&&e.edge==='source-projection'&&e.value===value);
     const arrival=model.events.find(e=>e.type==='deliver-next'&&e.edge==='projection-op'&&e.value===value+'$');
@@ -273,13 +276,14 @@ test('the sequential Observable example has no interlevel wires or waiting rows 
   }
 });
 
-test('after eight manual stops both HTTP requests hold the same frame as finish()',async()=>{
+test('after seven manual stops the single HTTP request holds the same frame as finish()',async()=>{
   const {player,callbacks}=await harness(),{api}=player('08-map-strumienie');
-  assert.equal(api.stops.length,8);
+  assert.equal(api.stops.length,7);
   api.seek(api.stops.at(-2).time);api.playContinuously();
   for(let now=0;now<30000;now+=50){const pending=[...callbacks.values()];callbacks.clear();pending.forEach(fn=>fn(now));}
   assert.equal(api.state,'finished');assert.equal(api.time,api.duration);assert.equal(callbacks.size,0);
-  assert.equal(api.snapshot.executionCounts.started,2);assert.equal(api.snapshot.executionCounts.active,0);
+  assert.equal(api.snapshot.executionCounts.started,1);assert.equal(api.snapshot.executionCounts.active,0);
+  assert.equal(api.snapshot.innerWorkPanels[0].rows.length,1);
   assert.equal(api.snapshot.innerWorkPanels[0].rows[0].receiver.state,'completed');
   const final=JSON.stringify(api.snapshot);api.seek(0);api.finish();assert.equal(JSON.stringify(api.snapshot),final);
   api.seek(api.stops[1].time);assert.equal(api.snapshot.executionCounts.started,0);

@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const {modules,playbackHarness,revealMock}=require('./v2-harness.cjs');
 const history=frame=>Array.from(frame.histories[0].values,v=>v.value);
 const close=(actual,expected)=>assert.ok(Math.abs(actual-expected)<1e-8,`${actual} != ${expected}`);
-const stopIds=['pipeline','arrived','mapped','received','complete'];
+const stopIds=['pipeline','subscribed-map','request','arrived','mapped','received','complete'];
 const definition="httpGet<User>('/api/users/42')";
 const piped=definition+'\n.pipe(map(user => `${user.firstName} ${user.lastName}`))';
 async function subject() {
@@ -60,14 +60,25 @@ test('code colours httpGet and map like the other lane slides; each lights up wh
 });
 
 test('subscribe A travels through map to HTTP and starts exactly one request',async()=>{
-  const {compiled:c}=await subject();
+  const {compiled:c,scene}=await subject();
   const downstream=c.plan.records.get('map-observer'),upstream=c.plan.records.get('source-map');
-  close(upstream.start,downstream.start+downstream.connectDuration);
-  // subscribe rusza zaraz po postoju pipeline (ten sam etap co request i emisja do map).
+  // Subskrypcja od odbiorcy do źródła: A → map, postój mapHold na map, dopiero potem map → HTTP.
+  close(upstream.start,downstream.start+downstream.connectDuration+scene.timing.mapHold);
+  // subscribe rusza zaraz po postoju pipeline.
   assert.ok(downstream.start-.3>=stop(c,'pipeline')&&downstream.start-stop(c,'pipeline')<.5);
   const shown=t=>Array.from(c.snapshot(t).callouts||[],k=>k.text+' '+k.label);
   assert.deepEqual(shown(downstream.start),['.subscribe() A']);
-  for(const s of c.stops)assert.deepEqual(shown(s.time),[],s.id);
+  // Na postoju subscribed-map impuls stoi na map: tylko połączenie A → map, HTTP bez wykonania i requestu.
+  const atMap=c.snapshot(stop(c,'subscribed-map'));
+  assert.ok(stop(c,'subscribed-map')>downstream.start+downstream.connectDuration&&stop(c,'subscribed-map')<upstream.start);
+  assert.deepEqual(Array.from(atMap.edges.filter(e=>e.visible),e=>e.id),['map-observer']);
+  assert.equal(requests(atMap),0);assert.equal(atMap.nodes.find(n=>n.id==='source').laneRows.length,0);
+  assert.deepEqual(shown(stop(c,'subscribed-map')),['.subscribe() A']);
+  for(const s of c.stops.filter(s=>s.id!=='subscribed-map'))assert.deepEqual(shown(s.time),[],s.id);
+  // Postój request: map → HTTP zestawione, request trwa (postęp widoczny, odpowiedź jeszcze nie wyszła).
+  const running=c.snapshot(stop(c,'request'));
+  assert.equal(requests(running),1);assert.ok(lane(running,'source').progress>.1&&lane(running,'source').progress<.6);
+  assert.equal(running.tokens.length,0);
   assert.equal(c.snapshot(downstream.start).nodes.find(n=>n.id==='source').laneRows.length,0);
   const frame=c.snapshot(upstream.start+upstream.connectDuration+.6);
   assert.equal(frame.nodes.find(n=>n.id==='source').laneRows[0].growth,1);
@@ -191,7 +202,7 @@ test('manual stops, AUTO, backwards and reset restore the displayed code and the
   assert.equal(player.state,'finished');assert.equal(h.frames.size,0);
   controller.previous();assert.equal(player.time,player.stops.at(-1).time);
   controller.previous();controller.previous();assert.deepEqual(history(player.snapshot),[]);
-  for(let i=0;i<4;i++)controller.previous();
+  for(let i=0;i<6;i++)controller.previous();
   assert.equal(JSON.stringify(player.snapshot),ready);
   for(const time of [0,...player.stops.map(s=>s.time),player.duration]) {
     controller.seek(time);controller.reset();assert.equal(player.state,'ready');assert.equal(h.frames.size,0);

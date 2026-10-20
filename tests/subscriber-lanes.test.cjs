@@ -318,7 +318,7 @@ test('share(): checkpoint notes for READY, every manual stop and the handoff',as
  assert.match(notes['joined-c'],/wszystkie trzy subskrypcje kończą się na share\. HTTP nadal wykonuje się tylko raz/);
  assert.match(notes.multicast,/ten sam obiekt do wszystkich trzech odbiorców, dokładnie tak jak wcześniej Subject/);
  assert.match(notes.complete,/Jeden request zamiast trzech/);
- assert.match(notes.finished,/Share współdzieli request automatycznie\. Ale współdzielenie to nie wszystko\. Co dzieje się ze źródłem, gdy odbiorcy rezygnują\?/);
+ assert.match(notes.finished,/Share współdzieli request automatycznie[\s\S]*A co, jeśli ktoś zasubskrybuje po zakończeniu requestu\?[\s\S]*Prawo: share — późny odbiorca/);
 });
 
 test('tiles grow: a fixed definition part, then one execution row per subscription reaching the tile',async()=>{

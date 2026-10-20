@@ -93,17 +93,23 @@ test('catchError outside: click B appears in the detached klik$, never reaches s
 });
 
 test('catchError outside: checkpoints follow the narration and speaker notes, code marks and rewind are deterministic',async()=>{
- const {scene,c,render}=await deck(),ids=['error','caught','fallback','click-b'];
+ const {scene,c,render}=await deck(),ids=['request','http-error','error','caught','fallback','click-b'];
  assert.deepEqual(Array.from(c.stops,s=>s.id),ids);
  assert.equal(scene.code,'klik$.pipe(switchMap(id =>\n  httpGet(url(id))), catchError(() => of([])))');
  const f=Object.fromEntries(c.stops.map(s=>[s.id,c.snapshot(s.time)]));
- // Końcowy slajd: pierwsze dalej od razu przechodzi klik A, krótki HTTP i błąd.
- const working=c.snapshot(at(c,'inner-subscribe','inner0-op')+.3);
+ // Pierwsze dalej: klik A i postój podczas trwającego HTTP (postęp widoczny, bez błędu).
+ const working=f.request;
  assert.equal(lane(working,'observer').state,'running');assert.equal(row(working).stages[0].state,'active');
- assert.ok(row(working).stages[0].progress>0);assert.equal(f.error.executionCounts.started,1);
- assert.ok(at(c,'stream-error','inner0-op')-at(c,'inner-subscribe','inner0-op')<=1.05,'HTTP trwa ok. 1 s');
- assert.ok(c.duration<11,'krótki slajd końcowy');
+ assert.ok(row(working).stages[0].progress>.2&&row(working).stages[0].progress<.8);assert.equal(f.error.executionCounts.started,1);
+ assert.ok(at(c,'stream-error','inner0-op')-at(c,'inner-subscribe','inner0-op')>=1.5,'HTTP trwa wystarczająco długo');
+ assert.ok(c.duration<13,'zwarty slajd końcowy');
+ // http-error: błąd opuścił HTTP, ale switchMap, catchError, klik$ i S1 jeszcze działają (bez równoczesnego końca).
+ assert.equal(row(f['http-error']).stages[0].state,'errored');
+ for(const id of ['source','op','catch','observer'])assert.equal(lane(f['http-error'],id).state,'running',id);
+ assert.ok(!f['http-error'].edges.filter(e=>!e.id.startsWith('inner')).some(e=>['error','complete','unsubscribe'].includes(e.phase)));
+ // error: błąd dotarł do catchError; klik$ nadal podłączony, fallback jeszcze nie ruszył.
  assert.equal(row(f.error).stages[0].state,'errored');assert.equal(lane(f.error,'source').state,'running');
+ assert.equal(lane(f.error,'catch').state,'running');assert.deepEqual(received(f.error),[]);
  assert.equal(lane(f.caught,'source').state,'cancelled');assert.deepEqual(received(f.caught),[]);
  assert.deepEqual(received(f.fallback),['[]']);assert.equal(lane(f.fallback,'observer').state,'completed');
  assert.ok(f['click-b'].tokens.some(t=>t.phase==='unobserved'&&t.value==='B'));

@@ -97,8 +97,9 @@ export function planFlow(nodes, links, modelDuration, timingOverrides) {
     // Wartość z decide: po dotarciu czeka (czas ilustracji), zanim operator pokaże reakcję — miejsce na pytanie.
     phase=Math.max(phase,...values.flatMap(e=>records.get(e.id).events.filter(v=>v.logicalAt===at&&v.decide).map(v=>v.arrival+v.decide)));
     // Czytelny checkpoint: nowa wartość już dotarła, stara praca jeszcze trwa.
-    // To wyłącznie handoff ilustracji, bez przesuwania czasu modelu.
-    if(values.length&&ending.length)phase+=handoffDuration;
+    // To wyłącznie handoff ilustracji, bez przesuwania czasu modelu. timing.valueTerminalGap (opt-in) wydłuża tę
+    // przerwę, żeby dotarcie ostatniej wartości i terminal tej samej chwili modelu były osobnymi kadrami.
+    if(values.length&&ending.length)phase+=timing?.valueTerminalGap??handoffDuration;
     const terminalEnds = new Map();
     function finish(e, visiting=new Set()) {
       if(terminalEnds.has(e))return terminalEnds.get(e);
@@ -109,9 +110,14 @@ export function planFlow(nodes, links, modelDuration, timingOverrides) {
         .filter(parent=>ending.includes(parent)&&parent.logicalEnd.kind===e.logicalEnd.kind);
       // Operator odłącza źródło dopiero po otrzymaniu błędu z innego wejścia (np. inner w switchMap).
       if(cancelling)dependencies.push(...incoming(e.b.id).filter(parent=>parent!==e&&ending.includes(parent)&&parent.logicalEnd.kind==='error'));
-      const departure=Math.max(phase,...dependencies.map(parent=>finish(parent,next)));
-      records.get(e.id).end={...e.logicalEnd,at:departure,logicalAt:e.logicalEnd.at,duration:terminalTravel};
-      const arrival=departure+terminalTravel;
+      // timing.terminalGap (opt-in): terminal zależny od innego (np. complete outer po complete ostatniego inner)
+      // rusza z przerwą po jego dotarciu, a nie w tej samej klatce.
+      const gap=cancelling?0:timing?.terminalGap??0;
+      const departure=Math.max(phase,...dependencies.map(parent=>finish(parent,next)+gap));
+      // edge.terminal (opt-in): własny czas przelotu terminala tej krawędzi.
+      const duration=e.terminal??terminalTravel;
+      records.get(e.id).end={...e.logicalEnd,at:departure,logicalAt:e.logicalEnd.at,duration};
+      const arrival=departure+duration;
       terminalEnds.set(e,arrival);
       return arrival;
     }

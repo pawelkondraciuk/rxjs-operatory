@@ -6,11 +6,12 @@ import { configureSearchDemo } from './search-demo.js';
 export const mainOrder = [
   // Slajdy techniczne: HTTP (subscribe/next/complete) z kodem źródłowym httpGet (05b-http-kod) i Cold (jedna definicja,
   // trzy wykonania), interval (cold: osobne wykonanie każdego odbiorcy, unsubscribe), Subject (ręczne next i complete), Subject + HTTP, Subject + interval.
-  // Potem pytanie o znane operatory, operator, kod myMap, pytanie o share oraz historia share HTTP → share + interval → późny odbiorca.
-  '05-zrodla-2','05b-http-kod','04a-dwa-tory','05-zrodla','05-zrodla-5','05-zrodla-3','05-zrodla-4','02-znane-operatory','04-operator','04b-map-kod','03-a-share','04a-dwa-tory-2','04a-dwa-tory-3',
+  // Potem pytanie o znane operatory, operator, kod myMap, pytanie o share oraz historia share HTTP → późny odbiorca share
+  // (pytanie publiczności: subskrypcja po zakończeniu requestu) → share + interval → shareReplay.
+  '05-zrodla-2','05b-http-kod','04a-dwa-tory','05-zrodla','05-zrodla-5','05-zrodla-3','05-zrodla-4','02-znane-operatory','04-operator','04b-map-kod','03-a-share','04a-dwa-tory-2','20-sharereplay','04a-dwa-tory-3',
   // Cztery *Map obok siebie, potem plansza wyszukiwarki, źródło query$, switchMap na żywo, debounceTime, distinctUntilChanged
   // przed switchMap i catchError wewnątrz switchMap w tej samej wyszukiwarce.
-  '20-sharereplay','20a-sharereplay-interval','20b-sharereplay-refcount','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12-intro-wyszukiwarka','12-query-zrodlo','12a-switchmap-live','12b-debounce-switchmap','11a-distinct-switchmap','11b-catcherror-search',
+  '20a-sharereplay-interval','20b-sharereplay-refcount','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12-intro-wyszukiwarka','12-query-zrodlo','12a-switchmap-live','12b-debounce-switchmap','11a-distinct-switchmap','11b-catcherror-search',
   'b04-catcherror','x03-retry-backoff','25-podsumowanie','pytania',
 ];
 // Dawne adresy ?extras nie dodają już żadnych slajdów.

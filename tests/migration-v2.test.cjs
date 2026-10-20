@@ -24,7 +24,7 @@ test('HTTP slides share the accepted panel and retain native Reveal playback',as
   assert.deepEqual(history(c.snapshot(c.duration),'observer'),expected);
   assert.equal(real.playback.controller,undefined);assert.equal(real.playback.entry,'manual');
   assert.deepEqual(Array.from(c.stops,s=>s.id),{concatMap:['subscribe','first','active','question','answer'],
-    switchMap:['question','answer','started']}[mode]||['question','answer']);
+    mergeMap:['question','answer','c-result'],switchMap:['question','answer','started']}[mode]||['question','answer']);
  }
  for(const id of ids){
   const scene=scenes.get(id),c=compile(scene);
@@ -42,8 +42,8 @@ test('concatMap introduces the queue after the sequential Observable example in 
  const done=render(c.snapshot(c.duration));assert.equal((done.match(/data-inner-state="completed"/g)||[]).length,3);
  assert.doesNotMatch(done,/PRACE WEWNĘTRZNE|data-queue=|EMISJE|ODBIÓR/);assert.match(done,/data-panel-divider="true"/);
  const all=compile(scenes.get('08-map-strumienie')),f=all.snapshot(all.stops.at(-1).time),svg=render(f);
- assert.equal(f.executionCounts.started,2);assert.doesNotMatch(svg,/W KOLEJCE|data-inner-placeholder/);
- assert.deepEqual(Array.from(f.innerWorkPanels[0].rows,r=>r.value),['A$','B$']);
+ assert.equal(f.executionCounts.started,1);assert.doesNotMatch(svg,/W KOLEJCE|data-inner-placeholder/);
+ assert.deepEqual(Array.from(f.innerWorkPanels[0].rows,r=>r.value),['A$']);
  assert.equal(f.executionCounts.active,0);
 });
 test('real mergeMap demonstrates chronological reception: B overlaps A and returns first',async()=>{
