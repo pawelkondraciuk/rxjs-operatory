@@ -62,6 +62,7 @@ export function createStageController(player,options={}) {
   }
   function next(){
     cancelResume();if(suspensions.size)return;
+    if(player.navigation==='slide'){options.onNavigate?.(1);return;}
     if(player.state==='finished'){options.onNavigate?.(1);return;}
     if(player.live){nextLive(player.live);return;}
     if(player.isPlaying){
@@ -70,6 +71,7 @@ export function createStageController(player,options={}) {
   }
   function previous(){
     cancelResume();if(suspensions.size)return;
+    if(player.navigation==='slide'){options.onNavigate?.(-1);return;}
     const live=player.live;
     // Akcje: cofnięcie ostatniej (kadr z chwili jej wywołania, emisje biegną dalej); bez akcji — poprzedni postój
     // przed live.start (jeśli scena je ma), ostatecznie poprzedni slajd.
@@ -114,7 +116,7 @@ export function createStageController(player,options={}) {
     if(player.live?.restore)player.live.restore(time);else player.seek(time);
     changed();
   }
-  function reset(){player.live?.reopen();seek(0);}
+  function reset(){player.live?.reopen();seek(0);if(player.navigation==='slide'&&!suspensions.size)player.playContinuously();}
   function finish(){cancelResume();target=null;player.finish();changed();}
   function suspend(reason='external'){
     if(suspensions.has(reason))return;

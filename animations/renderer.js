@@ -165,11 +165,11 @@ function innerInstancesPanel(panel,frame,reduced=false) {
     (label&&labelOpacity>0?text(placeholderX+placeholderW/2,lane+rowHeight/2,label,label==='?'?font*1.25:font,`style="fill:${kind==='ignored'?'#9A939C':'#746B76'};font-weight:${label==='?'?700:600};letter-spacing:.04em"${labelOpacity<1?` opacity="${+labelOpacity.toFixed(3)}"`:''}`):'')+'</g>';
   // ID wykonania i kulka wejścia: stałe przez cały cykl życia; anulowane szarzeje, pominięte jest przygaszone.
   const identity=(row,cy,{muted=false,dim=false}={})=>`<g data-inner-id="${esc(row.id)}"${dim?' opacity=".45"':''}>`+
-    text(idX,cy,row.id,font,`style="text-anchor:start;fill:${muted?'#808890':row.color};font-weight:700"`)+
+    text(idX,cy,row.id,panel.idFit?Math.min(font,(panel.idW-8)/(row.id.length*.6)):font,`style="text-anchor:start;fill:${muted?'#808890':row.color};font-weight:700"`)+
     ball(ballX,cy,row.value,row.color,ballSize,1,`data-inner-ball="${esc(row.value)}"${muted?' opacity=".5"':''}`)+'</g>';
   let svg=`<g data-inner-work-panel="${esc(panel.id)}" data-inner-layout="instances">`;
   for(const row of panel.rows) {
-    const lane=row.y+headerH,cy=lane+rowHeight/2,muted=row.state==='cancelled';
+    const rowY=reduced?(row.stillY??row.y):row.y,lane=rowY+headerH,cy=lane+rowHeight/2,muted=row.state==='cancelled';
     svg+=`<g data-inner-work="${esc(row.id)}" data-inner-state="${row.state}" data-row-slot="${row.slot}" opacity="${reduced?1:row.opacity}">`;
     svg+=`<title>${esc(row.id+' · '+row.value+' · '+row.state)}</title>`;
     const queuedLabel=row.queueLabel||'W KOLEJCE';
@@ -190,8 +190,8 @@ function innerInstancesPanel(panel,frame,reduced=false) {
       const column=panel.columns[i],sx=stageX(i),stageW=stageWs[i],fill=fills[stage.state]||column.runtime;
       const labelSize=clamp((stageW-24)/(Math.max(1,column.label.length)*.55),26*k,26*(frame.labelScale||k));
       svg+=`<g data-inner-stage="${esc(column.id)}" data-stage-state="${stage.state}">`;
-      svg+=`<rect data-inner-header="${esc(column.id)}" x="${sx}" y="${row.y}" width="${stageW}" height="${headerH}" fill="${column.fill}"/>`+
-        text(sx+stageW/2,row.y+headerH/2,column.label,labelSize,'style="fill:#26323B"');
+      svg+=`<rect data-inner-header="${esc(column.id)}" x="${sx}" y="${rowY}" width="${stageW}" height="${headerH}" fill="${muted&&panel.maxVisibleRows?'#DDE1E2':column.fill}"/>`+
+        text(sx+stageW/2,rowY+headerH/2,column.label,labelSize,'style="fill:#26323B"');
       svg+=`<rect data-inner-lane="${esc(column.id)}" x="${sx}" y="${lane}" width="${stageW}" height="${h}" fill="${fill}"/>`+flash(stage.state,stage.since,sx,lane,stageW);
       // Postęp jak w kafelku HTTP GET toru: tło całego lane (za paskiem koloru pracy) z czołem w kolorze pracy.
       if(stage.hasProgress&&['active','cancelled'].includes(stage.state)) {
@@ -251,9 +251,10 @@ function innerInstancesPanel(panel,frame,reduced=false) {
 }
 // Kulka wartości o stałym rozmiarze (graph.ball: r, font); scale tylko dla krótkiego pulsu przekształcenia.
 function ball(x,y,value,color,size,scale=1,attrs='') {
-  const r=size.r*scale,label=fitLabel(value,Math.max(1,Math.floor(r*2/(size.font*.58))));
+  const r=size.r*scale,font=size.fitText?Math.min(size.font,(size.r*2-8)/(Math.max(1,String(value).length)*.6)):size.font;
+  const label=size.fitText?String(value):fitLabel(value,Math.max(1,Math.floor(r*2/(size.font*.58))));
   const title=label===String(value)?'':`<title>${esc(value)}</title>`;
-  return `<g ${attrs}>${title}<circle cx="${x}" cy="${y}" r="${r}" fill="${colors[color]||color}" stroke="#fff" stroke-width="3"/>${text(x,y+1,label,size.font*scale,`style="font-weight:700${size.textFill?';fill:'+esc(size.textFill):''}"`)}</g>`;
+  return `<g ${attrs}>${title}<circle cx="${x}" cy="${y}" r="${r}" fill="${colors[color]||color}" stroke="#fff" stroke-width="3"/>${text(x,y+1,label,font*scale,`style="font-weight:700${size.textFill?';fill:'+esc(size.textFill):''}"`)}</g>`;
 }
 // Jeden wynik złożony z kilku semantycznie kolorowanych części (np. para combineLatest).
 // Konfiguracja jest opt-in na poziomie grafu; zwykłe wartości nadal korzystają z ball().
@@ -647,6 +648,16 @@ export function renderScene(frame,options={}) {
     svg+=text(x0+pad,c.y+1,c.text,size,`style="text-anchor:start;font-family:Consolas,ui-monospace,monospace;font-weight:700;fill:${c.ink}"`);
     if(badge)svg+=`<rect x="${x0+pad+textW+gap}" y="${c.y-badge/2}" width="${badge}" height="${badge}" rx="${badge*.22}" fill="${c.color}"/>`+
       text(x0+pad+textW+gap+badge/2,c.y+1,c.label,size*.82,'style="font-weight:700;fill:#fff"');
+    svg+='</g>';
+  }
+  for(const readout of frame.readouts||[]) {
+    const size=readout.font||26,value=String(readout.value);
+    svg+=`<g data-readout="${esc(readout.id)}"><rect x="${readout.x-readout.w/2}" y="${readout.y-readout.h/2}" width="${readout.w}" height="${readout.h}" rx="6" fill="${readout.fill||'#fff'}" stroke="${readout.stroke||'#43525b'}" stroke-width="2"/>`;
+    svg+=text(readout.x,readout.y+1,value,size,'style="font-family:Consolas,ui-monospace,monospace;fill:#26323B"');
+    if(readout.cursor) {
+      const x=readout.x+value.length*size*.3+5,opacity=reduced||Math.floor(frame.time*2)%2===0?1:0;
+      svg+=`<path data-input-cursor="true" d="M${x} ${readout.y-size*.5}v${size}" stroke="#26323B" stroke-width="2" opacity="${opacity}"/>`;
+    }
     svg+='</g>';
   }
   if(frame.queue&&!panels.length)svg+=text(frame.width/2,frame.height-20,frame.queue,22*k,'data-queue="true"');

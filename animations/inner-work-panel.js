@@ -2,8 +2,8 @@ const clamp = value => Math.max(0,Math.min(1,value));
 
 // Panel prac wewnętrznych: każde utworzone inner to osobny pipeline w swoim slocie (dawny wspólny kafelek z wierszami
 // usunięto — żaden slajd go nie używał). Dół panelu stoi nad dolnym marginesem ramki; bez własnego napisu.
-export function createInnerWorkPanel({works,columns,height,large=false,id='jobs',minRows=3}) {
-  return createInstancePanel({works,columns,height,large,id,minRows,x:28,w:1184,bottom:height-(large?12:8)});
+export function createInnerWorkPanel({works,columns,height,large=false,id='jobs',minRows=3,maxVisibleRows,shiftDuration=.25,evictDuration=.15}) {
+  return createInstancePanel({works,columns,height,large,id,minRows,maxVisibleRows,shiftDuration,evictDuration,x:28,w:1184,bottom:height-(large?12:8)});
 }
 
 // Każde uruchomione inner to osobny, pełny pipeline w jednym rzędzie:
@@ -13,15 +13,15 @@ export function createInnerWorkPanel({works,columns,height,large=false,id='jobs'
 // głównym (840–1210). Etap = nagłówek definicji + execution lane; subscriber — sam lane na wysokości lane etapów.
 // Slot = nagłówek + lane + odstęp; trzy sloty mieszczą się nad dolnym marginesem.
 export const instanceColumns={idX:50,idW:60,ballW:70,httpW:300,stageGap:60,receiverX:840,receiverW:370};
-function createInstancePanel({works,columns,height,large,id,minRows,x,w,bottom}) {
-  const headerH=large?56:44,rowH=large?64:50,gap=large?14:10,slots=Math.max(minRows,works.length);
+function createInstancePanel({works,columns,height,large,id,minRows,maxVisibleRows,shiftDuration,evictDuration,x,w,bottom}) {
+  const headerH=large?56:44,rowH=large?64:50,gap=large?14:10,slots=Math.max(minRows,Math.min(works.length,maxVisibleRows??Infinity));
   const rowsTop=bottom-slots*(headerH+rowH)-(slots-1)*gap,dividerY=Math.round((rowsTop+(large?172:130))/2);
   const {idX,idW,ballW,httpW,stageGap,receiverX,receiverW}=instanceColumns,stagesLeft=idX+idW+ballW,rest=columns.length-1;
   const opW=rest?(receiverX-stagesLeft-httpW-(rest+1)*stageGap)/rest:0;
   const stageWs=columns.map((_,i)=>i?opW:httpW);
   const stageXs=stageWs.map((_,i)=>stagesLeft+stageWs.slice(0,i).reduce((sum,width)=>sum+width+stageGap,0));
   return {id,innerWork:true,instances:true,frameless:true,x,y:dividerY,w,h:bottom-dividerY,
-    dividerY,slots:works.length,rowsTop,rowStep:headerH+rowH+gap,rowHeight:rowH,headerH,tileLeft:idX,tileRight:receiverX+receiverW,
+    dividerY,slots:maxVisibleRows??works.length,maxVisibleRows,shiftDuration,evictDuration,rowsTop,rowStep:headerH+rowH+gap,rowHeight:rowH,headerH,tileLeft:idX,tileRight:receiverX+receiverW,
     idX,idW,ballX:idX+idW+ballW/2,stagesLeft,stageXs,stageWs,stageGap,receiverX,receiverW,font:large?30:25,columns,works};
 }
 
@@ -141,5 +141,18 @@ export function innerWorkPanelSnapshot(panel, records, births, time, logicalTime
       ...(shown?{from:waitingAt!==undefined&&born>=waitingAt?'queued':'pending',question:pending?1-pending.decided:0}:{}),stages,wires,tokens,
       receiver}];
   });
-  return {...panel, rows};
+  if(!panel.maxVisibleRows)return {...panel, rows};
+  // Usunięcie i przesunięcie poprzedzają narodziny nowego innera: nawet w przejściu nie powstaje czwarty wiersz.
+  const ordered=panel.works.map(work=>({id:work.id,born:births.get(work.node)??Infinity})).sort((a,b)=>a.born-b.born);
+  const last=ordered.findLastIndex(work=>work.born<=time),offset=Math.max(0,last-panel.maxVisibleRows+1);
+  const next=ordered[last+1],shifting=last>=panel.maxVisibleRows-1&&next&&time>=next.born-panel.shiftDuration;
+  const shift=shifting?clamp((time-next.born+panel.shiftDuration)/panel.shiftDuration):0;
+  return {...panel,rows:rows.flatMap(row=>{
+    const index=ordered.findIndex(work=>work.id===row.id),replacement=ordered[index+panel.maxVisibleRows];
+    const removedAt=replacement?replacement.born-panel.shiftDuration:Infinity;
+    if(time>=removedAt)return [];
+    const opacity=row.opacity*clamp((removedAt-time)/panel.evictDuration),slot=index-offset;
+    return [{...row,slot,y:panel.rowsTop+(slot-shift)*panel.rowStep,
+      stillY:panel.rowsTop+(slot-(shifting?1:0))*panel.rowStep,opacity}];
+  })};
 }

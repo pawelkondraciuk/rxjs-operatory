@@ -94,7 +94,8 @@ for (const slide of steppedSlides) {
   markers.className = 'rx-fragment-steps';
   markers.setAttribute('aria-hidden', 'true');
   markers.innerHTML = stops.map((stop, index) => `<span class="rx-step fragment" data-fragment-index="${index}" data-time="${stop.time}" data-stop="${stop.id}"></span>`).join('');
-  if (scene.playback.controller === 'stages' || scene.playback.afterLastManualStop === 'start-auto') markers.innerHTML += `<span class="rx-step fragment" data-fragment-index="${stops.length}" data-time="${stops.at(-1)?.time || 0}" data-handoff="true"></span>`;
+  if (scene.playback.navigation==='slide') slide.classList.add('rx-slide-navigation');
+  else if (scene.playback.controller === 'stages' || scene.playback.afterLastManualStop === 'start-auto') markers.innerHTML += `<span class="rx-step fragment" data-fragment-index="${stops.length}" data-time="${stops.at(-1)?.time || 0}" data-handoff="true"></span>`;
   slide.append(markers);
   const button = document.createElement('button');
   button.className = 'rx-step-mode';
@@ -155,6 +156,7 @@ steppedSlides.forEach(updateMode);
 function fitTitles() {
   const context = document.createElement('canvas').getContext('2d');
   document.querySelectorAll('.animation-slide h2').forEach(title => {
+    if(title.closest('.rx-slide-navigation'))return;
     title.style.fontSize = '';
     const style = getComputedStyle(title), size = parseFloat(style.fontSize);
     const room = FORMATS[format].width - (title.closest('.rx-stepped') ? 230 : 0) - 8;

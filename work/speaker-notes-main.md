@@ -1,6 +1,6 @@
 # Speaker notes — slajdy techniczne RxJS
 
-Pełny eksport notatek z `index.html` do weryfikacji. Zakres: **21 slajdów technicznych aktualnej ścieżki MAIN**, od pierwszego slajdu po „A share?” — „HTTP: od definicji do wykonania” — do „Cztery pytania przed kolejnym pipe”, przed „Pytania?”.
+Pełny eksport notatek z `index.html` do weryfikacji. Zakres: **22 slajdów technicznych aktualnej ścieżki MAIN**, od pierwszego slajdu po „A share?” — „HTTP: od definicji do wykonania” — do „Cztery pytania przed kolejnym pipe”, przed „Pytania?”.
 
 Kolejność pochodzi z `mainOrder` w [animations/scene-config.js](../animations/scene-config.js). Tytuły pobrano z końcowych konfiguracji scen po rozwinięciu wariantów przez `prepareSlides`.
 
@@ -24,11 +24,12 @@ Eksport zachowuje oryginalne brzmienie wszystkich akapitów, w tym instrukcje pr
 14. **mergeMap — Równocześnie** — `10-mergemap`
 15. **switchMap — Najnowsza subskrypcja** — `11-switchmap`
 16. **exhaustMap — Jestem zajęty** — `12-exhaustmap`
-17. **distinctUntilChanged — czy coś się zmieniło?** — `11a-distinct-switchmap`
-18. **catchError na zewnątrz** — `b04-catcherror`
-19. **catchError wewnątrz** — `b04-catcherror-2`
-20. **debounceTime i auditTime: cisza czy okno?** — `16-czas-cztery`
-21. **Cztery pytania przed kolejnym pipe** — `25-podsumowanie`
+17. **switchMap — nowe zapytanie anuluje poprzednie** — `12a-switchmap-live`
+18. **distinctUntilChanged — czy coś się zmieniło?** — `11a-distinct-switchmap`
+19. **catchError na zewnątrz** — `b04-catcherror`
+20. **catchError wewnątrz** — `b04-catcherror-2`
+21. **debounceTime i auditTime: cisza czy okno?** — `16-czas-cztery`
+22. **Cztery pytania przed kolejnym pipe** — `25-podsumowanie`
 
 ## 1. HTTP: od definicji do wykonania
 
@@ -888,7 +889,20 @@ A kończy się normalnie, B nie wraca. C przychodzi po zakończeniu A i dostaje 
 
 **Wniosek:** Po zakończeniu A exhaustMap przyjmuje C.
 
-## 17. distinctUntilChanged — czy coś się zmieniło?
+## 17. switchMap — nowe zapytanie anuluje poprzednie
+
+**ID:** `12a-switchmap-live`
+**Źródło:** [index.html — sekcja 12a-switchmap-live](../index.html)
+
+### Notatki sekcji — wyświetlane podczas pętli
+
+Użytkownik szybko wpisuje tekst. Każde query dociera do switchMap, odłącza poprzedni inner HTTP i uruchamia nowy. Szary × to unsubscribe, bez complete i bez odpowiedzi. S1 przez cały czas subskrybuje główny pipeline.
+
+Widać trzy ostatnie requesty; najstarszy znika przed dodaniem kolejnego. Sekwencja r → re → rea → reac → react powtarza się przez zastąpienie tekstu kolejnym r. Numery i liczniki rosną. Animacja startuje sama; Spacja pauzuje, R zaczyna od nowa, strzałka w prawo od razu przechodzi do distinctUntilChanged.
+
+Odsubskrybowanie klienta nie cofa operacji wykonanej na serwerze. Teraz pytanie: co, jeśli kolejne query jest identyczne? Następny slajd pokazuje distinctUntilChanged.
+
+## 18. distinctUntilChanged — czy coś się zmieniło?
 
 **ID:** `11a-distinct-switchmap`  
 **Źródło:** [index.html — sekcja 11a-distinct-switchmap](../index.html#L588)
@@ -951,9 +965,9 @@ Pięć emisji, trzy requesty. distinctUntilChanged nie jest cache'em — po pros
 
 ### Bazowe notatki sekcji — kontekst do weryfikacji
 
-Jeden potok id$ → distinctUntilChanged → switchMap → S1; wejścia A, A, B, B, A. Slajd stoi po exhaustMap, zamyka rodzinę *Map. distinctUntilChanged pamięta tylko ostatnią przepuszczoną wartość (jedna kulka w lane operatora), osobno dla każdej subskrypcji, i porównuje przez ===. Powtórzenia gasną w operatorze: bez nowego HTTP i bez anulowania trwającego. Do switchMap trafia A, B, A — 3 requesty zamiast 5. To nie jest cache: A po B przechodzi. 60–90 s.
+Jeden potok id$ → distinctUntilChanged → switchMap → S1; wejścia A, A, B, B, A. Slajd stoi po pokazie switchMap na żywo, zamyka rodzinę *Map. distinctUntilChanged pamięta tylko ostatnią przepuszczoną wartość (jedna kulka w lane operatora), osobno dla każdej subskrypcji, i porównuje przez ===. Powtórzenia gasną w operatorze: bez nowego HTTP i bez anulowania trwającego. Do switchMap trafia A, B, A — 3 requesty zamiast 5. To nie jest cache: A po B przechodzi. 60–90 s.
 
-## 18. catchError na zewnątrz
+## 19. catchError na zewnątrz
 
 **ID:** `b04-catcherror`
 
@@ -1009,7 +1023,7 @@ Porównaj położenie catchError: wewnątrz pipe każdego HTTP albo osobny opera
 
 Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.
 
-## 19. catchError wewnątrz
+## 20. catchError wewnątrz
 
 **ID:** `b04-catcherror-2`
 
@@ -1071,7 +1085,7 @@ Porównaj położenie catchError: wewnątrz pipe każdego HTTP albo osobny opera
 
 Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.
 
-## 20. debounceTime i auditTime: cisza czy okno?
+## 21. debounceTime i auditTime: cisza czy okno?
 
 **ID:** `16-czas-cztery`  
 **Źródło:** [index.html — sekcja 16-czas-cztery](../index.html#L808)
@@ -1140,7 +1154,7 @@ Dopiero gdy przez pełne 3,5 sekundy nie przyjdzie nic nowego, debounce emituje 
 
 **throttleTime i sampleTime — EXTRAS:** Throttle domyślnie przepuszcza pierwszą wartość okna (leading:true, trailing:false). Sample ma stały rytm od subskrypcji i pomija takt bez nowych wejść. Wszystkie źródła pozostają aktywne; nie porównujemy zdarzeń dokładnie na granicy okna.
 
-## 21. Cztery pytania przed kolejnym pipe
+## 22. Cztery pytania przed kolejnym pipe
 
 **ID:** `25-podsumowanie`  
 **Źródło:** [index.html — sekcja 25-podsumowanie](../index.html#L734)

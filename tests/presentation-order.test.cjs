@@ -5,7 +5,7 @@ const {modules}=require('./v2-harness.cjs');
 
 // Cold → Subject → share (HTTP, interval, późny odbiorca); cztery *Map obok siebie, potem jeden distinctUntilChanged.
 const expectedMain=['05-zrodla-2','05b-http-kod','04a-dwa-tory','05-zrodla','05-zrodla-5','05-zrodla-3','05-zrodla-4','02-znane-operatory','04-operator','04b-map-kod','03-a-share','04a-dwa-tory-2','04a-dwa-tory-3',
- '20-sharereplay','20a-sharereplay-interval','20b-sharereplay-refcount','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','11a-distinct-switchmap',
+ '20-sharereplay','20a-sharereplay-interval','20b-sharereplay-refcount','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12a-switchmap-live','11a-distinct-switchmap',
  'b04-catcherror','b04-catcherror-2','16-czas-cztery','25-podsumowanie','pytania'];
 const openingLength=8;
 const mainEnd=openingLength+expectedMain.length;
@@ -60,12 +60,12 @@ test('EXTRAS contains latest-value comparison, retry backoff and defer',async()=
  for(const slide of container.children.slice(mainEnd)){assert.equal(slide.extra,true,slide.id);assert.ok(slide.back,slide.id);}
 });
 
-test('MAIN shows distinctUntilChanged once, right after the four *Map, and keeps manual Subject emissions, Subject HTTP and Subject interval together',async()=>{
+test('MAIN shows four adjacent *Map followed by live switchMap and one distinctUntilChanged, and keeps Subject examples together',async()=>{
  const {container,scenes}=await presentation(),ids=container.children.slice(openingLength).map(s=>s.id);
  assert.deepEqual(ids.filter(id=>/distinct/.test(id)),['11a-distinct-switchmap']);
  assert.equal(scenes.has('14-distinct'),false);
  const at=id=>ids.indexOf(id);
- assert.deepEqual(['09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','11a-distinct-switchmap'].map(at),[0,1,2,3,4].map(i=>at('09-concatmap')+i));
+ assert.deepEqual(['09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12a-switchmap-live','11a-distinct-switchmap'].map(at),[0,1,2,3,4,5].map(i=>at('09-concatmap')+i));
  // HTTP (z kodem źródłowym httpGet i Cold), interval i trzy Subjecty przed pytaniami o operatory; potem Operator to funkcja, kod myMap i pytanie o share.
  const opening=['05-zrodla-2','05b-http-kod','04a-dwa-tory','05-zrodla','05-zrodla-5','05-zrodla-3','05-zrodla-4','02-znane-operatory','04-operator','04b-map-kod','03-a-share'];
  assert.deepEqual(opening.map(at),opening.map((_,i)=>at(opening[0])+i));

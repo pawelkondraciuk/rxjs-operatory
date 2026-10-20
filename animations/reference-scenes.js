@@ -1411,7 +1411,7 @@ export function flattenGraph(scene) {
 // Opcjonalne columns/stages/edge pozwalają dodać kolejne etapy wiersza (np. HTTP GET → catchError); domyślnie jeden etap HTTP GET.
 // tiles nadpisuje górne kafelki [id,x,w,nagłówek] (np. klik$ → switchMap → catchError). Dół to panel instancji.
 export function configureHttpWorkPanel(graph,scene,frame,{columns=[{id:'source',label:'HTTP GET',fill:'#8FC9D4',runtime:'#E3F0F3'}],
-  stages=i=>[{column:'source',edge:'inner'+i+'-op',progress:true}],edge=i=>'inner'+i+'-op',tiles:customTiles}={}) {
+  stages=i=>[{column:'source',edge:'inner'+i+'-op',progress:true}],edge=i=>'inner'+i+'-op',tiles:customTiles,panelOptions={}}={}) {
   const large=scene.format==='4:3',top=large?28:10,defH=large?70:56,rowH=large?74:64;
   const all=scene.operatorName==='concatAll';
   const laneY=top+defH+rowH/2;
@@ -1440,7 +1440,7 @@ export function configureHttpWorkPanel(graph,scene,frame,{columns=[{id:'source',
     duration:job.dur??job.end-job.start,stages:stages(i)}));
   // Dół: każde uruchomione inner to pełny pipeline (#n → kulka → HTTP GET → … → inner subscriber); trzy sloty
   // we wspólnych kolumnach panelu, niezależnych od kafelków u góry.
-  const panel=createInnerWorkPanel({works,height:frame.height,large,columns});
+  const panel=createInnerWorkPanel({works,height:frame.height,large,columns,...panelOptions});
   Object.assign(panel,{ballText:'#fff',portRadius:11,wire:5,ball:large?graph.ball:{r:20,font:23},
     // Teardown anulowanego inner jako szary impuls × (switchMap); tempo paska do decyzji operatora (09–12).
     cancelPulse:true,pace:true});
@@ -2270,4 +2270,95 @@ function combineLatestWithLatestFromGraph(scene) {
     ball:{...ball,pair,valueParts},
     ...(large?{textScale:1.25,labelScale:1.4}:{}),timeline:[{type:'latest-summary',at:15.8,
       caption:'Stan: id 43, lang EN · S1: [42, PL], [42, EN], [43, EN]'}]};
+}
+
+
+// Czas ilustracji jest jedynym czasem tej sceny. Okno live ogranicza liczbę requestów w kompilacji;
+// globalny indeks pochodzi z czasu, więc przewinięcie okna nie zeruje numerów ani liczników.
+const timing={first:.4,period:1.4,travel:.4,cancel:.25,connect:.25,request:5};
+const queries=['r','re','rea','reac','react'];
+const colors=['#6D4CD3','#B85D05','#087FAD','#B73770','#287D68'];
+const countAt=(time,first)=>Math.max(0,Math.floor((time-first+1e-9)/timing.period)+1);
+const runAt=index=>{
+  const emitted=timing.first+index*timing.period,arrived=emitted+timing.travel;
+  const born=arrived+(index?timing.cancel:0),connected=born+timing.connect;
+  const cancel=arrived+timing.period;
+  return {index,id:'#'+(index+1),value:queries[index%queries.length],color:colors[index%colors.length],emitted,arrived,born,connected,cancel};
+};
+export const switchMapLiveStillTime=runAt(4).connected+.4;
+
+export function configureSwitchMapLive(scene) {
+  Object.assign(scene,{
+    title:'switchMap — nowe zapytanie anuluje poprzednie',
+    code:'query$.pipe(\n  switchMap(query => httpGet(url(query)))\n)',
+    graph:switchMapLiveGraph,rows:[],codeFrames:[],checkpoints:[],
+    playerLayout:'expanded',playerClass:'rx-flat-tiles rx-switchmap-live',ink:'#26323B',
+    playback:{entry:'manual',finish:'hold',controller:'stages',navigation:'slide',resetOnExit:true,stillTime:switchMapLiveStillTime,stops:[]},
+    live:{start:0,window:24,keep:6,margin:3,autoplay:true,variant:switchMapLiveVariant},
+  });
+  Object.assign(scene,switchMapLiveVariant(scene,{from:0,to:scene.live.window}));
+}
+
+export function switchMapLiveVariant(scene,{from=0,to=24}) {
+  const first=Math.max(0,Math.floor((from-timing.first)/timing.period)-4);
+  const last=Math.max(0,Math.ceil((to-timing.first)/timing.period));
+  const runs=Array.from({length:last-first+1},(_,i)=>runAt(first+i));
+  const source={id:'query',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'};
+  const op={id:'switch',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
+  const http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'};
+  const event=(type,run,offset=0)=>({type,edge:'inner-'+run.index,offset});
+  return {...scene,duration:to,switchMapLiveRuns:runs,
+    captions:[[0,'Każde nowe query anuluje poprzedni request i uruchamia nowy.']],
+    codeLines:[[{text:'query$',mark:source},{text:'.pipe('}],
+      [{text:'  '},{text:'switchMap',mark:op,active:runs.map(run=>({from:event('subscribe',run,run.index?-timing.cancel:0),to:event('inner-subscribe',run)}))},
+        {text:'(query => '},{text:'httpGet(url(query))',mark:http,active:runs.map(run=>({from:event('inner-subscribe',run),to:event('inner-unsubscribe',run)}))},{text:')'}],
+      [{text:')'}]],
+    metrics:[{label:'wejścia',value:time=>countAt(time,timing.first)},
+      {label:'requesty HTTP',value:time=>time<runAt(0).connected?0:1+countAt(time,runAt(1).connected)},
+      {label:'aktywne',value:time=>{
+        const n=countAt(time,timing.first+timing.travel)-1;
+        if(n<0)return 0;
+        const run=runAt(n);
+        return time>=run.connected&&time<run.cancel?1:0;
+      }}],
+  };
+}
+
+function switchMapLiveGraph(scene) {
+  const runs=scene.switchMapLiveRuns,frame=frameFor(scene),large=scene.format==='4:3';
+  const graph={layout:'fixed',formatAware:true,width:1240,height:frame.height,illustratedWork:true,
+    nodes:[{id:'source',label:'query$',ready:true},{id:'op',label:'switchMap',ready:true},{id:'observer',label:'S1',ready:true},
+      ...runs.map((run,i)=>({id:'inner'+i,label:'HTTP GET',born:run.born,inner:true,workRow:i+1,panel:'jobs',slot:i%3}))],
+    edges:[{id:'source-op',from:'source',to:'op',events:[],logicalStart:-1},
+      {id:'op-observer',from:'op',to:'observer',events:[],logicalStart:-1},
+      ...runs.map((run,i)=>({id:'inner-'+run.index,from:'inner'+i,to:'op',events:[],internal:true,
+        logicalStart:run.born,logicalEnd:{at:run.cancel,kind:'unsubscribe'},gateWork:true,fixedStart:true}))],
+    executions:runs.map((run,i)=>({id:run.id,node:'inner'+i,edge:'inner-'+run.index,panel:'jobs',value:run.value,duration:timing.request})),
+    trays:[],schedule:{
+      'source-op':{start:-1,connectDuration:.25,events:runs.map(run=>({at:run.emitted,arrival:run.arrived,logicalAt:run.emitted,value:run.value,color:run.color}))},
+      'op-observer':{start:-1,connectDuration:.25,events:[]},
+      ...Object.fromEntries(runs.map(run=>['inner-'+run.index,{start:run.born,connectDuration:timing.connect,events:[],
+        end:{at:run.cancel,logicalAt:run.cancel,kind:'unsubscribe',duration:timing.cancel}}])),
+    },
+    activities:runs.flatMap(run=>[{node:'source',at:run.emitted,until:run.arrived},{node:'op',at:run.arrived,until:run.connected}]),
+  };
+  // Wspólny wygląd toru i instancji HTTP, bez osobnego renderera slajdu.
+  configureHttpWorkPanel(graph,{...scene,rows:[{events:[]}],operatorName:'switchMap',jobs:runs.map(run=>({...run,dur:timing.request}))},frame,
+    {edge:i=>'inner-'+runs[i].index,stages:i=>[{column:'source',edge:'inner-'+runs[i].index,progress:true}],panelOptions:{maxVisibleRows:3}});
+  const panel=graph.panels[0];
+  Object.assign(panel,{idX:40,idW:100,ballX:190,stageXs:[245],stageWs:[300],
+    ball:{r:large?28:24,font:large?28:25,fitText:true},idFit:true});
+  panel.dividerY=large?190:132;panel.y=panel.dividerY;panel.h=frame.height-panel.dividerY;
+  panel.works.forEach((work,i)=>Object.assign(work,{id:runs[i].id,value:runs[i].value,color:runs[i].color,slot:i%3}));
+  graph.nodes.filter(node=>node.workRow!==undefined).forEach(node=>Object.assign(node,{y:panel.rowsTop+(node.slot+.5)*panel.rowStep,h:panel.rowHeight}));
+  const observer=graph.nodes.find(node=>node.id==='observer');
+  Object.assign(observer,{ready:true,inbox:{...observer.inbox,ready:true}});
+  graph.nodes.find(node=>node.id==='source').label='query$';
+  graph.trays=[];
+  graph.ball={r:large?28:25,font:29,textFill:'#fff',fitText:true};
+  const sourceNode=graph.nodes.find(node=>node.id==='source');
+  graph.readouts=[{id:'query-input',x:sourceNode.x+24,y:sourceNode.top+sourceNode.defH+sourceNode.rowH/2,w:190,h:large?54:46,
+    font:large?30:26,fill:'#F4FBFC',stroke:'#4fa5b5',cursor:true,
+    value:time=>queries[(Math.max(1,countAt(time,timing.first))-1)%queries.length]}];
+  return graph;
 }

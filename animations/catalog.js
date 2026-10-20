@@ -62,6 +62,7 @@ function mapping(mode){
 });
 // Model, graf i postoje distinctUntilChanged: configureDistinctSwitch (reference-scenes.js).
 add("11a-distinct-switchmap","distinctUntilChanged — czy coś się zmieniło?","",1,[],[],"");
+add("12a-switchmap-live","switchMap — nowe zapytanie anuluje poprzednie","",1,[],[],"");
 add("16-czas-cztery","debounceTime i auditTime: cisza czy okno?","",1,[],[],"");
 add("20-sharereplay","Co dostaje spóźniony odbiorca?","share() vs shareReplay({ bufferSize: 1, refCount: true })",22,[
  R("subskrypcje",[E(1,"A+","a"),E(10,"B+","b")]),

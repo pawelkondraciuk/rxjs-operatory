@@ -13,6 +13,7 @@ export function installRevealStages(deck,{getController,getPlayer=()=>null,getMa
   function sync(force=false){
     if(restoring||!controller||!slide||deck.getCurrentSlide()!==slide)return;
     const state=controller.state,count=slide.querySelectorAll('.rx-step').length;
+    if(!count)return;
     const index=state.state==='finished'?count-1:Math.min(count-1,state.checkpointIndex-1);
     if(!force&&index===lastIndex)return;
     lastIndex=index;syncing=true;

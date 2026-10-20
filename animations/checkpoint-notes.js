@@ -63,6 +63,7 @@ export function installCheckpointNotesReceiver(deck,stages,{getPlayer,view=windo
 // bez widocznego znacznika — READY; scena bez postojów pokazuje wynik (statyczna zostaje bez zmian).
 export function showNotesPreviewFrame(slide,player,{still=false}={}) {
   if(!player)return;
+  if(player.stillTime!==undefined){player.finish();return;}
   const markers=[...slide.querySelectorAll('.rx-step')],marker=markers[slide.querySelectorAll('.rx-step.visible').length-1];
   const handoff=marker?.dataset.handoff==='true',time=Number(marker?.dataset.time||0);
   if(player.controller){if(marker)player.controller.seekCheckpoint(time,handoff);else player.controller.reset();}

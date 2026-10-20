@@ -165,7 +165,9 @@ root.addEventListener('keydown',event=>{
 });
 paint();
 const api={subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener);},pause,play,playTo,playContinuously,toggle,step,finishStep,reset:restart,restart,seek,
+get navigation(){return scene.playback?.navigation;},get stillTime(){return scene.playback?.stillTime;},
 get resetOnExit(){return Boolean(scene.playback?.resetOnExit);},finish:()=>{
+ if(scene.playback?.stillTime!==undefined){seek(scene.playback.stillTime);return;}
  // „Pokaż wynik” w trakcie emisji anuluje bieżące wykonanie; druk i READY — umowna chwila defaultClose.
  if(live&&liveClosed===null){
   if(live.actions)finishActions();
@@ -174,7 +176,7 @@ get resetOnExit(){return Boolean(scene.playback?.resetOnExit);},finish:()=>{
  }
  seek(playbackDuration);
 },get isPlaying(){return running;},get time(){return Math.min(time,playbackDuration);},get duration(){return playbackDuration;},get snapshot(){return engine.snapshot(time);},get stops(){return engine.stops;},get state(){return running?'playing':time>=playbackDuration?'finished':time===0?'ready':'paused';},hideControls,toggleControls};
-if(live)api.live={get start(){return live.start;},get state(){return liveClosed!==null?'closed':time>=live.start?'running':'idle';},
+if(live)api.live={autoplay:Boolean(live.autoplay),get start(){return live.start;},get state(){return liveClosed!==null?'closed':time>=live.start?'running':'idle';},
  close:closeLive,reopen(){reopenLive();paint();}};
 // stage: liczba wykonanych akcji; busy: animacja ostatniej akcji jeszcze trwa (liveBusyUntil z wariantu).
 if(live?.actions)Object.defineProperties(api.live,Object.getOwnPropertyDescriptors({actions:live.actions,autoplay:Boolean(live.autoplay),
