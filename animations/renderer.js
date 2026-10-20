@@ -249,12 +249,17 @@ function innerInstancesPanel(panel,frame,reduced=false) {
   }
   return svg+'</g>';
 }
-// Kulka wartości o stałym rozmiarze (graph.ball: r, font); scale tylko dla krótkiego pulsu przekształcenia.
+// Opt-in shape:'pill': stały font, szerokość dopasowana do całej wartości zamiast pomniejszania tekstu.
+const ballWidth=(value,size)=>size.shape==='pill'?Math.max(size.r*2,Array.from(String(value)).length*size.font*.6+2*(size.padding??14)):size.r*2;
+// Kulka lub kapsułka wartości; scale tylko dla krótkiego pulsu przekształcenia.
 function ball(x,y,value,color,size,scale=1,attrs='') {
-  const r=size.r*scale,font=size.fitText?Math.min(size.font,(size.r*2-8)/(Math.max(1,String(value).length)*.6)):size.font;
-  const label=size.fitText?String(value):fitLabel(value,Math.max(1,Math.floor(r*2/(size.font*.58))));
+  const pill=size.shape==='pill',r=size.r*scale,font=pill?size.font:size.fitText?Math.min(size.font,(size.r*2-8)/(Math.max(1,String(value).length)*.6)):size.font;
+  const label=pill||size.fitText?String(value):fitLabel(value,Math.max(1,Math.floor(r*2/(size.font*.58))));
   const title=label===String(value)?'':`<title>${esc(value)}</title>`;
-  return `<g ${attrs}>${title}<circle cx="${x}" cy="${y}" r="${r}" fill="${colors[color]||color}" stroke="#fff" stroke-width="3"/>${text(x,y+1,label,font*scale,`style="font-weight:700${size.textFill?';fill:'+esc(size.textFill):''}"`)}</g>`;
+  const width=ballWidth(value,size)*scale;
+  const shape=pill?`<rect data-value-shape="pill" x="${x-width/2}" y="${y-r}" width="${width}" height="${r*2}" rx="${r}" fill="${colors[color]||color}" stroke="#fff" stroke-width="3"/>`:
+    `<circle cx="${x}" cy="${y}" r="${r}" fill="${colors[color]||color}" stroke="#fff" stroke-width="3"/>`;
+  return `<g ${attrs}>${title}${shape}${text(x,y+1,label,font*scale,`style="font-weight:700${size.textFill?';fill:'+esc(size.textFill):''}"`)}</g>`;
 }
 // Jeden wynik złożony z kilku semantycznie kolorowanych części (np. para combineLatest).
 // Konfiguracja jest opt-in na poziomie grafu; zwykłe wartości nadal korzystają z ball().
@@ -316,6 +321,47 @@ function laneIcon(x,y,lane,k,time=0) {
   if(lane.role==='work')return `<circle data-lane-icon="running" cx="${x}" cy="${y}" r="${r-1.5*k}" fill="none" stroke="${lane.color}" stroke-width="${3*k}" stroke-dasharray="${5*k} ${4*k}" stroke-dashoffset="${(-time*14*k).toFixed(2)}"/>`;
   return `<circle data-lane-icon="waiting" cx="${x}" cy="${y}" r="${r-1.5*k}" fill="#fff" stroke="${lane.color}" stroke-width="${3.5*k}"/>`;
 }
+// Ogólny panel wyników UI. Fraza i zakresy wyróżnień pochodzą ze snapshotu;
+// renderer nie filtruje danych ani nie zna sekwencji konkretnego slajdu.
+function searchPanel(panel,time,reduced) {
+  const {x,y,w,h}=panel,inset=28,inputY=y+66,listY=y+166,rowH=62;
+  let svg=`<g data-search-panel="${esc(panel.id)}" data-query="${esc(panel.query)}">`;
+  svg+=`<rect x="${x+2}" y="${y+7}" width="${w-4}" height="${h}" rx="20" fill="#6c5a3910"/>`;
+  svg+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="20" fill="#FFFDFA" stroke="#D9CFBE" stroke-width="1.5"/>`;
+  svg+=text(x+inset,y+35,panel.label,32,'style="text-anchor:start;fill:#655E53;font-weight:600"');
+  svg+=`<rect x="${x+inset}" y="${inputY}" width="${w-inset*2}" height="82" rx="12" fill="#FAF6EE" stroke="#AB98BA" stroke-width="1.5"/>`;
+  svg+=`<circle cx="${x+inset+34}" cy="${inputY+37}" r="12" fill="none" stroke="#786880" stroke-width="3"/><path d="M${x+inset+43} ${inputY+46}l11 11" stroke="#786880" stroke-width="3" stroke-linecap="round"/>`;
+  const valueX=x+inset+76;
+  svg+=text(valueX,inputY+43,panel.query||panel.placeholder,40,`data-search-input="true" style="text-anchor:start;font-family:Consolas,ui-monospace,monospace;fill:${panel.query?'#26323B':'#8A8379'}"`);
+  if(reduced||Math.floor(time*2)%2===0) {
+    const cursorX=valueX+panel.query.length*24+3;
+    svg+=`<path data-search-cursor="true" d="M${cursorX} ${inputY+21}v42" stroke="#695078" stroke-width="2.5"/>`;
+  }
+  const opacity=reduced?(panel.query&&panel.dropdownOpacity>0?1:0):panel.dropdownOpacity;
+  if(panel.results.length&&opacity>0) {
+    svg+=`<g data-search-dropdown="true" opacity="${+opacity.toFixed(3)}">`;
+    svg+=`<rect x="${x+inset}" y="${listY}" width="${w-inset*2}" height="${panel.results.length*rowH+16}" rx="12" fill="#FFFEFC" stroke="#E4DCCE"/>`;
+    panel.results.forEach((result,index)=>{
+      const rowY=listY+8+index*rowH;
+      svg+=`<g data-search-result="${esc(result.label)}">`;
+      if(index===0)svg+=`<rect x="${x+inset+8}" y="${rowY}" width="${w-inset*2-16}" height="${rowH}" rx="8" fill="#EEE7F2"/>`;
+      else svg+=`<path d="M${x+inset+20} ${rowY}h${w-inset*2-40}" stroke="#EDE7DD"/>`;
+      svg+=`<rect x="${x+inset+20}" y="${rowY+13}" width="36" height="36" rx="8" fill="${index===0?'#DCCDE6':'#F0EBE2'}"/>`;
+      svg+=text(x+inset+38,rowY+32,result.label[0],22,'style="font-weight:700;fill:#675674"');
+      let offset=0,label='';
+      for(const match of result.matches) {
+        label+=esc(result.label.slice(offset,match.start));
+        label+=`<tspan data-search-match="true" style="font-weight:750;fill:#513568">${esc(result.label.slice(match.start,match.end))}</tspan>`;
+        offset=match.end;
+      }
+      label+=esc(result.label.slice(offset));
+      svg+=`<text x="${x+inset+80}" y="${rowY+32}" dominant-baseline="middle" style="text-anchor:start;font-size:36px;fill:#37414A">${label}</text></g>`;
+    });
+    svg+='</g>';
+  }
+  return svg+'</g>';
+}
+
 export function renderScene(frame,options={}) {
   const reduced=Boolean(options.reducedMotion||frame.reducedMotion);
   // Skala tekstu i kapsułek (4:3 > 1); geometria węzłów i paneli pochodzi z grafu.
@@ -429,8 +475,8 @@ export function renderScene(frame,options={}) {
     // Opcjonalny odbiorca definicji jest czytelny także przed pierwszą subskrypcją; zostaje pod wierszem odbiorcy,
     // dopóki ten nie skończy fade-in (bez mignięcia ikony i litery przy subscribe).
     if(n.inbox?.ready&&!(n.laneStates||[]).some(lane=>lane.role==='receiver'&&lane.opacity>=1)) {
-      const x0=n.x-n.w/2+n.inbox.left;
-      svg+=inboxIcon(x0,n.y,n.inbox.size)+text(x0+n.inbox.size+8*k,n.y,n.inbox.label||n.subscriber,n.inbox.font,
+      const x0=n.x-n.w/2+n.inbox.left,y=n.defH?n.top+n.defH+n.rowH/2:n.y;
+      svg+=inboxIcon(x0,y,n.inbox.size)+text(x0+n.inbox.size+8*k,y,n.inbox.label||n.subscriber,n.inbox.font,
         'style="font-weight:700;fill:#43525b;text-anchor:start"');
     }
     for(const lane of n.laneStates||[]) {
@@ -572,7 +618,10 @@ export function renderScene(frame,options={}) {
     if(frame.ball&&h.balls) {
       // Kulki odebranych wartości od lewej, stały rozmiar; najwyżej h.max ostatnich, fade-in 0,3 s. Gdy nowa kulka
       // wchodzi do pełnej historii, wszystkie przesuwają się płynnie o jedno miejsce w lewo, a najstarsza wygasa.
-      const size=h.ball||frame.ball,step=size.r*2+(h.gap??8),max=h.max||3,shown=h.values.slice(-(max+1));
+      const size=h.ball||frame.ball,max=h.max||3;
+      // Jedna szeroka kapsułka zastępuje poprzednią w tym samym miejscu, bez wjazdu spoza kafelka.
+      const shown=h.values.slice(-(size.shape==='pill'&&max===1?1:max+1));
+      const step=Math.max(size.r*2,...shown.map(value=>ballWidth(value.value,size)))+(h.gap??8);
       const overflow=shown.length>max,newest=shown.at(-1);
       const shift=overflow&&!reduced&&newest.shownAt!==undefined?1-clamp((frame.time-newest.shownAt)/.3):0;
       shown.forEach((value,i)=>{
@@ -650,6 +699,7 @@ export function renderScene(frame,options={}) {
       text(x0+pad+textW+gap+badge/2,c.y+1,c.label,size*.82,'style="font-weight:700;fill:#fff"');
     svg+='</g>';
   }
+  for(const panel of frame.searchPanels||[])svg+=searchPanel(panel,frame.time,reduced);
   for(const readout of frame.readouts||[]) {
     const size=readout.font||26,value=String(readout.value);
     svg+=`<g data-readout="${esc(readout.id)}"><rect x="${readout.x-readout.w/2}" y="${readout.y-readout.h/2}" width="${readout.w}" height="${readout.h}" rx="6" fill="${readout.fill||'#fff'}" stroke="${readout.stroke||'#43525b'}" stroke-width="2"/>`;

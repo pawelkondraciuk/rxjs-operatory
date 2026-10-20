@@ -95,6 +95,13 @@ function closeLive(){
  liveClosed=time;rebuild();paint();return true;
 }
 function reopenLive(){if(!live)return;liveClosed=null;liveActs=[];liveFrom=0;liveTo=live.window;rebuild();}
+// Opt-in: opuszczenie slajdu domyka subskrypcje bez odtwarzania animacji teardown.
+function cleanup(){
+ if(!scene.playback?.cleanupOnExit)return;
+ pause();stopAt=null;
+ if(live){liveClosed=time;rebuild();}
+ time=playbackDuration;paint();
+}
 // Sekwencja akcji: „pokaż wynik” wykonuje pozostałe akcje co actionGap i zamraża kadr po settle;
 // z READY (druk) — umowne chwile live.defaults i defaultClose. Wariant skończony po ostatniej akcji (np. zatrzymane
 // źródło) nie wymaga zamrożenia: wynik to jego koniec.
@@ -164,7 +171,7 @@ root.addEventListener('keydown',event=>{
  if(event.target.matches('input')||(['Enter',' '].includes(event.key)&&event.target.matches('button')))event.stopPropagation();
 });
 paint();
-const api={subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener);},pause,play,playTo,playContinuously,toggle,step,finishStep,reset:restart,restart,seek,
+const api={subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener);},pause,cleanup,play,playTo,playContinuously,toggle,step,finishStep,reset:restart,restart,seek,
 get navigation(){return scene.playback?.navigation;},get stillTime(){return scene.playback?.stillTime;},
 get resetOnExit(){return Boolean(scene.playback?.resetOnExit);},finish:()=>{
  if(scene.playback?.stillTime!==undefined){seek(scene.playback.stillTime);return;}

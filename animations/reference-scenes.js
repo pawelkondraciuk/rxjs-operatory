@@ -2275,7 +2275,8 @@ function combineLatestWithLatestFromGraph(scene) {
 
 // fromEvent → map → share: ten sam wygląd torów, jeden upstream i dwóch stałych odbiorców.
 // Wpisanie i kasowanie angular jest cyklem zdarzeń input, nie resetem subskrypcji.
-const querySourceTiming={first:.8,key:1.6,hold:4,erase:1.1,empty:2,travel:.6,transform:.75,split:.6};
+const querySourceTiming={mapBorn:.1,mapStop:.55,shareBorn:.65,shareStop:1.1,subscribe:1.25,connect:.15,live:2,
+  first:2.8,key:1.6,hold:4,erase:1.1,empty:2,travel:.6,transform:.75,split:.6};
 const querySourceWord='angular';
 const querySourceDelete=(querySourceWord.length-1)*querySourceTiming.key+querySourceTiming.hold;
 const querySourceCycle=querySourceDelete+(querySourceWord.length-1)*querySourceTiming.erase+querySourceTiming.empty;
@@ -2303,53 +2304,68 @@ export function configureQuerySource(scene) {
   const last=querySourceInputs(0,22)[querySourceWord.length-1];
   Object.assign(scene,{
     title:'Źródło: skąd bierze się query$?',
-    code:"const query$ = fromEvent(inputEl, 'input').pipe(\n  map(event => (event.target as HTMLInputElement).value.trim()),\n  share()\n);",
+    code:"const query$ = fromEvent(inputEl, 'input').pipe(\n  map(() => inputEl.value.trim()),\n  share()\n);",
     graph:querySourceGraph,rows:[],codeFrames:[],checkpoints:[],metrics:[],
     playerLayout:'function',playerClass:'rx-flat-tiles rx-query-source',ink:'#26323B',
-    playback:{entry:'manual',finish:'hold',controller:'stages',navigation:'slide',resetOnExit:true,stillTime:querySourceOutputAt(last)+.35,stops:[]},
-    live:{start:0,window:32,keep:8,margin:3,autoplay:true,variant:querySourceVariant},
+    playback:{entry:'manual',finish:'hold',controller:'stages',navigation:'after-intro',resetOnExit:true,cleanupOnExit:true,
+      stillTime:querySourceOutputAt(last)+.35,stops:[{id:'map',time:querySourceTiming.mapStop},
+        {id:'share',time:querySourceTiming.shareStop},{id:'live',time:querySourceTiming.live}]},
+    live:{start:querySourceTiming.live,window:32,keep:8,margin:3,autoplay:false,variant:querySourceVariant},
   });
   Object.assign(scene,querySourceVariant(scene,{from:0,to:scene.live.window}));
 }
 
-export function querySourceVariant(scene,{from=0,to=32}) {
-  const input=querySourceInputs(from,to),source={id:'source',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},
+export function querySourceVariant(scene,{from=0,to=32,closedAt=null}) {
+  const input=querySourceInputs(from,to).filter(v=>closedAt===null||v.at<closedAt),source={id:'source',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},
     map={id:'map',bg:'rgba(216,179,230,.45)',line:'#b384c6'},share={...map,id:'share'};
   const during=(a,b)=>({from:{at:a},to:{at:b}});
-  return {...scene,duration:to,querySourceInputs:input,
+  const showMap={at:querySourceTiming.mapBorn},showShare={at:querySourceTiming.shareBorn};
+  const result={...scene,duration:closedAt===null?to:closedAt+.5,querySourceInputs:input,querySourceClosedAt:closedAt,
     captions:[[0,'fromEvent tworzy strumień ze zdarzeń input, map wyciąga tekst, a share pozwala współdzielić jedno źródło dalej.']],
-    codeLines:[[{text:'const query$ = '},{text:"fromEvent(inputEl, 'input')",mark:source,active:input.map(v=>during(v.at,v.arrival))},{text:'.pipe('}],
-      [{text:'  '},{text:'map(event => (event.target as HTMLInputElement).value.trim())',mark:map,active:input.map(v=>during(v.arrival,v.arrival+querySourceTiming.transform))},{text:','}],
-      [{text:'  '},{text:'share()',mark:share,active:input.map(v=>during(v.arrival+querySourceTiming.transform+querySourceTiming.travel,querySourceOutputAt(v))) }],
-      [{text:');'}]],
+    codeLines:[[{text:'const query$ = '},{text:"fromEvent(inputEl, 'input')",mark:source,active:input.map(v=>during(v.at,v.arrival))},{text:'.pipe(',show:showMap}],
+      [{text:'  ',show:showMap},{text:'map(() => inputEl.value.trim())',show:showMap,mark:map,active:input.map(v=>during(v.arrival,v.arrival+querySourceTiming.transform))},{text:',',show:showShare}],
+      [{text:'  ',show:showShare},{text:'share()',show:showShare,mark:share,active:input.map(v=>during(v.arrival+querySourceTiming.transform+querySourceTiming.travel,querySourceOutputAt(v))) }],
+      [{text:');',show:showMap}]],
   };
+  if(closedAt!==null)for(const line of result.codeLines)for(const part of line)part.active=[];
+  return result;
 }
 
 function querySourceGraph(scene) {
   const tall=scene.format==='4:3',top=tall?100:50,y=laneRowY(top,0),secondTop=top+210;
-  const input=scene.querySourceInputs,t=querySourceTiming,ball={...laneLook.ball,r:32,font:30,fitText:true};
+  const input=scene.querySourceInputs,t=querySourceTiming,closedAt=scene.querySourceClosedAt,ball={...laneLook.ball,r:32,font:30,shape:'pill'};
   const output=input.map(v=>({...v,value:v.value||'""',at:v.arrival+t.transform,arrival:v.arrival+t.transform+t.travel}));
   const shared=output.map(v=>({...v,at:v.arrival+t.split,arrival:v.arrival+t.split+t.travel}));
-  const receiver=(id,label,receiverTop)=>({id,label,x:1060,w:320,subscriber:id,
-    ...laneTile('receiver',receiverTop,{[id]:0},1,{growRows:false,labelOffset:-laneLook.rowH/2}),inbox:{...laneInbox(),ready:true},labelSize:32});
+  const receiver=(id,label,receiverTop)=>({id,label,x:1070,w:320,subscriber:id,
+    ...laneTile('receiver',receiverTop,{[id]:0},1,{growRows:false,labelOffset:-laneLook.rowH/2}),inbox:{...laneInbox(),ready:true}});
   const graph={layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball,
     subscribers:{U:{...laneSubscribers.A,label:''},A:laneSubscribers.A,B:laneSubscribers.B},
-    nodes:[{id:'source',label:'fromEvent(input)',x:190,w:340,labelSize:32,...laneTile('source',top,{U:0},1)},
-      {id:'map',label:'map',x:500,w:180,color:'op',transformBalls:true,...laneTile('operator',top,{U:0},1)},
-      {id:'share',label:'share',x:750,w:200,color:'op',splitBalls:true,hubFan:false,splitGuides:false,
-        ...laneTile('operator',top,{U:0,A:0,B:1},2)},
+    nodes:[{id:'source',label:'fromEvent',x:150,w:260,...laneTile('source',top,{U:0},1,{growRows:false,labelOffset:-laneLook.rowH/2,
+        laneRows:[{subscriber:'U',top:top+laneLook.defH,h:laneLook.rowH,growth:1,color:laneSubscribers.A.color}]})},
+      {id:'map',label:'map',x:460,w:180,color:'op',transformBalls:true,...laneTile('operator',top,{U:0},1,{ready:false,born:t.mapBorn})},
+      {id:'share',label:'share',x:740,w:180,color:'op',splitBalls:true,hubFan:false,splitGuides:false,
+        ...laneTile('operator',top,{U:0,A:0,B:1},2,{ready:false,born:t.shareBorn})},
       receiver('A','podgląd query',top),receiver('B','wyszukiwarka',secondTop)],
-    edges:[{id:'source-map',from:'source',to:'map',subscriber:'U',logicalStart:-1},
-      {id:'map-share',from:'map',to:'share',subscriber:'U',logicalStart:-1},
-      ...['A','B'].map(id=>({id:'share-'+id,from:'share',to:id,subscriber:id,logicalStart:-1}))],
-    schedule:{'source-map':{start:-1,connectDuration:.5,events:input.map(v=>({...v,value:'{…}'}))},
-      'map-share':{start:-1,connectDuration:.5,events:output},
-      ...Object.fromEntries(['A','B'].map(id=>['share-'+id,{start:-1,connectDuration:.5,events:shared}]))},
-    trays:['A','B'].map((id,i)=>({anchor:id,x:1110,y:laneRowY(i?secondTop:top,0),w:90,balls:true,max:1,ball})),
+    edges:[{id:'source-map',from:'source',to:'map',subscriber:'U',logicalStart:t.subscribe,fixedStart:true},
+      {id:'map-share',from:'map',to:'share',subscriber:'U',logicalStart:t.subscribe,fixedStart:true},
+      ...['A','B'].map(id=>({id:'share-'+id,from:'share',to:id,subscriber:id,logicalStart:t.subscribe,fixedStart:true}))],
+    schedule:{'source-map':{start:t.subscribe+2*t.connect,connectDuration:t.connect,events:input.map(v=>({...v,value:'{…}'}))},
+      'map-share':{start:t.subscribe+t.connect,connectDuration:t.connect,events:output},
+      ...Object.fromEntries(['A','B'].map((id,i)=>['share-'+id,{start:t.subscribe+i*3*t.connect,connectDuration:t.connect,events:shared}]))},
+    trays:['A','B'].map((id,i)=>({anchor:id,x:1120,y:laneRowY(i?secondTop:top,0),w:180,balls:true,max:1,ball})),
     activities:input.flatMap(v=>[{node:'source',at:v.at,until:v.arrival},{node:'map',at:v.arrival,until:v.arrival+t.transform},
       {node:'share',at:v.arrival+t.transform+t.travel,until:querySourceOutputAt(v)}]),
   };
-  graph.readouts=[{...queryInputReadout(graph,scene,querySourceTextAt),x:190,y:y,w:210}];
+  if(closedAt!==null) {
+    graph.edges=graph.edges.filter(edge=>graph.schedule[edge.id].start<closedAt);
+    for(const edge of graph.edges) {
+      const end={at:closedAt,logicalAt:closedAt,kind:'unsubscribe',duration:t.connect};
+      edge.logicalEnd=end;edge.hideAfterTerminal=true;
+      Object.assign(graph.schedule[edge.id],{end,events:graph.schedule[edge.id].events.filter(value=>value.arrival<=closedAt)});
+    }
+    graph.activities=graph.activities.map(activity=>({...activity,until:Math.min(activity.until,closedAt)}));
+  }
+  graph.readouts=[{...queryInputReadout(graph,scene,time=>querySourceTextAt(Math.min(time,closedAt??Infinity))),x:150,y:y,w:210}];
   return graph;
 }
 

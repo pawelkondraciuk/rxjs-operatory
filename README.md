@@ -39,7 +39,7 @@ Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorz
 
 Otwarcie do tytułu pozostaje bez zmian: społeczność, historia meet.js, fotografie i autor. Po tytule pokazujemy HTTP, Cold, interval, Subject — ręczną emisję, ręczny multicast HTTP i odłączanie źródła interval, a dopiero potem pytania o znane operatory i share. Budżet **30–35 minut dotyczy tylko części właściwej**; otwarcie, pytania i dogrywka są dodatkowo.
 
-MAIN ma **40 slajdów (26 animowanych)**. EXTRAS zawiera **3 slajdy animowane**. Całość obejmuje 35 bazowych slajdów HTML i 43 slajdy po rozwinięciu wariantów. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
+MAIN ma **40 slajdów (27 animowanych)**. EXTRAS zawiera **3 slajdy animowane**. Całość obejmuje 35 bazowych slajdów HTML i 43 slajdy po rozwinięciu wariantów. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
 
 Kolejność po slajdzie tytułowym:
 
@@ -520,44 +520,51 @@ Góra bez zmian: id$ → operator → kompaktowy Odbiorca, jeden główny tor S1
 
 ### Zaprojektujmy wyszukiwarkę — `12-intro-wyszukiwarka`
 
-**MAIN — bezpośrednio po exhaustMap, przed źródłem query$.** Statyczna plansza otwierająca historię wyszukiwarki, zaprojektowana dla 16:9 i dopasowana także do 4:3.
+**MAIN — bezpośrednio po exhaustMap, przed źródłem query$.** Duży, jasny komponent UI w 16:9 i 4:3: kremowe tło, serifowy tytuł, badge „Ręczny · M”, szeroki panel „Search JS frameworks”, renderowane pole z kursorem i pięć dużych wyników. Label ma 32 px, tekst inputa 40 px, wyniki 36 px w SVG; panel znajduje się wysoko pod tytułem. Pole nie przyjmuje tekstu ani fokusu. Na slajdzie nie ma kodu ani schematu.
 
-**Na ekranie:** kremowe tło, duży serifowy tytuł i badge „Ręczny · M”. Trzy płaskie bloczki połączone strzałkami: turkusowy „input / klawiatura” → jasnofioletowy „query$” → bardzo jasnofioletowy „HTTP / wyniki”. Podpisy: „użytkownik wpisuje kolejne znaki”, „powstaje strumień zapytań” i „dobieramy operatory i pobieramy dane”. Całość widoczna od wejścia; strzałki i pilot przechodzą bezpośrednio do sąsiednich slajdów.
+**Sterowanie:** pokaz startuje od wejścia i działa w pętli bez ręcznych postojów. Wpisuje `r → re → rea`, kasuje do pustego pola, następnie analogicznie `ang`, `vue` i `sve`; po skasowaniu ostatniej frazy zaczyna od nowa. Każda pełna fraza daje pięć wyników po 300 ms ciszy. Strzałki / Page Up / Page Down od razu zmieniają slajd. Spacja pauzuje/wznawia, R restartuje od pustego pola, F pokazuje nieruchomy kadr pięciu wyników `sve`. Powrót na slajd zaczyna pokaz od nowa. Druk i Upcoming pokazują kadr `sve` bez animacji.
 
-**Stopka:** Od zdarzeń z inputa do stabilnego pipeline’u zapytań HTTP.
+**Wyniki:**
 
-**Speaker notes:**
+| Fraza | Pięć wyników |
+| --- | --- |
+| rea | React, Preact, React Native, React Router, React Query |
+| ang | Angular, Angular Universal, Angular Material, Angular Signals, RxAngular |
+| vue | Vue, Vue Router, VueUse, Petite Vue, BootstrapVue |
+| sve | Svelte, SvelteKit, Svelte Material UI, Svelte Motion, Svelte Headless UI |
 
-> Zaprojektujmy wyszukiwarkę. Użytkownik wpisuje kolejne znaki, z których powstaje strumień query$. Dobierzemy operatory, które przeprowadzą nas od tych zdarzeń do wyników HTTP.
->
-> Najpierw ustalmy, skąd bierze się query$: na następnym slajdzie przejdziemy od zdarzenia input do tekstu współdzielonego przez dwóch odbiorców.
+Dopasowanie bez rozróżniania wielkości liter, także wewnątrz nazwy (np. P**rea**ct, Rx**Ang**ular). Podczas kasowania aktualizuje się natychmiast: **rea** → **re** → **r**. Dotychczasowe wyniki pozostają podczas kasowania; po usunięciu ostatniej litery dropdown gaśnie przez 180 ms. Nie pojawia się ponownie podczas wpisywania następnej frazy, dopóki nie nadejdzie nowa odpowiedź. Pusta fraza nie uruchamia zapytania.
+
+Pisanie co 180 ms, kasowanie co 150 ms, przejście przy pustym polu 700 ms, oglądanie wyników 2 s. Debounce oznacza aktualizację wyników po 300 ms ciszy od ostatniej zmiany, a nie cykliczne zapytanie co 300 ms. Dane i odpowiedzi są lokalną symulacją.
+
+**Stopka:** Pokaz działania gotowej wyszukiwarki: fraza zmienia się automatycznie, a lista wyników reaguje i pogrubia dopasowania.
+
+**Speaker notes:** Gotowy komponent startuje automatycznie, pokazuje cztery przykłady po pięć wyników. Zwróć uwagę na dopasowania wewnątrz nazw, skracanie wyróżnień przy kasowaniu i wygaszenie dropdownu przy pustym polu. Debounce czeka na 300 ms ciszy. Następny slajd zagląda pod spód: budujemy źródło query$ ze zdarzeń input.
 
 ### Źródło: skąd bierze się query$? — `12-query-zrodlo`
 
-**MAIN — po „Zaprojektujmy wyszukiwarkę”, przed switchMap na żywo.** Pokaz działa w pętli od wejścia, w 16:9 i 4:3. Badge „Ręczny · M” dotyczy przejścia między slajdami; prawo prowadzi do switchMap, lewo do planszy wyszukiwarki. Spacja pauzuje, R restartuje.
+**MAIN — po „Zaprojektujmy wyszukiwarkę”, przed switchMap na żywo.** W 16:9 i 4:3 wejście pokazuje tylko `const query$ = fromEvent(inputEl, 'input')`, kafelek źródła z pustym inputem i dwóch odbiorców. Pierwsze prawo dodaje kod i kafelek map, drugie share, trzecie szybko zestawia subskrypcje i uruchamia pętlę danych. Kolejne prawo podczas emisji prowadzi do switchMap. Lewo cofa etapy; Spacja pauzuje, R wraca do READY. Wyjście odłącza subskrypcje bez animacji i zatrzymuje RAF; powrót zaczyna od definicji.
 
 ```ts
 const query$ = fromEvent(inputEl, 'input').pipe(
-  map(event => (event.target as HTMLInputElement).value.trim()),
+  map(() => inputEl.value.trim()),
   share()
 );
 ```
 
-**Na ekranie:** wspólne kafelki z nagłówkiem, wierszem wykonania i portami jak na wcześniejszych slajdach: `fromEvent(input)` → `map` → `share` → dwóch odbiorców „podgląd query” i „wyszukiwarka”. W wierszu źródła jest ten sam input z kursorem co w pokazach wyszukiwarki. Automatycznie wpisuje `a → an → ang → angu → angul → angula → angular`, czeka, kasuje litery do pustego tekstu i zaczyna od nowa. Zdarzenie `{…}` wjeżdża do map, zmienia się w pełny tekst, a share rozdziela jedną kulkę do obu odbiorców. Pusty string ma oznaczenie `""`. Jedna wspólna subskrypcja upstream przez map, bez HTTP i liczników.
+**Na ekranie:** rozsunięte kafelki (przerwy 90/100/80 jednostek SVG) z nagłówkiem, wierszem wykonania i portami jak na wcześniejszych slajdach: `fromEvent` → `map` → `share` → dwóch odbiorców „podgląd query” i „wyszukiwarka”. Nagłówki źródła i obu odbiorców mają ten sam duży font co pozostałe kafelki (około 41 jednostek SVG). W wierszu źródła jest ten sam input z kursorem co w pokazach wyszukiwarki. Automatycznie wpisuje `a → an → ang → angu → angul → angula → angular`, czeka, kasuje litery do pustego tekstu i zaczyna od nowa. Zdarzenie `{…}` wjeżdża do map, zmienia się w pełny tekst, a share rozdziela tę samą wartość do obu odbiorców. Wartości są szerokimi kapsułkami: font pozostaje stały, a szerokość rośnie z tekstem (np. `angular`), także w trakcie przelotu. U odbiorcy nowa kapsułka zastępuje poprzednią w tym samym miejscu. Pusty string ma oznaczenie `""`. Jedna wspólna subskrypcja upstream przez map, bez HTTP i liczników.
 
-Kod rysuje standardowy odtwarzacz: kolory składni, pastelowe marki źródła/map/share i aktywne wyróżnienia zsynchronizowane z kafelkami. Źródła `fromEvent` i `query$`, operatory `map` i `share`, parametr `event`, typ `HTMLInputElement` i literał `'input'` korzystają ze wspólnej palety. Druk, F i Upcoming pokazują `angular` u obu odbiorców.
+Kod rysuje standardowy odtwarzacz: kolory składni, pastelowe marki źródła/map/share i aktywne wyróżnienia zsynchronizowane z kafelkami. Źródła `fromEvent` i `query$`, operatory `map` i `share` oraz literał `'input'` korzystają ze wspólnej palety. Przykład zakłada `inputEl: HTMLInputElement`; map czyta bezpośrednio `inputEl.value`, bez castu. Parametr `<T>` funkcji fromEvent opisuje typ emitowanego zdarzenia, a nie element DOM ([sygnatury RxJS 7.8.2](https://github.com/ReactiveX/rxjs/blob/7.8.2/src/internal/observable/fromEvent.ts#L56)). Druk, F i Upcoming pokazują `angular` u obu odbiorców.
 
 **Stopka:** fromEvent tworzy strumień ze zdarzeń input, map wyciąga tekst, a share pozwala współdzielić jedno źródło dalej.
 
-**Speaker notes:**
+**Speaker notes per checkpoint:**
 
-> Skąd bierze się query$? fromEvent nasłuchuje zdarzeń input z pola inputEl. Zdarzenie to jeszcze nie tekst: map pobiera value z elementu i usuwa białe znaki z obu końców przez trim(). Rzutowanie as HTMLInputElement jest informacją o typie w TypeScript.
->
-> Obaj odbiorcy już subskrybują. share współdzieli jedną subskrypcję do źródła i jedno wykonanie map. Ta sama emisja trafia do podglądu query i do wyszukiwarki. To rozdzielenie jednej emisji, bez historii dla późnego odbiorcy.
->
-> Pokaz sam wpisuje a → an → ang → angu → angul → angula → angular, czeka, kasuje litery aż do pustego inputa i zaczyna od nowa. Każde zdarzenie przechodzi przez map i share do obu odbiorców; pusta wartość jest oznaczona jako "". Przeloty spowalniają ilustrację synchronicznych map i share, nie dodają opóźnienia RxJS. Spacja pauzuje, R restartuje, strzałki zmieniają slajd. Druk, F i Upcoming pokazują angular u obu odbiorców.
->
-> Mamy gotowy strumień tekstu. Na następnym slajdzie podłączymy wyszukiwarkę do switchMap i zobaczymy na żywo, jak nowa fraza anuluje poprzedni request.
+- **ready — 0 — Źródło i odbiorcy:** Skąd bierze się query$? Na razie mamy tylko definicję fromEvent i pusty input. Dwa pola odbiorców są widoczne, ale nikt jeszcze nie subskrybuje: nie ma portów, przewodów ani emisji. Dalej dodaje map.
+- **map — 1 — Wyciągamy tekst:** Dopisujemy .pipe(map(() => inputEl.value.trim())). inputEl ma typ HTMLInputElement; map odczyta value i usunie białe znaki. Kafelek map pojawia się razem z kodem. To nadal tylko definicja, bez subskrypcji i danych. Dalej dodaje share.
+- **share — 2 — Wspólne źródło:** Dopisujemy share() i pokazujemy jego kafelek. Współdzielimy jedno źródło i jedno wykonanie map między podglądem query a wyszukiwarką. Dalsze prawo szybko podłączy obu odbiorców i jedyny upstream, a potem uruchomi pisanie.
+- **live — 3 — Subskrypcja i dane:** A szybko subskrybuje przez share i map do fromEvent; B dołącza do share bez drugiej subskrypcji źródła. Dopiero teraz input wpisuje a → an → ang → angu → angul → angula → angular, czeka, kasuje litery do pustego tekstu i powtarza. map zamienia zdarzenie na tekst, share rozdziela tę samą kapsułkę do obu odbiorców. Pusty string to "". Przeloty spowalniają ilustrację, nie rzeczywiste operatory. Spacja pauzuje, lewo wraca do etapu share, R do początkowej definicji. Prawo przechodzi do switchMap; wyjście odłącza subskrypcje i zatrzymuje zegar bez animacji. Powrót zaczyna od READY.
+- **finished — 4 — Gotowe query$:** Druk, F i Upcoming pokazują pełny pipeline i angular u obu odbiorców. Mamy gotowy strumień tekstu. Na następnym slajdzie podłączymy wyszukiwarkę do switchMap i zobaczymy na żywo, jak nowa fraza anuluje poprzedni request.
 
 ### switchMap na żywo — `12a-switchmap-live`
 

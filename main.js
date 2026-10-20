@@ -214,7 +214,10 @@ function activate(slide) {
   if (activePlayer?.controller) activePlayer.controller.suspend('slide'); else activePlayer?.pause();
   // Scena na żywo (interval) po wyjściu zatrzymuje wykonanie i wraca do READY; nie wznawia się po powrocie.
   // Ponowna aktywacja tego samego slajdu (np. przy inicjalizacji Reveal) nie jest wyjściem.
-  if ((activePlayer?.live || activePlayer?.resetOnExit) && activeSlide !== slide) activePlayer.controller.reset();
+  if (activeSlide !== slide) {
+    activePlayer?.cleanup();
+    if (activePlayer?.live || activePlayer?.resetOnExit) activePlayer.controller.reset();
+  }
   activePlayer?.hideControls();
   activeSlide = slide;
   activePlayer = playerFor(slide);

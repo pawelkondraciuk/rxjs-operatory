@@ -897,26 +897,39 @@ A kończy się normalnie, B nie wraca. C przychodzi po zakończeniu A i dostaje 
 **ID:** `12-intro-wyszukiwarka`
 **Źródło:** [index.html — sekcja 12-intro-wyszukiwarka](../index.html)
 
-### Notatki sekcji — wyświetlane w prezentacji
+### Notatki sekcji — wyświetlane podczas pętli
 
-Zaprojektujmy wyszukiwarkę. Użytkownik wpisuje kolejne znaki, z których powstaje strumień query$. Dobierzemy operatory, które przeprowadzą nas od tych zdarzeń do wyników HTTP.
+Zaprojektujmy wyszukiwarkę. Duży, jasny komponent UI startuje automatycznie i zapętla rea, ang, vue i sve. Każda fraza jest wpisywana i kasowana znak po znaku; po 300 ms ciszy pojawia się pięć wyników. Nie odpytujemy cyklicznie co 300 ms — to debounce. Dane są lokalną symulacją.
 
-Najpierw ustalmy, skąd bierze się query$: na następnym slajdzie przejdziemy od zdarzenia input do tekstu współdzielonego przez dwóch odbiorców.
+Podczas kasowania wyróżnienie skraca się razem z frazą: rea → re → r. Wyniki pozostają, ale przy pustym polu dropdown gaśnie. Pojawia się ponownie po odpowiedzi dla nowej frazy. Pokaż dopasowania wewnątrz Preact, RxAngular i BootstrapVue.
+
+Spacja pauzuje/wznawia, R restartuje, strzałki od razu zmieniają slajd. F, druk i Upcoming pokazują pięć wyników sve. Teraz zajrzymy pod spód: na następnym slajdzie przejdziemy od zdarzenia input do tekstu query$ współdzielonego przez dwóch odbiorców.
 
 ## 18. Źródło: skąd bierze się query$?
 
 **ID:** `12-query-zrodlo`
 **Źródło:** [index.html — sekcja 12-query-zrodlo](../index.html)
 
-### Notatki sekcji — wyświetlane podczas pętli
 
-Skąd bierze się query$? fromEvent nasłuchuje zdarzeń input z pola inputEl. Zdarzenie to jeszcze nie tekst: map pobiera value z elementu i usuwa białe znaki z obu końców przez trim(). Rzutowanie as HTMLInputElement jest informacją o typie w TypeScript.
+### 0 — Źródło i odbiorcy — `ready`
 
-Obaj odbiorcy już subskrybują. share współdzieli jedną subskrypcję do źródła i jedno wykonanie map. Ta sama emisja trafia do podglądu query i do wyszukiwarki. To rozdzielenie jednej emisji, bez historii dla późnego odbiorcy.
+Skąd bierze się query$? Na razie mamy tylko definicję fromEvent i pusty input. Dwa pola odbiorców są widoczne, ale nikt jeszcze nie subskrybuje: nie ma portów, przewodów ani emisji. Dalej dodaje map.
 
-Pokaz sam wpisuje a → an → ang → angu → angul → angula → angular, czeka, kasuje litery aż do pustego inputa i zaczyna od nowa. Każde zdarzenie przechodzi przez map i share do obu odbiorców; pusta wartość jest oznaczona jako "". Przeloty spowalniają ilustrację synchronicznych map i share, nie dodają opóźnienia RxJS. Spacja pauzuje, R restartuje, strzałki zmieniają slajd. Druk, F i Upcoming pokazują angular u obu odbiorców.
+### 1 — Wyciągamy tekst — `map`
 
-Mamy gotowy strumień tekstu. Na następnym slajdzie podłączymy wyszukiwarkę do switchMap i zobaczymy na żywo, jak nowa fraza anuluje poprzedni request.
+Dopisujemy .pipe(map(() => inputEl.value.trim())). inputEl ma typ HTMLInputElement; map odczyta value i usunie białe znaki. Kafelek map pojawia się razem z kodem. To nadal tylko definicja, bez subskrypcji i danych. Dalej dodaje share.
+
+### 2 — Wspólne źródło — `share`
+
+Dopisujemy share() i pokazujemy jego kafelek. Współdzielimy jedno źródło i jedno wykonanie map między podglądem query a wyszukiwarką. Dalsze prawo szybko podłączy obu odbiorców i jedyny upstream, a potem uruchomi pisanie.
+
+### 3 — Subskrypcja i dane — `live`
+
+A szybko subskrybuje przez share i map do fromEvent; B dołącza do share bez drugiej subskrypcji źródła. Dopiero teraz input wpisuje a → an → ang → angu → angul → angula → angular, czeka, kasuje litery do pustego tekstu i powtarza. map zamienia zdarzenie na tekst, share rozdziela tę samą kapsułkę do obu odbiorców. Pusty string to "". Przeloty spowalniają ilustrację, nie rzeczywiste operatory. Spacja pauzuje, lewo wraca do etapu share, R do początkowej definicji. Prawo przechodzi do switchMap; wyjście odłącza subskrypcje i zatrzymuje zegar bez animacji. Powrót zaczyna od READY.
+
+### 4 — Gotowe query$ — `finished`
+
+Druk, F i Upcoming pokazują pełny pipeline i angular u obu odbiorców. Mamy gotowy strumień tekstu. Na następnym slajdzie podłączymy wyszukiwarkę do switchMap i zobaczymy na żywo, jak nowa fraza anuluje poprzedni request.
 
 ## 19. switchMap — nowe zapytanie anuluje poprzednie
 

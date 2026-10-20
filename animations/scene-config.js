@@ -1,5 +1,7 @@
 import { configureQuerySource, configureDebounceSwitch, configureSwitchMapLive, configureFlatten, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureDebounceAudit, configureShareReplayOne, configureShareReplayRefCount, configureCombineLatestWithLatestFrom, configureRetryBackoff, configureDefer } from './reference-scenes.js';
 
+import { configureSearchDemo } from './search-demo.js';
+
 // Końcowe ID po rozwinięciu wariantów; otwarcie do tytułu pozostaje w kolejności HTML.
 export const mainOrder = [
   // Slajdy techniczne: HTTP (subscribe/next/complete) z kodem źródłowym httpGet (05b-http-kod) i Cold (jedna definicja,
@@ -30,6 +32,7 @@ function trimTail(scene) {
 // Applies AFTER variants are resolved, so a variant never inherits stale stop times.
 export function configureScene(scene) {
   const id=scene.rendererId||scene.id;
+  if(id==='12-intro-wyszukiwarka')configureSearchDemo(scene);
   if(id==='12-query-zrodlo')configureQuerySource(scene);
   if(id==='12a-switchmap-live')configureSwitchMapLive(scene);
   if(id==='12b-debounce-switchmap')configureDebounceSwitch(scene);

@@ -718,6 +718,7 @@ export function compileScene(scene) {
       panels:(graph.panels||[]).map((panel,i)=>panelShownAt[i]===undefined?panel:{...panel,shownAt:panelShownAt[i],visible:time>=panelShownAt[i]}),cards:scene.kind==='cards'?scene.items:[],caption:captionAt(captions,time),
       ...(graph.ball?{ball:graph.ball}:{}),
       ...(graph.readouts?{readouts:graph.readouts.map(readout=>({...readout,value:evaluate(readout.value,time)}))}:{}),
+      ...(graph.searchPanels?{searchPanels:graph.searchPanels.map(({state,...panel})=>({...panel,...evaluate(state,time)}))}:{}),
       ...(callouts.length?{callouts:callouts.flatMap(callout=>{
         const opacity=Math.min(clamp((time-callout.from)/.25),1-clamp((time-callout.to)/.3));
         if(time<callout.from||opacity<=0)return [];

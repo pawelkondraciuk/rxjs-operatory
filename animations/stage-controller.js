@@ -63,6 +63,7 @@ export function createStageController(player,options={}) {
   function next(){
     cancelResume();if(suspensions.size)return;
     if(player.navigation==='slide'){options.onNavigate?.(1);return;}
+    if(player.navigation==='after-intro'&&player.live?.state==='running'){options.onNavigate?.(1);return;}
     if(player.state==='finished'){options.onNavigate?.(1);return;}
     if(player.live){nextLive(player.live);return;}
     if(player.isPlaying){
