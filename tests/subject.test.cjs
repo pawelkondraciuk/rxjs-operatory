@@ -5,7 +5,7 @@ const values=(frame,id)=>Array.from(frame.histories.find(h=>h.anchor===id).value
 const node=(frame,id)=>frame.nodes.find(n=>n.id===id);
 const lanes=(frame,id)=>Array.from(node(frame,id).laneStates,l=>`${l.role}:${l.subscriber}:${l.state}`);
 const fieldOf=(svg,id)=>svg.slice(svg.indexOf(`data-field="${id}"`),svg.indexOf('</g>',svg.indexOf(`data-field="${id}"`)));
-const stopIds=['defined','connect-http','request','multicast','complete'];
+const stopIds=['defined','connect-http','multicast','complete'];
 const fields=[['A','user.firstName','Paweł'],['B','user.lastName','Kondraciuk'],['C','user.city','Białystok']];
 const codeText=['const subject$ = new Subject<User>();',"const http$ = httpGet<User>('/api/users/42');",'','http$.subscribe(subject$);'];
 // Krycie i aktywność fragmentów kodu w klatce: linia → [opacity…].
@@ -86,8 +86,8 @@ test('connect-http: the http$.subscribe(subject$) line appears, then the subscri
  assert.equal(accent.text,'.subscribe(subject$)');assert.equal(accent.mark.quiet,true);assert.equal(accent.mark.line,'#238F83','kolor impulsu subskrypcji (tor U)');
  assert.equal(accent.active,true,'akcent subscribe widoczny na postoju');
  assert.equal(markOf(c.snapshot(start-.1),'subscribe').active,true,'akcent od pojawienia się linii');
- assert.equal(markOf(c.snapshot(at('request')),'subscribe').active,false,'akcent chwilowy');
- assert.equal(markOf(c.snapshot(at('request')),'subscribe').opacity,1,'linia zostaje na stałe');
+ assert.equal(markOf(c.snapshot(at('connect-http')+1.5),'subscribe').active,false,'akcent chwilowy');
+ assert.equal(markOf(c.snapshot(at('connect-http')+1.5),'subscribe').opacity,1,'linia zostaje na stałe');
  assert.doesNotMatch(render(stop),/data-callout/);
  const cable=c.snapshot((start+connected)/2).edges.find(e=>e.id==='http-subject');
  assert.ok(cable.visible&&cable.progress>0&&cable.progress<1&&cable.offset<0,'kabel rośnie od Subjecta w lewo');
@@ -110,8 +110,11 @@ test('code marks match share(): Subject purple, httpGet turquoise; subscribe has
  assert.equal(JSON.stringify(codeOpacity(end)),'[[1,1,1],[1,1,1],[],[1,1,1]]');
 });
 
-test('request: one HTTP execution makes progress while A/B/C wait',async()=>{
- const {c,at}=await subject(),f=c.snapshot(at('request'));
+test('request: no stop while one HTTP execution makes progress (A/B/C wait); a short request goes straight to the multicast stop',async()=>{
+ const {c,at,ev}=await subject(),connected=ev('connected','http-subject'),response=ev('source-next','http-subject');
+ assert.ok(response-connected<=2.5,'krótki request');
+ assert.ok(!c.stops.some(s=>s.time>at('connect-http')&&s.time<response),'bez postoju podczas requestu');
+ const f=c.snapshot((connected+response)/2);
  assert.ok(node(f,'http').laneStates[0].progress>.3&&node(f,'http').laneStates[0].progress<.7);
  assert.equal(f.executionCounts.started,1);assert.equal(f.executionCounts.active,1);
  assert.deepEqual(lanes(f,'subject'),['operator:A:running','operator:B:running','operator:C:running']);
@@ -139,12 +142,20 @@ test('one User from HTTP reaches Subject, then splits into three identical next 
  assert.equal(new Set(split.tokens.map(t=>t.y)).size,3);
  const flying=c.snapshot((outs[0].at+outs[0].arrival)/2);
  assert.deepEqual(Array.from(flying.tokens,t=>t.edge).sort(),['subject-A','subject-B','subject-C']);
- const multicast=c.snapshot(at('multicast')),svg=render(multicast);
+ // Postój multicast: jedna kulka rozdzieliła się na trzy przy portach A/B/C, pola jeszcze puste; Subject świeci.
+ const multicast=c.snapshot(at('multicast'));
+ assert.equal(multicast.tokens.length,3);assert.ok(multicast.tokens.every(t=>t.phase==='split-out'&&t.value==='{…}'));
+ assert.equal(new Set(multicast.tokens.map(t=>t.y)).size,3);
+ assert.ok(multicast.histories.every(h=>!h.values.length),'pola jeszcze puste');
+ assert.ok(multicast.codeView.flat().find(p=>p.mark?.id==='subject').active,'Subject świeci podczas rozsyłania');
+ // Kolejny etap: kulki dolatują do pól (pełny obiekt, pole pokazuje swoją część), potem complete.
+ const delivered=c.snapshot(outs[0].arrival+.35),svg=render(delivered);
  for(const [id,,value] of fields){
-  assert.deepEqual(values(multicast,id),['{…}'],id+': cały obiekt');
+  assert.deepEqual(values(delivered,id),['{…}'],id+': cały obiekt');
   assert.match(fieldOf(svg,id),new RegExp(`data-field-value="${value}" opacity="1.000"`));
  }
- assert.ok(multicast.codeView.flat().find(p=>p.mark?.id==='subject').active===false);
+ assert.ok(delivered.codeView.flat().find(p=>p.mark?.id==='subject').active===false);
+ assert.ok(at('complete')>outs[0].arrival,'pola wypełniają się w etapie complete');
  assert.ok(c.snapshot(input.arrival+.1).codeView.flat().find(p=>p.mark?.id==='subject').active,'Subject świeci podczas rozsyłania');
  assert.doesNotMatch(render(split),/data-split-guide|data-hub-link|NaN|Infinity/);
 });
@@ -181,7 +192,7 @@ test('Subject keeps lane colours, horizontal receiver connections and the Cold f
  for(const format of ['4:3','16:9']){
   const {c,at}=await subject(format),end=c.snapshot(c.duration),coldEnd=cold(format).snapshot(cold(format).duration);
   const colors={A:'#7457D9',B:'#D8840F',C:'#2F7ED8',U:'#238F83'};
-  for(const time of [0,at('request'),at('multicast'),c.duration]){
+  for(const time of [0,at('connect-http')+1.5,at('multicast'),c.duration]){
    const f=c.snapshot(time);
    for(const n of f.nodes){
     assert.ok(n.socketDots.every(d=>d.color===colors[d.subscriber]));
@@ -205,7 +216,7 @@ test('Subject keeps lane colours, horizontal receiver connections and the Cold f
 
 test('all Subject checkpoints and split frames rewind deterministically; manual and AUTO finish and reset',async()=>{
  const {scene,c}=await subject();
- const times=[0,...c.stops.map(s=>s.time),7.8,8.6,c.duration];
+ const times=[0,...c.stops.map(s=>s.time),5.8,6.6,c.duration];
  for(const time of times){const expected=JSON.stringify(c.snapshot(time));c.snapshot(c.duration);c.snapshot(0);assert.equal(JSON.stringify(c.snapshot(time)),expected);}
  const h=await playbackHarness(),{player,controller}=h.create({scene});
  for(const stop of player.stops){controller.next();h.advance(30000);assert.equal(player.time,stop.time);assert.equal(player.isPlaying,false);}
@@ -226,8 +237,8 @@ test('Subject checkpoint notes follow the stops and end with the question about 
  assert.match(notes.defined,/const http\$ = httpGet[\s\S]*tylko definicja: nie ma wykonania ani requestu/);
  assert.match(notes['connect-http'],/Jest również Observerem[\s\S]*http\$\.subscribe\(subject\$\)[\s\S]*Subject jest Observerem/);
  assert.doesNotMatch(notes['connect-http'],/Migawka/);
- assert.match(notes.request,/jeden request, niezależnie od liczby odbiorców Subjecta/);
- assert.match(notes.multicast,/HTTP emituje go do Subjecta[\s\S]*wyświetla tylko potrzebne pole/);
+ assert.match(notes.multicast,/jeden request, niezależnie od liczby odbiorców Subjecta[\s\S]*HTTP emituje go do Subjecta/);
+ assert.match(notes.complete,/wyświetla tylko potrzebne pole/);
  assert.match(notes.complete,/Subject przekazuje complete wszystkim odbiorcom/);
  assert.match(notes.finished,/zamiast trzech requestów mamy jeden[\s\S]*Czy RxJS może zrobić to za nas\?/);
 });

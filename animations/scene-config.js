@@ -1,4 +1,4 @@
-import { configureFlatten, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureDebounceAudit, configureShareReplayInterval, configureCombineLatestWithLatestFrom, configureRetryBackoff, configureDefer } from './reference-scenes.js';
+import { configureFlatten, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureDebounceAudit, configureShareReplayOne, configureCombineLatestWithLatestFrom, configureRetryBackoff, configureDefer } from './reference-scenes.js';
 
 // Końcowe ID po rozwinięciu wariantów; otwarcie do tytułu pozostaje w kolejności HTML.
 export const mainOrder = [
@@ -7,17 +7,16 @@ export const mainOrder = [
   // Potem pytanie o znane operatory, operator, kod myMap, pytanie o share oraz historia share HTTP → share + interval → późny odbiorca.
   '05-zrodla-2','05b-http-kod','04a-dwa-tory','05-zrodla','05-zrodla-5','05-zrodla-3','05-zrodla-4','02-znane-operatory','04-operator','04b-map-kod','03-a-share','04a-dwa-tory-2','04a-dwa-tory-3',
   // Cztery *Map obok siebie, potem distinctUntilChanged przed switchMap.
-  '20-sharereplay','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','11a-distinct-switchmap',
+  '20-sharereplay','20a-sharereplay-interval','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','11a-distinct-switchmap',
   'b04-catcherror-2','b04-catcherror','16-czas-cztery','25-podsumowanie','pytania',
 ];
 export const extraOrder = [
-  'x01-sharereplay-interval',
   'x02-combinelatest-withlatestfrom',
   'x03-retry-backoff',
   'x04-defer',
 ];
 export const extraIds = new Set(extraOrder);
-const stagedIds = new Set(['x01-sharereplay-interval','x02-combinelatest-withlatestfrom','x03-retry-backoff','x04-defer','04-operator','04a-dwa-tory-2','04a-dwa-tory-3','05-zrodla','05-zrodla-2','05-zrodla-3','05-zrodla-4','05-zrodla-5','20-sharereplay','20-sharereplay-2']);
+const stagedIds = new Set(['20a-sharereplay-interval','x02-combinelatest-withlatestfrom','x03-retry-backoff','x04-defer','04-operator','04a-dwa-tory-2','04a-dwa-tory-3','05-zrodla','05-zrodla-2','05-zrodla-3','05-zrodla-4','05-zrodla-5','20-sharereplay','20-sharereplay-2']);
 
 // Sceny z finish:hold kończą się ok. 2 s po ostatnim zdarzeniu modelu, żeby AUTO nie stało długo.
 const trimmedTails = new Set(['20-sharereplay']);
@@ -47,8 +46,8 @@ export function configureScene(scene) {
   if(id==='05-zrodla'&&scene.sourceExample===3)configureSubjectInterval(scene);
   // Subject — ręczna emisja: next(1), next(2) i complete do A/B; po interval i przed Subject + HTTP.
   if(id==='05-zrodla'&&scene.sourceExample===4)configureSubjectManual(scene);
-  // shareReplay({ bufferSize: 1, refCount: false }) na interval: upstream działa także przy zerze odbiorców (EXTRAS).
-  if(id==='x01-sharereplay-interval')configureShareReplayInterval(scene);
+  // shareReplay(1) na interval (MAIN, przed shareReplay z refCount: true): A i B odchodzą, interval pracuje dalej.
+  if(id==='20a-sharereplay-interval')configureShareReplayOne(scene);
   // combineLatest: dwa źródła, dwa sloty ostatnich wartości i jeden strumień wynikowy (EXTRAS).
   if(id==='x02-combinelatest-withlatestfrom')configureCombineLatestWithLatestFrom(scene);
   // retry({ count, delay }) z trzema ponowieniami i exponential backoff 1/2/4 s (EXTRAS).

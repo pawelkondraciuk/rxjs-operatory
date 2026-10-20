@@ -1,6 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules}=require('./v2-harness.cjs');
-// 11a-distinct-switchmap: selectedUserId$ → distinctUntilChanged → switchMap → S1, wejścia A, A, B, B, A.
+// 11a-distinct-switchmap: id$ → distinctUntilChanged → switchMap → S1, wejścia A, A, B, B, A.
 // Powtórzenia gasną w wierszu distinctUntilChanged (pamięć: jedna kulka ostatniej przepuszczonej wartości), do switchMap
 // trafia A, B, A — trzy HTTP.
 async function deck(format='4:3'){
@@ -17,9 +17,9 @@ test('one pipeline with S1 lanes, an empty memory ball slot in the distinctUntil
  for(const format of ['4:3','16:9']){
   const {scene,c,render}=await deck(format),f=c.snapshot(0);
   assert.equal(scene.title,'distinctUntilChanged — czy coś się zmieniło?');
-  assert.equal(scene.code,'selectedUserId$.pipe(distinctUntilChanged(),\n  switchMap(id => httpGet(url(id))))');
+  assert.equal(scene.code,'id$.pipe(distinctUntilChanged(),\n  switchMap(id => httpGet(url(id))))');
   const top=f.nodes.filter(n=>['source','distinct','op','observer'].includes(n.id));
-  assert.deepEqual(Array.from(top,n=>n.label),['selectedUserId$','distinctUntilChanged','switchMap','']);
+  assert.deepEqual(Array.from(top,n=>n.label),['id$','distinctUntilChanged','switchMap','']);
   for(const [a,b] of [[0,1],[1,2],[2,3]])assert.ok(top[a].x+top[a].w/2<top[b].x-top[b].w/2,format+' kafelki bez nakładania');
   assert.ok(top.at(-1).x+top.at(-1).w/2<=f.width-20);
   const ys=f.edges.filter(e=>e.subscriber&&e.visible).flatMap(e=>e.points.map(p=>p[1]));

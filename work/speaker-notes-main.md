@@ -693,13 +693,13 @@ I to jest kluczowa różnica względem share(): jeden request, a późny odbiorc
 
 Teraz dochodzimy do operatorów, które dla każdej wartości mogą uruchomić osobną pracę. Funkcja projekcji zwraca Observable, a operator decyduje, kiedy go zasubskrybować.
 
-Na górze jest jeden pipeline: source$ → concatMap → S1. Na dole, w PRACACH WEWNĘTRZNYCH, każda wartość ma identyfikator #1 · A, #2 · B, #3 · C, a każde uruchomione inner Observable to osobny, znany już pipeline: własny kafelek HTTP GET i własny inbox — osobna wewnętrzna subskrypcja.
+Na górze jest jeden pipeline: id$ → concatMap → S1. Na dole, w PRACACH WEWNĘTRZNYCH, każda wartość ma identyfikator #1 · A, #2 · B, #3 · C, a każde uruchomione inner Observable to osobny, znany już pipeline: własny kafelek HTTP GET i własny inbox — osobna wewnętrzna subskrypcja.
 
 #### `subscribe`
 
 **1 — subscribe()**
 
-Wywołujemy subscribe: S1 subskrybuje concatMap, a concatMap — source$. To jedna główna subskrypcja; nie powstaje nowa dla każdej wartości.
+Wywołujemy subscribe: S1 subskrybuje concatMap, a concatMap — id$. To jedna główna subskrypcja; nie powstaje nowa dla każdej wartości.
 
 #### `first`
 
@@ -901,7 +901,7 @@ A kończy się normalnie, B nie wraca. C przychodzi po zakończeniu A i dostaje 
 
 Na koniec wracamy do switchMap. Widzieliśmy, że anuluje poprzedni request, gdy przychodzi nowa wartość. Ale jest pewien problem. Co jeśli ta nowa wartość jest identyczna?
 
-Na ekranie: selectedUserId$.pipe(distinctUntilChanged(), switchMap(...)), S1 już subskrybuje. Pięć emisji A, A, B, B, A. Cel: 60–90 s.
+Na ekranie: id$.pipe(distinctUntilChanged(), switchMap(...)), S1 już subskrybuje. Pięć emisji A, A, B, B, A. Cel: 60–90 s.
 
 #### `first`
 
@@ -951,7 +951,7 @@ Pięć emisji, trzy requesty. distinctUntilChanged nie jest cache'em — po pros
 
 ### Bazowe notatki sekcji — kontekst do weryfikacji
 
-Jeden potok selectedUserId$ → distinctUntilChanged → switchMap → S1; wejścia A, A, B, B, A. Slajd stoi po exhaustMap, zamyka rodzinę *Map. distinctUntilChanged pamięta tylko ostatnią przepuszczoną wartość (jedna kulka w lane operatora), osobno dla każdej subskrypcji, i porównuje przez ===. Powtórzenia gasną w operatorze: bez nowego HTTP i bez anulowania trwającego. Do switchMap trafia A, B, A — 3 requesty zamiast 5. To nie jest cache: A po B przechodzi. 60–90 s.
+Jeden potok id$ → distinctUntilChanged → switchMap → S1; wejścia A, A, B, B, A. Slajd stoi po exhaustMap, zamyka rodzinę *Map. distinctUntilChanged pamięta tylko ostatnią przepuszczoną wartość (jedna kulka w lane operatora), osobno dla każdej subskrypcji, i porównuje przez ===. Powtórzenia gasną w operatorze: bez nowego HTTP i bez anulowania trwającego. Do switchMap trafia A, B, A — 3 requesty zamiast 5. To nie jest cache: A po B przechodzi. 60–90 s.
 
 ## 18. catchError wewnątrz
 

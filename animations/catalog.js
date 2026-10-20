@@ -13,7 +13,7 @@ const cards=(id,title,items,captions,notes,duration=16,extra={})=>add(id,title,"
 cards("01-tytul","RxJS — operatory, które znasz, ale bałeś się zagadać",["Kiedy?","Ile naraz?","Co pominąć?","Co współdzielić?"],[[0,""],[3,"Znane nazwy. Konkretne decyzje o pracy."],[12,"Jedno zdarzenie może uruchomić znacznie więcej, niż myślisz."]],"Otwarcie. Zapowiedz decyzje o pracy, kolejności i współdzieleniu. Tytuł można pozostawić jako statyczny slajd.",14);
 add("04-operator","Operator to funkcja","",1,[],[],"");
 add("04a-dwa-tory","Cold: jedna definicja, trzy wykonania","",1,[],[],"");
-add("x01-sharereplay-interval","shareReplay — kto zatrzyma interval?","",1,[],[],"",{group:"bonus"});
+add("20a-sharereplay-interval","shareReplay(1): kto zatrzyma interval?","",1,[],[],"");
 add("x02-combinelatest-withlatestfrom","combineLatest — ostatnie wartości z wielu źródeł","",1,[],[],"",{group:"bonus"});
 add("x03-retry-backoff","retry — nie udało się? Spróbuj później","",1,[],[],"",{group:"bonus"});
 add("x04-defer","defer — nie wywołuj mnie jeszcze","",1,[],[],"",{group:"bonus"});
@@ -25,7 +25,7 @@ add("05-zrodla","Skąd płyną wartości?","timer · HTTP · Subject",20,[
 ],[[0,"Wartości mogą pochodzić z timera, HTTP albo ręcznego next()."],[4,"Subject emituje A. Odbiorca jeszcze nie słucha."],[8,"Odbiorca subskrybuje zwykły Subject."],[12,"Odbiera B. Wcześniejszego A nie dostaje."]],"To zwykły Subject, bez replay. Timer i HTTP są osobnymi przykładami źródeł. Odbiorca Subject subskrybuje dopiero w 8. sekundzie.");
 
 // Model pojedynczego innera i postoje nadaje configureReferences.
-add("08-map-strumienie","A jeśli wartością jest Observable?","source$.pipe(map(id => httpGet(url(id))), concatAll())",1,[],[],"map tworzy Observable. concatAll subskrybuje go i przepuszcza jego wynik dalej.");
+add("08-map-strumienie","A jeśli wartością jest Observable?","id$.pipe(map(id => httpGet(url(id))), concatAll())",1,[],[],"map tworzy Observable. concatAll subskrybuje go i przepuszcza jego wynik dalej.");
 function mapping(mode){
  const input=[{at:1,value:"A",dur:6,color:"a"},{at:4,value:"B",dur:6,color:"b"},{at:7.2,value:"C",dur:6,color:"c"}];
  let end=0;
@@ -57,7 +57,7 @@ function mapping(mode){
   rows.push(R(job.value+"$",ev,spans,{completeAt:job.ignored||job.cancelled?undefined:job.end}));
  });
  rows.push(R("wynik",m.out,[],{showCount:true}));
- add(String(i+9).padStart(2,"0")+"-"+mode.toLowerCase(),mode+" — "+descriptions[mode][0],"source$.pipe("+mode+"(makeInner$))",22,rows,[[0,"Te same wejścia i te same zimne źródła wewnętrzne."],[4,descriptions[mode][1]],[14,descriptions[mode][2]]],descriptions[mode].join(" ")+" Czas każdego źródła liczymy od jego subskrypcji. Emisje po odsubskrybowaniu nie trafiają do wyniku.",{jobs:m.jobs,metrics:[{label:"uruchomione",value:t=>m.jobs.filter(j=>!j.ignored&&j.start<=t).length},{label:"aktywne",value:t=>m.jobs.filter(j=>!j.ignored&&j.start<=t&&j.end>t).length},{label:"w kolejce",value:t=>m.jobs.filter(j=>!j.ignored&&j.at<=t&&j.start>t).length}]});
+ add(String(i+9).padStart(2,"0")+"-"+mode.toLowerCase(),mode+" — "+descriptions[mode][0],"id$.pipe("+mode+"(makeInner$))",22,rows,[[0,"Te same wejścia i te same zimne źródła wewnętrzne."],[4,descriptions[mode][1]],[14,descriptions[mode][2]]],descriptions[mode].join(" ")+" Czas każdego źródła liczymy od jego subskrypcji. Emisje po odsubskrybowaniu nie trafiają do wyniku.",{jobs:m.jobs,metrics:[{label:"uruchomione",value:t=>m.jobs.filter(j=>!j.ignored&&j.start<=t).length},{label:"aktywne",value:t=>m.jobs.filter(j=>!j.ignored&&j.start<=t&&j.end>t).length},{label:"w kolejce",value:t=>m.jobs.filter(j=>!j.ignored&&j.at<=t&&j.start>t).length}]});
 });
 // Model, graf i postoje distinctUntilChanged: configureDistinctSwitch (reference-scenes.js).
 add("11a-distinct-switchmap","distinctUntilChanged — czy coś się zmieniło?","",1,[],[],"");
@@ -87,8 +87,8 @@ revise("20-sharereplay",{
  }
 });
 revise("11-switchmap",{
- captions:[[0,"A$ powstanie dopiero po pierwszej emisji source$."],[1,"A$ zaczyna pracować."],[2.5,"Pierwsza wartość A1 trafia do wyniku."],[4,"Nowe B: unsubscribe A$ → subscribe B$."],[5.5,"Teraz wartości emituje B$. A$ już nie pracuje."],[7.2,"Nowe C przerywa B$ i uruchamia C$."],[13.2,"C$ kończy się. Przerwane A$ i B$ nie wracają."]],
- notes:"Projection switchMap jest wywoływana po emisji source$. Każda nowa wartość najpierw odsubskrybowuje poprzedni inner, a potem uruchamia nowy. W naszym źródle teardown zatrzymuje emisje. Unsubscribe HTTP może anulować żądanie po stronie klienta, ale nie cofa wykonanych już zmian na serwerze."
+ captions:[[0,"A$ powstanie dopiero po pierwszej emisji id$."],[1,"A$ zaczyna pracować."],[2.5,"Pierwsza wartość A1 trafia do wyniku."],[4,"Nowe B: unsubscribe A$ → subscribe B$."],[5.5,"Teraz wartości emituje B$. A$ już nie pracuje."],[7.2,"Nowe C przerywa B$ i uruchamia C$."],[13.2,"C$ kończy się. Przerwane A$ i B$ nie wracają."]],
+ notes:"Projection switchMap jest wywoływana po emisji id$. Każda nowa wartość najpierw odsubskrybowuje poprzedni inner, a potem uruchamia nowy. W naszym źródle teardown zatrzymuje emisje. Unsubscribe HTTP może anulować żądanie po stronie klienta, ale nie cofa wykonanych już zmian na serwerze."
 });
 for(const scene of D)if(scene.variants)Object.assign(scene,scene.variants.without);
 // Model, graf i postoje powstają w configureCatchInside/configureCatchOutside (reference-scenes.js).

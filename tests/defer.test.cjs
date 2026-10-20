@@ -173,7 +173,7 @@ test('MANUAL stops at every checkpoint; AUTO pauses on the from result and on th
 
 test('order, return link, code marks and speaker notes',async()=>{
  const {m,c}=await deck(),order=Array.from(m['scene-config'].extraOrder);
- assert.deepEqual(order,['x01-sharereplay-interval','x02-combinelatest-withlatestfrom','x03-retry-backoff',id]);
+ assert.deepEqual(order,['x02-combinelatest-withlatestfrom','x03-retry-backoff',id]);
  assert.ok(!m['scene-config'].mainOrder.includes(id));
  const html=fs.readFileSync('index.html','utf8');
  assert.ok(html.indexOf(`<section id="${id}"`)>html.indexOf('<section id="x03-retry-backoff"'));

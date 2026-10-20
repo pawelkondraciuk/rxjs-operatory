@@ -40,9 +40,9 @@ test('16:9 keeps the previous geometry and SVG of every variant',async()=>{
   const wide=compile(scene),legacy=compile({...scene,format:undefined});
   for(const time of [0,...wide.stops.map(s=>s.time),wide.duration])
    assert.equal(render(wide.snapshot(time)),render(legacy.snapshot(time)),scene.id+' @'+time);
-  // Slajdy torów (04a-dwa-tory(-2,-3), 04-operator, cała rodzina 05-zrodla, para 20-sharereplay(-2) i x01, x04) mają w obu formatach wspólne,
+  // Slajdy torów (04a-dwa-tory(-2,-3), 04-operator, cała rodzina 05-zrodla, para 20-sharereplay(-2), 20a, x03 i x04) mają w obu formatach wspólne,
   // powiększone wymiary pod projektor (graph.textScale).
-  if(!/^(04a-dwa-tory|04-operator$|05-zrodla(-[2345])?$|20-sharereplay(-2)?$|x01-sharereplay-interval$|x03-retry-backoff$|x04-defer$)/.test(scene.id))assert.equal(wide.snapshot(0).textScale,1);
+  if(!/^(04a-dwa-tory|04-operator$|05-zrodla(-[2345])?$|20-sharereplay(-2)?$|20a-sharereplay-interval$|x03-retry-backoff$|x04-defer$)/.test(scene.id))assert.equal(wide.snapshot(0).textScale,1);
  }
 });
 

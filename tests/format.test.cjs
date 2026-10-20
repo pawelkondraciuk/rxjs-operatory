@@ -13,8 +13,7 @@ test('Format defaults to 4:3 and accepts 16:9 spellings',async()=>{
 
 test('Internal links keep the selected format',async()=>{
   const f=await format();
-  assert.equal(f.withFormat('?extras#/x01-sharereplay-interval','4:3'),'?extras#/x01-sharereplay-interval');
-  assert.equal(f.withFormat('?extras#/x01-sharereplay-interval','16:9'),'?extras&ratio=16:9#/x01-sharereplay-interval');
+  assert.equal(f.withFormat('?extras#/x02-combinelatest-withlatestfrom','4:3'),'?extras#/x02-combinelatest-withlatestfrom');
   assert.equal(f.withFormat('?extras#/x02-combinelatest-withlatestfrom','16:9'),'?extras&ratio=16:9#/x02-combinelatest-withlatestfrom');
   assert.equal(f.withFormat('./#/pytania','4:3'),'./#/pytania');
   assert.equal(f.withFormat('./#/pytania','16:9'),'./?ratio=16:9#/pytania');

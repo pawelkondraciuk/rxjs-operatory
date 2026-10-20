@@ -82,7 +82,7 @@ function stateFor(slide = deck.getCurrentSlide()) {
 }
 
 // Etapy są fragmentami Reveal, tak samo jak zdjęcia na wcześniejszych slajdach.
-// Każda scena deklaruje semantyczne postoje; ostatni fragment uruchamia AUTO.
+// Każda scena deklaruje semantyczne postoje; opcjonalny ostatni fragment uruchamia AUTO.
 const stopsBySlide = new Map();
 const steppedSlides = printMode ? [] : [...document.querySelectorAll('[data-animation]')].filter(slide => sceneById.get(slide.dataset.animation)?.playback?.stops?.length || sceneById.get(slide.dataset.animation)?.playback?.controller === 'stages');
 for (const slide of steppedSlides) {
@@ -284,6 +284,15 @@ deck.on('fragmenthidden', event => {
   if (isStaged() || printMode || restoringSlide || stateFor().mode !== 'manual' || !event.fragment.closest('.rx-fragment-steps') || event.fragment.closest('section') !== activeSlide) return;
   stateFor().fragmentIndex = activeSlide.querySelectorAll('.rx-step.visible').length - 1;
   playerFor(deck.getCurrentSlide())?.seek(fragmentTime());
+});
+
+// Ostatni ręczny postój może już być finałem. Wtedy Reveal nie ma kolejnego fragmentu,
+// który przechwyciłby szybkie „dalej”: najpierw kończymy rozpoczęty etap, potem zmieniamy slajd.
+deck.on('beforeslidechange', event => {
+  if (!activePlayer || printMode || notesPreview || restoringSlide || isStaged() || deck.isOverview() || deck.isPaused() || stateFor().mode !== 'manual') return;
+  const current = deck.getIndices(activeSlide);
+  const forward = event.indexh > current.h || event.indexh === current.h && event.indexv > (current.v || 0);
+  if (forward && fragmentTime() === activePlayer.duration && activePlayer.finishStep()) event.preventDefault();
 });
 
 deck.on('slidechanged', event => activate(event.currentSlide));

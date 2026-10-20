@@ -109,7 +109,7 @@ export function innerWorkPanelSnapshot(panel, records, births, time, logicalTime
       return {...stage,index:i,state,hasProgress:Boolean(stage.progress),progress,since,...(fallback?{fallback}:{})};
     });
     const establishing=time<Math.max(connected(output),...work.stages.map(s=>connected(record(s.edge||work.edge))));
-    const state=establishing?'subscribing':stateOf(output), reveal=clamp((time-(waits?output.start:born))/.3);
+    const state=time<output.start?'idle':establishing?'subscribing':stateOf(output), reveal=clamp((time-(waits?output.start:born))/.3);
     // Kable i wartości pozostają w poziomym wierszu, aż do prawej granicy panelu.
     const wires = work.stages.map((stage,i) => {
       const r = record(stage.edge || work.edge), terminal = r.end;

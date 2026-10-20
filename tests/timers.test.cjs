@@ -73,9 +73,23 @@ test('B joins: appears, subscribes and gets its own execution from 0 while A kee
  assert.deepEqual(sourceLanes(f),['A:running','B:running'],'dwa wykonania interval');
  assert.equal(values(f,'B')[0],'0','B zaczyna od 0');assert.ok(metric(f,'Emisje A')>before+2);
  assert.ok(Number(values(f,'A').at(-1))>Number(values(f,'B').at(-1))+2,'A ma własny, wyższy licznik');
- assert.equal(metric(f,'Wykonania interval'),2);assert.deepEqual(shown(f),['.subscribe() B'],'migawka B zostaje do następnej akcji');
+ assert.equal(metric(f,'Wykonania interval'),2);assert.deepEqual(shown(f),[],'migawka B gaśnie, gdy B zaczyna emitować');
  const lanes=f.nodes.find(n=>n.id==='interval').laneStates;
  assert.ok(lanes[1].y>lanes[0].y,'wiersz B pod wierszem A');
+});
+
+test('B gets its first value sooner than A and .subscribe() B fades out once B starts emitting',async()=>{
+ const {scene}=await interval('4:3'),{engine}=await modules(['engine']);
+ const variant=scene.live.variant(scene,{from:0,to:scene.live.window,closedAt:null,actions:[6]});
+ const compiled=engine.compileScene(variant),at=(type,edge,value)=>compiled.events.find(e=>e.type===type&&e.edge===edge&&(value===undefined||e.value===value)).at;
+ const connectedB=at('connected','interval-B'),firstB=at('source-next','interval-B','0');
+ const connectedA=at('connected','interval-A'),firstA=at('source-next','interval-A','0');
+ assert.ok(Math.abs(firstB-connectedB-.6)<1e-6,'B: pierwsza wartość 0,6 s po zestawieniu');
+ assert.ok(firstA-connectedA>1.4,'A bez zmian: emit + period');
+ const calloutsAt=time=>Array.from(compiled.snapshot(time).callouts||[],c=>`${c.text} ${c.label}:${c.opacity>0}`);
+ assert.deepEqual(calloutsAt(firstB-.1),['.subscribe() B:true'],'migawka do startu emisji');
+ assert.deepEqual(calloutsAt(firstB+.35).filter(c=>c.endsWith('true')),[],'po starcie emisji migawka zgaszona');
+ assert.ok(variant.liveBusyUntil[0]>=firstB+.3-1e-9,'akcja B trwa do wygaszenia migawki');
 });
 
 test('unsubscribe A then B: grey × pulses, each execution stops separately, no complete; then the slide navigates',async()=>{
