@@ -201,7 +201,7 @@ function innerInstancesPanel(panel,frame,reduced=false) {
       }
       svg+=`<rect x="${sx}" y="${lane}" width="${bar}" height="${h}" fill="${muted?'#808890':row.color}"/>`;
       svg+=`<path d="M${sx} ${lane}H${sx+stageW}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/>`;
-      const label=status[stage.state]||(stage.hasProgress?'w trakcie':'oczekuje');
+      const label=(stage.state==='errored'&&stage.errorLabel)||status[stage.state]||(stage.hasProgress?'w trakcie':'oczekuje');
       if(stage.fallback) {
         const fw=(String(stage.fallback.label).length*.6*font)+28,fx=sx+stageW-14-fw;
         svg+=`<g data-inner-fallback="${esc(stage.fallback.label)}" opacity="${reduced?1:+stage.fallback.opacity.toFixed(3)}"><rect x="${fx}" y="${cy-font*.75}" width="${fw}" height="${font*1.5}" rx="${font*.75}" fill="#F3E6F8" stroke="#B384C6" stroke-width="2"/>`+
@@ -292,7 +292,7 @@ function inboxIcon(x,y,size) {
 // ✓ complete, ! error albo × odłączono (unsubscribe). Pojawia się (fade-in 0,3 s) dopiero po animacji terminalnej:
 // complete/error po dotarciu impulsu, unsubscribe po dotarciu × do źródła (lane.statusAt). Tło wiersza niesie kolor stanu.
 // Pole widoku (tray.field): status stoi w linii wartości, a gdy wartość jest za długa — w linii etykiety pola.
-// laneTerminalText może być obiektem z krótszymi tekstami stanów (np. {cancelled:'×'} przy trzech kulkach interval).
+// laneTerminalText może nadpisać teksty stanów i offsetY, gdy kompaktowy odbiorca zachowuje poprzedni wynik.
 const laneTerminalStatus={completed:['✓ complete','#087438'],error:['! error','#9B1C28'],cancelled:['× odłączono','#5B6670']};
 function laneTerminalLabel(n,lane,k,frame,reduced) {
   const base=n.laneTerminalText&&laneTerminalStatus[lane.state];
@@ -309,7 +309,7 @@ function laneTerminalLabel(n,lane,k,frame,reduced) {
     const shown=field.values?.length?field.field.value:field.failed?field.field.error:'';
     y=field.x+Array.from(String(shown)).length*.58*22*k+12*k<=right-width?field.y+14*k:field.y-16*k;
   }
-  return text(right,y,status[0],size,
+  return text(right,y+(n.laneTerminalText.offsetY??0),status[0],size,
     `data-lane-terminal="${lane.state}" opacity="${opacity.toFixed(3)}" style="font-weight:700;fill:${status[1]};text-anchor:end"`);
 }
 // Ikona stanu toru: ✓ complete, × error, przekreślony okrąg = odsubskrybowano. Trwający tor: producent (work, np. HTTP)
@@ -510,7 +510,7 @@ export function renderScene(frame,options={}) {
             svg+=`<rect data-lane-timer="${+lane.timer.progress.toFixed(4)}" x="${left}" y="${timerRow.top}" width="${w}" height="${h}" fill="${lane.progressFill||lane.fill||lane.color}"/>`;
             if(lane.timer.progress>0)svg+=`<rect x="${left+w-3*k}" y="${timerRow.top}" width="${3*k}" height="${h}" fill="${lane.color}"/>`;
           }
-          svg+=text(n.x-n.w/2+(n.laneTimer.textInset??80)*k,lane.y,lane.timer.text,22*k,`data-lane-timer-text="true" style="text-anchor:start;font-weight:${lane.timer.active?700:500};fill:${lane.timer.active?'#26323B':'#7A858C'}"`);
+          svg+=text(n.x-n.w/2+(n.laneTimer.textInset??80)*k,lane.y,lane.timer.text,n.laneTimer.textSize??22*k,`data-lane-timer-text="true" style="text-anchor:start;font-weight:${lane.timer.active?700:500};fill:${lane.timer.active?'#26323B':'#7A858C'}"`);
         }
         // Wiersz operatora: sama litera toru; stan niesie tło wiersza.
         if(lane.label&&!rows.some(row=>row.subscriber===lane.subscriber&&row.label))svg+=text(chipLeft+(hubInputs.length&&n.hubFan!==false?18:6)*k,lane.y,lane.label,24*k,`style="font-weight:700;fill:${lane.labelColor||'#43525b'};text-anchor:start"`);

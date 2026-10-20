@@ -28,7 +28,7 @@ Eksport zachowuje oryginalne brzmienie wszystkich akapitów, w tym instrukcje pr
 18. **Źródło: skąd bierze się query$?** — `12-query-zrodlo`
 19. **Wybór operatora** — `12a-switchmap-live`
 20. **debounceTime — czekamy na ciszę** — `12b-debounce-switchmap`
-21. **distinctUntilChanged — czy coś się zmieniło?** — `11a-distinct-switchmap`
+21. **distinctUntilChanged — znowu to samo?** — `11a-distinct-switchmap`
 22. **catchError na zewnątrz** — `b04-catcherror`
 23. **catchError wewnątrz** — `b04-catcherror-2`
 24. **debounceTime i auditTime: cisza czy okno?** — `16-czas-cztery`
@@ -1013,70 +1013,54 @@ Po kolejnej ciszy react dotarło do switchMap i ruszył HTTP #2. Od tego momentu
 
 Druk, F i Upcoming pokazują trzy zakończone HTTP (#1 rea, #2 react, #3 rea), wynik [#3], input angu i liczniki 14/3/0. To nieruchomy kadr ciągłego pokazu. Nie ma błędów ani anulowań; complete dotyczy wyłącznie inner, źródło i odbiorca nadal działają. Ta sama fraza może uruchomić request ponownie po kolejnej zmianie i ciszy. Na następnym slajdzie pokażemy distinctUntilChanged() po debounceTime, przed switchMap: porównuje tylko kolejne przepuszczone wartości, nie całą historię.
 
-## 21. distinctUntilChanged — czy coś się zmieniło?
+## 21. distinctUntilChanged — znowu to samo?
 
-**ID:** `11a-distinct-switchmap`  
-**Źródło:** [index.html — sekcja 11a-distinct-switchmap](../index.html#L588)
+**ID:** `11a-distinct-switchmap`
+**Źródło:** [index.html — sekcja 11a-distinct-switchmap](../index.html#L666)
 
 ### Notatki per checkpoint — wyświetlane w prezentacji
 
 #### `ready`
 
-**0 — Gotowy pipeline**
+**0 — Dokładamy distinctUntilChanged**
 
-Na koniec wracamy do switchMap. Widzieliśmy, że anuluje poprzedni request, gdy przychodzi nowa wartość. Ale jest pewien problem. Co jeśli ta nowa wartość jest identyczna?
-
-Na ekranie: id$.pipe(distinctUntilChanged(), switchMap(...)), S1 już subskrybuje. Pięć emisji A, A, B, B, A. Cel: 60–90 s.
+Operator i pełny kod są widoczne od wejścia, input i pamięć są puste. Poprzedni slajd pokazał duplikaty; tutaj obserwujemy ich odrzucanie. Zapytania mają do trzech znaków. Kolejne strzałki pokazują pierwszy sukces, duplikat, trzy udane HTTP, następny aktywny HTTP, error z odłączeniem i dopiero potem pisanie bez reakcji pipeline’u. Pierwsze dalej uruchomi rea i zatrzyma się po wyniku oraz complete inner.
 
 #### `first`
 
-**1 — Pierwsze A**
+**1 — Pierwsza wartość przechodzi**
 
-Wybieramy użytkownika A. Operator przepuszcza pierwszy identyfikator i uruchamiamy HTTP.
+r → re → rea. Po 300 ms ciszy debounceTime przepuścił rea. distinctUntilChanged zapamiętał pierwszą wartość, switchMap uruchomił HTTP #1, odpowiedź dotarła do odbiorcy i inner zakończył się complete. Główna subskrypcja nadal działa. Trzy wejścia, jedna emisja debounce, jeden udany request. Dalej pokaże usunięcie i ponowne dopisanie a.
 
-Kulka A zostaje w lane distinctUntilChanged — to jedyna rzecz, którą operator pamięta: ostatnia przepuszczona wartość.
+#### `duplicate`
 
-#### `question`
+**2 — To samo rea zostaje odrzucone**
 
-**2 — Drugie A: pytanie**
+Użytkownik zmienił rea na re i po 100 ms znów na rea. debounceTime wyemitował rea, ale distinctUntilChanged pamięta rea: porównanie przez === odrzuciło duplikat. Przygaszona kulka i podpis duplikat. Pięć wejść, dwie emisje debounce, nadal tylko jeden request. Nie było nowego HTTP ani anulowania. Pamięć dotyczy ostatniej przepuszczonej wartości, nie całej historii. Dalej pokaże ang i vue, po czym zatrzyma się po wszystkich sukcesach.
 
-HTTP jeszcze trwa, a my ponownie wybieramy A. Sam switchMap anulowałby poprzedni request i uruchomił go jeszcze raz. Czy naprawdę tego chcemy?
+#### `successes`
 
-#### `answer`
+**3 — Trzy poprawne wyszukiwania**
 
-**2 — Drugie A: odpowiedź**
+rea, ang i vue przeszły; duplikat rea nie utworzył HTTP. Każdy z trzech requestów dostarczył wynik i complete inner. Główny pipeline nadal działa. Liczniki: 13 zmian inputa i wejść query$, 4 emisje debounce, 3 requesty, 0 aktywnych. Następna strzałka uruchomi sve i zatrzyma się na działającym HTTP #4, przed błędem.
 
-distinctUntilChanged pamięta ostatnią przepuszczoną wartość. A jest równe A, więc niczego nie emituje dalej. HTTP może spokojnie pracować.
+#### `request-error`
 
-#### `switched`
+**4 — Kolejny HTTP jeszcze działa**
 
-**3 — Pierwsze B**
+Użytkownik wpisał sve. debounceTime przepuścił frazę, distinctUntilChanged porównał ją z vue i przepuścił zmianę. HTTP #4 jest aktywny, główna subskrypcja działa. Liczniki: 17 zmian inputa i wejść query$, 5 emisji debounce, 4 requesty, 1 aktywny. Ten kadr może stać dowolnie długo; błąd pojawi się dopiero po kolejnym dalej.
 
-Teraz wybieramy B. To już zmiana, więc wartość przechodzi do switchMap. Poprzedni HTTP zostaje anulowany i startuje nowy.
+#### `error`
 
-Kulka w pamięci operatora zmienia się z A na B.
+**5 — Error zamknął subskrypcję**
 
-#### `repeat-b`
-
-**4 — Drugie B**
-
-Drugie B ponownie zostaje odrzucone. Nie przerywamy wykonywanego requestu.
-
-#### `again-a`
-
-**5 — Ponowne A**
-
-A teraz znowu wybieramy A. I uwaga: tym razem wartość przechodzi. distinctUntilChanged porównuje ją z ostatnim B, a nie ze wszystkimi wartościami z historii.
+HTTP #4 dla sve zwrócił error 500. Czerwony impuls przeszedł przez switchMap do odbiorcy. Nie było complete tego HTTP ani głównej subskrypcji. Teardown odłączył distinctUntilChanged, debounceTime i query$. Input nadal pokazuje sve: nie rozpoczęliśmy jeszcze kolejnych zmian pola. 17 zmian UI i wejść query$, 5 emisji debounce, 4 requesty, 0 aktywnych; subskrypcja zakończona błędem. Zatrzymaj się na tym problemie. Dopiero dalej pokaże, że użytkownik nadal może pisać, ale wyszukiwarka nie reaguje.
 
 #### `finished`
 
-**6 — Wynik**
+**6 — Pisanie bez aktywnej wyszukiwarki**
 
-Pięć emisji, trzy requesty. distinctUntilChanged nie jest cache'em — po prostu nie przepuszcza kolejnych identycznych wartości. Umieszczony przed switchMap pozwala uniknąć niepotrzebnych anulowań i requestów.
-
-### Bazowe notatki sekcji — kontekst do weryfikacji
-
-Jeden potok id$ → distinctUntilChanged → switchMap → S1; wejścia A, A, B, B, A. Slajd stoi po pokazie debounceTime + switchMap, zamyka historię wyszukiwarki. distinctUntilChanged pamięta tylko ostatnią przepuszczoną wartość (jedna kulka w lane operatora), osobno dla każdej subskrypcji, i porównuje przez ===. Powtórzenia gasną w operatorze: bez nowego HTTP i bez anulowania trwającego. Do switchMap trafia A, B, A — 3 requesty zamiast 5. To nie jest cache: A po B przechodzi. 60–90 s.
+Po strzałce w prawo wpisaliśmy sve. Nowa fraza przeszła przez distinctUntilChanged i uruchomiła HTTP #4, który zakończył się error 500. Błąd przeszedł przez switchMap do odbiorcy, główna subskrypcja została zamknięta, a query$, debounceTime i distinctUntilChanged odłączone. Ten HTTP i główny odbiorca nie dostały complete; wcześniejsze sukcesy pozostają historią. Użytkownik wyczyścił pole i wpisał rxj. UI działa, ale pipeline nie odbiera wejść: brak nowych kulek, timera, wyników i HTTP #5. Ostatni poprawny wynik [#3] zostaje w czerwonym odbiorcy. Liczniki: 21 zmian inputa, 17 wejść query$, 5 emisji debounce, 4 requesty, 0 aktywnych. distinctUntilChanged oszczędził duplikat, ale nie ochronił przed błędem backendu. W dalszej części pokażemy catchError wewnątrz switchMap.
 
 ## 22. catchError na zewnątrz
 

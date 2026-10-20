@@ -608,19 +608,35 @@ Kolejne pisanie zaczyna się 1 s po uruchomieniu poprzedniego HTTP. Request trwa
 
 **Stopka:** debounceTime przepuszcza wartość dopiero po chwili ciszy. Ta sama fraza może uruchomić request ponownie.
 
-### distinctUntilChanged przed switchMap — `11a-distinct-switchmap`
+### distinctUntilChanged — znowu to samo? — `11a-distinct-switchmap`
 
-**MAIN — po pokazie debounceTime + switchMap, zamyka historię wyszukiwarki; jedyny distinctUntilChanged w MAIN.** **Temat:** sam switchMap przy powtórzonym ID anuluje request i uruchamia go od nowa; distinctUntilChanged przed nim zatrzymuje kolejne powtórzenia.
+**MAIN — bezpośrednio po debounceTime + switchMap.** Kontynuujemy tę samą wyszukiwarkę, z zapytaniami do trzech znaków. Poprzedni slajd pokazał duplikaty; tutaj distinctUntilChanged jest widoczny od wejścia i od razu pokazujemy jego działanie. Slajdy catchError i ich kolejność są osobnym zadaniem.
 
-| ID slajdu | Tytuł na ekranie | Kod nad diagramem |
-| --- | --- | --- |
-| 11a-distinct-switchmap | distinctUntilChanged — czy coś się zmieniło? | `id$.pipe(distinctUntilChanged(),`<br>`  switchMap(id => httpGet(url(id))))` |
+Pełny kod jest widoczny od READY:
 
-**Na bloczkach:** jeden potok „id$” → „distinctUntilChanged” → „switchMap” → kompaktowy odbiorca S1 (S1 zestawione w READY, bez animacji subscribe). W wierszu S1 operatora distinctUntilChanged pamięć to jedna kulka ostatniej przepuszczonej wartości tuż przed portem wyjścia (jak w debounceTime/auditTime; bez prostokąta i napisu `prev:`, przed pierwszą wartością pusto); przepuszczona kulka podmienia ją, gdy ją mija, porównanie z powtórzeniem daje krótki puls. Dół jak w 09–12 (separator bez napisu) — każde uruchomione HTTP to `#n` z kulką X, kafelek HTTP GET z lane i inner subscriber. Wejścia A, A, B, B, A (A zawsze indygo, B pomarańczowe). Powtórzenie wjeżdża do wiersza distinctUntilChanged, stoi na pytaniu i gaśnie — bez kabla dalej, bez HTTP, inner subscribera i placeholdera, bez anulowania trwającej pracy. B po A i A po B przechodzą: switchMap anuluje poprzedni HTTP (szary impuls ×) i startuje nowy. Do switchMap trafia A, B, A: 3 requesty zamiast 5. #3 · A zwraca wynik do S1 i kończy się complete; S1, źródło i operatory pozostają aktywne. Postęp HTTP liczony w czasie modelu, więc stoi podczas przelotów i pytania.
+```ts
+query$.pipe(
+  debounceTime(300),
+  distinctUntilChanged(),
+  switchMap(query => httpGet(url(query)))
+)
+```
 
-Postoje: first (przed drugim A, HTTP A ~45%), question (drugie A w operatorze), answer (zgasło, w pamięci A, HTTP A pracuje), switched (#1 anulowane, #2 · B), repeat-b (drugie B odrzucone), again-a (#3 · A, w pamięci A), potem AUTO do wyniku. Notatki per checkpoint w `template[data-checkpoint-notes="11a-distinct-switchmap"]` (60–90 s).
+**Na ekranie:** input, timer i płaskie execution lanes poprzednika. Stałe pozycje: węższy query$ z kompaktowym inputem → debounceTime → distinctUntil / Changed → switchMap → poszerzony inbox z miejscem na ikonę i wartość. Wszystkie bloczki oraz kod są od początku, bez pustego slotu i odsłaniania operatora. Bez widocznych S1, z dotychczasowymi portami, przewodami, paskami i impulsami. Najwyżej trzy rzeczywiste HTTP w dole; najstarszy ustępuje kolejnemu. Syntax highlighting i marki: turkusowe źródła/HTTP, fioletowe operatory. Wcięcia są poza pastelowymi wyróżnieniami, więc tła operatorów zaczynają się w tej samej kolumnie.
 
-**Speaker notes (skrót):** switchMap anuluje przy każdej nowej wartości, także identycznej → distinctUntilChanged pamięta ostatnią przepuszczoną wartość i porównuje przez === → nie jest cache'em: A po B przechodzi.
+**Kolejne naciśnięcia w prawo:**
+
+1. `first`: rea przechodzi przez debounce i distinct, HTTP #1 dostarcza wynik i complete inner. Pauza: 3 zmiany inputa / 3 wejścia query$ / 1 emisja debounce / 1 request / 0 aktywnych.
+2. `duplicate`: re → rea po 100 ms, debounce emituje ponownie rea, distinct odrzuca duplikat (przygaszona kulka i podpis). Bez nowego HTTP i anulowania. Pauza: 5 / 5 / 2 / 1 / 0.
+3. `successes`: ang i vue przechodzą. Wszystkie trzy HTTP kończą się sukcesem i complete inner, główny pipeline działa. Pauza: 13 / 13 / 4 / 3 / 0.
+4. `request-error`: pusty → s → sv → sve. HTTP #4 już pracuje, jeszcze bez błędu. Pauza: 17 / 17 / 5 / 4 / 1. Pasek i request stoją do kolejnej strzałki.
+5. `error`: HTTP #4 emituje error 500. Błąd idzie przez switchMap do odbiorcy; szary teardown odłącza distinct, debounce i query$. Ten HTTP i główny pipeline bez complete. Pauza po pełnym odłączeniu: input nadal sve, 17 / 17 / 5 / 4 / 0, główna subskrypcja zakończona błędem.
+6. FINISHED: input pokazuje pusty → r → rx → rxj. Zmienia się wyłącznie UI, bez kulek RxJS, timera, wyników i HTTP #5. Liczniki: 21 / 17 / 5 / 4 / 0; wynik [#3] zostaje w czerwonym odbiorcy. W dole zakończone poprawnie #2 i #3 oraz błędny #4.
+7. Dopiero kolejna strzałka przechodzi na następny slajd.
+
+Litery co 100 ms i debounce 300 ms modelu, ilustracja 5× wolniejsza. Każdy z pięciu postojów zatrzymuje MANUAL i AUTO dowolnie długo. Szybkie dalej kończy wyłącznie bieżący etap; nie przeskakuje z sukcesów od razu do finału ani na kolejny slajd. Lewo cofa po checkpointach, R i powrót resetują READY, wyjście zatrzymuje zegar. F/druk/podgląd końcowy pokazują rxj i martwy pipeline. Notatki: ready, first, duplicate, successes, request-error, error, finished.
+
+**Stopka końcowa:** Jeden nieobsłużony błąd HTTP zakończył całą wyszukiwarkę.
 
 ### catchError — `b04-catcherror`
 
@@ -805,7 +821,7 @@ Podgląd developerski: /work/animation-review.html (lokalna konfiguracja Vite ma
 
 Slajdy MAIN 08–12 korzystają ze wspólnego adaptera `configureHttpWorkPanel` na bazie `flattenGraph`. Góra pokazuje jeden S1 z execution lanes, pastelowymi nagłówkami i kolorowymi poziomymi połączeniami. Źródło nie trzyma historii emisji; do czterech odpowiedzi HTTP mieści się w kompaktowym odbiorcy. Kulki mają białe litery i pełną paletę A indygo #6D4CD3 / B pomarańcz #B85D05 / C niebieski #087FAD / D malinowy #B73770. Tę samą paletę mają porty, paski i linie prac; progress jest łagodniejszy, complete jasnozielone.
 
-Dół: poziomy separator i do trzech wewnętrznych pipeline'ów jeden pod drugim (na wprowadzeniu `08-map-strumienie` dwa kolejne wykonania). Każde utworzone i subskrybowane inner to pełny rząd: **ID wykonania (#1) → kulka wartości wejścia (A / A$) → HTTP GET (nagłówek + pełny execution lane z postępem i stanem tekstem) → opcjonalny operator (catchError) → inner subscriber** — pełny lane jak odbiorca główny, z ikoną, etykietą „inner #1”, odebraną wartością i statusem (`✓ complete`, `! error`, `× odłączono`). Kolumny są wspólne dla wszystkich ośmiu slajdów i wszystkich wykonań: ID od x 50, kulka, HTTP GET 180–480, catchError 540–780, subscriber 840–1210 (pod odbiorcą głównym); bez operatora kabel HTTP → subscriber jest po prostu dłuższy. Wartość bez utworzonego inner ma ID, kulkę i neutralny placeholder o wysokości lane: „?” (pytanie), „W KOLEJCE” (concatMap — wartość przed projekcją) albo przygaszone „POMINIĘTE” (exhaustMap) — bez HTTP GET, subscribera i portów. switchMap zachowuje cały anulowany pipeline #1 (szary impuls × od subscribera do HTTP, ID szare, `× odłączono`, bez complete). distinctUntilChanged odrzuca duplikaty w górnym operatorze, bez dolnego wiersza. Nie ma napisu nad pracami, ramki sekcji ani przewodów między poziomami; wynik inner logicznie wraca przez górny operator.
+Dół: poziomy separator i do trzech wewnętrznych pipeline'ów jeden pod drugim (na wprowadzeniu `08-map-strumienie` dwa kolejne wykonania). Każde utworzone i subskrybowane inner to pełny rząd: **ID wykonania (#1) → kulka wartości wejścia (A / A$) → HTTP GET (nagłówek + pełny execution lane z postępem i stanem tekstem) → opcjonalny operator (catchError) → inner subscriber** — pełny lane jak odbiorca główny, z ikoną, etykietą „inner #1”, odebraną wartością i statusem (`✓ complete`, `! error`, `× odłączono`). Standardowe kolumny rodziny *Map i catchError są wspólne dla wszystkich wykonań: ID od x 50, kulka, HTTP GET 180–480, catchError 540–780, subscriber 840–1210 (pod odbiorcą głównym); bez operatora kabel HTTP → subscriber jest po prostu dłuższy. Wartość bez utworzonego inner ma ID, kulkę i neutralny placeholder o wysokości lane: „?” (pytanie), „W KOLEJCE” (concatMap — wartość przed projekcją) albo przygaszone „POMINIĘTE” (exhaustMap) — bez HTTP GET, subscribera i portów. switchMap zachowuje cały anulowany pipeline #1 (szary impuls × od subscribera do HTTP, ID szare, `× odłączono`, bez complete). distinctUntilChanged odrzuca duplikaty w górnym operatorze, bez dolnego wiersza; jego wyszukiwarka korzysta z kolumn poprzedniego slajdu debounceTime (ID x 40, kulka x 180, HTTP x 280, subscriber x 720). Nie ma napisu nad pracami, ramki sekcji ani przewodów między poziomami; wynik inner logicznie wraca przez górny operator.
 
 **Kod na wszystkich slajdach** ma subtelne kolorowanie składni (źródła i `httpGet`, operatory RxJS, literały, parametry funkcji, typy, słowa kluczowe) jako osobną warstwę pod pastelowymi wyróżnieniami fragmentów powiązanych z kafelkami; jasne tło i duże fonty bez zmian.
 

@@ -1819,101 +1819,152 @@ function catchOutsideGraph(scene) {
   return graph;
 }
 
-// distinctUntilChanged + switchMap: jeden potok źródło → distinctUntilChanged → switchMap → S1, w dolnej części
-// z instancjami HTTP GET → inbox jak w 09–12. distinctUntilChanged pamięta ostatnią przepuszczoną wartość (memory.ball: sama
-// kulka w wierszu, jak pamięć debounceTime/auditTime),
-// powtórzenie wjeżdża do wiersza, czeka (decide) i gaśnie — bez kabla dalej, bez nowego HTTP i bez anulowania.
-// 11a-distinct-switchmap — S1 zestawione przed READY, A, A, B, B, A: B i drugie A anulują trwające HTTP (switchMap).
-const distinctProfiles={
-  '11a-distinct-switchmap':{
-    input:[{at:.6,value:'A'},{at:3,value:'A',dup:true},{at:4.2,value:'B'},{at:5.4,value:'B',dup:true},{at:6.6,value:'A'}],
-    colors:{A:'#6D4CD3',B:'#B85D05'},decide:1.2,durations:[4.4,3,1.5],preconnected:true,
-    source:'id$',url:'url(id)',title:'distinctUntilChanged — czy coś się zmieniło?',inputsLabel:'wejścia',
-    captions:jobs=>[[0,'S1 już subskrybuje. distinctUntilChanged pamięta tylko ostatnią przepuszczoną wartość'],
-      [jobs[0].at,'A: brak poprzedniej wartości — przechodzi i zostaje w pamięci. switchMap uruchamia HTTP A'],
-      [jobs[1].at,'B ≠ A — przechodzi i zastępuje A w pamięci. switchMap anuluje HTTP A i uruchamia HTTP B'],
-      [jobs[2].at,'A ≠ B — przechodzi. Porównanie z ostatnią wartością, nie z całą historią'],
-      [jobs.at(-1).end,'HTTP A zwraca wynik do S1 i kończy się complete. S1 czeka na kolejne ID']],
-    stops:({ev,arrived,dups,decide})=>[
-      {id:'first',event:ev('source-next',{edge:'source-distinct',logicalAt:dups[0].at}),offset:-.4,caption:'A przeszło i zostało w pamięci operatora. switchMap uruchomił HTTP A'},
-      {id:'question',event:arrived(dups[0].at),offset:.6,caption:'HTTP A trwa, a znowu przychodzi A. Czy switchMap anuluje request i uruchomi go ponownie?'},
-      {id:'answer',event:arrived(dups[0].at),offset:decide+.6,caption:'A === A — odrzucone w distinctUntilChanged. HTTP A pracuje dalej'},
-      {id:'switched',event:ev('inner-subscribe',{edge:'inner1-op'}),offset:.3,caption:'B ≠ A — w pamięci jest teraz B. switchMap anulował HTTP A i uruchomił HTTP B'},
-      {id:'repeat-b',event:arrived(dups[1].at),offset:decide+.6,caption:'B === B — odrzucone. HTTP B bez restartu'},
-      {id:'again-a',event:ev('inner-subscribe',{edge:'inner2-op'}),offset:.3,caption:'A ≠ B — przechodzi. HTTP B anulowany, startuje HTTP #3 · A'}],
-    reject:v=>`${v.value} === ${v.value} — odrzucone. HTTP ${v.value} pracuje dalej`,
-    summary:'5 wejść, 3 requesty: A, B, A. distinctUntilChanged odrzuca tylko kolejne powtórzenia'},
-};
-export function configureDistinctSwitch(scene,profileId=scene.id) {
-  const profile=distinctProfiles[profileId],distinctInput=profile.input,colors=profile.colors,decide=profile.decide;
-  const passed=distinctInput.filter(v=>!v.dup),dups=distinctInput.filter(v=>v.dup),durations=profile.durations;
-  const jobs=passed.map((v,i)=>{
-    const next=passed[i+1],natural=v.at+durations[i],end=next?Math.min(natural,next.at):natural;
-    return {value:v.value,at:v.at,start:v.at,end,dur:durations[i],cancelled:end<natural};
-  });
-  const last=jobs.at(-1);
-  const ev=(type,extra)=>({type,...extra}),during=(from,to)=>({from,to}),arrived=at=>ev('deliver-next',{edge:'source-distinct',logicalAt:at});
-  const op={id:'switch',bg:'rgba(216,179,230,.45)',line:'#b384c6'},http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'};
-  // Kod w dwóch liniach (jak catchError); fragmenty świecą, gdy dany operator albo request pracuje.
-  const lines=[[{text:profile.source+'.pipe('},{text:'distinctUntilChanged()',mark:{...op,id:'distinct'},active:distinctInput.map(v=>during(arrived(v.at),
-      v.dup?{...arrived(v.at),offset:decide}:ev('source-next',{edge:'distinct-op',logicalAt:v.at})))},{text:','}],
-    [{text:'  '},{text:'switchMap',mark:op,active:jobs.map((job,i)=>during(ev('deliver-next',{edge:'distinct-op',logicalAt:job.at}),ev('inner-subscribe',{edge:`inner${i}-op`})))},
-      {text:'(id => '},{text:`httpGet(${profile.url})`,mark:http,active:jobs.map((job,i)=>during(ev('inner-subscribe',{edge:`inner${i}-op`}),
-        ev(job.cancelled?'inner-unsubscribe':'inner-next',{edge:`inner${i}-op`})))},{text:'))'}]];
-  // Wynik S1: każde niezanulowane HTTP zwraca swoją wartość.
-  const results=jobs.filter(job=>!job.cancelled);
-  Object.assign(scene,{jobs,operatorName:'switchMap',distinctInput,distinctColors:colors,distinctDecide:decide,
-    distinctReject:profile.reject,distinctSummary:profile.summary,subscribeAt:profile.subscribeAt??.1,
-    graph:distinctSwitchGraph,duration:last.end+1.4,preconnected:profile.preconnected,
-    title:profile.title,playerLayout:'expanded',playerClass:'rx-flat-tiles rx-catch-inside',
-    timing:{subscribe:1.5,travel:1,transform:1.4,terminal:.8,gap:.5},
-    code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
-    rows:[R(profile.source,distinctInput.map(v=>E(v.at,v.value,colors[v.value]))),
-      R('distinctUntilChanged',passed.map(v=>E(v.at,v.value,colors[v.value]))),
-      ...jobs.map(job=>R('HTTP '+job.value,job.cancelled?[]:[E(job.end,job.value,colors[job.value])],
-        [B(job.start,job.end,job.value,job.cancelled?'cancel':'work',{duration:job.dur})],{completeAt:job.cancelled?undefined:job.end})),
-      R('wynik',results.map(job=>E(job.end,job.value,colors[job.value])))],
-    captions:profile.captions(jobs),
-    metrics:[{label:profile.inputsLabel,value:t=>distinctInput.filter(v=>v.at<=t).length},{label:'requesty HTTP',count:'started'},{label:'aktywne',count:'active'}],
-    playback:{entry:'manual',finish:'hold',afterLastManualStop:'start-auto',stops:profile.stops({ev,arrived,dups,decide})},
+// Trzeci etap wyszukiwarki: distinct od READY → trzy sukcesy → po kliknięciu nieobsłużony error.
+// UI po błędzie jest niezależne od zdarzeń zamkniętej subskrypcji.
+export function configureDistinctSwitch(scene) {
+  const model=distinctSearchModel();
+  Object.assign(scene,model,{
+    title:'distinctUntilChanged — znowu to samo?',
+    playerLayout:'expanded',playerClass:'rx-flat-tiles rx-switchmap-live rx-distinct-search',ink:'#26323B',
+    playback:{entry:'manual',finish:'hold',controller:'stages',resetOnExit:true,stops:[
+      {id:'first',time:model.search.runs[0].completed+.3,autoPause:true},
+      {id:'duplicate',time:model.search.outputs[1].arrival+1.05,autoPause:true},
+      {id:'successes',time:model.search.successStop,autoPause:true},
+      {id:'request-error',time:model.search.runs.at(-1).connected+.2,autoPause:true},
+      {id:'error',time:model.search.detached+.25,autoPause:true},
+    ]},
   });
 }
 
-function distinctSwitchGraph(scene) {
-  const frame=frameFor(scene),[input,passed]=scene.rows,result=scene.rows.at(-1),decide=scene.distinctDecide,colors=scene.distinctColors;
-  const subscribeAt=scene.subscribeAt;
-  // Numer wykonania HTTP trwającego w chwili odrzucenia (napis „HTTP #k pracuje dalej”).
-  const runningJob=at=>'#'+(scene.jobs.findLastIndex(job=>job.start<=at)+1);
-  const nodes=[{id:'source',label:scene.rows[0].label,color:'source',ready:true},
-    // Pamięć (kulka ostatniej przepuszczonej wartości) i odrzucenie powtórzeń w wierszu S1 operatora; przepuszczona kulka
-    // przejeżdża przez wiersz (hold).
-    {id:'distinct',label:'distinctUntilChanged',color:'op',ready:true,memory:{label:'prev',ball:true},rejectBalls:true,rejectAt:.42,transformBalls:true},
-    {id:'op',label:'switchMap',color:'op',ready:true},{id:'observer',label:'',ready:true},
-    ...scene.jobs.map((job,i)=>({id:'inner'+i,label:'HTTP '+job.value,inner:true,workRow:true,panel:'jobs',slot:i,ready:false,born:job.start}))];
-  const edges=[
-    {from:'source',to:'distinct',events:input.events.map(e=>scene.distinctInput.find(v=>v.at===e.at).dup?{...e,decide}:e),logicalStart:subscribeAt,logicalEnd:null},
-    {from:'distinct',to:'op',events:passed.events,logicalStart:subscribeAt,logicalEnd:null,hold:1},
-    {from:'op',to:'observer',events:result.events,logicalStart:subscribeAt,logicalEnd:null},
-    ...scene.jobs.map((job,i)=>({id:`inner${i}-op`,from:'inner'+i,to:'op',events:scene.rows[2+i].events.map(e=>({...e,execution:'#'+(i+1)})),
-      logicalStart:job.start,logicalEnd:{at:job.end,kind:job.cancelled?'unsubscribe':'complete'},gateWork:true,internal:true}))];
-  const graph={layout:'fixed',formatAware:true,width:1240,height:frame.height,illustratedWork:true,nodes,edges,
-    executions:scene.jobs.map((job,i)=>({id:'#'+(i+1),node:'inner'+i,edge:`inner${i}-op`,panel:'jobs',value:job.value,label:'HTTP '+job.value,duration:job.dur})),
-    timeline:[
-      ...scene.distinctInput.filter(v=>v.dup).map(v=>({type:'distinct-reject',event:{type:'deliver-next',edge:'source-distinct',logicalAt:v.at},offset:decide,
-        caption:scene.distinctReject(v,runningJob(v.at))})),
-      {type:'distinct-summary',event:{type:'deliver-next',edge:'op-observer'},last:true,offset:1.2,caption:scene.distinctSummary}]};
-  // Cztery kafelki na wspólnej osi portów; kompaktowy odbiorca S1 mieści jedną kulkę wyniku.
-  configureHttpWorkPanel(graph,scene,frame,{
-    tiles:[['source',178,300,'#8FC9D4'],['distinct',568,400,'#D8B3E6'],['op',905.5,195,'#D8B3E6']]});
-  const receiver=nodes.find(n=>n.id==='observer');
-  Object.assign(receiver,{x:1127.5,w:169});
-  Object.assign(graph.trays[0],{x:1168,w:60,max:1});
-  // Kolor należy do wartości: wszystkie wykonania tej samej wartości mają ten sam kolor.
-  for(const edge of graph.edges)edge.events=edge.events.map(e=>({...e,color:colors[e.value]||e.color}));
-  for(const work of graph.panels[0].works)work.color=colors[work.value];
-  // Postęp HTTP w czasie modelu: stoi podczas przelotów i pytania, przy anulowaniu zostaje na ułamku modelu.
-  graph.panels[0].modelProgress=true;
-  if(scene.preconnected)for(const edge of graph.edges.filter(e=>!e.internal))edge.preconnected=true;
+function distinctSearchModel() {
+  const t=searchTiming,firstAt=3.3,round=n=>+n.toFixed(6);
+  const burst=(values,at)=>values.map((value,i)=>({value,color:queryColor(value),at:round(at+i*t.key*t.scale),
+    arrival:round(at+i*t.key*t.scale+t.travel),logicalAt:round((at+i*t.key*t.scale)/t.scale)}));
+  const bursts=[burst(['r','re','rea'],firstAt),burst(['re','rea'],11.8),
+    burst(['','a','an','ang'],16.5),burst(['','v','vu','vue'],25.5),burst(['','s','sv','sve'],34.6)];
+  const inputs=bursts.flat();
+  const outputs=debounceSearchInputs(inputs).map((v,i,all)=>({...v,at:round(v.at),arrival:round(v.arrival),
+    duplicate:i>0&&v.value===all[i-1].value}));
+  const passed=outputs.filter(v=>!v.duplicate).map(v=>({...v,at:round(v.arrival+.6),
+    arrival:round(v.arrival+.6+t.travel)}));
+  const runs=passed.map((value,index)=>{
+    const born=value.arrival,connected=round(born+t.connect),response=round(connected+t.request);
+    const errored=index===passed.length-1,end=errored?response:round(response+t.terminalGap);
+    return {id:'#'+(index+1),index,value:value.value,color:value.color,born,connected,response,
+      end,completed:round(end+t.terminal),duration:t.request,received:round(response+2*t.travel+.15),errored};
+  });
+  const error=runs.at(-1).end,resultError=round(error+t.terminal+.15),receiverError=round(resultError+t.terminal);
+  const teardown=[receiverError,round(receiverError+t.terminal),round(receiverError+2*t.terminal)];
+  const detached=round(teardown[2]+t.terminal),uiStart=round(detached+.65);
+  const unobserved=burst(['','r','rx','rxj'],uiStart);
+  const successStop=round(runs.at(-2).completed+.35);
+  const duration=round(unobserved.at(-1).at+1);
+  const source={id:'query',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},http={...source,id:'http'};
+  const op={id:'switch',bg:'rgba(216,179,230,.45)',line:'#b384c6'},debounce={...op,id:'debounce'};
+  const clock=at=>({type:'search-clock',logicalAt:at}),during=(from,to)=>({from:clock(from),to:clock(to)});
+  const code='query$.pipe(\n  debounceTime(300),\n  distinctUntilChanged(),\n'+
+    '  switchMap(query => httpGet(url(query)))\n)';
+  const codeLines=[
+    [{text:'query$',mark:source,active:inputs.map(v=>during(v.at,v.arrival))},{text:'.pipe('}],
+    [{text:'  '},{text:'debounceTime(300)',mark:debounce,active:outputs.map((v,i)=>during(bursts[i][0].arrival,v.arrival))},{text:','}],
+    [{text:'  '},{text:'distinctUntilChanged()',mark:{...op,id:'distinct'},
+      active:outputs.map(v=>during(v.arrival,v.duplicate?v.arrival+.8:passed.find(p=>p.logicalAt===v.logicalAt).arrival))},
+      {text:','}],
+    [{text:'  '},{text:'switchMap',mark:op,active:runs.flatMap((run,i)=>[during(passed[i].arrival,run.connected),
+      during(run.response+t.travel,run.errored?receiverError:run.received)])},
+      {text:'(query => '},{text:'httpGet(url(query))',mark:http,active:runs.map(run=>during(run.connected,run.end))},{text:')'}],
+    [{text:')'}],
+  ];
+  const clocks=[...new Set(codeLines.flat().flatMap(part=>(part.active||[]).flatMap(v=>[v.from.logicalAt,v.to.logicalAt])))];
+  const seen=(values,time)=>values.filter(v=>v.at<=time+1e-9).length;
+  return {code,codeLines,codeFrames:[],rows:[],checkpoints:[],duration,
+    graph:distinctSearchGraph,search:{bursts,inputs,outputs,passed,runs,unobserved,successStop,error,resultError,receiverError,teardown,detached,clocks},
+    captions:[[0,'distinctUntilChanged porównuje kolejne wartości po debounceTime.'],
+      [firstAt,'Pierwsze rea przejdzie przez debounceTime i zostanie w pamięci distinctUntilChanged.'],
+      [runs[0].completed,'Pierwsze rea: HTTP #1 dostarczył wynik i complete inner. Główna subskrypcja działa.'],
+      [outputs[1].arrival+.8,'rea === rea — duplikat. Nie powstaje zbędny request.'],
+      [bursts[2][0].at,'ang różni się od rea — distinctUntilChanged przepuszcza nowe zapytanie.'],
+      [bursts[3][0].at,'vue różni się od ang — kolejny HTTP dostarczy wynik i complete inner.'],
+      [runs.at(-2).completed,'Trzy udane HTTP: rea, ang, vue. Dalej uruchomi kolejne zapytanie, które zakończy się błędem.'],
+      [bursts[4][0].at,'Nowe zapytanie sve — distinctUntilChanged przepuszcza je do switchMap.'],
+      [runs.at(-1).connected,'HTTP #4 dla sve pracuje. Dalej pokaże błąd tego requestu.'],
+      [error,'HTTP #4 dla sve: error 500. Nieobsłużony błąd przechodzi przez switchMap.'],
+      [receiverError,'Odbiorca dostał error. Cała subskrypcja wyszukiwarki zostaje zamknięta.'],
+      [detached,'query$ odłączone. Dalej pokaże zmiany inputa, na które pipeline już nie reaguje.'],
+      [uiStart,'Input nadal działa. Pipeline jest odłączony — brak emisji i requestu dla rxj.'],
+      [duration-.3,'Jeden nieobsłużony błąd HTTP zakończył całą wyszukiwarkę.']],
+    metrics:[{label:'zmiany inputa',value:time=>seen(inputs,time)+seen(unobserved,time)},
+      {label:'wejścia query$',value:time=>seen(inputs,time)},
+      {label:'emisje po debounce',value:time=>seen(outputs,time)},
+      {label:'requesty HTTP',count:'started'},{label:'aktywne HTTP',count:'active'},
+      {label:'główna subskrypcja',value:time=>time<.8?'nieuruchomiona':
+        time>=receiverError?'zakończona błędem':'aktywna'}],
+  };
+}
+
+function distinctSearchGraph(scene) {
+  const {search:s}=scene,t=searchTiming,frame=frameFor(scene),runs=s.runs;
+  const mainEnd=(at,kind='unsubscribe')=>({at,logicalAt:at,kind,duration:t.terminal});
+  const inputEdges=[
+    {id:'source-debounce',from:'source',to:'debounce',end:mainEnd(s.teardown[2]),start:2.3,events:s.inputs},
+    {id:'debounce-distinct',from:'debounce',to:'distinct',end:mainEnd(s.teardown[1]),start:1.8,
+      events:s.outputs.map(v=>({...v,...(v.duplicate?{decide:.8}:{})}))},
+    {id:'distinct-op',from:'distinct',to:'op',end:mainEnd(s.teardown[0]),start:1.3,events:s.passed},
+  ];
+  const graph={layout:'fixed',formatAware:true,width:1240,height:frame.height,illustratedWork:true,
+    nodes:[{id:'source',label:'query$',ready:true},
+      {id:'debounce',label:'debounceTime',color:'op',ready:true,
+        laneTimer:{kind:'debounce',period:t.period,timeScale:t.scale,unit:'ms',label:'',empty:'',ball:true}},
+      {id:'distinct',label:'distinctUntil Changed',color:'op',ready:true,memory:{ball:true},
+        rejectBalls:true,rejectAt:.24,transformBalls:true},
+      {id:'op',label:'switchMap',color:'op',ready:true},{id:'observer',label:'',ready:true},
+      ...runs.map((run,i)=>({id:'inner'+i,label:'HTTP GET',born:run.born,inner:true,workRow:i+1,panel:'jobs',slot:i%3}))],
+    edges:[...inputEdges.map(e=>({id:e.id,from:e.from,to:e.to,events:[],logicalStart:.3,logicalEnd:e.end,
+      ...(e.end?{cancelPulse:true}:{})})),
+      {id:'op-observer',from:'op',to:'observer',events:[],logicalStart:.3,logicalEnd:mainEnd(s.resultError,'error')},
+      ...runs.map((run,i)=>({id:'inner'+i+'-op',from:'inner'+i,to:'op',internal:true,gateWork:true,fixedStart:true,
+        events:[],logicalStart:run.born,logicalEnd:mainEnd(run.end,run.errored?'error':'complete')}))],
+    executions:runs.map((run,i)=>({id:run.id,node:'inner'+i,edge:'inner'+i+'-op',panel:'jobs',value:run.value,duration:run.duration})),
+    schedule:{...Object.fromEntries(inputEdges.map(e=>[e.id,{start:e.start,connectDuration:.5,events:e.events,...(e.end?{end:e.end}:{})}])),
+      'op-observer':{start:.8,connectDuration:.5,events:runs.filter(run=>!run.errored).map(run=>({at:run.response+t.travel+.15,
+        arrival:run.received,logicalAt:run.response/t.scale,value:searchResultValue(run),color:run.color,execution:run.id})),
+        end:mainEnd(s.resultError,'error')},
+      ...Object.fromEntries(runs.map((run,i)=>['inner'+i+'-op',{start:run.born,connectDuration:t.connect,
+        events:run.errored?[]:[{at:run.response,arrival:run.response+t.travel,logicalAt:run.response/t.scale,
+          value:searchResultValue(run),color:run.color,execution:run.id}],end:mainEnd(run.end,run.errored?'error':'complete')}])),
+    },
+    timeline:[...s.clocks.map(at=>({type:'search-clock',at})),
+      ...[...s.inputs,...s.unobserved].map(v=>({type:'input-change',at:v.at,value:v.value,observed:v.at<s.detached})),
+      {type:'http-error',at:s.error,execution:runs.at(-1).id,status:500},
+        {type:'distinct-reject',at:s.outputs[1].arrival+.8,node:'distinct',value:'rea'}],
+    activities:[...s.inputs.map(v=>({node:'source',at:v.at,until:v.arrival})),
+      ...s.outputs.map((v,i)=>({node:'debounce',at:s.bursts[i][0].arrival,until:v.arrival})),
+      ...s.outputs.map(v=>({node:'distinct',at:v.arrival,until:v.duplicate?v.arrival+.8:s.passed.find(p=>p.logicalAt===v.logicalAt).arrival})),
+      ...runs.flatMap((run,i)=>[{node:'op',at:s.passed[i].arrival,until:run.connected},
+        {node:'op',at:run.response+t.travel,until:run.errored?s.receiverError:run.received}])],
+  };
+  configureHttpWorkPanel(graph,{...scene,rows:[{events:[]}],operatorName:'switchMap',jobs:runs.map(run=>({...run,dur:run.duration}))},frame,{
+    tiles:[['source',115,190,'#8FC9D4'],['debounce',355,230,'#D8B3E6'],
+      ['distinct',620,240,'#D8B3E6'],['op',875,210,'#D8B3E6']],
+    stages:i=>[{column:'source',edge:'inner'+i+'-op',progress:true,errorLabel:'error 500'}],panelOptions:{maxVisibleRows:3}});
+  configureQueryWorkLook(graph,scene,frame,runs);
+  const receiver=graph.nodes.find(n=>n.id==='observer');
+  Object.assign(receiver,{x:1125,w:230,laneTerminalText:{offsetY:-receiver.rowH*.85}});receiver.inbox.label='';
+  for(const node of graph.nodes.filter(n=>['source','debounce','distinct','op','observer'].includes(n.id))){
+    node.growRows=false;
+    node.laneRows=[{subscriber:'S1',top:node.top+node.defH,h:node.rowH,growth:1,color:'#7457D9',tint:'#EDE6F8'}];
+    node.labelOffset=-node.h/2+node.defH/2;
+  }
+  // Nagłówek w dwóch liniach; mniejszy font mieści pełne nazwy w kompaktowych kolumnach.
+  graph.nodes.find(n=>n.id==='debounce').labelSize=scene.format==='4:3'?30:28;
+  const d=graph.nodes.find(n=>n.id==='distinct');if(d)d.labelSize=scene.format==='4:3'?30:28;
+  Object.assign(graph.nodes.find(n=>n.id==='debounce').laneTimer,{memoryX:405,textSize:22});
+  graph.callouts=[{text:'duplikat',label:'',subscriber:'S1',x:620,y:frame.height===612?187:140,size:18,
+      from:{type:'distinct-reject'},to:{type:'distinct-reject',offset:.35}}];
+  graph.trays=[{anchor:'observer',x:receiver.x+15,y:receiver.y,w:80,balls:true,max:1,ball:graph.ball}];
+  const ui=[...s.inputs,...s.unobserved];
+  graph.readouts=[{...queryInputReadout(graph,scene,time=>ui.filter(v=>v.at<=time).at(-1)?.value||''),
+    x:graph.nodes.find(n=>n.id==='source').x+6,w:140}];
   return graph;
 }
 

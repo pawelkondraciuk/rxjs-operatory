@@ -38,7 +38,7 @@ export function configureScene(scene) {
   if(id==='12b-debounce-switchmap')configureDebounceSwitch(scene);
   if(['09-concatmap','10-mergemap','12-exhaustmap'].includes(id))configureFlatten(scene,{
     '09-concatmap':'concatMap','10-mergemap':'mergeMap','12-exhaustmap':'exhaustMap'}[id]);
-  // distinctUntilChanged przed switchMap: A, A, B, B, A → 3 requesty (osobny slajd po switchMap).
+  // Wyszukiwarka: distinct od READY usuwa duplikat → trzy sukcesy → po kliknięciu HTTP error.
   if(id==='11a-distinct-switchmap')configureDistinctSwitch(scene);
   // debounceTime i auditTime (MAIN): dwa potoki z timerami w wierszach operatorów.
   if(scene.id==='16-czas-cztery')configureDebounceAudit(scene);

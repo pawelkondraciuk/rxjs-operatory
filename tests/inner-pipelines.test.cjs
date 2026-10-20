@@ -64,7 +64,7 @@ test('switchMap and distinct: cancelled pipelines keep their tiles, grey out and
  assert.doesNotMatch(rowSvg(svg,'#1'),/✓ complete|data-row-state="completed"/);
  assert.match(rowSvg(svg,'#2'),/data-inner-header="source"[\s\S]*>inner #2</);
  const d=compile('11a-distinct-switchmap'),end=d.snapshot(d.duration);
- assert.equal(end.innerWorkPanels[0].rows.length,3,'A, A, B, B, A → trzy inner, powtórzenia bez wiersza');
+ assert.equal(end.innerWorkPanels[0].rows.length,3,'trzy ostatnie HTTP, duplikat bez dodatkowego wiersza');
 });
 
 test('exhaustMap: skipped B keeps #2 and its ball with a dimmed POMINIĘTE placeholder, without HTTP or subscriber',async()=>{

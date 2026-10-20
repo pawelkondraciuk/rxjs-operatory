@@ -61,7 +61,7 @@ function mapping(mode){
  add(String(i+9).padStart(2,"0")+"-"+mode.toLowerCase(),mode+" — "+descriptions[mode][0],"id$.pipe("+mode+"(makeInner$))",22,rows,[[0,"Te same wejścia i te same zimne źródła wewnętrzne."],[4,descriptions[mode][1]],[14,descriptions[mode][2]]],descriptions[mode].join(" ")+" Czas każdego źródła liczymy od jego subskrypcji. Emisje po odsubskrybowaniu nie trafiają do wyniku.",{jobs:m.jobs,metrics:[{label:"uruchomione",value:t=>m.jobs.filter(j=>!j.ignored&&j.start<=t).length},{label:"aktywne",value:t=>m.jobs.filter(j=>!j.ignored&&j.start<=t&&j.end>t).length},{label:"w kolejce",value:t=>m.jobs.filter(j=>!j.ignored&&j.at<=t&&j.start>t).length}]});
 });
 // Model, graf i postoje distinctUntilChanged: configureDistinctSwitch (reference-scenes.js).
-add("11a-distinct-switchmap","distinctUntilChanged — czy coś się zmieniło?","",1,[],[],"");
+add("11a-distinct-switchmap","distinctUntilChanged — znowu to samo?","",1,[],[],"");
 add("12-intro-wyszukiwarka","Zaprojektujmy wyszukiwarkę","",1,[],[],"");
 add("12-query-zrodlo","Źródło: skąd bierze się query$?","",1,[],[],"");
 add("12a-switchmap-live","switchMap — nowe zapytanie anuluje poprzednie","",1,[],[],"");

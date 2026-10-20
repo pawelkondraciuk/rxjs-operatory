@@ -103,6 +103,22 @@
 [data-ratio="16-9"] .reveal .animation-slide.rx-debounce-search-slide h2 { height:76px; font-size:40px; }
 [data-ratio="16-9"] .rx-player.rx-debounce-search { grid-template-rows:104px 436px 72px; height:612px; }
 [data-ratio="16-9"] .rx-player.rx-debounce-search .rx-code { font-size:26px; }
+/* Distinct: miejsce na dopisywaną linię kodu, te same płaskie tory i input co debounce. */
+.reveal .animation-slide.rx-distinct-search-slide h2 { height:96px; font-size:46px; color:#111; font-family:'Palatino Linotype','Book Antiqua',Palatino,Georgia,'Times New Roman','Liberation Serif',serif; }
+.rx-player.rx-distinct-search { grid-template-rows:176px 550px 124px; height:850px; }
+.rx-player.rx-distinct-search .rx-code { font-size:28px; line-height:1.2; }
+.rx-player.rx-distinct-search .rx-summary { flex-direction:column; justify-content:center; gap:8px; padding-top:8px; }
+.rx-player.rx-distinct-search .rx-caption { flex:0; font-size:23px; text-align:center; }
+.rx-player.rx-distinct-search .rx-metrics { flex-wrap:wrap; justify-content:center; gap:8px 20px; }
+.rx-player.rx-distinct-search .rx-metric { font-size:17px; }
+.rx-player.rx-distinct-search .rx-metric:last-child { max-width:none; }
+.rx-player.rx-distinct-search .rx-metric:last-child b { font-size:24px; white-space:nowrap; }
+[data-ratio="16-9"] .reveal .animation-slide.rx-distinct-search-slide h2 { height:76px; font-size:38px; }
+[data-ratio="16-9"] .rx-player.rx-distinct-search { grid-template-rows:140px 380px 92px; height:612px; }
+[data-ratio="16-9"] .rx-player.rx-distinct-search .rx-code { font-size:23px; }
+[data-ratio="16-9"] .rx-player.rx-distinct-search .rx-caption { font-size:20px; }
+[data-ratio="16-9"] .rx-player.rx-distinct-search .rx-metric { font-size:15px; }
+[data-ratio="16-9"] .rx-player.rx-distinct-search .rx-metric:last-child b { font-size:21px; }
 .rx-stepped .rx-scrub { min-width:160px; }
 .rx-stepped .rx-hide { margin-left:auto; }
 .reveal.overview .rx-step-mode { display:none; }
