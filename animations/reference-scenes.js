@@ -806,19 +806,21 @@ export function subjectGraph(scene) {
 // Subject — ręczna emisja (05-zrodla-5): po interval (wiele next, unsubscribe), przed ręcznym multicastem HTTP.
 // Subject jest hot: READY to sam kafelek Subject<number>; A subskrybuje i dostaje next(1),
 // dopiero potem pojawia się B — bez wcześniejszej 1 (brak historii). next(2) trafia do A i B, complete() zamyka obie
-// subskrypcje (bez unsubscribe). Odbiorca pojawia się (fade-in) tuż przed swoim subscribe. Subject nie ma upstreamu ani connection.
+// subskrypcje (bez unsubscribe). Późny C dostaje tylko complete; next(3) po zakończeniu jest ignorowane.
+// Odbiorca pojawia się (fade-in) tuż przed swoim subscribe. Subject nie ma upstreamu ani connection.
 // Wygląd torów i wymiary kafelków jak interval (05-zrodla): Subject x/w 340/420, kompaktowi odbiorcy 910/400 z kulkami
 // wartości. Kod to stale tylko definicja Subjecta; subscribe, next i complete są migawkami: subscribe i next widoczne do
-// postoju, gasną w następnym etapie; complete() zostaje do końca. Jawny harmonogram: czas ilustracji = czas modelu.
+// postoju, gasną w następnym etapie; complete() gaśnie przed C, ignorowane next(3) zostaje do końca.
+// Jawny harmonogram: czas ilustracji = czas modelu.
 // next(1) trafia tylko do A (B jeszcze nie istnieje); B subskrybuje między next(1) i next(2).
 // Etapy: subscribe A → next(1): kulka czeka w Subjecie (emit-1) → dotarcie do A → subscribe B → next(2): kulka ze środka
-// rozchodzi się do portów A i B i staje (emit-2) → dotarcie do A i B → complete().
+// rozchodzi się do portów A i B i staje (emit-2) → dotarcie do A i B → complete() → subscribe C → ignorowane next(3).
 // emitStop: postój emit-1 po fade-in kulki (przed ruchem do portu); calloutTail: migawka gaśnie tuż po wznowieniu.
-const subjectManualTimes={subscribe:[.6,5.8],reveal:.3,link:1,next:[2.3,7.5],hold:1.2,travel:1.4,complete:10.8,completeDelay:.6,terminal:1.2,
-  emitStop:.5,calloutTail:.1,summary:13.6,duration:14.6};
-const subjectManualReceivers=[{id:'A',slot:0},{id:'B',slot:1}];
+const subjectManualTimes={subscribe:[.6,5.8,14],reveal:.3,link:1,next:[2.3,7.5],hold:1.2,travel:1.4,complete:10.8,completeDelay:.6,terminal:1.2,
+  emitStop:.5,calloutTail:.1,ignoredNext:17.5,summary:19.2,duration:20.2};
+const subjectManualReceivers=[{id:'A',slot:0},{id:'B',slot:1},{id:'C',slot:2}];
 // Odbiorcy emisji: ci, których subskrypcja jest zestawiona przed wywołaniem next.
-const subjectManualTargets=(at,call)=>subjectManualReceivers.filter((r,i)=>at.subscribe[i]+at.link<=call);
+const subjectManualTargets=(at,call)=>call<at.complete?subjectManualReceivers.filter((r,i)=>at.subscribe[i]+at.link<=call):[];
 // Migawka complete() w zieleni zakończenia; bez własnego toru.
 const subjectCompleteCall={color:'#087438',fill:'#DDF1E1',ink:'#0B5A2E',tint:'#E8F5EC'};
 export function configureSubjectManual(scene) {
@@ -830,13 +832,16 @@ export function configureSubjectManual(scene) {
   // Stały kod: wyłącznie definicja Subject; świeci od ręcznego next do wyjścia powiadomień i od complete() do jego wysłania.
   const lines=[[{text:'const subject$ = '},{text:'new Subject<number>()',mark:subjectMark,
     active:[...nexts.map(n=>({from:{type:'manual-next',value:n.value},to:ev('source-next','subject-'+n.targets[0],{value:n.value})})),
-      {from:{type:'manual-complete'},to:ev('stream-complete','subject-A')}]},{text:';'}]];
+      {from:{type:'manual-complete'},to:ev('stream-complete','subject-A')},
+      {from:{type:'manual-next-ignored'},to:{type:'manual-next-ignored',offset:at.emitStop+at.calloutTail}}]},{text:';'}]];
   Object.assign(scene,{graph:subjectManualGraph,subjectManualTimes:{...at,nexts,completeAt,completeArrival},
     playerLayout:'function',duration:at.duration,ink:'#26323B',playerClass:'rx-lanes rx-flat-tiles',
     title:'Subject — ręczna emisja',code:lines[0].map(part=>part.text).join(''),codeLines:lines,codeFrames:[],
     rows:[R('Subject',nexts.map(n=>E(n.call,n.value,fill)),[],{completeAt:at.complete}),
-      ...subjectManualReceivers.map(r=>R('Odbiorca '+r.id,nexts.filter(n=>n.targets.includes(r.id)).map(n=>E(n.split,n.value,fill)),[],{completeAt:at.complete}))],
-    // Odbiorcy: zestawione i jeszcze niezakończone subskrypcje (complete zamyka obie). Emisje next: ręczne wywołania next.
+      ...subjectManualReceivers.map((r,i)=>R('Odbiorca '+r.id,nexts.filter(n=>n.targets.includes(r.id)).map(n=>E(n.split,n.value,fill)),[],
+        {completeAt:Math.max(at.complete,at.subscribe[i]+at.link)}))],
+    // Odbiorcy: zestawione i jeszcze niezakończone subskrypcje; C po complete nie staje się aktywny.
+    // Emisje next: tylko skuteczne next(1)/next(2), bez ignorowanego wywołania next(3).
     metrics:[{label:'Odbiorcy',value:t=>t>=completeArrival?0:at.subscribe.filter(start=>t>=start+at.link).length},
       {label:'Emisje next',value:t=>nexts.filter(n=>t>=n.call).length}],
     captions:[[0,'new Subject<number>(): Subject nie ma jeszcze odbiorców i niczego nie emituje']],
@@ -849,6 +854,8 @@ export function configureSubjectManual(scene) {
       {id:'emit-2',event:ev('source-next','subject-A',{value:'2'}),caption:'subject$.next(2): Subject rozsyła 2 do wszystkich aktualnych odbiorców — A i B'},
       {id:'next-2',event:ev('deliver-next','subject-B',{value:'2'}),offset:.35,caption:'subject$.next(2): A i B dostają 2. B nie dostał 1 — Subject nie odtwarza historii'},
       {id:'complete',event:ev('disconnected','subject-B'),offset:.5,caption:'subject$.complete(): A i B dostają complete. Obie subskrypcje są zamknięte'},
+      {id:'subscribed-c',event:ev('disconnected','subject-C'),offset:.5,caption:'C subskrybuje zakończony Subject: od razu complete, bez wcześniejszych wartości. Odbiorcy: 0'},
+      {id:'next-ignored',event:{type:'manual-next-ignored'},offset:at.emitStop,caption:'subject$.next(3): brak emisji. Zakończonego Subjecta nie można wznowić'},
     ]),
   });
 }
@@ -860,32 +867,37 @@ export function subjectManualGraph(scene) {
   // Kulka liczby jak w Subject + interval; wartości w kolorze emisji Subjecta (fill toru #1 z sąsiednich slajdów).
   const ball={r:34,font:30},fill=subjectUpstream.fill;
   // complete: terminalna notyfikacja — zielony impuls od Subjecta do każdego odbiorcy, bez kulki i bez unsubscribe.
-  const complete={at:at.completeAt,logicalAt:at.complete,kind:'complete',duration:at.terminal};
+  // Dla C complete jest wysyłane natychmiast po dotarciu subscribe do już zakończonego Subjecta.
+  const complete=i=>at.subscribe[i]<at.complete?
+    {at:at.completeAt,logicalAt:at.complete,kind:'complete',duration:at.terminal}:
+    {at:at.subscribe[i]+at.link,logicalAt:at.subscribe[i]+at.link,kind:'complete',duration:at.terminal};
   const call=(text,subscriber,from,to)=>({...laneCallout(text,subscriber,from,to,{x:620,y:top/2}),size:34,label:''});
   return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball,
-    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,U:subjectUpstream,C:subjectCompleteCall},
+    subscribers:{...laneSubscribers,U:subjectUpstream,DONE:subjectCompleteCall},
     nodes:[{id:'subject',x:g.subjectX,w:g.subjectW,label:'Subject',splitBalls:true,splitGuides:false,upstreamStripe:false,hubFan:false,
         emits:at.nexts.map(n=>({value:n.value,color:fill,at:n.call})),
         ...laneTile('operator',top,Object.fromEntries(subjectManualReceivers.map(r=>[r.id,r.slot])),subjectManualReceivers.length)},
       // Odbiorca nie istnieje przed swoim subscribe: pojawia się (fade-in) tuż przed nim, bez pustego prostokąta w READY.
       ...subjectManualReceivers.map((r,i)=>laneReceiver(r.id,r.id,pos(r),{ready:false,born:at.subscribe[i]-at.reveal,laneTerminalText:true}))],
     edges:subjectManualReceivers.map((r,i)=>({id:'subject-'+r.id,from:'subject',to:r.id,subscriber:r.id,logicalStart:at.subscribe[i],
-      logicalEnd:{at:at.complete,kind:'complete'}})),
+      logicalEnd:{at:complete(i).logicalAt,kind:'complete'}})),
     // Powiadomienia emisji tylko do aktualnych subskrybentów: wspólne logicalAt (wywołanie next), ten sam kolor i wylot.
     schedule:Object.fromEntries(subjectManualReceivers.map((r,i)=>['subject-'+r.id,{start:at.subscribe[i],connectDuration:at.link,
-      events:at.nexts.filter(n=>n.targets.includes(r.id)).map(n=>({value:n.value,color:fill,at:n.split,arrival:n.delivered,logicalAt:n.call})),end:complete}])),
+      events:at.nexts.filter(n=>n.targets.includes(r.id)).map(n=>({value:n.value,color:fill,at:n.split,arrival:n.delivered,logicalAt:n.call})),end:complete(i)}])),
     trays:subjectManualReceivers.map(r=>laneTray(r.id,pos(r),2,ball)),
     // Migawki w jednym miejscu nad diagramem, kolejno: subscribe (litera toru), next(1), next(2) (bez badge'a)
-    // i complete() (zieleń zakończenia). subscribe i next zostają na swoim postoju (subscribed-X, emit-N) i gasną tuż po
-    // wznowieniu; complete() zostaje do końca sceny.
+    // i complete() (zieleń zakończenia). C: subscribe zostaje do postoju po complete, bez nakładania migawek.
     callouts:[...subjectManualReceivers.map(r=>({...call(`subject$.subscribe(observer${r.id})`,r.id,
-        laneEvent('subscribe','subject-'+r.id),laneEvent('connected','subject-'+r.id,.35+at.calloutTail)),label:r.id})),
+        laneEvent('subscribe','subject-'+r.id),r.id==='C'?laneEvent('disconnected','subject-C',.5+at.calloutTail):
+          laneEvent('connected','subject-'+r.id,.35+at.calloutTail)),label:r.id})),
       // Postój emisji: przy jednym odbiorcy kulka czeka w Subjecie (emit-1), przy kilku — staje na portach po rozejściu (emit-2).
       ...at.nexts.map(n=>call(`subject$.next(${n.value})`,'U',{type:'manual-next',value:n.value},n.targets.length>1?
         {type:'source-next',edge:'subject-'+n.targets[0],value:n.value,offset:at.calloutTail}:{type:'manual-next',value:n.value,offset:at.emitStop+at.calloutTail})),
-      call('subject$.complete()','C',{type:'manual-complete'},laneEvent('disconnected','subject-B',Infinity))],
+      call('subject$.complete()','DONE',{type:'manual-complete'},laneEvent('subscribe','subject-C',-at.reveal-.3)),
+      call('subject$.next(3)','U',{type:'manual-next-ignored'},{type:'manual-next-ignored',offset:Infinity})],
     timeline:[...at.nexts.map(n=>({type:'manual-next',value:n.value,at:n.call})),{type:'manual-complete',at:at.complete},
-      {type:'subject-manual-summary',at:at.summary,caption:'A: 1, 2, complete. B: 2, complete. Subject jest hot — późny odbiorca nie dostaje historii'}],
+      {type:'manual-next-ignored',value:'3',at:at.ignoredNext},
+      {type:'subject-manual-summary',at:at.summary,caption:'A: 1, 2, complete. B: 2, complete. C: tylko complete. Subject nie odtwarza historii; po complete nie emituje'}],
   };
 }
 

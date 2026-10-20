@@ -4,7 +4,7 @@ Polska prezentacja Pawła Kondraciuka o sterowaniu pracą, kolejnością, subskr
 
 Ten README jest mapą treści: opisuje slajdy, zawartość bloczków i speaker notes. Implementację animacji, mapę plików i używane API znajdziesz w [AGENTS.md](AGENTS.md).
 
-Pełny eksport notatek do weryfikacji dla 25 slajdów technicznych MAIN znajduje się w [work/speaker-notes-main.md](work/speaker-notes-main.md). Dokument uwzględnia aktualną kolejność, końcowe tytuły wariantów i wszystkie notatki checkpointów, od slajdu po „A share?” do podsumowania przed „Pytania?”.
+Pełny eksport notatek dla **40 slajdów MAIN**, od powitania do pytań i feedbacku, znajduje się w [work/speaker-notes-main.md](work/speaker-notes-main.md). Uwzględnia plan 33 tematów, aktualną kolejność wariantów oraz wszystkie notatki checkpointów i fragmentów. Źródłem notatek wyświetlanych przez Reveal pozostaje `index.html`.
 
 ## Uruchomienie i obsługa
 
@@ -31,7 +31,9 @@ Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przyw
 
 Porównania są osobnymi slajdami. Warianty z sufiksami -2/-3/-4 powstają podczas uruchamiania; pierwszy zachowuje ID bazowe. Poniżej podano kolejność MAIN, a dalszy spis opisuje rodziny tematycznie.
 
-Każda pozycja opisuje temat, ekran/bloczki i notatki prelegenta. Tabele wariantów podają rzeczywiste tytuły i kod nad diagramem. Speaker notes przy rodzinie dotyczą wszystkich jej wariantów, ponieważ sekcje są klonowane razem z notatkami. Wyjątkiem są trzy slajdy Subject (`05-zrodla-5`, `05-zrodla-3`, `05-zrodla-4`): mają własne notatki przypisane do checkpointów. Notatki przytoczono z ujednoliconymi odstępami; powtarzaną instrukcję obsługi zwykłych animacji opisano wspólnie wyżej.
+Każda pozycja opisuje temat, ekran/bloczki i notatki prelegenta. Tabele wariantów podają rzeczywiste tytuły i kod nad diagramem. Bazowe speaker notes rodzin są klonowane z sekcją; gdy wariant ma `template[data-checkpoint-notes]` dla swojego ID, jego notatki checkpointów zastępują bazowy opis w oknie prelegenta. Notatki przytoczono z ujednoliconymi odstępami; powtarzaną instrukcję obsługi zwykłych animacji opisano wspólnie wyżej.
+
+Notatki są dopasowane do planu 33 tematów: krótkie punkty bazowe, **❓ SALA** przy pytaniach i **⏸ PAUZA** przy postojach animacji. Otwarcie obejmuje powrót do Zmiany Klimatu, lokalną społeczność i konkurs WebStorm; slajd tytułowy pyta „Kto zna? Kto używa? Kto lubi?” oraz wprowadza źródło → operatory → odbiorcę. Rozwinięcia checkpointów zachowują wskazówki do demonstracji.
 
 Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorze spowalniają ilustrację; nie dodają opóźnień do rzeczywistego synchronicznego RxJS. HTTP jest symulowane. Pasek pokazuje czas pracy, a nie pomiar postępu prawdziwego żądania.
 
@@ -43,7 +45,7 @@ Prezentacja ma **40 slajdów (26 scen odtwarzacza)**, z 33 bazowych sekcji HTML 
 
 Kolejność po slajdzie tytułowym:
 
-1. Pierwsze slajdy techniczne pokazują komplet podstawowych zachowań Observable: HTTP — subscribe, next, complete (`05-zrodla-2`) → kod źródłowy httpGet krok po kroku (`05b-http-kod`) → Cold: jedna definicja, trzy wykonania, trzy complete (`04a-dwa-tory`) → interval na żywo — cold, osobne wykonanie każdego odbiorcy, unsubscribe (`05-zrodla`) → Subject — ręczne next, późny subskrybent bez historii i complete (`05-zrodla-5`) → Subject: ręczny multicast HTTP (`05-zrodla-3`) → Subject — kto odłączy źródło? (`05-zrodla-4`). Po nich „Jakie znasz operatory RxJS?” (`02-znane-operatory`) → HTTP GET + map: obiekt User → „Paweł Kondraciuk” (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`), wstęp do share + HTTP.
+1. Pierwsze slajdy techniczne pokazują komplet podstawowych zachowań Observable: HTTP — subscribe, next, complete (`05-zrodla-2`) → kod źródłowy httpGet krok po kroku (`05b-http-kod`) → Cold: jedna definicja, trzy wykonania, trzy complete (`04a-dwa-tory`) → interval na żywo — cold, osobne wykonanie każdego odbiorcy, unsubscribe (`05-zrodla`) → Subject — ręczne next, późny subskrybent bez historii, complete, subskrypcja po zakończeniu i ignorowane next(3) (`05-zrodla-5`) → Subject: ręczny multicast HTTP (`05-zrodla-3`) → Subject — kto odłączy źródło? (`05-zrodla-4`). Po nich „Jakie znasz operatory RxJS?” (`02-znane-operatory`) → HTTP GET + map: obiekt User → „Paweł Kondraciuk” (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`), wstęp do share + HTTP.
 2. Jedna historia Cold → Subject → share na tych samych przykładach: cold — trzy subskrypcje, trzy HTTP, trzy complete (`04a-dwa-tory`) → Subject + HTTP: jeden HTTP, trzech odbiorców (`05-zrodla-3`) → Subject + interval: odbiorcy odchodzą, źródło nadal działa (`05-zrodla-4`) → pytanie o znane operatory → HTTP GET + map (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`) → share + HTTP: jeden HTTP, trzech odbiorców (`04a-dwa-tory-2`) → share + HTTP: późny odbiorca uruchamia nowy request (`20-sharereplay`, odpowiedź na pytanie z próby: „A co, jeśli ktoś zasubskrybuje po zakończeniu requestu?”) → share + interval: ostatni odbiorca odłącza źródło (`04a-dwa-tory-3`) → shareReplay(1) na interval: odbiorcy odchodzą, źródło pracuje dalej (`20a-sharereplay-interval`) → shareReplay z refCount: true na interval: ostatni odbiorca czyści bufor i odłącza źródło, późny C zaczyna od zera (`20b-sharereplay-refcount`) → shareReplay z refCount: true + HTTP: późny odbiorca dostaje wynik z bufora (`20-sharereplay-2`). Powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
 3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap (cztery *Map obok siebie) → „Zaprojektujmy wyszukiwarkę” (`12-intro-wyszukiwarka`) → źródło query$ (`12-query-zrodlo`) → switchMap na żywo (`12a-switchmap-live`) → debounceTime + switchMap (`12b-debounce-switchmap`) → distinctUntilChanged przed switchMap (`11a-distinct-switchmap`, jedyny distinctUntilChanged w MAIN) → catchError wewnątrz switchMap w tej samej wyszukiwarce (`11b-catcherror-search`).
 4. catchError na zewnątrz (`b04-catcherror`) → retry z backoff 1/2/4 s (`x03-retry-backoff`) → podsumowanie. Osobny wariant „catchError wewnątrz” i porównanie debounce/audit zostały usunięte; lokalną obsługę błędu pokazuje wyszukiwarka (`11b-catcherror-search`).
@@ -97,7 +99,10 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Speaker notes:**
 
-> Powitaj uczestników i wspomnij, że współorganizujesz meet.js Białystok. Po lewej jest kod do serwera Discord meet.js Poland, gdzie spotyka się też społeczność Białegostoku. Po prawej jest grupa „JavaScript i front-end Białystok” na Facebooku. Daj chwilę na zeskanowanie kodów, a potem przejdź do pytania o pierwsze spotkanie.
+- Powitanie meet.js Białystok — wracamy do Zmiany Klimatu.
+- Lokalna społeczność: Discord meet.js Poland i grupa JavaScript i front-end Białystok. Daj chwilę na zeskanowanie QR.
+- WebStorm — zapowiedz konkurs / giveaway; wrócimy do niego na końcu.
+- Przejście do pytania: kiedy odbyło się pierwsze spotkanie?
 
 ### Pierwsze meet.js: pytanie — `pierwsze-meetjs-pytanie`
 
@@ -107,7 +112,8 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Speaker notes:**
 
-> Zadaj pytanie sali i daj chwilę na odpowiedzi. To podchwytliwe pytanie. Odpowiedź pokaż dopiero na następnym slajdzie.
+- ❓ SALA: Kiedy odbyło się pierwsze spotkanie meet.js w Białymstoku?
+- Daj chwilę na odpowiedzi. To podchwytliwe pytanie — odpowiedź na następnym slajdzie.
 
 ### meet.js Białystok #2 — `pierwsze-meetjs-odpowiedz`
 
@@ -117,9 +123,8 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Speaker notes:**
 
-> Pierwsze spotkanie pod szyldem meet.js odbyło się 24 lutego 2015, ale miało numer #2. Spotkanie #1 odbyło się wcześniej jako JavaScript Białystok. Stąd podchwytliwe pytanie.
-
-> Plakat pokazuje datę spotkania. Kolejne kliknięcie przechodzi do JavaScript Białystok #1.
+- 24 lutego 2015, Zmiana Klimatu — pierwsze spotkanie pod szyldem meet.js, ale numer #2.
+- Numer #1 odbył się wcześniej jako JavaScript Białystok. Dalej: początki przed meet.js.
 
 ### JavaScript Białystok #1 — `javascript-bialystok-1`
 
@@ -129,11 +134,10 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Speaker notes:**
 
-> A to wcześniejsze spotkanie: JavaScript Białystok #1, 20 stycznia 2015. Pierwsze meet.js odbyło się miesiąc później, jako spotkanie #2.
-
-> Wtedy jeszcze nie wiedziałem, kim są ci ludzie, którzy przyszli na spotkanie. Dziś kojarzę większość z nich, może nie wszystkich z imienia :) Trochę jak z operatorami z tytułu tej prezentacji: znasz je z widzenia, ale bałeś się zagadać.
-
-> Plakat i kolejne trzy zdjęcia pochodzą z pierwszego spotkania JavaScript Białystok. Pokazuj zdjęcia kolejnymi kliknięciami.
+- 20 stycznia 2015 — pierwsze spotkanie JavaScript Białystok, jeszcze przed meet.js.
+- Angular — Karol Rogowski. Adam Piotrowski, Hubert i znajome twarze na zdjęciach.
+- Zmiana Klimatu — dzisiejsze spotkanie to powrót do korzeni.
+- Odsłaniaj zdjęcia kolejnymi kliknięciami. Wtedy obcy ludzie, dziś znajome twarze — jak operatorzy z tytułu.
 
 ### Historia meet.js Białystok — `historia-meetjs`
 
@@ -143,7 +147,10 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Speaker notes:**
 
-> Pokaż wizualnie pełną historię spotkań: od pierwszego w 2015 aż do teraz. Zauważ przerwę w 2020 (pandemia COVID). 62 spotkania w 7 miejscach. Edycje #34 i #38 odwołano. Edycja #65 jest planowana na 22 października 2026. Edycja #65 odbędzie się w Zmianie Klimatu. Kolory tła dat oznaczają miejsca zgodnie z legendą.
+- 62 spotkania; numeracja nie opisuje całej historii — początki przed meet.js i odwołane edycje.
+- Zmiana Klimatu → SoftwareHut → Instapage i kolejne miejsca. Kolory na osi odpowiadają legendzie.
+- Rozwój → COVID → przerwy → powroty.
+- Lokalna społeczność, ci sami ludzie przez lata. Cel: regularne spotkania.
 
 ### Zawsze gdzieś się przewijałem
 
@@ -153,7 +160,8 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Speaker notes:**
 
-> Świetny moment na uśmiech z widownią: pokaż, że bez względu na edycję zawsze gdzieś byłeś w kadrze! Klikaj spację, żeby odsłaniać kolejne archiwalne zdjęcia.
+- Zawsze gdzieś się przewijałem — znajdź mnie na archiwalnych zdjęciach.
+- Ci sami ludzie przez lata tworzą lokalną społeczność. Kolejne kliknięcia odsłaniają zdjęcia.
 
 ### Poprzednie wystąpienia
 
@@ -163,7 +171,9 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Speaker notes:**
 
-> Wspomnij o swoich poprzednich prelekcjach: w 2016 roku mówiłeś o mobile developmencie (meet.js #8), a w 2017 roku o redukcji wagi skryptów i spalaniu kilobajtów (meet.js #15).
+- Dwa wcześniejsze wystąpienia, około 10 lat temu: mobile development (2016) i redukcja wagi skryptów (2017).
+- Programowanie wtedy a AI dzisiaj — wiele się zmieniło.
+- Dzisiaj RxJS: praktyczne zachowanie operatorów i decyzje o pracy, kolejności oraz współdzieleniu.
 
 ### Tytuł prezentacji — `tytul`
 
@@ -173,7 +183,10 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Speaker notes:**
 
-> A dziś porozmawiamy o RxJS. Na tej prezentacji odczarujemy trudne operatory z RxJS. Pokażę Wam, że nie taki diabeł straszny. Pamiętajcie o uśmiechu! Przejście od poprzednich wystąpień do dzisiejszego tematu. Zapowiedz decyzje o pracy, kolejności i współdzieleniu. Tytuł można pozostawić jako statyczny slajd.
+- ❓ SALA: Kto zna RxJS? Kto używa? Kto lubi?
+- Asynchroniczne zdarzenia i wartości: kliknięcia, HTTP, WebSocket, timery.
+- Źródło → operatory → odbiorca. Emisje w czasie i deklaratywne przetwarzanie.
+- Dziś przyglądamy się praktycznemu zachowaniu operatorów. Zaczynamy od HTTP.
 
 ## Wprowadzenie do RxJS
 
@@ -185,7 +198,9 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Speaker notes:**
 
-> Zapytaj salę: „Jakie znasz operatory RxJS?” i daj chwilę na odpowiedzi. Kolejnymi naciśnięciami strzałki w prawo odsłaniaj po jednym operatorze: map, tap, filter i switchMap. Następny slajd pokazuje, że operator to funkcja, na przykładzie map.
+- ❓ SALA: Jakie znasz operatory RxJS? Daj chwilę na odpowiedzi.
+- Odsłaniaj kolejno: map, tap, filter, switchMap.
+- Dalej: operator to funkcja — User → fullName na przykładzie map.
 
 ### A share? — `03-a-share`
 
@@ -195,7 +210,9 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Speaker notes:**
 
-Brak notatek w HTML.
+- ❓ SALA: A share? Kto używa i co właściwie współdzielimy?
+- Przypomnij: Cold — trzy requesty; Subject + HTTP — jeden request, ale ręczne podłączenie.
+- Czy operator może podłączyć źródło i zarządzać nim za nas? Dalej: share(), jedno HTTP i trzech odbiorców.
 
 ## Źródła, subskrypcje i operatory
 
@@ -285,9 +302,9 @@ Warianty zachowują ID, lecz zajmują oddzielne miejsca narracji: **HTTP otwiera
 
 | ID | Kod i zachowanie |
 | --- | --- |
-| 05-zrodla-2 | `httpGet('/api/data')`. READY ma tylko nagłówek HTTP GET. Etapy: receiver (pojawia się odbiorca z ikoną inbox i literą A, bez połączenia) → subscribed (dopisane `.subscribe(render)`, impuls dotarł do HTTP, migawka `.subscribe()` A widoczna, request jeszcze nie ruszył) → response (migawka gaśnie, request w wierszu HTTP, pauza tuż po wylocie „dane”) → first (dane u A przed complete) → AUTO: complete do A i FINISHED. Notatki per checkpoint w `template[data-checkpoint-notes="05-zrodla-2"]` (definicja, odbiorca, subscribe, request i odpowiedź, dane u A, complete i przejście do interval). |
+| 05-zrodla-2 | `httpGet('/api/data')`. READY ma tylko nagłówek HTTP GET. Etapy: receiver (pojawia się odbiorca z ikoną inbox i literą A, bez połączenia) → subscribed (dopisane `.subscribe(render)`, impuls dotarł do HTTP, migawka `.subscribe()` A widoczna, request jeszcze nie ruszył) → response (migawka gaśnie, request w wierszu HTTP, pauza tuż po wylocie „dane”) → first (dane u A przed complete) → AUTO: complete do A i FINISHED. Notatki per checkpoint w `template[data-checkpoint-notes="05-zrodla-2"]` (definicja, odbiorca, subscribe, request i odpowiedź, dane u A, complete i przejście do kodu httpGet). |
 | 05-zrodla | `interval(1000)` na żywo (cold), kafelek podpisany samym `interval`. READY: interval i odbiorca A (ikona inbox, litera A) → `.subscribe()` (dopisane `.subscribe(render)`, postój z migawką `.subscribe()` A, bez emisji) → emisje A 0, 1, 2… bez końca → pojawia się B i subskrybuje: drugi wiersz wykonania w interval, B dostaje własne 0, 1, 2… (pierwsze 0 już 0,6 s po zestawieniu subskrypcji; migawka `.subscribe()` B gaśnie, gdy B zaczyna emitować) → `.unsubscribe()` A → `.unsubscribe()` B (bez complete) → kolejne „dalej” przechodzi dalej. |
-| 05-zrodla-5 | Stale tylko `const subject$ = new Subject<number>();`. A subskrybuje i dostaje `subject$.next(1)`; dopiero potem pojawia się B (`subject$.subscribe(observerB)`) i nie dostaje wcześniejszej 1; `subject$.next(2)` trafia do A i B; `subject$.complete()` — zielony impuls do obu, wiersze ✓ complete, historie zostają (A: 1, 2; B: 2). Bez error, unsubscribe i upstreamu. |
+| 05-zrodla-5 | Stale tylko `const subject$ = new Subject<number>();`. A subskrybuje i dostaje `subject$.next(1)`; dopiero potem pojawia się B (`subject$.subscribe(observerB)`) i nie dostaje wcześniejszej 1; `subject$.next(2)` trafia do A i B; `subject$.complete()` — zielony impuls do obu, wiersze ✓ complete, historie zostają (A: 1, 2; B: 2). Następnie C subskrybuje zakończony Subject i dostaje tylko complete, bez wartości; next(3) jest ignorowane. Odbiorcy nadal 0. Bez error, unsubscribe i upstreamu. |
 | 05-zrodla-3 | Kod rośnie etapami: `const subject$ = new Subject<User>();` → `const http$ = httpGet<User>('/api/users/42');` → `http$.subscribe(subject$);`. A/B/C (pola widoku z Cold) subskrybują Subject od READY; dopiero trzecia linia podłącza jedno HTTP, które przez Subject rozsyła obiekt User i complete do trzech pól. |
 | 05-zrodla-4 | `const subject$ = new Subject<number>();` i `const connection = interval(1000).subscribe(subject$);`. Start już działający: interval → Subject → A/B/C; kolejne „dalej” to `subA/subB/subC.unsubscribe()`, a interval emituje dalej do Subjecta bez odbiorców; ostatnie „dalej” wywołuje `connection.unsubscribe()` i zatrzymuje interval (Subject bez complete). |
 
@@ -295,9 +312,9 @@ Cała rodzina ma wygląd torów jak w `04a-dwa-tory` (nagłówek = definicja, wi
 
 interval: kafelek `interval` (340/420, wymiary jak Subject — ręczna emisja) z wierszami wykonań A i B → odbiorcy A/B (910/400). Najpierw zwykły postój subscribe, potem slajd jest wyjątkiem od postojów: emisje trwają tak długo, jak prelegent chce (liczniki „Emisje A/B” rosną bez ograniczeń, w wierszu odbiorcy zostają 3 ostatnie kulki). Kolejne „dalej” to akcje: B dołącza (interval jest cold — nowe wykonanie od 0, A liczy dalej, „Wykonania interval” 2), potem `.unsubscribe()` A i `.unsubscribe()` B: wartość już wysłana dociera, potem szary pocisk „×” jedzie od odbiorcy do interval, wiersz szarzeje, wykonanie przestaje emitować; nie ma zielonego complete. Migawki stoją w jednym miejscu nad diagramem — każda do następnej akcji, ostatnia do końca. AUTO ani pauza nie wykonują akcji same. Lewo cofa ostatnią akcję, potem emisje, subscribe i READY; wyjście ze slajdu sprząta wykonania, a powrót startuje od READY. Druk pokazuje oba wykonania anulowane.
 
-**Subject — ręczna emisja (`05-zrodla-5`) — 45–60 sekund.** Slajd techniczny zaraz po interval i bezpośrednio przed „Subject: ręczny multicast HTTP”. Pokazuje, że Subject można subskrybować, samodzielnie emitować do niego wartości i ręcznie go zakończyć — oraz że Subject jest hot: późny subskrybent nie otrzymuje wcześniejszych wartości. Subject nie jest podłączony do zewnętrznego źródła (bez connection i upstreamu).
+**Subject — ręczna emisja (`05-zrodla-5`) — 60–75 sekund.** Slajd techniczny zaraz po interval i bezpośrednio przed „Subject: ręczny multicast HTTP”. Pokazuje, że Subject można subskrybować, samodzielnie emitować do niego wartości i ręcznie go zakończyć — oraz że Subject jest hot: późny subskrybent nie otrzymuje wcześniejszych wartości. Po complete() nowy odbiorca dostaje natychmiast tylko complete, a kolejne next() nie wznawia emisji. Subject nie jest podłączony do zewnętrznego źródła (bez connection i upstreamu).
 
-Kod demonstracji (na slajdzie stale tylko pierwsza linia; pozostałe wywołania to migawki nad diagramem, x 620, y top/2, size 34 — subscribe i next widoczne do swojego postoju, `complete()` do końca):
+Kod demonstracji (na slajdzie stale tylko pierwsza linia; pozostałe wywołania to migawki nad diagramem, x 620, y top/2, size 34 — subscribe i next widoczne do swojego postoju; `complete()` gaśnie przed pojawieniem się C, ignorowane `next(3)` zostaje do końca):
 
 ```ts
 const subject$ = new Subject<number>();
@@ -307,9 +324,11 @@ subject$.next(1);
 subject$.subscribe(observerB);
 subject$.next(2);
 subject$.complete();
+subject$.subscribe(observerC); // natychmiast complete, bez next
+subject$.next(3); // ignorowane — Subject jest zakończony
 ```
 
-Fragment `new Subject<number>()` świeci od każdego ręcznego next do wyjścia powiadomień i od complete() do jego wysłania. Diagram Subject → A/B w wyglądzie torów: kafelek `Subject` x/w 340/420 (jak interval; wiersze rosną z subskrypcjami), kompaktowi odbiorcy A/B 910/400 (jak odbiorca interval) (inbox, litera, do dwóch kulek r 34/font 30), top 178/102, viewBox 1240×612/460, płaskie kafelki, liczniki rx-lanes (Odbiorcy, Emisje next). Odbiorca pojawia się dopiero tuż przed swoim subscribe; w READY nie ma pustych prostokątów A/B. Bez HTTP, innych operatorów, legendy i dodatkowych paneli.
+Fragment `new Subject<number>()` świeci od każdego ręcznego next do wyjścia powiadomień i od complete() do jego wysłania. Diagram Subject → A/B/C w wyglądzie torów: kafelek `Subject` x/w 340/420 (jak interval; wiersze rosną z subskrypcjami), kompaktowi odbiorcy A/B/C 910/400 (jak odbiorca interval) (inbox, litera, do dwóch kulek r 34/font 30), top 178/102, viewBox 1240×612/460, płaskie kafelki, liczniki rx-lanes (Odbiorcy, Emisje next). Odbiorca pojawia się dopiero tuż przed swoim subscribe; w READY nie ma pustych prostokątów A/B/C. A i B zachowują dotychczasowe położenie; C zajmuje trzeci tor. Bez HTTP, innych operatorów, legendy i dodatkowych paneli.
 
 | Nr | Checkpoint | Na ekranie |
 | --- | --- | --- |
@@ -320,20 +339,26 @@ Fragment `new Subject<number>()` świeci od każdego ręcznego next do wyjścia 
 | 4 | subscribed-b | Pojawia się B i od razu subskrybuje; migawka `subject$.subscribe(observerB)` na pauzie, wiersz B w Subject. B ma pusty inbox, A zachowuje 1 — pytanie do sali, czy B dostanie 1. |
 | 5 | emit-2 | Migawka `subject$.next(2)`; kulka 2 startuje ze środka Subjecta, rozchodzi się do wyjść A i B i staje na portach. |
 | 6 | next-2 | Dwójka dotarła do A i B, migawka zgasła. A: 1, 2; B: 2. |
-| 7 | complete | Zielona migawka `subject$.complete()` (zostaje do końca sceny); zielony impuls do A i B, wiersze Subject, A i B przechodzą w ✓ complete (tło i tekst), historie zostają, Odbiorcy 0. Bez unsubscribe i error. |
-| 8 | FINISHED | Podpis „A: 1, 2, complete. B: 2, complete. Subject jest hot — późny odbiorca nie dostaje historii”. |
+| 7 | complete | Zielona migawka `subject$.complete()` (gaśnie przed C); zielony impuls do A i B, wiersze Subject, A i B przechodzą w ✓ complete (tło i tekst), historie zostają, Odbiorcy 0. Bez unsubscribe i error. |
+| 8 | subscribed-c | Po zakończeniu A i B pojawia się C; `subject$.subscribe(observerC)` i impuls od C do Subjecta. Subject natychmiast wysyła complete do C (zielony impuls), bez next i bez historii. C: pusty inbox, ✓ complete. A i B bez zmian, Odbiorcy stale 0. |
+| 9 | next-ignored | Migawka `subject$.next(3)`, bez kulek i bez zmiany historii lub statusów. Zakończony Subject już nie emituje. Odbiorcy 0, Emisje next nadal 2. |
+| 10 | FINISHED | Podpis „A: 1, 2, complete. B: 2, complete. C: tylko complete. Subject nie odtwarza historii; po complete nie emituje”. |
 
-Harmonogram (czas ilustracji = czas modelu): A pojawia się 0,3 s, subscribe 0,6 s (zestawienie 1 s), next(1) 2,3 s (postój emit-1 2,8; rozesłanie 3,5, dotarcie 4,9), B pojawia się 5,5 s, subscribe 5,8 s, next(2) 7,5 s (rozejście do portów 8,1–8,7 = postój emit-2, dotarcie 10,1), complete 10,8 s (wysłanie 11,4, dotarcie 12,6), podsumowanie 13,6 s, koniec 14,6 s. Cofanie przed subscribe B usuwa odbiorcę B razem z jego wierszem; historia B nigdy nie pojawia się przed subskrypcją.
+Harmonogram (czas ilustracji = czas modelu): A pojawia się 0,3 s, subscribe 0,6 s (zestawienie 1 s), next(1) 2,3 s (postój emit-1 2,8; rozesłanie 3,5, dotarcie 4,9), B pojawia się 5,5 s, subscribe 5,8 s, next(2) 7,5 s (rozejście do portów 8,1–8,7 = postój emit-2, dotarcie 10,1), complete 10,8 s (wysłanie 11,4, dotarcie 12,6), C pojawia się 13,7 s, subscribe 14 s → zestawienie i natychmiastowe complete 15 s → dotarcie 16,2 s (postój 16,7), ignorowane next(3) 17,5 s (postój 18), podsumowanie 19,2 s, koniec 20,2 s. Cofanie przed subscribe B/C usuwa odpowiedniego odbiorcę razem z jego wierszem; historia B nigdy nie pojawia się przed subskrypcją, C zawsze ma pustą historię. Wydłużenie przelotu complete służy ilustracji — Subject nie czeka i nie otwiera ponownie emisji.
 
 | Nr | Checkpoint | Notatka prelegenta |
 | --- | --- | --- |
 | 0 | READY | Interval sam produkował kolejne liczby. A co, jeśli chcielibyśmy sami decydować, kiedy pojawi się następna wartość? |
 | 1 | subscribed-a | Subject jest jednocześnie Observable, które można subskrybować, i Observerem, któremu możemy przekazywać wartości. Najpierw korzystamy z pierwszej roli: A subskrybuje. |
-| 2 | next-1 | Teraz druga rola Subjecta: sami wywołujemy next(1). Subject rozsyła wartość do aktualnych odbiorców — na razie jest tylko A. |
-| 3 | subscribed-b | Teraz pojawia się drugi odbiorca. Jak myślicie, czy dostanie jedynkę, którą Subject wyemitował wcześniej? |
-| 4 | next-2 | Nie. Subject nie odtwarza wcześniejszych wartości. B dostaje dopiero dwójkę, podczas gdy A otrzymał zarówno jedynkę, jak i dwójkę. |
-| 5 | complete | Teraz ręcznie kończymy Subject. Complete trafia do wszystkich odbiorców i zamyka ich subskrypcje. Nie musimy już osobno wywoływać unsubscribe. |
-| 6 | FINISHED / podsumowanie | Subject jest przykładem hot Observable — rozsyła emisje do aktualnych subskrybentów. Nowy odbiorca nie dostaje historii. Do różnicy między hot i cold jeszcze wrócimy. Przed chwilą wywoływaliśmy next i complete ręcznie. A jeśli te powiadomienia przyjdą z HTTP? Czy Subject może rozesłać wynik jednego requestu do kilku odbiorców? Prawo: „Subject: ręczny multicast HTTP”. |
+| 2 | emit-1 | Teraz druga rola Subjecta: sami wywołujemy next(1). Komu Subject przekaże tę wartość? |
+| 3 | next-1 | Subject rozsyła wartość do aktualnych odbiorców — na razie jest tylko A. |
+| 4 | subscribed-b | Teraz pojawia się drugi odbiorca. Jak myślicie, czy dostanie jedynkę, którą Subject wyemitował wcześniej? |
+| 5 | emit-2 | Wywołujemy next(2): jedna wartość rozchodzi się na powiadomienia do A i B. |
+| 6 | next-2 | Nie. Subject nie odtwarza wcześniejszych wartości. B dostaje dopiero dwójkę, podczas gdy A otrzymał zarówno jedynkę, jak i dwójkę. |
+| 7 | complete | Teraz ręcznie kończymy Subject. Complete trafia do wszystkich odbiorców i zamyka ich subskrypcje. Nie musimy już osobno wywoływać unsubscribe. |
+| 8 | subscribed-c | C subskrybuje zakończony Subject: dostaje od razu complete, bez wartości next. A i B bez zmian, Odbiorcy stale 0. |
+| 9 | next-ignored | subject$.next(3) nic nie emituje. Zakończonego Subjecta nie można wznowić kolejnym next. |
+| 10 | FINISHED / podsumowanie | Subject jest przykładem hot Observable — rozsyła emisje do aktualnych subskrybentów. Nowy odbiorca nie dostaje historii; po complete dostaje tylko complete. Przed chwilą wywoływaliśmy next i complete ręcznie. A jeśli te powiadomienia przyjdą z HTTP? Czy Subject może rozesłać wynik jednego requestu do kilku odbiorców? Prawo: „Subject: ręczny multicast HTTP”. |
 
 **Subject: ręczny multicast HTTP — 60–75 sekund.** Bezpośrednio po „Subject — ręczna emisja”, przed „Subject — kto odłączy źródło?”; odpowiedź na wcześniejszy problem Cold. Te same pola widoku A/B/C (`user.firstName` → Paweł, `user.lastName` → Kondraciuk, `user.city` → Białystok; ten sam wygląd, rozmiar, kolory i kulka `{…}`), ale jeden request zasila je przez Subject. Kod rośnie etapami w tym samym rendererze, z tą samą lewą krawędzią, fontem i interlinią:
 
@@ -381,7 +406,7 @@ Slajd startuje już działający: wszystkie subskrypcje są zestawione przed t =
 
 ### httpGet od środka — `05b-http-kod`
 
-**MAIN — zaraz po HTTP (`05-zrodla-2`), przed interval.** Uproszczony środek `httpGet(url)` — tylko tyle:
+**MAIN — zaraz po HTTP (`05-zrodla-2`), przed Cold.** Uproszczony środek `httpGet(url)` — tylko tyle:
 
 ```ts
 return new Observable(subscriber => {
@@ -779,7 +804,7 @@ Checkpointy: request-1, error-1, request-2, error-2, request-3, error-3 (pytanie
 
 Natywny fragment Reveal: kolejne „dalej” prowadzi do „Pytania?”, „wstecz” ukrywa puentę. Przy ograniczeniu ruchu ujawnienie jest natychmiastowe. Bez odtwarzacza i badge’a trybu. W przyszłości trzy pytania dostaną osobne fragmenty przed puentą.
 
-**Speaker notes:** na wejściu wróć do tytułowego pytania; po odsłonięciu wypowiedz puentę i zatrzymaj się na tej myśli. Następnie zaproś do pytań i feedbacku na kolejnym slajdzie.
+**Speaker notes:** na wejściu wróć do tytułu i wypowiedz trzy pytania: „Ile naprawdę uruchamiam subskrypcji?”, „Nowa wartość: kolejka, równoległość, anulowanie czy ignorowanie?”, „complete, error, unsubscribe — kto sprząta?”. Po odsłonięciu wypowiedz puentę i zatrzymaj się na tej myśli. Pytania pozostają wyłącznie w notatkach. Następnie zaproś do pytań i feedbacku na kolejnym slajdzie.
 
 ## Pytania i feedback
 
@@ -787,7 +812,7 @@ Natywny fragment Reveal: kolejne „dalej” prowadzi do „Pytania?”, „wste
 
 **Ostatni slajd prezentacji.** Duże „Pytania?” (150 px w 4:3, 130 px w 16:9), pod nim czarno-biały kod QR (380/320 px) do [formularza feedbacku na Crossweb](https://crossweb.pl/feedback/aks-lwt/). QR jest również klikalnym linkiem. Bez linków do dodatków i dalszych slajdów. Gotowy SVG z białym marginesem znajduje się w `public/feedback-qr.svg` i działa także offline oraz w druku.
 
-**Speaker notes:** zaproś do pytań i poproś o feedback przez QR.
+**Speaker notes:** zaproś do pytań o przykłady i operatory, poproś o feedback przez QR, przypomnij konkurs WebStorm i podziękuj za udział.
 
 ## Gdzie jest źródło treści
 
@@ -815,13 +840,13 @@ Dół: poziomy separator i do trzech wewnętrznych pipeline'ów jeden pod drugim
 
 Prototypy QA zachowują poprzednie modele oraz geometrię. Cold/share pozostają bez zmian. Slajdy catchError korzystają z tego samego adaptera z panelem instancji jak 09–12 — w wyszukiwarce każdy rząd to #n → kulka → HTTP GET → catchError → inner subscriber, na zewnątrz #n → kulka → HTTP GET → inner subscriber, a catchError stoi w górnym potoku.
 
-W concatMap B pojawia się jako wartość W KOLEJCE; dopiero po complete poprzednika powstaje B$ i jego subskrypcja. Wprowadzenie map + concatAll pokazuje A$/B$ i dwa kolejne udane HTTP, bez kolejki; pierwszy pełny pipeline pojawia się przed wewnętrzną subskrypcją. Wiersze zakończone pozostają zielone; pominięte wejścia exhaustMap nie tworzą wykonań. Kapsułki emisji i odbioru wchodzą przez 0,3 s. Postęp jest wyliczany w czasie ilustracji; w MAIN 08–12 kulka najpierw przechodzi po lokalnym wyjściu do prawej granicy panelu, a potem wychodzi z operatora. Prototypy zachowują krótki, niewidoczny powrót.
+W concatMap B pojawia się jako wartość W KOLEJCE; dopiero po complete poprzednika powstaje B$ i jego subskrypcja. Wprowadzenie map + concatAll pokazuje A$ i jeden udany HTTP, bez kolejki; pierwszy pełny pipeline pojawia się przed wewnętrzną subskrypcją. Wiersze zakończone pozostają zielone; pominięte wejścia exhaustMap nie tworzą wykonań. Kapsułki emisji i odbioru wchodzą przez 0,3 s. Postęp jest wyliczany w czasie ilustracji; w MAIN 08–12 kulka najpierw przechodzi po lokalnym wyjściu do prawej granicy panelu, a potem wychodzi z operatora. Prototypy zachowują krótki, niewidoczny powrót.
 
 Liczniki uruchomionych i aktywnych inner korzystają ze stanu faktycznych subskrypcji. Nawigacja i postoje Reveal rodziny flatteningu pozostają dotychczasowe. Kontroler `stages` działa w podglądzie prototypów oraz w przebudowanym wprowadzeniu (04, wszystkie 05, oba 20). Spacja pauzuje/wznawia także pozostałe animacje, bez zmiany natywnej obsługi statycznego otwarcia. Zachowano identyfikatory i działające demonstracje; kolejność części właściwej odpowiada opisanej wyżej narracji 30–35 minut.
 
 Na migrowanych slajdach diagram zajmuje 480 px wysokości. Większe kafelki mają 76 px wysokości, a odstęp do paneli 60 px; wiersze prac w prototypach są rozdzielone o 20 px, a MAIN 08–12 ma przylegające wiersze nowego panelu. Mniejszy podpis i liczniki są w stopce przy dole slajdu. U pokazuje kontrolki w miejscu stopki; ukrycie kontrolek przywraca podpis.
 
-W `map + concatAll` górny pipeline ma cztery poziome kolumny: id$ → map → concatAll → odbiorca. Kulka A/B wjeżdża do map i zmienia się w A$/B$ w czasie ilustracji 0,6 s, bez czasowego progressu. Każdy dolny pipeline ujawnia się po dotarciu Observable do concatAll; pierwszy ma osobny postój przed subskrypcją. Tempo 08: subscribe 0,4 s na odcinek, przelot 0,6 s, terminal 0,4 s; pozostałe 09–12: subscribe 0,5 s na odcinek (także subskrypcja inner), przelot 1 s.
+W `map + concatAll` górny pipeline ma cztery poziome kolumny: id$ → map → concatAll → odbiorca. Kulka A wjeżdża do map i zmienia się w A$ w czasie ilustracji 0,6 s, bez czasowego progressu. Każdy dolny pipeline ujawnia się po dotarciu Observable do concatAll; pierwszy ma osobny postój przed subskrypcją. Tempo 08: subscribe 0,4 s na odcinek, przelot 0,6 s, terminal 0,4 s; pozostałe 09–12: subscribe 0,5 s na odcinek (także subskrypcja inner), przelot 1 s.
 
 W MAIN 08–12 przy complete zielony staje się execution lane, a nagłówek definicji pozostaje pastelowy. Pozostałe migrowane sceny zmieniają tło całego kafelka przy własnym complete. Źródło może zakończyć się wcześniej; *Map pozostaje aktywne aż do zakończenia wymaganych inner i kolejki. Nieobsłużony error daje czerwony operator, a odsubskrybowane źródło zachowuje swój kolor.
 

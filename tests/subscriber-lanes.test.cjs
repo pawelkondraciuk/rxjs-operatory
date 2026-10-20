@@ -491,9 +491,8 @@ test('cold has checkpoint notes for READY, each manual stop and the handoff to i
  assert.match(notes.received,/Każdy request wraca osobno\./);
  assert.doesNotMatch(notes.received,/complete docierają/,'odbiór przed complete');
  assert.match(notes.complete,/Każde wykonanie kończy się własnym complete\./);
- assert.doesNotMatch(source,/Błąd|błęd|error/,'Cold bez błędów');
  assert.match(notes.finished,/Czy naprawdę musimy wykonywać trzy requesty\?[\s\S]*Prawo: interval/);
- assert.doesNotMatch(source,/catchError|Angular|async pipe/);
+ assert.doesNotMatch(source,/catchError/,'obsługa błędów pozostaje na późniejsze slajdy');
 });
 
 test('cold statuses at the fields: A, B and C ✓ complete, each only after its terminal pulse',async()=>{

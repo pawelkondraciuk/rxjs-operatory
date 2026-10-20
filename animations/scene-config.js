@@ -49,7 +49,7 @@ export function configureScene(scene) {
   if(id==='05-zrodla'&&scene.sourceExample===2)configureSubject(scene);
   // Subject + interval: odbiorcy odchodzą, connection z interval zostaje (scena na żywo z akcjami).
   if(id==='05-zrodla'&&scene.sourceExample===3)configureSubjectInterval(scene);
-  // Subject — ręczna emisja: next(1), next(2) i complete do A/B; po interval i przed Subject + HTTP.
+  // Subject — ręczna emisja: next(1)/next(2), complete A/B, późny C tylko z complete i ignorowane next(3).
   if(id==='05-zrodla'&&scene.sourceExample===4)configureSubjectManual(scene);
   // shareReplay(1) na interval (MAIN, przed shareReplay z refCount: true): A i B odchodzą, interval pracuje dalej.
   if(id==='20a-sharereplay-interval')configureShareReplayOne(scene);
