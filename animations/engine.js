@@ -352,21 +352,26 @@ export function compileScene(scene) {
       return {timer:{label:n.laneTimer.label,progress:window?clamp((time-window.start)/period):0,active:Boolean(window),
         text:window?`${n.laneTimer.label} ${remaining.toFixed(1).replace('.',',')} s`:'',since:window?.start}};
     }
-    const {kind,period,label}=n.laneTimer,logical=plan.logicalTime(time);
+    // timeScale: sekundy ilustracji przeliczone na sekundy modelu (np. 5×, prezentacja w ms).
+    // Bez opcji pozostaje dotychczasowy zegar modelu, zatrzymywany na czas przelotów.
+    const {kind,period,label,timeScale,unit}=n.laneTimer,scaled=timeScale!==undefined;
+    const logical=scaled?time/timeScale:plan.logicalTime(time),startOf=e=>scaled?e.arrival/timeScale:e.logicalAt;
     const arrived=(input?.events||[]).filter(e=>e.arrival<=time);
     let open=null;
     for(const e of arrived){
-      if(kind==='debounce'||!open||e.logicalAt>=open.end)open={start:e.logicalAt,end:e.logicalAt+period,value:e.value,color:e.color||'a'};
+      const start=startOf(e);
+      if(kind==='debounce'||!open||start>=open.end)open={start,end:start+period,value:e.value,color:e.color||'a'};
       else Object.assign(open,{value:e.value,color:e.color||'a'});
     }
-    const emitted=open&&out.events.some(v=>v.logicalAt>=open.end-1e-9&&v.at<=time);
+    const emitted=open&&out.events.some(v=>(scaled?v.at/timeScale:v.logicalAt)>=open.end-1e-9&&v.at<=time);
     const active=open&&!emitted&&logical<open.end+1e-9;
     const remaining=active?Math.max(0,open.end-logical):null;
     // ball (opt-in): wejście dojeżdża do kulki pamięci (storeMove), dopiero wtedy zastępuje poprzednią wartość.
     const ball=n.laneTimer.ball,stored=ball?arrived.filter(e=>e.arrival+storeMove<=time).at(-1):arrived.at(-1);
-    const keep=active&&stored&&!out.events.some(v=>v.logicalAt>=stored.logicalAt&&v.at<=time);
+    const keep=active&&stored&&!out.events.some(v=>(scaled?v.at/timeScale:v.logicalAt)>=startOf(stored)&&v.at<=time);
+    const remainingText=unit==='ms'?Math.round(remaining*1000)+' ms':remaining?.toFixed(1).replace('.',',')+' s';
     return {timer:{label,progress:active?clamp((logical-open.start)/period):0,active:Boolean(active),
-      text:label+': '+(active?remaining.toFixed(1).replace('.',',')+' s':'—'),since:active?open.start:undefined},
+      text:(label?label+': ':'')+(active?remainingText:'—'),since:active?open.start:undefined},
       memory:{label:n.laneTimer.memory??'pamięć',empty:'—',...(ball?{ball:true,x:memorySlot(n)}:{}),
         ...(keep?{value:ball?stored.value:open.value,color:ball?stored.color||'a':open.color,since:stored.arrival+(ball?storeMove:0)}:{})}};
   }

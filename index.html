@@ -621,15 +621,42 @@ return new Observable(subscriber => {
                         <div data-checkpoint="finished"><p><strong>3 — Wynik</strong></p><p>A kończy się normalnie, B nie wraca. C przychodzi po zakończeniu A i dostaje własny kafelek HTTP GET z inner subscriberem. S1 dostaje A i C.</p><p><strong>Zastosowanie:</strong> Ignorowanie kolejnych kliknięć „Zapisz”, dopóki obecny zapis trwa — podwójne kliknięcie nie wyśle dwóch zapisów.</p></div>
                     </template>
 				</section>
+				<section id="12-intro-wyszukiwarka" class="animation-slide rx-search-intro">
+                    <h2>Zaprojektujmy wyszukiwarkę</h2>
+                    <span class="rx-step-mode rx-intro-mode">Ręczny · M</span>
+                    <div class="rx-search-intro-content">
+                        <ol class="rx-search-steps" aria-label="Od wpisywania tekstu do wyników wyszukiwania">
+                            <li>
+                                <div class="rx-search-block rx-search-source">input / klawiatura</div>
+                                <p>użytkownik wpisuje kolejne znaki</p>
+                            </li>
+                            <li>
+                                <div class="rx-search-block rx-search-query">query$</div>
+                                <p>powstaje strumień zapytań</p>
+                            </li>
+                            <li>
+                                <div class="rx-search-block rx-search-results">HTTP / wyniki</div>
+                                <p>dobieramy operatory i pobieramy dane</p>
+                            </li>
+                        </ol>
+                        <p class="rx-search-footer">Od zdarzeń z inputa do stabilnego pipeline’u zapytań HTTP.</p>
+                    </div>
+                    <aside class="notes"><p>Zaprojektujmy wyszukiwarkę. Użytkownik wpisuje kolejne znaki, z których powstaje strumień query$. Dobierzemy operatory, które przeprowadzą nas od tych zdarzeń do wyników HTTP.</p><p>Zaczniemy od switchMap: na następnym slajdzie zobaczymy na żywo, co dzieje się z poprzednim requestem, gdy pojawia się nowa fraza.</p></aside>
+                </section>
 				<section id="12a-switchmap-live" class="animation-slide rx-slide-navigation" data-animation="12a-switchmap-live">
 					<h2>switchMap — nowe zapytanie anuluje poprzednie</h2>
 					<div class="rx-player" aria-label="switchMap — nowe zapytanie anuluje poprzednie"></div>
-					<aside class="notes"><p>Użytkownik szybko wpisuje tekst. Każde query dociera do switchMap, odłącza poprzedni inner HTTP i uruchamia nowy. Szary × to unsubscribe, bez complete i bez odpowiedzi. S1 przez cały czas subskrybuje główny pipeline.</p><p>Widać trzy ostatnie requesty; najstarszy znika przed dodaniem kolejnego. Sekwencja r → re → rea → reac → react powtarza się przez zastąpienie tekstu kolejnym r. Numery i liczniki rosną. Animacja startuje sama; Spacja pauzuje, R zaczyna od nowa, strzałka w prawo od razu przechodzi do distinctUntilChanged.</p><p>Odsubskrybowanie klienta nie cofa operacji wykonanej na serwerze. Teraz pytanie: co, jeśli kolejne query jest identyczne? Następny slajd pokazuje distinctUntilChanged.</p></aside>
+					<aside class="notes"><p>Użytkownik szybko wpisuje tekst. Każde query dociera do switchMap, odłącza poprzedni inner HTTP i uruchamia nowy. Szary × to unsubscribe, bez complete i bez odpowiedzi. S1 przez cały czas subskrybuje główny pipeline.</p><p>Widać trzy ostatnie requesty; najstarszy znika przed dodaniem kolejnego. Sekwencja r → re → rea → reac → react powtarza się przez zastąpienie tekstu kolejnym r. Numery i liczniki rosną. Animacja startuje sama; Spacja pauzuje, R zaczyna od nowa, strzałka w prawo od razu przechodzi do debounceTime.</p><p>Odsubskrybowanie klienta nie cofa operacji wykonanej na serwerze. Teraz ograniczymy liczbę requestów: zamiast uruchamiać HTTP po każdej zmianie tekstu, zaczekamy 300 ms ciszy. Następny slajd dodaje debounceTime.</p></aside>
 				</section>
+				<section id="12b-debounce-switchmap" class="animation-slide rx-slide-navigation" data-animation="12b-debounce-switchmap">
+                    <h2>debounceTime — czekamy na ciszę</h2>
+                    <div class="rx-player" aria-label="debounceTime — czekamy na ciszę"></div>
+                    <aside class="notes"><p>Drugi etap projektowania wyszukiwarki. Po poprzednim pokazie switchMap dodajemy debounceTime(300): zamiast uruchamiać i anulować HTTP przy każdej literze, czekamy 300 ms od ostatniej zmiany tekstu. Ilustracja jest spowolniona 5×: litery co 0,5 s, cisza 1,5 s, timer pokazuje rzeczywiste 300 ms modelu. Przeloty ilustrują komunikację, nie dodatkowe opóźnienia RxJS.</p><p>Najpierw S1 subskrybuje cały pipeline. Input jest pusty, requestów brak. Użytkownik wpisuje r → re → rea. Każda kulka dociera do debounceTime, podmienia oczekującą wartość i resetuje timer. Podczas pisania nic nie trafia do switchMap. Dopiero po ciszy rea przechodzi dalej i uruchamia HTTP #1. Wynik trafia do S1, zielony complete kończy wyłącznie inner. Główna subskrypcja nadal działa.</p><p>Następnie użytkownik usuwa literę i szybko wraca: re → rea → cisza. Powstaje HTTP #2 z tą samą frazą rea. Pięć zmian tekstu, dwa requesty. debounceTime ogranicza częstotliwość, ale nie porównuje kolejnych wyników. Sama dalsza cisza nie emituje ponownie — potrzebna jest nowa zmiana tekstu. Kolejne serie reac → react, reac → react i reac → rea powtarzają wzorzec identycznych requestów.</p><p>Widać maksymalnie trzy ostatnie pełne wiersze HTTP; numery i liczniki rosną. Każdy request kończy się sukcesem przed następną serią pisania. Pokaz startuje sam i trwa do ręcznego przejścia dalej; Spacja pauzuje, R resetuje, powrót zaczyna od pustego inputa i HTTP #1. Druk, F i Upcoming pokazują dwa zakończone requesty rea, liczniki 5/2/0.</p><p>Teraz pytanie: skoro ostatnia wyszukana fraza znowu brzmi rea, czy drugi request jest potrzebny? W wyszukiwarce następnym krokiem będzie distinctUntilChanged() po debounceTime, przed switchMap. Następny slajd wyjaśnia porównywanie kolejnych wartości na prostym przykładzie ID.</p></aside>
+                </section>
 				<section id="11a-distinct-switchmap" class="animation-slide" data-animation="11a-distinct-switchmap">
 					<h2>distinctUntilChanged — czy coś się zmieniło?</h2>
 					<div class="rx-player" aria-label="distinctUntilChanged — czy coś się zmieniło?"></div>
-					<aside class="notes"><p>Jeden potok id$ → distinctUntilChanged → switchMap → S1; wejścia A, A, B, B, A. Slajd stoi po pokazie switchMap na żywo, zamyka rodzinę *Map. distinctUntilChanged pamięta tylko ostatnią przepuszczoną wartość (jedna kulka w lane operatora), osobno dla każdej subskrypcji, i porównuje przez ===. Powtórzenia gasną w operatorze: bez nowego HTTP i bez anulowania trwającego. Do switchMap trafia A, B, A — 3 requesty zamiast 5. To nie jest cache: A po B przechodzi. 60–90 s.</p></aside>
+					<aside class="notes"><p>Jeden potok id$ → distinctUntilChanged → switchMap → S1; wejścia A, A, B, B, A. Slajd stoi po pokazie debounceTime + switchMap, zamyka historię wyszukiwarki. distinctUntilChanged pamięta tylko ostatnią przepuszczoną wartość (jedna kulka w lane operatora), osobno dla każdej subskrypcji, i porównuje przez ===. Powtórzenia gasną w operatorze: bez nowego HTTP i bez anulowania trwającego. Do switchMap trafia A, B, A — 3 requesty zamiast 5. To nie jest cache: A po B przechodzi. 60–90 s.</p></aside>
 					<template data-checkpoint-notes="11a-distinct-switchmap">
                         <div data-checkpoint="ready"><p><strong>0 — Gotowy pipeline</strong></p><p>Na koniec wracamy do switchMap. Widzieliśmy, że anuluje poprzedni request, gdy przychodzi nowa wartość. Ale jest pewien problem. Co jeśli ta nowa wartość jest identyczna?</p><p>Na ekranie: id$.pipe(distinctUntilChanged(), switchMap(...)), S1 już subskrybuje. Pięć emisji A, A, B, B, A. Cel: 60–90 s.</p></div>
                         <div data-checkpoint="first"><p><strong>1 — Pierwsze A</strong></p><p>Wybieramy użytkownika A. Operator przepuszcza pierwszy identyfikator i uruchamiamy HTTP.</p><p>Kulka A zostaje w lane distinctUntilChanged — to jedyna rzecz, którą operator pamięta: ostatnia przepuszczona wartość.</p></div>

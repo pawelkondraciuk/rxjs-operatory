@@ -1,6 +1,6 @@
 # Speaker notes — slajdy techniczne RxJS
 
-Pełny eksport notatek z `index.html` do weryfikacji. Zakres: **22 slajdów technicznych aktualnej ścieżki MAIN**, od pierwszego slajdu po „A share?” — „HTTP: od definicji do wykonania” — do „Cztery pytania przed kolejnym pipe”, przed „Pytania?”.
+Pełny eksport notatek z `index.html` do weryfikacji. Zakres: **24 slajdów technicznych aktualnej ścieżki MAIN**, od pierwszego slajdu po „A share?” — „HTTP: od definicji do wykonania” — do „Cztery pytania przed kolejnym pipe”, przed „Pytania?”.
 
 Kolejność pochodzi z `mainOrder` w [animations/scene-config.js](../animations/scene-config.js). Tytuły pobrano z końcowych konfiguracji scen po rozwinięciu wariantów przez `prepareSlides`.
 
@@ -24,12 +24,14 @@ Eksport zachowuje oryginalne brzmienie wszystkich akapitów, w tym instrukcje pr
 14. **mergeMap — Równocześnie** — `10-mergemap`
 15. **switchMap — Najnowsza subskrypcja** — `11-switchmap`
 16. **exhaustMap — Jestem zajęty** — `12-exhaustmap`
-17. **switchMap — nowe zapytanie anuluje poprzednie** — `12a-switchmap-live`
-18. **distinctUntilChanged — czy coś się zmieniło?** — `11a-distinct-switchmap`
-19. **catchError na zewnątrz** — `b04-catcherror`
-20. **catchError wewnątrz** — `b04-catcherror-2`
-21. **debounceTime i auditTime: cisza czy okno?** — `16-czas-cztery`
-22. **Cztery pytania przed kolejnym pipe** — `25-podsumowanie`
+17. **Zaprojektujmy wyszukiwarkę** — `12-intro-wyszukiwarka`
+18. **switchMap — nowe zapytanie anuluje poprzednie** — `12a-switchmap-live`
+19. **debounceTime — czekamy na ciszę** — `12b-debounce-switchmap`
+20. **distinctUntilChanged — czy coś się zmieniło?** — `11a-distinct-switchmap`
+21. **catchError na zewnątrz** — `b04-catcherror`
+22. **catchError wewnątrz** — `b04-catcherror-2`
+23. **debounceTime i auditTime: cisza czy okno?** — `16-czas-cztery`
+24. **Cztery pytania przed kolejnym pipe** — `25-podsumowanie`
 
 ## 1. HTTP: od definicji do wykonania
 
@@ -889,7 +891,18 @@ A kończy się normalnie, B nie wraca. C przychodzi po zakończeniu A i dostaje 
 
 **Wniosek:** Po zakończeniu A exhaustMap przyjmuje C.
 
-## 17. switchMap — nowe zapytanie anuluje poprzednie
+## 17. Zaprojektujmy wyszukiwarkę
+
+**ID:** `12-intro-wyszukiwarka`
+**Źródło:** [index.html — sekcja 12-intro-wyszukiwarka](../index.html)
+
+### Notatki sekcji — wyświetlane w prezentacji
+
+Zaprojektujmy wyszukiwarkę. Użytkownik wpisuje kolejne znaki, z których powstaje strumień query$. Dobierzemy operatory, które przeprowadzą nas od tych zdarzeń do wyników HTTP.
+
+Zaczniemy od switchMap: na następnym slajdzie zobaczymy na żywo, co dzieje się z poprzednim requestem, gdy pojawia się nowa fraza.
+
+## 18. switchMap — nowe zapytanie anuluje poprzednie
 
 **ID:** `12a-switchmap-live`
 **Źródło:** [index.html — sekcja 12a-switchmap-live](../index.html)
@@ -898,11 +911,28 @@ A kończy się normalnie, B nie wraca. C przychodzi po zakończeniu A i dostaje 
 
 Użytkownik szybko wpisuje tekst. Każde query dociera do switchMap, odłącza poprzedni inner HTTP i uruchamia nowy. Szary × to unsubscribe, bez complete i bez odpowiedzi. S1 przez cały czas subskrybuje główny pipeline.
 
-Widać trzy ostatnie requesty; najstarszy znika przed dodaniem kolejnego. Sekwencja r → re → rea → reac → react powtarza się przez zastąpienie tekstu kolejnym r. Numery i liczniki rosną. Animacja startuje sama; Spacja pauzuje, R zaczyna od nowa, strzałka w prawo od razu przechodzi do distinctUntilChanged.
+Widać trzy ostatnie requesty; najstarszy znika przed dodaniem kolejnego. Sekwencja r → re → rea → reac → react powtarza się przez zastąpienie tekstu kolejnym r. Numery i liczniki rosną. Animacja startuje sama; Spacja pauzuje, R zaczyna od nowa, strzałka w prawo od razu przechodzi do debounceTime.
 
-Odsubskrybowanie klienta nie cofa operacji wykonanej na serwerze. Teraz pytanie: co, jeśli kolejne query jest identyczne? Następny slajd pokazuje distinctUntilChanged.
+Odsubskrybowanie klienta nie cofa operacji wykonanej na serwerze. Teraz ograniczymy liczbę requestów: zamiast uruchamiać HTTP po każdej zmianie tekstu, zaczekamy 300 ms ciszy. Następny slajd dodaje debounceTime.
 
-## 18. distinctUntilChanged — czy coś się zmieniło?
+## 19. debounceTime — czekamy na ciszę
+
+**ID:** `12b-debounce-switchmap`
+**Źródło:** [index.html — sekcja 12b-debounce-switchmap](../index.html)
+
+### Notatki sekcji — wyświetlane podczas pokazu ciągłego
+
+Drugi etap projektowania wyszukiwarki. Po poprzednim pokazie switchMap dodajemy debounceTime(300): zamiast uruchamiać i anulować HTTP przy każdej literze, czekamy 300 ms od ostatniej zmiany tekstu. Ilustracja jest spowolniona 5×: litery co 0,5 s, cisza 1,5 s, timer pokazuje rzeczywiste 300 ms modelu. Przeloty ilustrują komunikację, nie dodatkowe opóźnienia RxJS.
+
+Najpierw S1 subskrybuje cały pipeline. Input jest pusty, requestów brak. Użytkownik wpisuje r → re → rea. Każda kulka dociera do debounceTime, podmienia oczekującą wartość i resetuje timer. Podczas pisania nic nie trafia do switchMap. Dopiero po ciszy rea przechodzi dalej i uruchamia HTTP #1. Wynik trafia do S1, zielony complete kończy wyłącznie inner. Główna subskrypcja nadal działa.
+
+Następnie użytkownik usuwa literę i szybko wraca: re → rea → cisza. Powstaje HTTP #2 z tą samą frazą rea. Pięć zmian tekstu, dwa requesty. debounceTime ogranicza częstotliwość, ale nie porównuje kolejnych wyników. Sama dalsza cisza nie emituje ponownie — potrzebna jest nowa zmiana tekstu. Kolejne serie reac → react, reac → react i reac → rea powtarzają wzorzec identycznych requestów.
+
+Widać maksymalnie trzy ostatnie pełne wiersze HTTP; numery i liczniki rosną. Każdy request kończy się sukcesem przed następną serią pisania. Pokaz startuje sam i trwa do ręcznego przejścia dalej; Spacja pauzuje, R resetuje, powrót zaczyna od pustego inputa i HTTP #1. Druk, F i Upcoming pokazują dwa zakończone requesty rea, liczniki 5/2/0.
+
+Teraz pytanie: skoro ostatnia wyszukana fraza znowu brzmi rea, czy drugi request jest potrzebny? W wyszukiwarce następnym krokiem będzie distinctUntilChanged() po debounceTime, przed switchMap. Następny slajd wyjaśnia porównywanie kolejnych wartości na prostym przykładzie ID.
+
+## 20. distinctUntilChanged — czy coś się zmieniło?
 
 **ID:** `11a-distinct-switchmap`  
 **Źródło:** [index.html — sekcja 11a-distinct-switchmap](../index.html#L588)
@@ -965,9 +995,9 @@ Pięć emisji, trzy requesty. distinctUntilChanged nie jest cache'em — po pros
 
 ### Bazowe notatki sekcji — kontekst do weryfikacji
 
-Jeden potok id$ → distinctUntilChanged → switchMap → S1; wejścia A, A, B, B, A. Slajd stoi po pokazie switchMap na żywo, zamyka rodzinę *Map. distinctUntilChanged pamięta tylko ostatnią przepuszczoną wartość (jedna kulka w lane operatora), osobno dla każdej subskrypcji, i porównuje przez ===. Powtórzenia gasną w operatorze: bez nowego HTTP i bez anulowania trwającego. Do switchMap trafia A, B, A — 3 requesty zamiast 5. To nie jest cache: A po B przechodzi. 60–90 s.
+Jeden potok id$ → distinctUntilChanged → switchMap → S1; wejścia A, A, B, B, A. Slajd stoi po pokazie debounceTime + switchMap, zamyka historię wyszukiwarki. distinctUntilChanged pamięta tylko ostatnią przepuszczoną wartość (jedna kulka w lane operatora), osobno dla każdej subskrypcji, i porównuje przez ===. Powtórzenia gasną w operatorze: bez nowego HTTP i bez anulowania trwającego. Do switchMap trafia A, B, A — 3 requesty zamiast 5. To nie jest cache: A po B przechodzi. 60–90 s.
 
-## 19. catchError na zewnątrz
+## 21. catchError na zewnątrz
 
 **ID:** `b04-catcherror`
 
@@ -1023,7 +1053,7 @@ Porównaj położenie catchError: wewnątrz pipe każdego HTTP albo osobny opera
 
 Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.
 
-## 20. catchError wewnątrz
+## 22. catchError wewnątrz
 
 **ID:** `b04-catcherror-2`
 
@@ -1085,7 +1115,7 @@ Porównaj położenie catchError: wewnątrz pipe każdego HTTP albo osobny opera
 
 Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.
 
-## 21. debounceTime i auditTime: cisza czy okno?
+## 23. debounceTime i auditTime: cisza czy okno?
 
 **ID:** `16-czas-cztery`  
 **Źródło:** [index.html — sekcja 16-czas-cztery](../index.html#L808)
@@ -1154,7 +1184,7 @@ Dopiero gdy przez pełne 3,5 sekundy nie przyjdzie nic nowego, debounce emituje 
 
 **throttleTime i sampleTime — EXTRAS:** Throttle domyślnie przepuszcza pierwszą wartość okna (leading:true, trailing:false). Sample ma stały rytm od subskrypcji i pomija takt bez nowych wejść. Wszystkie źródła pozostają aktywne; nie porównujemy zdarzeń dokładnie na granicy okna.
 
-## 22. Cztery pytania przed kolejnym pipe
+## 24. Cztery pytania przed kolejnym pipe
 
 **ID:** `25-podsumowanie`  
 **Źródło:** [index.html — sekcja 25-podsumowanie](../index.html#L734)

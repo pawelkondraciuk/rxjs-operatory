@@ -4,7 +4,7 @@ Polska prezentacja Pawła Kondraciuka o sterowaniu pracą, kolejnością, subskr
 
 Ten README jest mapą treści: opisuje slajdy, zawartość bloczków i speaker notes. Implementację animacji, mapę plików i używane API znajdziesz w [AGENTS.md](AGENTS.md).
 
-Pełny eksport notatek do weryfikacji dla 22 slajdów technicznych MAIN znajduje się w [work/speaker-notes-main.md](work/speaker-notes-main.md). Dokument uwzględnia aktualną kolejność, końcowe tytuły wariantów i wszystkie notatki checkpointów, od slajdu po „A share?” do podsumowania przed „Pytania?”.
+Pełny eksport notatek do weryfikacji dla 24 slajdów technicznych MAIN znajduje się w [work/speaker-notes-main.md](work/speaker-notes-main.md). Dokument uwzględnia aktualną kolejność, końcowe tytuły wariantów i wszystkie notatki checkpointów, od slajdu po „A share?” do podsumowania przed „Pytania?”.
 
 ## Uruchomienie i obsługa
 
@@ -19,11 +19,13 @@ Sceny MAIN z pytaniami zaczynają od nieruchomego READY. Prawo / Page Down uruch
 
 W oknie prelegenta (`S`) podgląd następnego slajdu domyślnie pokazuje dużą nazwę, np. **switchMap**, i krótki podtytuł. Wskazuje kolejny slajd, także podczas ręcznych postojów bieżącej animacji. Przełącznik **Podgląd: Tytuł / Slajd** w prawym dolnym rogu tego pola przywraca standardowy podgląd. Wybór jest zapamiętywany w przeglądarce. Notatki pozostają w standardowym polu Notes. Opcjonalne `data-speaker-title` na sekcji ustawia własny podpis wyłącznie dla prelegenta.
 
-Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 40 slajdów daje 58 stron PDF (także pięć stanów kodu `05b-http-kod`: bez wyróżnienia i cztery wyróżnione fragmenty, oraz trzy stany pełnego kodu `04b-map-kod`: bez wyróżnienia i dwa kolejne wyróżnienia).
+Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 42 slajdy dają 60 stron PDF (także pięć stanów kodu `05b-http-kod`: bez wyróżnienia i cztery wyróżnione fragmenty, oraz trzy stany pełnego kodu `04b-map-kod`: bez wyróżnienia i dwa kolejne wyróżnienia).
 
 Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przywraca ekran panoramiczny 1280×720. `W` przeładowuje stronę w drugim formacie, zostając na tym samym slajdzie i fragmencie; animacja wraca do stanu tego fragmentu. Linki do EXTRAS i powrót do pytań zachowują wybrany format. Druk działa w obu: `?print-pdf` (4:3) lub `?print-pdf&ratio=16:9`. W 4:3 slajdy wykorzystują pełną wysokość: większe zdjęcia i kody QR, wyższe diagramy, większy tekst i kapsułki w animacjach (×1,15), etykiety kafelków do ×1,3 oraz większy tytuł (64 px; za długi zmniejsza się, by został w jednej linii), kod (42 px, długi łańcuch przechodzi do nowej linii przed .pipe/.subscribe) i podpis.
 
-Wyjątek MAIN: `12a-switchmap-live` po exhaustMap startuje sam i bez końca pokazuje pisanie query oraz anulowanie HTTP. „Ręczny · M” dotyczy ręcznego przejścia między slajdami: prawo/Page Down/pilot przechodzą od razu do distinctUntilChanged, lewo wraca do exhaustMap. Spacja pauzuje/wznawia, R restartuje pokaz; powrót na slajd zaczyna od #1. Druk, F i podgląd Upcoming pokazują nieruchomy kadr #3/#4 anulowane i #5 aktywny.
+Wyjątek MAIN: `12a-switchmap-live` po planszy „Zaprojektujmy wyszukiwarkę” startuje sam i bez końca pokazuje pisanie query oraz anulowanie HTTP. „Ręczny · M” dotyczy ręcznego przejścia między slajdami: prawo/Page Down/pilot przechodzą od razu do debounceTime, lewo wraca do planszy wprowadzającej wyszukiwarkę. Spacja pauzuje/wznawia, R restartuje pokaz; powrót na slajd zaczyna od #1. Druk, F i podgląd Upcoming pokazują nieruchomy kadr #3/#4 anulowane i #5 aktywny.
+
+`12b-debounce-switchmap` kontynuuje wyszukiwarkę: także startuje sam i działa do ręcznego przejścia dalej. Pokazuje pisanie z pauzami, odliczanie 300 ms (ilustracja spowolniona 5×) i udane HTTP, w tym kolejne requesty dla tej samej frazy. Prawo prowadzi do distinctUntilChanged, lewo do switchMap na żywo. Spacja, R i reset po powrocie działają jak na poprzednim pokazie. Druk, F i Upcoming pokazują dwa zakończone HTTP dla `rea`, liczniki 5/2/0.
 
 ## Jak czytać spis
 
@@ -37,13 +39,13 @@ Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorz
 
 Otwarcie do tytułu pozostaje bez zmian: społeczność, historia meet.js, fotografie i autor. Po tytule pokazujemy HTTP, Cold, interval, Subject — ręczną emisję, ręczny multicast HTTP i odłączanie źródła interval, a dopiero potem pytania o znane operatory i share. Budżet **30–35 minut dotyczy tylko części właściwej**; otwarcie, pytania i dogrywka są dodatkowo.
 
-MAIN ma **37 slajdów (24 animowane)**. EXTRAS zawiera **3 slajdy animowane**. Całość obejmuje 32 bazowe slajdy HTML i 40 slajdów po rozwinięciu wariantów. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
+MAIN ma **39 slajdów (25 animowanych)**. EXTRAS zawiera **3 slajdy animowane**. Całość obejmuje 34 bazowe slajdy HTML i 42 slajdy po rozwinięciu wariantów. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
 
 Kolejność po slajdzie tytułowym:
 
 1. Pierwsze slajdy techniczne pokazują komplet podstawowych zachowań Observable: HTTP — subscribe, next, complete (`05-zrodla-2`) → kod źródłowy httpGet krok po kroku (`05b-http-kod`) → Cold: jedna definicja, trzy wykonania, error (`04a-dwa-tory`) → interval na żywo — cold, osobne wykonanie każdego odbiorcy, unsubscribe (`05-zrodla`) → Subject — ręczne next, późny subskrybent bez historii i complete (`05-zrodla-5`) → Subject: ręczny multicast HTTP (`05-zrodla-3`) → Subject — kto odłączy źródło? (`05-zrodla-4`). Po nich „Jakie znasz operatory RxJS?” (`02-znane-operatory`) → HTTP GET + map: obiekt User → „Paweł Kondraciuk” (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`), wstęp do share + HTTP.
 2. Jedna historia Cold → Subject → share na tych samych przykładach: cold — trzy subskrypcje, trzy HTTP, B kończy się błędem (`04a-dwa-tory`) → Subject + HTTP: jeden HTTP, trzech odbiorców (`05-zrodla-3`) → Subject + interval: odbiorcy odchodzą, źródło nadal działa (`05-zrodla-4`) → pytanie o znane operatory → HTTP GET + map (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`) → share + HTTP: jeden HTTP, trzech odbiorców (`04a-dwa-tory-2`) → share + interval: ostatni odbiorca odłącza źródło (`04a-dwa-tory-3`) → share + HTTP: późny odbiorca uruchamia nowy request (`20-sharereplay`) → shareReplay(1) na interval: odbiorcy odchodzą, źródło pracuje dalej (`20a-sharereplay-interval`) → shareReplay z refCount: true na interval: ostatni odbiorca czyści bufor i odłącza źródło, późny C zaczyna od zera (`20b-sharereplay-refcount`) → shareReplay z refCount: true + HTTP: późny odbiorca dostaje wynik z bufora (`20-sharereplay-2`). Powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
-3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap (cztery *Map obok siebie) → switchMap na żywo (`12a-switchmap-live`) → distinctUntilChanged przed switchMap (`11a-distinct-switchmap`, jedyny distinctUntilChanged w MAIN).
+3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap (cztery *Map obok siebie) → „Zaprojektujmy wyszukiwarkę” (`12-intro-wyszukiwarka`) → switchMap na żywo (`12a-switchmap-live`) → debounceTime + switchMap (`12b-debounce-switchmap`) → distinctUntilChanged przed switchMap (`11a-distinct-switchmap`, jedyny distinctUntilChanged w MAIN).
 4. catchError na zewnątrz → catchError wewnątrz → wspólne porównanie debounceTime i auditTime (`16-czas-cztery`).
 5. Cztery pytania podsumowania → „Pytania?” → rozmowa z salą albo dodatkowy przykład.
 
@@ -516,9 +518,23 @@ Góra bez zmian: id$ → operator → kompaktowy Odbiorca, jeden główny tor S1
 - **Odpowiedź:** exhaustMap ignoruje B. Nie uruchamia projekcji, nie tworzy requestu i nie zapisuje B na później. Dopiero po zakończeniu A może przyjąć następną wartość.
 - **Zastosowanie (tylko w notatkach):** ignorowanie kolejnych kliknięć „Zapisz”, dopóki obecny zapis trwa.
 
+### Zaprojektujmy wyszukiwarkę — `12-intro-wyszukiwarka`
+
+**MAIN — bezpośrednio po exhaustMap, przed switchMap na żywo.** Statyczna plansza otwierająca historię wyszukiwarki, zaprojektowana dla 16:9 i dopasowana także do 4:3.
+
+**Na ekranie:** kremowe tło, duży serifowy tytuł i badge „Ręczny · M”. Trzy płaskie bloczki połączone strzałkami: turkusowy „input / klawiatura” → jasnofioletowy „query$” → bardzo jasnofioletowy „HTTP / wyniki”. Podpisy: „użytkownik wpisuje kolejne znaki”, „powstaje strumień zapytań” i „dobieramy operatory i pobieramy dane”. Całość widoczna od wejścia; strzałki i pilot przechodzą bezpośrednio do sąsiednich slajdów.
+
+**Stopka:** Od zdarzeń z inputa do stabilnego pipeline’u zapytań HTTP.
+
+**Speaker notes:**
+
+> Zaprojektujmy wyszukiwarkę. Użytkownik wpisuje kolejne znaki, z których powstaje strumień query$. Dobierzemy operatory, które przeprowadzą nas od tych zdarzeń do wyników HTTP.
+>
+> Zaczniemy od switchMap: na następnym slajdzie zobaczymy na żywo, co dzieje się z poprzednim requestem, gdy pojawia się nowa fraza.
+
 ### switchMap na żywo — `12a-switchmap-live`
 
-**MAIN — po exhaustMap, przed distinctUntilChanged.** Tytuł: **switchMap — nowe zapytanie anuluje poprzednie**.
+**MAIN — po planszy „Zaprojektujmy wyszukiwarkę”, przed debounceTime + switchMap.** Tytuł: **switchMap — nowe zapytanie anuluje poprzednie**.
 
 ```ts
 query$.pipe(
@@ -532,11 +548,31 @@ query$.pipe(
 
 **Stopka:** Każde nowe query anuluje poprzedni request i uruchamia nowy.
 
-**Speaker notes:** użytkownik szybko pisze; switchMap odłącza poprzedni inner, ale S1 nadal słucha. Anulowanie klienta nie cofa operacji na serwerze. Pokaz trwa do ręcznego przejścia dalej. Następne pytanie: co, jeśli kolejne query jest identyczne? Przejście do distinctUntilChanged.
+**Speaker notes:** użytkownik szybko pisze; switchMap odłącza poprzedni inner, ale S1 nadal słucha. Anulowanie klienta nie cofa operacji na serwerze. Pokaz trwa do ręcznego przejścia dalej. Następny krok: ograniczyć liczbę requestów — poczekać 300 ms ciszy dzięki debounceTime.
+
+### debounceTime — czekamy na ciszę — `12b-debounce-switchmap`
+
+**MAIN — bezpośrednio po switchMap na żywo, przed distinctUntilChanged.** Drugi etap projektowania wyszukiwarki.
+
+```ts
+query$.pipe(
+  debounceTime(300),
+  switchMap(query => httpGet(url(query))))
+```
+
+**Na ekranie:** query$ → debounceTime → switchMap → S1, ten sam mały input z kursorem i te same pełne wiersze HTTP GET → inner co na poprzednim slajdzie. Pipeline ma stałą geometrię od wejścia; subscribe biegnie od S1 w lewo. Kod ma trzy linie: query$ i HTTP turkusowe, oba operatory fioletowe, z aktywnymi wyróżnieniami zgodnymi z diagramem. W lane debounceTime jest kulka ostatniej wartości i resetujący się pasek z pozostałym czasem w ms. Pod separatorem najwyżej trzy ostatnie rzeczywiste requesty.
+
+**Przebieg:** pierwsza seria r → re → rea, potem re → rea, następnie cykl reac → react, reac → react, reac → rea, re → rea. Każda seria kończy się ciszą i jednym HTTP. Czasy modelu: zmiana co 100 ms, debounce 300 ms; ilustracja 5× wolniejsza (0,5 s / 1,5 s), z osobnymi przelotami komunikacji. Pośrednie wartości zastępują pamięć i resetują timer, nie trafiają do switchMap. Dopiero po ciszy powstaje inner i subskrypcja uruchamia HTTP. Wynik dociera do S1, complete kończy tylko inner. Każdy request kończy się przed następną serią; główna subskrypcja pozostaje aktywna.
+
+Pokaz działa bez końca. Wyjścia debounce: rea, rea, react, react, rea, rea… — powtórzenie nadal uruchamia nowy HTTP. Sama cisza bez nowej emisji nie powtarza requestu. Numery i liczniki wejścia/requesty HTTP/aktywne rosną bez resetu; aktywne 0 albo 1. Po drugim requestcie: 5/2/0. Najstarsze wiersze ustępują miejsca nowym, bez pustych requestów.
+
+**Stopka:** Czekamy 300 ms ciszy. Ta sama fraza może uruchomić kolejny request.
+
+**Speaker notes:** pokaż resety timera i brak HTTP podczas pisania. Następnie zwróć uwagę na HTTP #1 i #2 dla rea: debounceTime czeka na ciszę, ale nie porównuje kolejnych wyników. Kolejny krok wyszukiwarki to distinctUntilChanged() po debounceTime, przed switchMap; następny slajd tłumaczy porównywanie na prostym przykładzie ID. Pokaz trwa do ręcznego przejścia dalej.
 
 ### distinctUntilChanged przed switchMap — `11a-distinct-switchmap`
 
-**MAIN — po pokazie switchMap na żywo, zamyka rodzinę *Map; jedyny distinctUntilChanged w MAIN.** **Temat:** sam switchMap przy powtórzonym ID anuluje request i uruchamia go od nowa; distinctUntilChanged przed nim zatrzymuje kolejne powtórzenia.
+**MAIN — po pokazie debounceTime + switchMap, zamyka historię wyszukiwarki; jedyny distinctUntilChanged w MAIN.** **Temat:** sam switchMap przy powtórzonym ID anuluje request i uruchamia go od nowa; distinctUntilChanged przed nim zatrzymuje kolejne powtórzenia.
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
