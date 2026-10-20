@@ -60,8 +60,14 @@ export function createStageController(player,options={}) {
     else player.playContinuously();
     target=null;changed();
   }
+  // Opt-in: pierwszy klik odsłania odpowiedź i uruchamia pokaz; dalsze kliki nawigują.
+  function startOnNext(){
+    if(player.startOnNext===undefined||player.time>=player.startOnNext-epsilon)return false;
+    player.seek(player.startOnNext);target=null;player.playContinuously();changed();return true;
+  }
   function next(){
     cancelResume();if(suspensions.size)return;
+    if(startOnNext())return;
     if(player.navigation==='slide'){options.onNavigate?.(1);return;}
     if(player.navigation==='after-intro'&&player.live?.state==='running'){options.onNavigate?.(1);return;}
     if(player.state==='finished'){options.onNavigate?.(1);return;}
@@ -97,6 +103,7 @@ export function createStageController(player,options={}) {
   function toggle(){
     cancelResume();if(suspensions.size||player.state==='finished')return;
     if(player.isPlaying)player.pause();
+    else if(startOnNext())return;
     else if(player.live)player.playContinuously();
     else if(mode==='manual'&&target!==null&&target>player.time+epsilon)player.playTo(target);
     else start();changed();
@@ -104,7 +111,7 @@ export function createStageController(player,options={}) {
   function setMode(value){
     if(!['manual','auto'].includes(value)||value===mode)return;
     cancelResume();mode=value;
-    if(player.live){if(value==='auto'&&!suspensions.size&&player.state!=='finished'&&!player.isPlaying)player.playContinuously();}
+    if(player.live){if(value==='auto'&&!suspensions.size&&player.state!=='finished'&&!player.isPlaying){if(!startOnNext())player.playContinuously();}}
     else if(value==='manual'){target=null;player.seek(checkpoints()[Math.max(0,reachedIndex())]);}
     else if(!suspensions.size&&player.state!=='finished'){target=nextCheckpoint();run();}
     changed();
@@ -117,7 +124,7 @@ export function createStageController(player,options={}) {
     if(player.live?.restore)player.live.restore(time);else player.seek(time);
     changed();
   }
-  function reset(){player.live?.reopen();seek(0);if(player.navigation==='slide'&&!suspensions.size)player.playContinuously();}
+  function reset(){player.live?.reopen();seek(0);if(player.navigation==='slide'&&player.startOnNext===undefined&&!suspensions.size)player.playContinuously();}
   function finish(){cancelResume();target=null;player.finish();changed();}
   function suspend(reason='external'){
     if(suspensions.has(reason))return;

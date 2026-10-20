@@ -26,7 +26,7 @@ Eksport zachowuje oryginalne brzmienie wszystkich akapitów, w tym instrukcje pr
 16. **exhaustMap — Jestem zajęty** — `12-exhaustmap`
 17. **Zaprojektujmy wyszukiwarkę** — `12-intro-wyszukiwarka`
 18. **Źródło: skąd bierze się query$?** — `12-query-zrodlo`
-19. **switchMap — nowe zapytanie anuluje poprzednie** — `12a-switchmap-live`
+19. **Wybór operatora** — `12a-switchmap-live`
 20. **debounceTime — czekamy na ciszę** — `12b-debounce-switchmap`
 21. **distinctUntilChanged — czy coś się zmieniło?** — `11a-distinct-switchmap`
 22. **catchError na zewnątrz** — `b04-catcherror`
@@ -925,41 +925,93 @@ Dopisujemy share() i pokazujemy jego kafelek. Współdzielimy jedno źródło i 
 
 ### 3 — Subskrypcja i dane — `live`
 
-A szybko subskrybuje przez share i map do fromEvent; B dołącza do share bez drugiej subskrypcji źródła. Dopiero teraz input wpisuje a → an → ang → angu → angul → angula → angular, czeka, kasuje litery do pustego tekstu i powtarza. map zamienia zdarzenie na tekst, share rozdziela tę samą kapsułkę do obu odbiorców. Pusty string to "". Przeloty spowalniają ilustrację, nie rzeczywiste operatory. Spacja pauzuje, lewo wraca do etapu share, R do początkowej definicji. Prawo przechodzi do switchMap; wyjście odłącza subskrypcje i zatrzymuje zegar bez animacji. Powrót zaczyna od READY.
+A szybko subskrybuje przez share i map do fromEvent; B dołącza do share bez drugiej subskrypcji źródła. Dopiero teraz input wpisuje a → an → ang → angu → angul → angula → angular, czeka, kasuje litery do pustego tekstu i powtarza. map zamienia zdarzenie na tekst, share rozdziela tę samą kapsułkę do obu odbiorców. Pusty string to "". Przeloty spowalniają ilustrację, nie rzeczywiste operatory. Spacja pauzuje, lewo wraca do etapu share, R do początkowej definicji. Prawo przechodzi do wyboru operatora; wyjście odłącza subskrypcje i zatrzymuje zegar bez animacji. Powrót zaczyna od READY.
 
 ### 4 — Gotowe query$ — `finished`
 
-Druk, F i Upcoming pokazują pełny pipeline i angular u obu odbiorców. Mamy gotowy strumień tekstu. Na następnym slajdzie podłączymy wyszukiwarkę do switchMap i zobaczymy na żywo, jak nowa fraza anuluje poprzedni request.
+Druk, F i Upcoming pokazują pełny pipeline i angular u obu odbiorców. Mamy gotowy strumień tekstu. Na następnym slajdzie wybierzemy operator: co powinno stać się z poprzednim requestem, gdy przychodzi nowa fraza?
 
-## 19. switchMap — nowe zapytanie anuluje poprzednie
+## 19. Wybór operatora
 
 **ID:** `12a-switchmap-live`
 **Źródło:** [index.html — sekcja 12a-switchmap-live](../index.html)
 
-### Notatki sekcji — wyświetlane podczas pętli
+### Notatki sekcji / READY — `ready`
 
-Użytkownik szybko wpisuje tekst. Każde query dociera do switchMap, odłącza poprzedni inner HTTP i uruchamia nowy. Szary × to unsubscribe, bez complete i bez odpowiedzi. S1 przez cały czas subskrybuje główny pipeline.
+0 — Wybór operatora
 
-Widać trzy ostatnie requesty; najstarszy znika przed dodaniem kolejnego. Sekwencja r → re → rea → reac → react powtarza się przez zastąpienie tekstu kolejnym r. Numery i liczniki rosną. Animacja startuje sama; Spacja pauzuje, R zaczyna od nowa, strzałka w prawo od razu przechodzi do debounceTime.
+Mamy query$ i funkcję zwracającą HTTP Observable. Jaki operator wstawić w puste, wyróżnione miejsce? Chcemy wyświetlać wyniki aktualnej frazy. Co zrobić z requestem poprzedniej frazy, który jeszcze trwa? Daj sali chwilę na odpowiedź. Pierwsze dalej odsłoni wybór i uruchomi pokaz.
 
-Odsubskrybowanie klienta nie cofa operacji wykonanej na serwerze. Teraz ograniczymy liczbę requestów: zamiast uruchamiać HTTP po każdej zmianie tekstu, zaczekamy 300 ms ciszy. Następny slajd dodaje debounceTime.
+### Odsłonięcie i pokaz — `revealed`
+
+1 — switchMap
+
+Wybieramy switchMap. Pierwsza seria to r → re → rea → react. Nowe re odłącza HTTP #1: szary ×, bez odpowiedzi i bez complete. HTTP #2 dla re zdąży dostarczyć wynik i zakończyć się zielonym complete. HTTP #3 dla rea zostaje anulowane przez react, a #4 może zakończyć się sukcesem. Complete dotyczy tylko inner; główny odbiorca nadal słucha.
+
+Użytkownik dalej kasuje i dopisuje litery: reac → rea → re → red → redu → redux, potem wraca do r i wpisuje rx → rxj → rxjs. Krótkie odstępy przerywają pracę, dłuższe pozwalają odebrać wynik. Widać maksymalnie trzy requesty; nowy dochodzi na dole, najstarszy znika z góry. Numery i liczniki rosną bez resetu.
+
+Pokaz działa do przejścia dalej. Spacja pauzuje/wznawia, R przywraca pytanie z ukrytą nazwą; prawo przechodzi do debounceTime, lewo do źródła query$. Odsubskrybowanie klienta nie cofa operacji wykonanej na serwerze. Teraz ograniczymy liczbę requestów: zaczekamy 300 ms ciszy.
+
+### Kadr podsumowania — `finished`
+
+Kadr podsumowania
+
+switchMap odsłonięty, HTTP #2 zakończone, #3 anulowane, #4 aktywne. Odbiorca zachowuje tablicę [#2] wyników dla re. Nowe query może przerwać poprzedni request, ale zakończonego requestu już nie anuluje. Dalej dodamy debounceTime.
 
 ## 20. debounceTime — czekamy na ciszę
 
 **ID:** `12b-debounce-switchmap`
 **Źródło:** [index.html — sekcja 12b-debounce-switchmap](../index.html)
 
-### Notatki sekcji — wyświetlane podczas pokazu ciągłego
+### Notatki per checkpoint — ręczne wprowadzenie, potem pokaz ciągły
 
-Drugi etap projektowania wyszukiwarki. Po poprzednim pokazie switchMap dodajemy debounceTime(300): zamiast uruchamiać i anulować HTTP przy każdej literze, czekamy 300 ms od ostatniej zmiany tekstu. Ilustracja jest spowolniona 5×: litery co 0,5 s, cisza 1,5 s, timer pokazuje rzeczywiste 300 ms modelu. Przeloty ilustrują komunikację, nie dodatkowe opóźnienia RxJS.
+#### `ready`
 
-Najpierw S1 subskrybuje cały pipeline. Input jest pusty, requestów brak. Użytkownik wpisuje r → re → rea. Każda kulka dociera do debounceTime, podmienia oczekującą wartość i resetuje timer. Podczas pisania nic nie trafia do switchMap. Dopiero po ciszy rea przechodzi dalej i uruchamia HTTP #1. Wynik trafia do S1, zielony complete kończy wyłącznie inner. Główna subskrypcja nadal działa.
+**0 — Czekamy na ciszę**
 
-Następnie użytkownik usuwa literę i szybko wraca: re → rea → cisza. Powstaje HTTP #2 z tą samą frazą rea. Pięć zmian tekstu, dwa requesty. debounceTime ogranicza częstotliwość, ale nie porównuje kolejnych wyników. Sama dalsza cisza nie emituje ponownie — potrzebna jest nowa zmiana tekstu. Kolejne serie reac → react, reac → react i reac → rea powtarzają wzorzec identycznych requestów.
+Drugi etap projektowania wyszukiwarki. Dodajemy debounceTime(300) przed switchMap. Ilustracja jest spowolniona 5×: litery co 0,5 s, cisza 1,5 s; timer pokazuje logiczne 300 ms. Przeloty ilustrują komunikację. Pipeline gotowy, input pusty. Ręczne etapy trwają do drugiej wartości przepuszczonej przez debounce; potem pokaz płynie bez końca.
 
-Widać maksymalnie trzy ostatnie pełne wiersze HTTP; numery i liczniki rosną. Każdy request kończy się sukcesem przed następną serią pisania. Pokaz startuje sam i trwa do ręcznego przejścia dalej; Spacja pauzuje, R resetuje, powrót zaczyna od pustego inputa i HTTP #1. Druk, F i Upcoming pokazują dwa zakończone requesty rea, liczniki 5/2/0.
+#### `subscribed`
 
-Teraz pytanie: skoro ostatnia wyszukana fraza znowu brzmi rea, czy drugi request jest potrzebny? W wyszukiwarce następnym krokiem będzie distinctUntilChanged() po debounceTime, przed switchMap. Następny slajd wyjaśnia porównywanie kolejnych wartości na prostym przykładzie ID.
+**1 — Subskrypcja**
+
+Odbiorca subskrybuje switchMap, potem debounceTime i query$. Impulsy subscribe przeszły w lewo. Input jest pusty i nie ma HTTP. Podczas odliczania pokażemy czas, poza nim lane nie ma kreski ani dodatkowego napisu.
+
+#### `buffered`
+
+**2 — rea w buforze**
+
+Użytkownik wpisał r → re → rea. Każda zmiana dotarła do debounceTime, zastąpiła oczekującą wartość i zresetowała timer. Trzy wejścia, zero requestów. Dopiero pełne 300 ms ciszy pozwoli przepuścić rea.
+
+#### `request-1`
+
+**3 — HTTP #1: rea**
+
+Cisza minęła. debounceTime przepuścił jedną wartość rea, a switchMap utworzył inner i uruchomił HTTP #1. Pośrednie r i re nie uruchomiły HTTP. Użytkownik zaraz dopisze kolejne litery, bez czekania na odpowiedź.
+
+#### `typing`
+
+**4 — Pisanie podczas HTTP**
+
+Input pokazuje już react. Każda nowa litera została wyemitowana, ale debounce nadal czeka. HTTP #1 dla rea wciąż pracuje. Samo pisanie nie anuluje requestu: switchMap nie dostał jeszcze kolejnej wartości.
+
+#### `complete-1`
+
+**5 — HTTP zdążył się zakończyć**
+
+HTTP #1 zwrócił tablicę [#1] wyników dla rea i zakończył inner zielonym complete. Timer dla react jeszcze odlicza. Request zdążył zakończyć się przed końcem kolejnego okna debounce. Główna subskrypcja nadal działa. Następne dalej uruchomi drugie HTTP i ciągły pokaz, bez kolejnych postojów.
+
+#### `request-2`
+
+**6 — Druga emisja i pokaz ciągły**
+
+Po kolejnej ciszy react dotarło do switchMap i ruszył HTTP #2. Od tego momentu animacja nie zatrzymuje się na etapach: użytkownik czyści input, ponownie wpisuje rea, potem angu i angular. Cykl pisania z pauzami powtarza się bez końca. Każde HTTP zwraca tablicę [#N] i kończy swój inner przez complete; główny pipeline pozostaje aktywny. Są najwyżej trzy ostatnie rzeczywiste requesty. Numery i liczniki rosną bez resetu. Prawo podczas pokazu ciągłego od razu zmienia slajd, także po pauzie Spacją. Lewo cofa do ostatniego ręcznego postoju, R wraca do zatrzymanego READY.
+
+#### `finished`
+
+**Kadr podsumowania**
+
+Druk, F i Upcoming pokazują trzy zakończone HTTP (#1 rea, #2 react, #3 rea), wynik [#3], input angu i liczniki 14/3/0. To nieruchomy kadr ciągłego pokazu. Nie ma błędów ani anulowań; complete dotyczy wyłącznie inner, źródło i odbiorca nadal działają. Ta sama fraza może uruchomić request ponownie po kolejnej zmianie i ciszy. Na następnym slajdzie pokażemy distinctUntilChanged() po debounceTime, przed switchMap: porównuje tylko kolejne przepuszczone wartości, nie całą historię.
 
 ## 21. distinctUntilChanged — czy coś się zmieniło?
 

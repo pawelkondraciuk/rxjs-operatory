@@ -2278,6 +2278,8 @@ function combineLatestWithLatestFromGraph(scene) {
 const querySourceTiming={mapBorn:.1,mapStop:.55,shareBorn:.65,shareStop:1.1,subscribe:1.25,connect:.15,live:2,
   first:2.8,key:1.6,hold:4,erase:1.1,empty:2,travel:.6,transform:.75,split:.6};
 const querySourceWord='angular';
+const queryTextBadge={...laneLook.ball,r:32,font:30,shape:'pill'};
+const searchResultValue=run=>`[${run.id}]`;
 const querySourceDelete=(querySourceWord.length-1)*querySourceTiming.key+querySourceTiming.hold;
 const querySourceCycle=querySourceDelete+(querySourceWord.length-1)*querySourceTiming.erase+querySourceTiming.empty;
 const querySourceValue=(step)=>step<querySourceWord.length?querySourceWord.slice(0,step+1):querySourceWord.slice(0,querySourceWord.length-1-(step-querySourceWord.length));
@@ -2333,7 +2335,7 @@ export function querySourceVariant(scene,{from=0,to=32,closedAt=null}) {
 
 function querySourceGraph(scene) {
   const tall=scene.format==='4:3',top=tall?100:50,y=laneRowY(top,0),secondTop=top+210;
-  const input=scene.querySourceInputs,t=querySourceTiming,closedAt=scene.querySourceClosedAt,ball={...laneLook.ball,r:32,font:30,shape:'pill'};
+  const input=scene.querySourceInputs,t=querySourceTiming,closedAt=scene.querySourceClosedAt,ball=queryTextBadge;
   const output=input.map(v=>({...v,value:v.value||'""',at:v.arrival+t.transform,arrival:v.arrival+t.transform+t.travel}));
   const shared=output.map(v=>({...v,at:v.arrival+t.split,arrival:v.arrival+t.split+t.travel}));
   const receiver=(id,label,receiverTop)=>({id,label,x:1070,w:320,subscriber:id,
@@ -2371,94 +2373,131 @@ function querySourceGraph(scene) {
 
 // Czas ilustracji jest jedynym czasem tej sceny. Okno live ogranicza liczbę requestów w kompilacji;
 // globalny indeks pochodzi z czasu, więc przewinięcie okna nie zeruje numerów ani liczników.
-const timing={first:.4,period:1.4,travel:.4,cancel:.25,connect:.25,request:5};
+const timing={reveal:.3,first:.9,short:1.4,long:4.8,travel:.4,cancel:.25,connect:.25,request:2,terminalGap:.7,terminal:.4};
+// Paleta i starszy zestaw fraz są współdzielone z pokazem debounceTime.
 const queries=['r','re','rea','reac','react'];
 const colors=['#6D4CD3','#B85D05','#087FAD','#B73770','#287D68'];
-const countAt=(time,first)=>Math.max(0,Math.floor((time-first+1e-9)/timing.period)+1);
-const runAt=index=>{
-  const emitted=timing.first+index*timing.period,arrived=emitted+timing.travel;
-  const born=arrived+(index?timing.cancel:0),connected=born+timing.connect;
-  const cancel=arrived+timing.period;
-  return {index,id:'#'+(index+1),value:queries[index%queries.length],color:colors[index%colors.length],emitted,arrived,born,connected,cancel};
+const switchQueries=['r','re','rea','react','reac','rea','re','red','redu','redux','redu','red','re','r','rx','rxj','rxjs','rxj','rx','r'];
+const switchPeriod=timing.short+timing.long;
+const emittedAt=index=>timing.first+Math.floor(index/2)*switchPeriod+(index%2?timing.short:0);
+// Licznik analityczny: dwie emisje na okres, bez przechodzenia po całej historii.
+const countAt=(time,first=timing.first,second=timing.short)=>{
+  if(time<first-1e-9)return 0;
+  const elapsed=Math.max(0,time-first),cycle=Math.floor((elapsed+1e-9)/switchPeriod);
+  return cycle*2+1+(elapsed-cycle*switchPeriod>=second-1e-9?1:0);
 };
-export const switchMapLiveStillTime=runAt(4).connected+.4;
+const runAt=index=>{
+  const emitted=emittedAt(index),arrived=emitted+timing.travel,cancelled=index%2===0;
+  const born=arrived+(index%2?timing.cancel:0),connected=born+timing.connect;
+  const response=connected+timing.request,complete=response+timing.terminalGap;
+  const end=cancelled?emittedAt(index+1)+timing.travel:complete;
+  return {index,id:'#'+(index+1),value:switchQueries[index?1+(index-1)%(switchQueries.length-1):0],
+    color:colors[index%colors.length],emitted,arrived,born,connected,response,complete,cancelled,end,
+    completed:end+(cancelled?timing.cancel:timing.terminal),received:response+timing.travel+.15+timing.travel};
+};
+export const switchMapLiveStillTime=runAt(3).connected+.4;
+const hiddenSwitchName='         ';
+const switchCode=name=>`query$.pipe(\n  ${name}(query => httpGet(url(query)))\n)`;
 
 export function configureSwitchMapLive(scene) {
   Object.assign(scene,{
-    title:'switchMap — nowe zapytanie anuluje poprzednie',
-    code:'query$.pipe(\n  switchMap(query => httpGet(url(query)))\n)',
-    graph:switchMapLiveGraph,rows:[],codeFrames:[],checkpoints:[],
-    playerLayout:'expanded',playerClass:'rx-flat-tiles rx-switchmap-live',ink:'#26323B',
-    playback:{entry:'manual',finish:'hold',controller:'stages',navigation:'slide',resetOnExit:true,stillTime:switchMapLiveStillTime,stops:[]},
-    live:{start:0,window:24,keep:6,margin:3,autoplay:true,variant:switchMapLiveVariant},
+    title:'Wybór operatora',code:switchCode(hiddenSwitchName),
+    graph:switchMapLiveGraph,rows:[],checkpoints:[],
+    codeFrames:[{at:timing.reveal,code:switchCode('switchMap')}],
+    playerLayout:'expanded',playerClass:'rx-flat-tiles rx-switchmap-live rx-operator-choice',ink:'#26323B',
+    playback:{entry:'manual',finish:'hold',controller:'stages',navigation:'slide',startOnNext:timing.reveal,
+      resetOnExit:true,stillTime:switchMapLiveStillTime,stops:[{id:'revealed',time:timing.reveal}]},
+    live:{start:timing.reveal,window:24,keep:12,margin:3,autoplay:false,variant:switchMapLiveVariant},
   });
   Object.assign(scene,switchMapLiveVariant(scene,{from:0,to:scene.live.window}));
 }
 
 export function switchMapLiveVariant(scene,{from=0,to=24}) {
-  const first=Math.max(0,Math.floor((from-timing.first)/timing.period)-4);
-  const last=Math.max(0,Math.ceil((to-timing.first)/timing.period));
+  // Sześć poprzednich wykonań wystarcza na trzy widoczne wiersze i ostatni udany wynik.
+  const first=Math.max(0,countAt(from)-7),last=countAt(to)+1;
   const runs=Array.from({length:last-first+1},(_,i)=>runAt(first+i));
   const source={id:'query',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'};
-  const op={id:'switch',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
+  const op={id:'switch',bg:'rgba(216,179,230,.6)',line:'#9c64b3'};
   const http={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'};
-  const event=(type,run,offset=0)=>({type,edge:'inner-'+run.index,offset});
+  const event=(type,run)=>({type,edge:'inner-'+run.index});
+  const reveal={type:'operator-reveal'};
   return {...scene,duration:to,switchMapLiveRuns:runs,
-    captions:[[0,'Każde nowe query anuluje poprzedni request i uruchamia nowy.']],
+    captions:[[0,'Każde nowe query może przerwać poprzedni request i uruchomić nowy.']],
     codeLines:[[{text:'query$',mark:source},{text:'.pipe('}],
-      [{text:'  '},{text:'switchMap',mark:op,active:runs.map(run=>({from:event('subscribe',run,run.index?-timing.cancel:0),to:event('inner-subscribe',run)}))},
-        {text:'(query => '},{text:'httpGet(url(query))',mark:http,active:runs.map(run=>({from:event('inner-subscribe',run),to:event('inner-unsubscribe',run)}))},{text:')'}],
+      [{text:'  '},{text:time=>time<timing.reveal?hiddenSwitchName:'switchMap',mark:op,active:[{from:reveal,to:{...reveal,offset:Infinity}}]},
+        {text:'(query => '},{text:'httpGet(url(query))',mark:http,active:runs.map(run=>({from:event('inner-subscribe',run),
+          to:event(run.cancelled?'inner-unsubscribe':'stream-complete',run)}))},{text:')'}],
       [{text:')'}]],
-    metrics:[{label:'wejścia',value:time=>countAt(time,timing.first)},
-      {label:'requesty HTTP',value:time=>time<runAt(0).connected?0:1+countAt(time,runAt(1).connected)},
+    metrics:[{label:'wejścia',value:time=>countAt(time)},
+      {label:'requesty HTTP',value:time=>countAt(time,runAt(0).connected,runAt(1).connected-runAt(0).connected)},
       {label:'aktywne',value:time=>{
-        const n=countAt(time,timing.first+timing.travel)-1;
-        if(n<0)return 0;
-        const run=runAt(n);
-        return time>=run.connected&&time<run.cancel?1:0;
+        const index=countAt(time,runAt(0).connected,runAt(1).connected-runAt(0).connected)-1;
+        return index>=0&&time<runAt(index).end?1:0;
       }}],
   };
 }
 
 function switchMapLiveGraph(scene) {
-  const runs=scene.switchMapLiveRuns,frame=frameFor(scene),large=scene.format==='4:3';
+  const runs=scene.switchMapLiveRuns,frame=frameFor(scene),successful=runs.filter(run=>!run.cancelled);
   const graph={layout:'fixed',formatAware:true,width:1240,height:frame.height,illustratedWork:true,
-    nodes:[{id:'source',label:'query$',ready:true},{id:'op',label:'switchMap',ready:true},{id:'observer',label:'S1',ready:true},
+    nodes:[{id:'source',label:'query$',ready:true},{id:'op',label:time=>time<timing.reveal?'':'switchMap',ready:true},
+      {id:'observer',label:'',ready:true},
       ...runs.map((run,i)=>({id:'inner'+i,label:'HTTP GET',born:run.born,inner:true,workRow:i+1,panel:'jobs',slot:i%3}))],
     edges:[{id:'source-op',from:'source',to:'op',events:[],logicalStart:-1},
       {id:'op-observer',from:'op',to:'observer',events:[],logicalStart:-1},
       ...runs.map((run,i)=>({id:'inner-'+run.index,from:'inner'+i,to:'op',events:[],internal:true,
-        logicalStart:run.born,logicalEnd:{at:run.cancel,kind:'unsubscribe'},gateWork:true,fixedStart:true}))],
+        logicalStart:run.born,logicalEnd:{at:run.end,kind:run.cancelled?'unsubscribe':'complete'},gateWork:true,fixedStart:true}))],
     executions:runs.map((run,i)=>({id:run.id,node:'inner'+i,edge:'inner-'+run.index,panel:'jobs',value:run.value,duration:timing.request})),
     trays:[],schedule:{
       'source-op':{start:-1,connectDuration:.25,events:runs.map(run=>({at:run.emitted,arrival:run.arrived,logicalAt:run.emitted,value:run.value,color:run.color}))},
-      'op-observer':{start:-1,connectDuration:.25,events:[]},
-      ...Object.fromEntries(runs.map(run=>['inner-'+run.index,{start:run.born,connectDuration:timing.connect,events:[],
-        end:{at:run.cancel,logicalAt:run.cancel,kind:'unsubscribe',duration:timing.cancel}}])),
+      'op-observer':{start:-1,connectDuration:.25,events:successful.map(run=>({at:run.response+timing.travel+.15,arrival:run.received,
+        logicalAt:run.response,value:searchResultValue(run),color:run.color,execution:run.id}))},
+      ...Object.fromEntries(runs.map(run=>['inner-'+run.index,{start:run.born,connectDuration:timing.connect,
+        events:run.cancelled?[]:[{at:run.response,arrival:run.response+timing.travel,logicalAt:run.response,value:searchResultValue(run),color:run.color}],
+        end:{at:run.end,logicalAt:run.end,kind:run.cancelled?'unsubscribe':'complete',duration:run.cancelled?timing.cancel:timing.terminal}}])),
     },
-    activities:runs.flatMap(run=>[{node:'source',at:run.emitted,until:run.arrived},{node:'op',at:run.arrived,until:run.connected}]),
+    timeline:[{type:'operator-reveal',at:timing.reveal}],
+    activities:[{node:'op',at:timing.reveal,until:timing.first},
+      ...runs.flatMap(run=>[{node:'source',at:run.emitted,until:run.arrived},{node:'op',at:run.arrived,until:run.connected}]),
+      ...successful.map(run=>({node:'op',at:run.response+timing.travel,until:run.received}))],
   };
-  // Wspólny wygląd toru i instancji HTTP, bez osobnego renderera slajdu.
   configureHttpWorkPanel(graph,{...scene,rows:[{events:[]}],operatorName:'switchMap',jobs:runs.map(run=>({...run,dur:timing.request}))},frame,
     {edge:i=>'inner-'+runs[i].index,stages:i=>[{column:'source',edge:'inner-'+runs[i].index,progress:true}],panelOptions:{maxVisibleRows:3}});
   configureQueryWorkLook(graph,scene,frame,runs);
-  graph.trays=[];
-  graph.readouts=[queryInputReadout(graph,scene,time=>queries[(Math.max(1,countAt(time,timing.first))-1)%queries.length])];
+  // Pełna fraza, identyfikator inner i complete mają osobne miejsce także w 4:3.
+    // Nagłówki, porty i input rezerwują pełny tor jeszcze przed odsłonięciem operatora.
+  graph.subscribers.S1.label='';
+  for(const node of graph.nodes.filter(node=>['source','op','observer'].includes(node.id))) {
+    node.growRows=false;
+    node.laneRows=[{subscriber:'S1',top:node.top+node.defH,h:node.rowH,growth:1,color:'#7457D9',tint:'#EDE6F8'}];
+    node.labelOffset=-node.h/2+node.defH/2;
+  }
+  const observer=graph.nodes.find(node=>node.id==='observer');
+  observer.inbox.label='wyniki';observer.inbox.font=26;
+  graph.trays=[{anchor:'observer',x:observer.x+70,y:observer.y,w:95,balls:true,max:1,ball:graph.ball}];
+  graph.readouts=[queryInputReadout(graph,scene,time=>{
+    const index=countAt(time)-1;
+    return index<0?'':runAt(index).value;
+  })];
   return graph;
 }
 
 // Wspólny wygląd wyszukiwarki: ten sam input, geometria lokalnych HTTP i kolory query w obu etapach.
 function configureQueryWorkLook(graph,scene,frame,runs) {
   const large=scene.format==='4:3',panel=graph.panels[0];
-  Object.assign(panel,{idX:40,idW:100,ballX:190,stageXs:[245],stageWs:[300],
-    ball:{r:large?28:24,font:large?28:25,fitText:true},idFit:true});
+  Object.assign(panel,{idX:40,idW:60,ballX:180,stagesLeft:280,stageXs:[280],stageWs:[300],
+    receiverX:720,receiverW:490,receiverValueOffset:240,
+    ball:{...queryTextBadge,r:large?28:24},idFit:true});
   panel.dividerY=large?190:132;panel.y=panel.dividerY;panel.h=frame.height-panel.dividerY;
   panel.works.forEach((work,i)=>Object.assign(work,{id:runs[i].id,value:runs[i].value,color:runs[i].color,slot:i%3}));
   graph.nodes.filter(node=>node.workRow!==undefined).forEach(node=>Object.assign(node,{y:panel.rowsTop+(node.slot+.5)*panel.rowStep,h:panel.rowHeight}));
   const observer=graph.nodes.find(node=>node.id==='observer');
-  Object.assign(observer,{ready:true,inbox:{...observer.inbox,ready:true}});
+  Object.assign(observer,{ready:true,inbox:{...observer.inbox,ready:true,label:'S1'}});
+  graph.subscribers.S1.label='';
   graph.nodes.find(node=>node.id==='source').label='query$';
-  graph.ball={r:large?28:25,font:29,textFill:'#fff',fitText:true};
+  graph.ball={...queryTextBadge,textFill:'#fff'};
+  const debounce=graph.nodes.find(node=>node.id==='debounce');
+  if(debounce)Object.assign(debounce.laneTimer,{memoryX:debounce.x+65,textInset:8});
 }
 
 function queryInputReadout(graph,scene,value) {
@@ -2469,74 +2508,99 @@ function queryInputReadout(graph,scene,value) {
     value};
 }
 
-// Drugi etap wyszukiwarki. Czas RxJS: litery co 100 ms, debounce 300 ms; ilustracja 5× wolniejsza.
-// Przeloty są dodatkową ilustracją komunikacji. Każdy HTTP kończy się przed kolejną serią pisania.
-const searchTiming={first:2.3,key:.1,scale:5,period:.3,travel:.4,connect:.5,request:2,terminalGap:.7,terminal:.4,gap:.5};
-const searchBursts=[['re','rea'],['reac','react'],['reac','react'],['reac','rea']];
-const firstSearchLength=3;
-const searchTail=searchTiming.travel+searchTiming.period*searchTiming.scale+searchTiming.travel+searchTiming.connect+
-  searchTiming.request+searchTiming.terminalGap+searchTiming.terminal+searchTiming.gap;
-const searchCycle=searchTiming.key*searchTiming.scale+searchTail;
-const nextSearchFirst=searchTiming.first+(firstSearchLength-1)*searchTiming.key*searchTiming.scale+searchTail;
-const searchIndexAt=time=>time<nextSearchFirst?0:1+Math.floor((time-nextSearchFirst+1e-9)/searchCycle);
-const queryColor=value=>colors[queries.indexOf(value)];
-const searchInputsAt=index=>{
-  const values=index?searchBursts[(index-1)%searchBursts.length]:['r','re','rea'];
-  const first=index?nextSearchFirst+(index-1)*searchCycle:searchTiming.first;
-  return values.map((value,i)=>({value,color:queryColor(value),at:first+i*searchTiming.key*searchTiming.scale,
-    logicalAt:first/searchTiming.scale+i*searchTiming.key,arrival:first+i*searchTiming.key*searchTiming.scale+searchTiming.travel}));
-};
+// Drugi etap wyszukiwarki. Litery co 100 ms i debounce 300 ms; ilustracja 5× wolniejsza.
+// Po drugiej wartości debounce pokaz działa bez końca; przeloty ilustrują komunikację.
+const searchTiming={first:2.3,key:.1,scale:5,period:.3,travel:.4,connect:.5,request:2,terminalGap:.7,terminal:.4,nextTyping:1};
+const searchBursts=[['r','re','rea'],['reac','react'],['','r','re','rea'],['','a','an','ang','angu'],['angul','angula','angular']];
+const searchRepeatBursts=searchBursts.map((values,i)=>i?values:['',...values]);
+const searchValues=[...new Set(searchBursts.flat())];
+const queryColor=value=>colors[Math.max(0,searchValues.indexOf(value))%colors.length];
+const searchStep=values=>(values.length-1)*searchTiming.key*searchTiming.scale+2*searchTiming.travel+
+  searchTiming.period*searchTiming.scale+searchTiming.connect+searchTiming.nextTyping;
+const searchOffsets=bursts=>bursts.reduce((times,values)=>[...times,times.at(-1)+searchStep(values)],[0]);
+const searchInitialOffsets=searchOffsets(searchBursts),searchRepeatOffsets=searchOffsets(searchRepeatBursts);
+const searchRepeatAt=searchTiming.first+searchInitialOffsets.at(-1),searchRepeatDuration=searchRepeatOffsets.at(-1);
+const searchInitialInputs=searchBursts.reduce((counts,values)=>[...counts,counts.at(-1)+values.length],[0]);
+const searchRepeatInputs=searchRepeatBursts.reduce((counts,values)=>[...counts,counts.at(-1)+values.length],[0]);
 
-// Wyjście zależy od pełnego okresu ciszy; nowa wartość przed upływem okresu zastępuje poprzednią.
+// Numer i czas serii są analityczne, niezależne od długości pokazu i bieżącego okna kompilacji.
+function searchSeriesAt(index) {
+  if(index<searchBursts.length)return {values:searchBursts[index],first:searchTiming.first+searchInitialOffsets[index],before:searchInitialInputs[index]};
+  const cycle=Math.floor((index-searchBursts.length)/searchRepeatBursts.length),slot=(index-searchBursts.length)%searchRepeatBursts.length;
+  return {values:searchRepeatBursts[slot],first:searchRepeatAt+cycle*searchRepeatDuration+searchRepeatOffsets[slot],
+    before:searchInitialInputs.at(-1)+cycle*searchRepeatInputs.at(-1)+searchRepeatInputs[slot]};
+}
+function searchIndexAt(time) {
+  if(time<searchRepeatAt-1e-9)return Math.max(0,searchInitialOffsets.slice(0,-1).findLastIndex(at=>searchTiming.first+at<=time+1e-9));
+  const cycle=Math.floor((time-searchRepeatAt+1e-9)/searchRepeatDuration),elapsed=time-searchRepeatAt-cycle*searchRepeatDuration;
+  const slot=Math.max(0,searchRepeatOffsets.slice(0,-1).findLastIndex(at=>at<=elapsed+1e-9));
+  return searchBursts.length+cycle*searchRepeatBursts.length+slot;
+}
+
+// Każde nowe wejście zastępuje poprzednie; dopiero pełne okno ciszy emituje ostatnią wartość.
 function debounceSearchInputs(input) {
   return input.filter((v,i)=>!input[i+1]||input[i+1].logicalAt-v.logicalAt>=searchTiming.period-1e-9)
     .map(v=>({...v,logicalAt:v.logicalAt+searchTiming.period,at:v.arrival+searchTiming.period*searchTiming.scale,
       arrival:v.arrival+searchTiming.period*searchTiming.scale+searchTiming.travel}));
 }
-
-const searchRunAt=index=>{
-  const input=searchInputsAt(index),output=debounceSearchInputs(input)[0];
-  const born=output.arrival,connected=born+searchTiming.connect,response=connected+searchTiming.request;
-  const complete=response+searchTiming.terminalGap,completed=complete+searchTiming.terminal;
-  return {index,id:'#'+(index+1),value:output.value,color:output.color,input,output,born,connected,response,complete,completed,
-    received:response+searchTiming.travel+.15+searchTiming.travel};
+function debounceSearchRunAt(index) {
+  const {values,first}=searchSeriesAt(index);
+  const input=values.map((value,i)=>{
+    const at=first+i*searchTiming.key*searchTiming.scale;
+    return {value,color:queryColor(value),at,logicalAt:at/searchTiming.scale,arrival:at+searchTiming.travel};
+  });
+  const output=debounceSearchInputs(input)[0],born=output.arrival,connected=born+searchTiming.connect;
+  const response=connected+searchTiming.request,complete=response+searchTiming.terminalGap;
+  return {index,id:'#'+(index+1),value:output.value,color:output.color,input,output,born,connected,duration:searchTiming.request,
+    response,complete,end:complete,completed:complete+searchTiming.terminal,received:response+searchTiming.travel+.15+searchTiming.travel};
+}
+const searchStartedAt=time=>{
+  const index=searchIndexAt(time);
+  return index+(time>=debounceSearchRunAt(index).connected?1:0);
 };
 
 export function configureDebounceSwitch(scene) {
+  const first=debounceSearchRunAt(0),second=debounceSearchRunAt(1);
+  const start=second.connected+.1;
   Object.assign(scene,{
     title:'debounceTime — czekamy na ciszę',
     code:'query$.pipe(\n  debounceTime(300),\n  switchMap(query => httpGet(url(query))))',
     graph:debounceSwitchGraph,rows:[],codeFrames:[],checkpoints:[],
     playerLayout:'expanded',playerClass:'rx-flat-tiles rx-switchmap-live rx-debounce-search',ink:'#26323B',
-    playback:{entry:'manual',finish:'hold',controller:'stages',navigation:'slide',resetOnExit:true,
-      stillTime:searchRunAt(1).completed+.2,stops:[]},
-    live:{start:0,window:32,keep:24,margin:3,autoplay:true,variant:debounceSwitchVariant},
+    playback:{entry:'manual',finish:'hold',controller:'stages',navigation:'after-intro',resetOnExit:true,
+      stillTime:debounceSearchRunAt(2).completed+.9,stops:[
+        {id:'subscribed',time:1.95},
+        {id:'buffered',time:first.input.at(-1).arrival+.3},
+        {id:'request-1',time:first.connected+.1},
+        {id:'typing',time:second.input.at(-1).arrival+.05},
+        {id:'complete-1',time:first.completed+.15},
+        {id:'request-2',time:start},
+      ]},
+    live:{start,window:32,keep:24,margin:3,autoplay:false,variant:debounceSwitchVariant},
   });
   Object.assign(scene,debounceSwitchVariant(scene,{from:0,to:scene.live.window}));
 }
 
 export function debounceSwitchVariant(scene,{from=0,to=32}) {
-  // Trzy poprzednie HTTP oraz kolejna seria potrzebna do płynnego przesunięcia historii; wielkość stała w czasie.
+  // Cztery wcześniejsze serie zachowują historię trzech HTTP i ostatni odebrany wynik.
   const first=Math.max(0,searchIndexAt(from)-4),last=searchIndexAt(to)+1;
-  const runs=Array.from({length:last-first+1},(_,i)=>searchRunAt(first+i));
-  const inputs=runs.flatMap(run=>run.input),firstRun=searchRunAt(0);
-  const count=time=>Math.max(0,Math.floor((time-firstRun.connected+1e-9)/searchCycle)+1);
+  const runs=Array.from({length:last-first+1},(_,i)=>debounceSearchRunAt(first+i)),inputs=runs.flatMap(run=>run.input);
   const source={id:'query',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},http={...source,id:'http'};
   const op={id:'switch',bg:'rgba(216,179,230,.45)',line:'#b384c6'},debounce={...op,id:'debounce'};
   const during=(from,to)=>({from:{at:from},to:{at:to}});
   return {...scene,duration:to,debounceSearchRuns:runs,
-    captions:[[0,'Czekamy 300 ms ciszy. Ta sama fraza może uruchomić kolejny request.']],
+    captions:[[0,'debounceTime przepuszcza wartość dopiero po chwili ciszy. Ta sama fraza może uruchomić request ponownie.']],
     codeLines:[[{text:'query$',mark:source,active:inputs.map(v=>during(v.at,v.arrival))},{text:'.pipe('}],
       [{text:'  '},{text:'debounceTime(300)',mark:debounce,active:runs.map(run=>during(run.input[0].arrival,run.output.arrival))},{text:','}],
-      [{text:'  '},{text:'switchMap',mark:op,active:runs.flatMap(run=>[during(run.born,run.connected),during(run.response+searchTiming.travel,run.received)])},
-        {text:'(query => '},{text:'httpGet(url(query))',mark:http,active:runs.map(run=>during(run.connected,run.complete))},{text:'))'}]],
+      [{text:'  '},{text:'switchMap',mark:op,active:runs.flatMap(run=>[during(run.output.arrival,run.connected),
+        during(run.response+searchTiming.travel,run.received)])},
+        {text:'(query => '},{text:'httpGet(url(query))',mark:http,active:runs.map(run=>during(run.connected,run.end))},{text:'))'}]],
     metrics:[{label:'wejścia',value:time=>{
-      if(time<searchTiming.first)return 0;
-      const index=searchIndexAt(time),input=searchInputsAt(index);
-      return (index?firstSearchLength+(index-1)*2:0)+input.filter(v=>v.at<=time+1e-9).length;
-    }},{label:'requesty HTTP',value:count},{label:'aktywne',value:time=>{
-      const index=count(time)-1;
-      return index>=0&&time<searchRunAt(index).complete?1:0;
+      const index=searchIndexAt(time),series=searchSeriesAt(index);
+      return series.before+series.values.filter((_,i)=>series.first+i*searchTiming.key*searchTiming.scale<=time+1e-9).length;
+    }},{label:'requesty HTTP',value:searchStartedAt},{label:'aktywne',value:time=>{
+      const started=searchStartedAt(time);
+      return started&&time<debounceSearchRunAt(started-1).end?1:0;
     }}],
   };
 }
@@ -2546,45 +2610,47 @@ function debounceSwitchGraph(scene) {
   const inputs=runs.flatMap(run=>run.input),outputs=debounceSearchInputs(inputs);
   const graph={layout:'fixed',formatAware:true,width:1240,height:frame.height,illustratedWork:true,
     nodes:[{id:'source',label:'query$',ready:true},{id:'debounce',label:'debounceTime',color:'op',ready:true,
-      laneTimer:{kind:'debounce',period:searchTiming.period,timeScale:searchTiming.scale,unit:'ms',label:'',ball:true}},
-      {id:'op',label:'switchMap',color:'op',ready:true},{id:'observer',label:'S1',ready:true},
+      laneTimer:{kind:'debounce',period:searchTiming.period,timeScale:searchTiming.scale,unit:'ms',label:'',empty:'',ball:true}},
+      {id:'op',label:'switchMap',color:'op',ready:true},{id:'observer',label:'',ready:true},
       ...runs.map((run,i)=>({id:'inner'+i,label:'HTTP GET',born:run.born,inner:true,workRow:i+1,panel:'jobs',slot:i%3}))],
     edges:[{id:'source-debounce',from:'source',to:'debounce',events:[],logicalStart:.3,logicalEnd:null},
       {id:'debounce-op',from:'debounce',to:'op',events:[],logicalStart:.3,logicalEnd:null},
       {id:'op-observer',from:'op',to:'observer',events:[],logicalStart:.3,logicalEnd:null},
       ...runs.map((run,i)=>({id:'inner-'+run.index,from:'inner'+i,to:'op',events:[],internal:true,gateWork:true,fixedStart:true,
-        logicalStart:run.born,logicalEnd:{at:run.complete,kind:'complete'}}))],
-    executions:runs.map((run,i)=>({id:run.id,node:'inner'+i,edge:'inner-'+run.index,panel:'jobs',value:run.value,duration:searchTiming.request})),
+        logicalStart:run.born,logicalEnd:{at:run.end,kind:'complete'}}))],
+    executions:runs.map((run,i)=>({id:run.id,node:'inner'+i,edge:'inner-'+run.index,panel:'jobs',value:run.value,duration:run.duration})),
     trays:[],schedule:{
       'op-observer':{start:.3,connectDuration:.5,events:runs.map(run=>({at:run.response+searchTiming.travel+.15,arrival:run.received,
-        logicalAt:run.response/searchTiming.scale,value:run.value,color:run.color,execution:run.id}))},
+        logicalAt:run.response/searchTiming.scale,value:searchResultValue(run),color:run.color,execution:run.id}))},
       'debounce-op':{start:.8,connectDuration:.5,events:outputs},
       'source-debounce':{start:1.3,connectDuration:.5,events:inputs},
       ...Object.fromEntries(runs.map(run=>['inner-'+run.index,{start:run.born,connectDuration:searchTiming.connect,
-        events:[{at:run.response,arrival:run.response+searchTiming.travel,logicalAt:run.response/searchTiming.scale,value:run.value,color:run.color}],
-        end:{at:run.complete,logicalAt:run.complete,kind:'complete',duration:searchTiming.terminal}}])),
+        events:[{at:run.response,arrival:run.response+searchTiming.travel,logicalAt:run.response/searchTiming.scale,value:searchResultValue(run),color:run.color}],
+        end:{at:run.end,logicalAt:run.end,kind:'complete',duration:searchTiming.terminal}}])),
     },
     activities:[...inputs.map(v=>({node:'source',at:v.at,until:v.arrival})),
       ...runs.flatMap(run=>[{node:'debounce',at:run.input[0].arrival,until:run.output.arrival},
-        {node:'op',at:run.born,until:run.connected},{node:'op',at:run.response+searchTiming.travel,until:run.received}])],
+        {node:'op',at:run.output.arrival,until:run.connected},{node:'op',at:run.response+searchTiming.travel,until:run.received}])],
   };
-  configureHttpWorkPanel(graph,{...scene,rows:[{events:[]}],operatorName:'switchMap',jobs:runs.map(run=>({...run,dur:searchTiming.request}))},frame,
+  configureHttpWorkPanel(graph,{...scene,rows:[{events:[]}],operatorName:'switchMap',jobs:runs.map(run=>({...run,dur:run.duration}))},frame,
     {tiles:[['source',175,310,'#8FC9D4'],['debounce',525,326,'#D8B3E6'],['op',837.5,235,'#D8B3E6']],
       edge:i=>'inner-'+runs[i].index,stages:i=>[{column:'source',edge:'inner-'+runs[i].index,progress:true}],panelOptions:{maxVisibleRows:3}});
   configureQueryWorkLook(graph,scene,frame,runs);
   const observer=graph.nodes.find(node=>node.id==='observer');
   Object.assign(observer,{x:1103.5,w:233});
-  // Wiersze głównego diagramu rezerwują całą wysokość przed animacją subscribe.
+  observer.inbox.label='';
+  // Wiersze i porty rezerwują pełne miejsce przed subskrypcją.
   for(const node of graph.nodes.filter(n=>['source','debounce','op','observer'].includes(n.id))){
     node.growRows=false;
     node.laneRows=[{subscriber:'S1',top:node.top+node.defH,h:node.rowH,growth:1,color:'#7457D9',tint:'#EDE6F8'}];
     node.labelOffset=-node.h/2+node.defH/2;
   }
   const laneY=observer.y;
-  graph.trays=[{anchor:'observer',x:observer.x+40,y:laneY,w:90,balls:true,max:1,ball:graph.ball}];
+  graph.trays=[{anchor:'observer',x:observer.x+25,y:laneY,w:90,balls:true,max:1,ball:graph.ball}];
   graph.readouts=[queryInputReadout(graph,scene,time=>{
-    const index=searchIndexAt(time),input=searchInputsAt(index);
-    return input.filter(v=>v.at<=time).at(-1)?.value||(index?searchRunAt(index-1).value:'');
+    const index=searchIndexAt(time),series=searchSeriesAt(index);
+    const last=series.values.findLastIndex((_,i)=>series.first+i*searchTiming.key*searchTiming.scale<=time);
+    return last>=0?series.values[last]:index?debounceSearchRunAt(index-1).value:'';
   })];
   return graph;
 }

@@ -172,7 +172,7 @@ root.addEventListener('keydown',event=>{
 });
 paint();
 const api={subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener);},pause,cleanup,play,playTo,playContinuously,toggle,step,finishStep,reset:restart,restart,seek,
-get navigation(){return scene.playback?.navigation;},get stillTime(){return scene.playback?.stillTime;},
+get navigation(){return scene.playback?.navigation;},get startOnNext(){return scene.playback?.startOnNext;},get stillTime(){return scene.playback?.stillTime;},
 get resetOnExit(){return Boolean(scene.playback?.resetOnExit);},finish:()=>{
  if(scene.playback?.stillTime!==undefined){seek(scene.playback.stillTime);return;}
  // „Pokaż wynik” w trakcie emisji anuluje bieżące wykonanie; druk i READY — umowna chwila defaultClose.

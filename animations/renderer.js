@@ -212,12 +212,13 @@ function innerInstancesPanel(panel,frame,reduced=false) {
     });
     // Inner subscriber: pełny lane jak odbiorca główny — pasek koloru pracy, ikona, „inner #n”, odebrana wartość, status.
     const receiver=row.receiver||{state:'active'},iconSize=panel.inboxSize||25,unsubscribed=receiver.state==='cancelled';
-    const labelSize=font*.75,iconX=receiverX+bar+16,valueX=receiverX+195;
+    const iconX=receiverX+bar+16,valueX=receiverX+(panel.receiverValueOffset??195),labelX=iconX+iconSize+8*k;
+    const labelSize=panel.idFit?Math.min(font*.75,(valueX-ballWidth(row.receiver?.value??'',ballSize)/2-12-labelX)/(('inner '+row.id).length*.62)):font*.75;
     svg+=`<g data-inner-receiver="${esc(row.id)}" data-receiver-state="${receiver.state}"><title>${esc('inner '+row.id+' · '+row.value+' · '+receiver.state)}</title>`;
     svg+=`<rect x="${receiverX}" y="${lane}" width="${receiverW}" height="${h}" fill="${fills[receiver.state]||'#EDE6F8'}"/>`+flash(receiver.state,receiver.since,receiverX,lane,receiverW);
     svg+=`<rect x="${receiverX}" y="${lane}" width="${bar}" height="${h}" fill="${unsubscribed?'#808890':row.color}"${unsubscribed?' opacity=".45"':''}/>`;
     svg+=`<path d="M${receiverX} ${lane}H${receiverX+receiverW}" stroke="#26343d" stroke-opacity=".3" stroke-width="1"/>`;
-    svg+=inboxIcon(iconX,cy,iconSize)+text(iconX+iconSize+8*k,cy,'inner '+row.id,labelSize,'style="text-anchor:start;font-weight:700;fill:#43525b"');
+    svg+=inboxIcon(iconX,cy,iconSize)+text(labelX,cy,'inner '+row.id,labelSize,'style="text-anchor:start;font-weight:700;fill:#43525b"');
     if(receiver.value!==undefined) {
       const shown=reduced?1:clamp((frame.time-receiver.valueAt)/.3);
       svg+=ball(valueX,cy,receiver.value,row.color,ballSize,1,`data-inner-received="${esc(receiver.value)}" opacity="${shown.toFixed(3)}"`);
@@ -476,7 +477,7 @@ export function renderScene(frame,options={}) {
     // dopóki ten nie skończy fade-in (bez mignięcia ikony i litery przy subscribe).
     if(n.inbox?.ready&&!(n.laneStates||[]).some(lane=>lane.role==='receiver'&&lane.opacity>=1)) {
       const x0=n.x-n.w/2+n.inbox.left,y=n.defH?n.top+n.defH+n.rowH/2:n.y;
-      svg+=inboxIcon(x0,y,n.inbox.size)+text(x0+n.inbox.size+8*k,y,n.inbox.label||n.subscriber,n.inbox.font,
+      svg+=inboxIcon(x0,y,n.inbox.size)+text(x0+n.inbox.size+8*k,y,n.inbox.label??n.subscriber,n.inbox.font,
         'style="font-weight:700;fill:#43525b;text-anchor:start"');
     }
     for(const lane of n.laneStates||[]) {
@@ -509,7 +510,7 @@ export function renderScene(frame,options={}) {
             svg+=`<rect data-lane-timer="${+lane.timer.progress.toFixed(4)}" x="${left}" y="${timerRow.top}" width="${w}" height="${h}" fill="${lane.progressFill||lane.fill||lane.color}"/>`;
             if(lane.timer.progress>0)svg+=`<rect x="${left+w-3*k}" y="${timerRow.top}" width="${3*k}" height="${h}" fill="${lane.color}"/>`;
           }
-          svg+=text(n.x-n.w/2+80*k,lane.y,lane.timer.text,22*k,`data-lane-timer-text="true" style="text-anchor:start;font-weight:${lane.timer.active?700:500};fill:${lane.timer.active?'#26323B':'#7A858C'}"`);
+          svg+=text(n.x-n.w/2+(n.laneTimer.textInset??80)*k,lane.y,lane.timer.text,22*k,`data-lane-timer-text="true" style="text-anchor:start;font-weight:${lane.timer.active?700:500};fill:${lane.timer.active?'#26323B':'#7A858C'}"`);
         }
         // Wiersz operatora: sama litera toru; stan niesie tło wiersza.
         if(lane.label&&!rows.some(row=>row.subscriber===lane.subscriber&&row.label))svg+=text(chipLeft+(hubInputs.length&&n.hubFan!==false?18:6)*k,lane.y,lane.label,24*k,`style="font-weight:700;fill:${lane.labelColor||'#43525b'};text-anchor:start"`);
@@ -543,7 +544,8 @@ export function renderScene(frame,options={}) {
         // Kompaktowy odbiorca: ikona inbox i identyfikator toru; odebrane wartości rysuje historia (kulki).
         const size=n.inbox.size,x0=n.x-n.w/2+n.inbox.left;
         svg+=inboxIcon(x0,lane.y,size);
-        if(lane.label)svg+=text(x0+size+8*k,lane.y,lane.label,n.inbox.font,`style="font-weight:700;fill:${lane.labelColor||'#43525b'};text-anchor:start"`);
+        const label=n.inbox.label??lane.label;
+        if(label)svg+=text(x0+size+8*k,lane.y,label,n.inbox.font,`style="font-weight:700;fill:${lane.labelColor||'#43525b'};text-anchor:start"`);
         svg+=laneTerminalLabel(n,lane,k,frame,reduced);
       } else if(!inRow)svg+=laneIcon(n.x+n.w/2-30*k,n.y+n.h/2-30*k,lane,k,frame.time);
       svg+='</g>';

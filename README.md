@@ -23,9 +23,9 @@ Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTR
 
 Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przywraca ekran panoramiczny 1280×720. `W` przeładowuje stronę w drugim formacie, zostając na tym samym slajdzie i fragmencie; animacja wraca do stanu tego fragmentu. Linki do EXTRAS i powrót do pytań zachowują wybrany format. Druk działa w obu: `?print-pdf` (4:3) lub `?print-pdf&ratio=16:9`. W 4:3 slajdy wykorzystują pełną wysokość: większe zdjęcia i kody QR, wyższe diagramy, większy tekst i kapsułki w animacjach (×1,15), etykiety kafelków do ×1,3 oraz większy tytuł (64 px; za długi zmniejsza się, by został w jednej linii), kod (42 px, długi łańcuch przechodzi do nowej linii przed .pipe/.subscribe) i podpis.
 
-Wyjątek MAIN: `12a-switchmap-live` po slajdzie źródła query$ startuje sam i bez końca pokazuje pisanie query oraz anulowanie HTTP. „Ręczny · M” dotyczy ręcznego przejścia między slajdami: prawo/Page Down/pilot przechodzą od razu do debounceTime, lewo wraca do slajdu źródła query$. Spacja pauzuje/wznawia, R restartuje pokaz; powrót na slajd zaczyna od #1. Druk, F i podgląd Upcoming pokazują nieruchomy kadr #3/#4 anulowane i #5 aktywny.
+`12a-switchmap-live` („Wybór operatora”) po slajdzie źródła query$ czeka z ukrytą nazwą operatora. Pierwsze prawo/Page Down/pilot odsłania switchMap i uruchamia ciągły pokaz; kolejne przechodzi do debounceTime. Lewo wraca do źródła query$. Spacja uruchamia lub pauzuje/wznawia, R i ponowne wejście przywracają zamaskowany READY. Badge pozostaje „Ręczny · M”, dopóki prelegent nie zmieni trybu. Druk, F i Upcoming pokazują #2 zakończony, #3 anulowany i #4 aktywny.
 
-`12b-debounce-switchmap` kontynuuje wyszukiwarkę: także startuje sam i działa do ręcznego przejścia dalej. Pokazuje pisanie z pauzami, odliczanie 300 ms (ilustracja spowolniona 5×) i udane HTTP, w tym kolejne requesty dla tej samej frazy. Prawo prowadzi do distinctUntilChanged, lewo do switchMap na żywo. Spacja, R i reset po powrocie działają jak na poprzednim pokazie. Druk, F i Upcoming pokazują dwa zakończone HTTP dla `rea`, liczniki 5/2/0.
+`12b-debounce-switchmap` kontynuuje wyszukiwarkę: ręczne etapy pokazują subskrypcję, timer, pierwszy HTTP i pisanie podczas requestu. Do drugiej emisji debounceTime (`react`) prawo odtwarza etap, a ponowne prawo w ruchu kończy bieżący. Od drugiego HTTP pokaz płynie bez końca, a prawo od razu prowadzi do distinctUntilChanged. Wszystkie HTTP kończą się sukcesem i complete inner; główny pipeline nadal działa. Lewo cofa do ręcznego postoju, Spacja pauzuje/wznawia, R i ponowne wejście przywracają zatrzymany początek. Druk, F i Upcoming pokazują trzy zakończone HTTP, liczniki 14/3/0.
 
 ## Jak czytać spis
 
@@ -563,26 +563,30 @@ Kod rysuje standardowy odtwarzacz: kolory składni, pastelowe marki źródła/ma
 - **ready — 0 — Źródło i odbiorcy:** Skąd bierze się query$? Na razie mamy tylko definicję fromEvent i pusty input. Dwa pola odbiorców są widoczne, ale nikt jeszcze nie subskrybuje: nie ma portów, przewodów ani emisji. Dalej dodaje map.
 - **map — 1 — Wyciągamy tekst:** Dopisujemy .pipe(map(() => inputEl.value.trim())). inputEl ma typ HTMLInputElement; map odczyta value i usunie białe znaki. Kafelek map pojawia się razem z kodem. To nadal tylko definicja, bez subskrypcji i danych. Dalej dodaje share.
 - **share — 2 — Wspólne źródło:** Dopisujemy share() i pokazujemy jego kafelek. Współdzielimy jedno źródło i jedno wykonanie map między podglądem query a wyszukiwarką. Dalsze prawo szybko podłączy obu odbiorców i jedyny upstream, a potem uruchomi pisanie.
-- **live — 3 — Subskrypcja i dane:** A szybko subskrybuje przez share i map do fromEvent; B dołącza do share bez drugiej subskrypcji źródła. Dopiero teraz input wpisuje a → an → ang → angu → angul → angula → angular, czeka, kasuje litery do pustego tekstu i powtarza. map zamienia zdarzenie na tekst, share rozdziela tę samą kapsułkę do obu odbiorców. Pusty string to "". Przeloty spowalniają ilustrację, nie rzeczywiste operatory. Spacja pauzuje, lewo wraca do etapu share, R do początkowej definicji. Prawo przechodzi do switchMap; wyjście odłącza subskrypcje i zatrzymuje zegar bez animacji. Powrót zaczyna od READY.
-- **finished — 4 — Gotowe query$:** Druk, F i Upcoming pokazują pełny pipeline i angular u obu odbiorców. Mamy gotowy strumień tekstu. Na następnym slajdzie podłączymy wyszukiwarkę do switchMap i zobaczymy na żywo, jak nowa fraza anuluje poprzedni request.
+- **live — 3 — Subskrypcja i dane:** A szybko subskrybuje przez share i map do fromEvent; B dołącza do share bez drugiej subskrypcji źródła. Dopiero teraz input wpisuje a → an → ang → angu → angul → angula → angular, czeka, kasuje litery do pustego tekstu i powtarza. map zamienia zdarzenie na tekst, share rozdziela tę samą kapsułkę do obu odbiorców. Pusty string to "". Przeloty spowalniają ilustrację, nie rzeczywiste operatory. Spacja pauzuje, lewo wraca do etapu share, R do początkowej definicji. Prawo przechodzi do wyboru operatora; wyjście odłącza subskrypcje i zatrzymuje zegar bez animacji. Powrót zaczyna od READY.
+- **finished — 4 — Gotowe query$:** Druk, F i Upcoming pokazują pełny pipeline i angular u obu odbiorców. Mamy gotowy strumień tekstu. Na następnym slajdzie wybierzemy operator: co powinno stać się z poprzednim requestem, gdy przychodzi nowa fraza?
 
-### switchMap na żywo — `12a-switchmap-live`
+### Wybór operatora — `12a-switchmap-live`
 
-**MAIN — po slajdzie źródła query$, przed debounceTime + switchMap.** Tytuł: **switchMap — nowe zapytanie anuluje poprzednie**.
+**MAIN — po slajdzie źródła query$, przed debounceTime + switchMap.** READY jest nieruchomym pytaniem: pusty input, zero requestów i liczniki 0/0/0. Kod:
 
 ```ts
 query$.pipe(
-  switchMap(query => httpGet(url(query)))
+           (query => httpGet(url(query)))
 )
 ```
 
-**Na ekranie:** podłączony pipeline query$ → switchMap → S1, kapsułka tekstu z kursorem przy źródle i trzy ostatnie inner HTTP pod separatorem. Kod ma kolorowanie składni oraz lawendową markę operatora i turkusową markę wywołania HTTP; aktywne bloki i fragmenty kodu podświetlają się zgodnie ze zdarzeniami.
+Pierwsze dalej jednocześnie wypełnia puste wyróżnienie kodu i pusty nagłówek operatora nazwą **switchMap**, mocno wyróżnia operator w kodzie i uruchamia pokaz. Miejsce na nazwę jest zarezerwowane, więc kod nie przeskakuje. Góra: turkusowy query$ z inputem → jasnofioletowy operator → bardzo jasnofioletowy odbiorca „wyniki”, bez zbędnych oznaczeń S1. Kremowe tło i czarny serifowy tytuł pasują do prezentacji. Bloczki mają identyczny płaski wygląd jak na slajdzie debounceTime: nagłówek, prostokątny execution lane i boczny pasek; bez dodatkowych ikon pracy i zaokrąglonych wnętrz.
 
-**Przebieg:** emisje r → re → rea → reac → react co 1,4 s, potem zastąpienie tekstu kolejnym r. Każde query anuluje poprzedni request (szary ×, „anulowane”, „× odłączono”), zanim wystartuje nowy. Aktywny HTTP pokazuje „w trakcie”; nie ma odpowiedzi ani complete. Przed czwartym innerem najstarszy wiersz znika, dwa pozostałe przesuwają się w górę, nowy pojawia się na dole. Także w przejściu widać najwyżej trzy wiersze. Numery i liczniki „wejścia”, „requesty HTTP”, „aktywne” rosną bez resetu cyklu; aktywne ≤ 1.
+**Przebieg:** r → re → rea → react; HTTP #1/#3 anulowane, #2/#4 udane. Potem dalsze edytowanie: reac → rea → re → red → redu → redux → redu → red → re → r → rx → rxj → rxjs → rxj → rx → r. Kolejne cykle zaczynają od re. Odstępy naprzemiennie 1,4/4,8 s; praca HTTP 2 s. Krótki odstęp powoduje szary × i „anulowane”, dłuższy pozwala dostarczyć wynik do głównego odbiorcy oraz zakończyć inner zielonym complete. Główny pipeline pozostaje aktywny; ostatni udany wynik zostaje do następnej odpowiedzi.
 
-**Stopka:** Każde nowe query anuluje poprzedni request i uruchamia nowy.
+Frazy lecą w badge’ach ze slajdu źródła query$: stały font 30, szerokość dopasowana do tekstu. HTTP emituje tablicę oznaczoną numerem wykonania, np. `[#2]` lub `[#32]`, która trafia do inner subscribera i głównego odbiorcy. Fraza pozostaje etykietą wejścia requestu.
 
-**Speaker notes:** użytkownik szybko pisze; switchMap odłącza poprzedni inner, ale S1 nadal słucha. Anulowanie klienta nie cofa operacji na serwerze. Pokaz trwa do ręcznego przejścia dalej. Następny krok: ograniczyć liczbę requestów — poczekać 300 ms ciszy dzięki debounceTime.
+Pod separatorem najwyżej trzy pełne wiersze HTTP GET → inner subscriber. Nowy request dochodzi na dole; najstarszy znika przed przesunięciem pozostałych. Anulowane nie emitują wyniku ani complete. Numery i liczniki „wejścia”, „requesty HTTP”, „aktywne” rosną bez resetu; aktywne ≤ 1.
+
+**Stopka:** Każde nowe query może przerwać poprzedni request i uruchomić nowy.
+
+**Sterowanie i notatki:** READY daje chwilę na odpowiedź sali. Pierwsze dalej odsłania operator i uruchamia pokaz, kolejne zmienia slajd. Spacja pauzuje/wznawia, R i powrót przywracają pytanie. Lewo wraca do źródła query$. Notatki `ready`, `revealed`, `finished` opisują pytanie, pokaz i nieruchomy kadr (#2 completed, #3 cancelled, #4 active, 4/4/1, tablica [#2] dla re). Anulowanie klienta nie cofa operacji na serwerze. Następny krok: poczekać 300 ms ciszy dzięki debounceTime.
 
 ### debounceTime — czekamy na ciszę — `12b-debounce-switchmap`
 
@@ -594,15 +598,15 @@ query$.pipe(
   switchMap(query => httpGet(url(query))))
 ```
 
-**Na ekranie:** query$ → debounceTime → switchMap → S1, ten sam mały input z kursorem i te same pełne wiersze HTTP GET → inner co na poprzednim slajdzie. Pipeline ma stałą geometrię od wejścia; subscribe biegnie od S1 w lewo. Kod ma trzy linie: query$ i HTTP turkusowe, oba operatory fioletowe, z aktywnymi wyróżnieniami zgodnymi z diagramem. W lane debounceTime jest kulka ostatniej wartości i resetujący się pasek z pozostałym czasem w ms. Pod separatorem najwyżej trzy ostatnie rzeczywiste requesty.
+**Na ekranie:** mniejszy serifowy tytuł wysoko, trzy linie kodu i pipeline query$ → debounceTime → switchMap → odbiorca z ikoną inbox, bez etykiety S1. Wspólny input i badge fraz ze źródła query$, tablice wyników z numerami HTTP (np. [#1]). Kod i odpowiadające mu bloczki podświetlają się razem. Timer pokazuje pozostały czas tylko podczas odliczania; poza nim nie ma kreski. Stała geometria i maksymalnie trzy ostatnie pełne wiersze HTTP GET → inner, bez placeholderów.
 
-**Przebieg:** pierwsza seria r → re → rea, potem re → rea, następnie cykl reac → react, reac → react, reac → rea, re → rea. Każda seria kończy się ciszą i jednym HTTP. Czasy modelu: zmiana co 100 ms, debounce 300 ms; ilustracja 5× wolniejsza (0,5 s / 1,5 s), z osobnymi przelotami komunikacji. Pośrednie wartości zastępują pamięć i resetują timer, nie trafiają do switchMap. Dopiero po ciszy powstaje inner i subskrypcja uruchamia HTTP. Wynik dociera do S1, complete kończy tylko inner. Każdy request kończy się przed następną serią; główna subskrypcja pozostaje aktywna.
+**Przebieg:** r/re/rea → reac/react → wyczyszczenie/r/re/rea → wyczyszczenie/a/an/ang/angu → angul/angula/angular. Potem cykl od wyczyszczenia i ponownego rea, bez końca. Każda zmiana emituje wejście; pusta i pośrednie wartości zostają zastąpione przed ciszą. Litery co 100 ms modelu, debounce 300 ms; ilustracja 5× wolniejsza (0,5 s / 1,5 s), z osobnymi przelotami. Każda zmiana resetuje timer. Sama cisza bez nowej zmiany nie powtarza emisji.
 
-Pokaz działa bez końca. Wyjścia debounce: rea, rea, react, react, rea, rea… — powtórzenie nadal uruchamia nowy HTTP. Sama cisza bez nowej emisji nie powtarza requestu. Numery i liczniki wejścia/requesty HTTP/aktywne rosną bez resetu; aktywne 0 albo 1. Po drugim requestcie: 5/2/0. Najstarsze wiersze ustępują miejsca nowym, bez pustych requestów.
+Kolejne pisanie zaczyna się 1 s po uruchomieniu poprzedniego HTTP. Request trwa 2 s i zdąży dostarczyć wynik oraz complete inner przed kolejną emisją debounce. Wszystkie HTTP kończą się sukcesem, bez error i anulowania. Główna subskrypcja pozostaje aktywna. Numery requestów, wyniki [#N] i liczniki rosną przez kolejne cykle bez resetu.
 
-**Stopka:** Czekamy 300 ms ciszy. Ta sama fraza może uruchomić kolejny request.
+**Sterowanie:** postoje subscribed, buffered, request-1, typing, complete-1. Następne prawo odtwarza drugą emisję react i uruchamia ciągły pokaz (request-2): od tej chwili nie ma dalszych postojów. Ponowne prawo w trakcie przejścia kończy wprowadzenie i zaczyna emisje. Prawo podczas ciągłych emisji od razu zmienia slajd, także przy pauzie. Lewo cofa do complete-1, Spacja pauzuje/wznawia, R i ponowne wejście resetują do zatrzymanego READY. AUTO może odtworzyć całe wprowadzenie bez postojów i kontynuuje bez końca. F, druk i Upcoming pokazują nieruchomy kadr po trzecim udanym HTTP: #1 rea, #2 react, #3 rea, input angu, wynik [#3], liczniki 14/3/0. Notatki per checkpoint, request-2 opisuje cały pokaz ciągły.
 
-**Speaker notes:** pokaż resety timera i brak HTTP podczas pisania. Następnie zwróć uwagę na HTTP #1 i #2 dla rea: debounceTime czeka na ciszę, ale nie porównuje kolejnych wyników. Kolejny krok wyszukiwarki to distinctUntilChanged() po debounceTime, przed switchMap; następny slajd tłumaczy porównywanie na prostym przykładzie ID. Pokaz trwa do ręcznego przejścia dalej.
+**Stopka:** debounceTime przepuszcza wartość dopiero po chwili ciszy. Ta sama fraza może uruchomić request ponownie.
 
 ### distinctUntilChanged przed switchMap — `11a-distinct-switchmap`
 

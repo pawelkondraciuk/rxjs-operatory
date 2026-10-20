@@ -91,6 +91,18 @@
 [data-ratio="16-9"] .rx-player.rx-switchmap-live .rx-code { font-size:24px; }
 [data-ratio="16-9"] .rx-player.rx-switchmap-live .rx-caption { font-size:21px; }
 [data-ratio="16-9"] .rx-player.rx-switchmap-live .rx-metric { font-size:17px; }
+/* Odsłonięcie operatora: ta sama szerokość kodu przed kliknięciem i po nim. */
+.rx-player.rx-operator-choice [data-mark="switch"] { display:inline-block; width:9ch; }
+.reveal .animation-slide.rx-operator-choice-slide h2 { color:#111; height:110px; }
+.rx-player.rx-operator-choice { grid-template-rows:132px 608px 100px; height:840px; }
+[data-ratio="16-9"] .reveal .animation-slide.rx-operator-choice-slide h2 { height:76px; }
+[data-ratio="16-9"] .rx-player.rx-operator-choice { grid-template-rows:92px 460px 82px; height:634px; }
+/* Debounce: kompaktowy tytuł wysoko, potem trzy linie kodu i pełne tory wykonania. */
+.reveal .animation-slide.rx-debounce-search-slide h2 { height:96px; font-size:52px; color:#111; font-family:'Palatino Linotype','Book Antiqua',Palatino,Georgia,'Times New Roman','Liberation Serif',serif; }
+.rx-player.rx-debounce-search { grid-template-rows:132px 608px 110px; height:850px; }
+[data-ratio="16-9"] .reveal .animation-slide.rx-debounce-search-slide h2 { height:76px; font-size:40px; }
+[data-ratio="16-9"] .rx-player.rx-debounce-search { grid-template-rows:104px 436px 72px; height:612px; }
+[data-ratio="16-9"] .rx-player.rx-debounce-search .rx-code { font-size:26px; }
 .rx-stepped .rx-scrub { min-width:160px; }
 .rx-stepped .rx-hide { margin-left:auto; }
 .reveal.overview .rx-step-mode { display:none; }

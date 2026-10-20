@@ -333,7 +333,7 @@ export function compileScene(scene) {
     });
   }
   // Środek kulki pamięci: tuż przed portem wyjścia, w odległości jak kulka czekająca przy porcie.
-  function memorySlot(n){return n.x+n.w/2-(graph.ball?.r??25)-18;}
+  function memorySlot(n){return n.laneTimer?.memoryX??n.x+n.w/2-(graph.ball?.r??25)-18;}
   // Ułamek przejazdu transformBalls, w którym kulka mija x: wyjazd od środka do prawej krawędzi w ostatnich 30%
   // (smoothstep), więc odwracamy smoothstep: u = 1/2 − sin(asin(1 − 2f)/3).
   function transformPassAt(n,x) {
@@ -354,7 +354,7 @@ export function compileScene(scene) {
     }
     // timeScale: sekundy ilustracji przeliczone na sekundy modelu (np. 5×, prezentacja w ms).
     // Bez opcji pozostaje dotychczasowy zegar modelu, zatrzymywany na czas przelotów.
-    const {kind,period,label,timeScale,unit}=n.laneTimer,scaled=timeScale!==undefined;
+    const {kind,period,label,timeScale,unit,empty='—'}=n.laneTimer,scaled=timeScale!==undefined;
     const logical=scaled?time/timeScale:plan.logicalTime(time),startOf=e=>scaled?e.arrival/timeScale:e.logicalAt;
     const arrived=(input?.events||[]).filter(e=>e.arrival<=time);
     let open=null;
@@ -371,7 +371,7 @@ export function compileScene(scene) {
     const keep=active&&stored&&!out.events.some(v=>(scaled?v.at/timeScale:v.logicalAt)>=startOf(stored)&&v.at<=time);
     const remainingText=unit==='ms'?Math.round(remaining*1000)+' ms':remaining?.toFixed(1).replace('.',',')+' s';
     return {timer:{label,progress:active?clamp((logical-open.start)/period):0,active:Boolean(active),
-      text:(label?label+': ':'')+(active?remainingText:'—'),since:active?open.start:undefined},
+      text:(label?label+': ':'')+(active?remainingText:empty),since:active?open.start:undefined},
       memory:{label:n.laneTimer.memory??'pamięć',empty:'—',...(ball?{ball:true,x:memorySlot(n)}:{}),
         ...(keep?{value:ball?stored.value:open.value,color:ball?stored.color||'a':open.color,since:stored.arrival+(ball?storeMove:0)}:{})}};
   }
@@ -712,7 +712,7 @@ export function compileScene(scene) {
     const reveal=codeReveals.find(frame=>frame.index===codeIndex)||codeReveals.find(frame=>frame.index===codeIndex+1);
     return {id:scene.id,title:scene.title,code:codeFrames.filter(frame=>frame.at<=time).at(-1)?.code??scene.code,...(scene.codeSyntax?{codeSyntax:true}:{}),
       ...(reveal?{codeReveal:{prefix:reveal.prefix,suffix:reveal.suffix,opacity:clamp((time-reveal.at)/reveal.duration)}}:{}),
-      ...(codeLines.length?{codeView:codeLines.map(line=>line.map(({text,mark,shownAt,hiddenAt,activeIntervals})=>({text,mark,
+      ...(codeLines.length?{codeView:codeLines.map(line=>line.map(({text,mark,shownAt,hiddenAt,activeIntervals})=>({text:evaluate(text,time),mark,
         opacity:Math.min(shownAt?clamp((time-shownAt)/fadeDuration):1,hiddenAt===undefined?1:1-clamp((time-hiddenAt)/fadeDuration)),active:activeIntervals.some(([from,to])=>time>=from&&time<to)})))}:{}),
       width,height,textScale:graph.textScale??textScaleFor(scene),labelScale:graph.labelScale??labelScaleFor(scene),time,logicalTime,nodes:nodeStates,edges:edgeStates,tokens,histories,
       panels:(graph.panels||[]).map((panel,i)=>panelShownAt[i]===undefined?panel:{...panel,shownAt:panelShownAt[i],visible:time>=panelShownAt[i]}),cards:scene.kind==='cards'?scene.items:[],caption:captionAt(captions,time),
