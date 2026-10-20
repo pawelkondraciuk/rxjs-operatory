@@ -481,8 +481,16 @@ export function compileScene(scene) {
     const bottom=n.top+n.defH+laneRowsOf(n,time).reduce((sum,row)=>sum+row.growth*n.rowH,0);
     const y=bottom+gap+h/2,ball={x:n.x+n.w/2-pad-r-(b.inset??10),y};
     const splits=splitsOf(n),inputs=laneRecords.filter(rec=>rec.b.id===n.id).flatMap(rec=>rec.events);
+    // clears (opt-in, np. shareReplay z refCount przy refCount = 0): od tej chwili wcześniejsze wartości znikają
+    // (kurczą się i gasną jak wartość bez odbiorcy), kieszeń zostaje pusta do kolejnego zapisu.
+    const clearOf=v=>(b.clears||[]).filter(at=>at>=v.shownAt).sort((x,y)=>x-y)[0];
     const stored=inputs.map(e=>({value:e.value,color:e.color||'a',shownAt:splits.find(sp=>sp.value===e.value&&sp.arrival===e.arrival)?.departure??e.arrival}))
-      .filter(v=>v.shownAt<=time).sort((a,b)=>a.shownAt-b.shownAt).slice(-(b.size||1));
+      .filter(v=>v.shownAt<=time).flatMap(v=>{
+        const cleared=clearOf(v);
+        if(cleared===undefined||time<cleared)return [v];
+        const p=(time-cleared)/dropDuration;
+        return p<1?[{...v,opacity:1-p,scale:1-.4*p}]:[];
+      }).sort((a,b)=>a.shownAt-b.shownAt).slice(-(b.size||1));
     return {x:n.x,y,w:n.w,h,label:b.label??'bufor',ball,values:stored};
   }
   // Odtworzenia z bufora: wartości wyjścia z replayHold bez odpowiadającego wejścia (logicalAt) — kulka wyjeżdża z kieszeni.

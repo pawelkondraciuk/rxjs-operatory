@@ -128,10 +128,10 @@ test('print and restore: stable frames with defaults; deterministic snapshots in
  assert.equal(printed.player.state,'finished');assert.equal(printed.player.live.stage,3);
 });
 
-test('placed between share() late receiver and shareReplay refCount: true; notes cover every checkpoint',async()=>{
+test('placed between share() late receiver and shareReplay refCount: true on interval; notes cover every checkpoint',async()=>{
  const {scene:s}=await scene(),{mainOrder}=(await modules(['scene-config']))['scene-config'];
  const i=mainOrder.indexOf(id);
- assert.deepEqual([mainOrder[i-1],mainOrder[i+1]],['20-sharereplay','20-sharereplay-2']);
+ assert.deepEqual([mainOrder[i-1],mainOrder[i+1]],['20-sharereplay','20b-sharereplay-refcount']);
  const html=fs.readFileSync('index.html','utf8');
  const source=html.match(new RegExp(`<template data-checkpoint-notes="${id}">([\\s\\S]*?)</template>`))[1];
  assert.deepEqual(Array.from(source.matchAll(/data-checkpoint="([^"]+)"/g),x=>x[1]),['ready',...s.playback.stops.map(x=>x.id),'finished']);

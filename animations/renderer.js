@@ -515,7 +515,8 @@ export function renderScene(frame,options={}) {
       svg+=text(x0+16*k,b.y,b.label,20*k,'style="text-anchor:start;fill:#65566C;font-weight:700"');
       svg+=`<circle cx="${b.ball.x}" cy="${b.ball.y}" r="${size.r}" fill="none" stroke="#B384C6" stroke-width="2" stroke-dasharray="6 5"/>`;
       // Zapisana kulka pojawia się dokładnie tam, gdzie dojechał token zapisu, więc bez fade-in.
-      for(const v of b.values)svg+=ball(b.ball.x,b.ball.y,v.value,v.color,size,1,'data-token="buffered"');
+      for(const v of b.values)svg+=ball(b.ball.x,b.ball.y,v.value,v.color,size,v.scale??1,
+        'data-token="buffered"'+(v.opacity===undefined?'':` data-buffer-clear="true" opacity="${v.opacity.toFixed(3)}"`));
       svg+='</g>';
     }
     // Wspólna kulka pamięci huba (replayMemory, np. shareReplay(1)): wygląd jak pamięć distinctUntilChanged; pusta — nic,

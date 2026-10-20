@@ -1129,6 +1129,155 @@ export function shareReplayOneGraph(scene) {
   };
 }
 
+// shareReplay({ bufferSize: 1, refCount: true }) na interval (MAIN 20b-sharereplay-refcount, po 20a): ten sam wygląd
+// i bufor, scena na żywo. Pierwsze „dalej” — A subskrybuje i ruszają emisje (#1). Akcje: B — pauza animacji (interval
+// na chwilę nie emituje; wartość w drodze dojeżdża do bufora), potem B subskrybuje i dostaje wartość z bufora; resume —
+// emisje wracają do A i B; unsub-all — subA/subB.unsubscribe() co 1 s: refCount = 0, więc shareReplay od razu robi reset
+// (RxJS 7.8.2: share z resetOnRefCountZero) — bufor znika i × biegnie do interval; C — nowy ReplaySubject (pusty bufor)
+// i nowa subskrypcja interval (#2) liczy od 0; unsub-C — ponownie reset i odłączenie #2, scena staje się skończona.
+// Każda akcja zaczyna się najwcześniej po animacji poprzedniej (szybkie „dalej” nie miesza etapów).
+const shareReplayRefTiming={...shareReplayOneTiming,sequence:1,resumeBusy:.3,bufferShown:.3,stopTail:1,defaults:[7,12.5,17,23,30]};
+const shareReplayRefActions=['B','resume','unsub-all','C','unsub-C'];
+export function configureShareReplayRefCount(scene) {
+  const t=shareReplayRefTiming,start=t.subscribeA+2*t.link+t.first;
+  Object.assign(scene,{graph:shareReplayRefGraph,playerLayout:'function',ink:'#26323B',playerClass:'rx-flat-tiles',
+    title:'shareReplay z refCount: kiedy znika bufor?',
+    rows:[R('interval(1000) #1'),R('interval(1000) #2'),R('shareReplay'),R('Odbiorca A'),R('Odbiorca B'),R('Odbiorca C')],
+    live:{start,window:t.window,keep:t.keep,margin:t.margin,defaultClose:0,actions:shareReplayRefActions,defaults:t.defaults,
+      actionGap:t.actionGap,settle:t.settle,variant:shareReplayRefVariant}});
+  // Postoje to stabilne kadry umownej osi defaults (hash, notatki, druk), liczone z tego samego wariantu.
+  const ref=shareReplayRefVariant(scene,{from:0,to:t.window,closedAt:null,actions:t.defaults}),p=ref.shareReplayRefPlan;
+  scene.live.defaultClose=ref.duration;
+  scene.playback={entry:'manual',finish:'hold',live:true,stops:[{id:'subscribed-a',time:start},
+    {id:'subscribed-b',time:p.busy[0]+.4},{id:'resumed',time:p.delivered(p.resumeAt+t.first)+.4},{id:'unsub-all',time:p.busy[2]+.4},
+    {id:'subscribed-c',time:(p.runs[2].events[0]?p.delivered(p.runs[2].events[0].at):p.busy[3])+.4},{id:'unsub-c',time:p.busy[4]}]};
+  Object.assign(scene,shareReplayRefVariant(scene,{from:0,to:t.window,closedAt:null,actions:[]}));
+}
+
+function shareReplayRefVariant(scene,{from,to,closedAt,actions=[]}) {
+  const t=shareReplayRefTiming,closed=closedAt!==null&&closedAt!==undefined,allDone=actions.length>=shareReplayRefActions.length;
+  const horizon=allDone?Infinity:closed?closedAt:to,busy=[];
+  const connectedA=t.subscribeA+t.link,up1=connectedA+t.link;
+  const arrival=at=>at+t.travel,departure=at=>arrival(at)+t.hold,delivered=at=>departure(at)+t.travel;
+  const [pauseCall,resumeCall,leaveCall,joinCall,leaveCCall]=actions;
+  // Emisje do pierwszego argumentu stop (wyłącznie) i horyzontu okna; emit(k) rośnie z k.
+  const list=(emit,stop)=>{const out=[];for(let k=0;;k++){const at=emit(k);if(!(at<stop&&at<horizon))break;out.push({k,at});}return out;};
+  const leave=(run,events,call)=>{
+    if(call===undefined)return {...run,events,unsubscribeAt:null};
+    const last=events.at(-1),until=last?delivered(last.at):run.replay?run.replay.at+t.travel:call,unsubscribeAt=Math.max(call,until);
+    return {...run,events,calledAt:call,unsubscribeAt};
+  };
+  // #1: emisje do pauzy (wartość wyemitowana dokładnie w chwili pauzy jeszcze się liczy), po wznowieniu dalej od kp.
+  const base=k=>up1+t.first+t.period*k;
+  const kp=pauseCall===undefined?Infinity:Math.floor((pauseCall-base(0))/t.period+1e-9)+1;
+  let runB=null;
+  if(pauseCall!==undefined){
+    // B subskrybuje, gdy ostatnia wartość sprzed pauzy jest już w buforze; dostaje ją z kieszeni.
+    const written=departure(base(kp-1)),born=Math.max(pauseCall,written),subscribe=born+t.reveal,connected=subscribe+t.link;
+    runB={id:'B',slot:1,born,subscribe,connected,kFirst:kp,replay:{k:kp-1,at:Math.max(connected+t.replayHold,written+t.replayWait)}};
+    busy.push(runB.replay.at+t.travel);
+  }
+  const resumeAt=resumeCall===undefined?undefined:Math.max(resumeCall,busy[0]);
+  if(resumeAt!==undefined)busy.push(resumeAt+t.resumeBusy);
+  const callA=leaveCall===undefined?undefined:Math.max(leaveCall,busy[1]),callB=callA===undefined?undefined:callA+t.sequence;
+  const e1=list(k=>k<kp?base(k):resumeAt===undefined?Infinity:resumeAt+t.first+t.period*(k-kp),callB??Infinity);
+  const runA=leave({id:'A',slot:0,born:t.subscribeA-t.reveal,subscribe:t.subscribeA,connected:connectedA},
+    e1.filter(e=>arrival(e.at)<(callA??Infinity)),callA);
+  const runs=[runA];
+  if(runB)runs.push(leave(runB,e1.filter(e=>e.k>=kp&&arrival(e.at)<(callB??Infinity)),callB));
+  // refCount = 0: reset, gdy × ostatniego odbiorcy dotrze do shareReplay i ostatnia wysłana wartość jest już w buforze.
+  const resetAt=(leaving,events)=>Math.max(...leaving.map(r=>r.unsubscribeAt+t.cancel),events.length?departure(events.at(-1).at)+t.bufferShown:0);
+  const clear1=callB===undefined?undefined:resetAt(runs,e1);
+  if(clear1!==undefined)busy.push(clear1+t.cancel+t.calloutHold);
+  // C: nowa subskrypcja upstream (#2) po resecie; emisje od 0 do subC.unsubscribe().
+  let up2,e2=[],clear2;
+  const joinAt=joinCall===undefined?undefined:Math.max(joinCall,busy[2]);
+  if(joinAt!==undefined){
+    const subscribe=joinAt+t.reveal,connected=subscribe+t.link;up2=connected+t.link;
+    busy.push(up2+.35);
+    const callC=leaveCCall===undefined?undefined:Math.max(leaveCCall,busy[3]);
+    e2=list(k=>up2+t.first+t.period*k,callC??Infinity);
+    const runC=leave({id:'C',slot:2,born:joinAt,subscribe,connected,upstream:2},e2.filter(e=>arrival(e.at)<(callC??Infinity)),callC);
+    runs.push(runC);
+    if(callC!==undefined){clear2=resetAt([runC],e2);busy.push(clear2+t.cancel+t.calloutHold);}
+  }
+  const finite=clear2===undefined?Infinity:busy[4]+t.stopTail,end=allDone&&closed?finite:closed?closedAt:Math.min(to,finite);
+  const live=(time,r)=>time>=r.connected&&(r.unsubscribeAt===null||time<r.unsubscribeAt+t.cancel);
+  const upstreams=[{at:up1,until:clear1},...(up2===undefined?[]:[{at:up2,until:clear2}])];
+  const [,B,C]=runs;
+  // Kod jak w 20-sharereplay-2; shareReplay świeci od resetu (refCount = 0) do odłączenia interval.
+  const resetMark=(edge,at)=>at===undefined?[]:[{from:{type:'buffer-reset',edge},to:{type:'disconnected',edge}}];
+  const lines=[[{text:'interval(1000)',mark:shareReplayOneMarks.interval},{text:'.pipe('}],
+    [{text:'  '},{text:'shareReplay({ bufferSize: 1, refCount: true })',mark:{...shareReplayOneMarks.op,
+      active:[...resetMark('interval-replay',clear1),...resetMark('interval-replay-2',clear2)]}},{text:')'}]];
+  const caption=[[0,'shareReplay({ bufferSize: 1, refCount: true }) na interval: definicja i pusty bufor'],
+    [t.subscribeA,'A subskrybuje: shareReplay podłącza się do interval (#1)'],
+    [base(0),'interval emituje. shareReplay przekazuje wartość A i zapisuje ją w buforze'],
+    ...(B?[[pauseCall,'Pauza animacji: interval na chwilę nie emituje'],[B.born,'B subskrybuje i od razu dostaje ostatnią wartość z bufora']]:[]),
+    ...(resumeAt!==undefined?[[resumeAt,'interval znowu emituje — te same wartości trafiają do A i B']]:[]),
+    ...(callA!==undefined?[[callA,'A i B się odłączają. Co stanie się z interval i z buforem?'],
+      [clear1,'refCount = 0: shareReplay czyści bufor i odłącza interval']]:[]),
+    ...(C?[[C.born,'C subskrybuje: pusty bufor, nowe połączenie #2 — interval liczy od zera']]:[]),
+    ...(clear2!==undefined?[[C.calledAt,'C się odłącza — znowu refCount = 0'],[clear2,'Bufor wyczyszczony, interval #2 odłączony. Nic nie pracuje w tle']]:[])];
+  return {...scene,duration:end,code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
+    shareReplayRefPlan:{runs,e1,e2,from,up1,up2,connectedA,pauseCall,resumeAt,clear1,clear2,busy,arrival,departure,delivered},
+    liveBusyUntil:busy,
+    metrics:[{label:'Odbiorcy',value:time=>runs.filter(r=>live(time,r)).length},
+      {label:'Upstream',value:time=>upstreams.filter(u=>time>=u.at&&(u.until===undefined||time<u.until+t.cancel)).length}],
+    captions:caption.sort((a,b)=>a[0]-b[0])};
+}
+
+export function shareReplayRefGraph(scene) {
+  const tall=scene.format==='4:3',top=tall?178:102,t=shareReplayRefTiming,p=scene.shareReplayRefPlan;
+  // Kolumny jak w 20a; trzy wiersze odbiorców i kieszeń bufora mieszczą się w 16:9 dzięki niższym wierszom (jak retry).
+  const g={srcX:202,srcW:280,opX:577,opW:330,recvX:995,recvW:366};
+  const L=tall?{defH:laneLook.defH,rowH:laneLook.rowH}:{defH:62,rowH:66},ball=tall?laneLook.ball:{r:26,font:32};
+  const tile=(kind,slots,rows,extra)=>{const h=L.defH+rows*L.rowH;return {...laneTile(kind,top,slots,rows,extra),...L,h,y:top+h/2};};
+  const pos=r=>({x:g.recvX,w:g.recvW,y:top+L.defH+(r.slot+.5)*L.rowH}),fill=id=>laneSubscribers[id].fill;
+  const value=(k,color,at,arrival,logicalAt=at)=>({value:String(k),color,at,arrival,logicalAt});
+  // Okno kompilacji: starsze wartości odpadają, ale bufor (ostatnia emisja) i ostatnie kulki odbiorców zostają.
+  const recent=(events,early)=>[...events.filter(e=>e.at<p.from-6).slice(-early),...events.filter(e=>e.at>=p.from-6)];
+  const edge=r=>'replay-'+r.id,upstream=k=>k===2?'interval-replay-2':'interval-replay';
+  const unsubscribe=at=>at===undefined||at===null?{}:{end:{at,logicalAt:at,kind:'unsubscribe',duration:t.cancel}};
+  const C=p.runs.find(r=>r.id==='C');
+  // Kolejne migawki w jednym miejscu: .subscribe() A do zestawienia upstreamu, potem każda do następnej.
+  const events=[{text:'.subscribe()',run:p.runs[0],at:p.runs[0].subscribe,from:laneEvent('subscribe','replay-A',-.3),until:laneEvent('connected','interval-replay',.35)},
+    ...p.runs.flatMap(r=>[...(r.id==='A'?[]:[{text:'.subscribe()',run:r,at:r.subscribe,from:laneEvent('subscribe',edge(r),-.3)}]),
+      ...(r.unsubscribeAt!==null?[{text:'.unsubscribe()',run:r,at:r.calledAt,from:{type:'unsubscribe-call',edge:edge(r)}}]:[])])]
+    .sort((a,b)=>a.at-b.at);
+  const callouts=events.map((e,i)=>laneCallout(e.text,e.run.id,e.from,e.until??(events[i+1]?{...events[i+1].from,offset:(events[i+1].from.offset||0)-.3}:{...e.from,offset:Infinity}),{x:g.recvX,y:top/2}));
+  // Pauza to wyłącznie zatrzymanie animacji (nie zachowanie operatora): napis nad interval do wznowienia.
+  if(p.pauseCall!==undefined)callouts.push({...laneCallout('pauza animacji','U1',{type:'interval-pause'},
+    p.resumeAt===undefined?{type:'interval-pause',offset:Infinity}:{type:'interval-resume'},{x:g.srcX,y:top/2}),size:34,label:''});
+  const resets=[[1,p.clear1],[2,p.clear2]].filter(([,at])=>at!==undefined);
+  return {layout:'fixed',formatAware:true,width:1240,height:tall?612:460,...laneGraphLook(),ball,
+    subscribers:{A:laneSubscribers.A,B:laneSubscribers.B,C:laneSubscribers.C,U1:{...laneSubscribers.A,label:'#1'},U2:{...laneSubscribers.C,label:'#2'}},
+    nodes:[{id:'interval',x:g.srcX,w:g.srcW,label:'interval(1000)',...tile('source',{U1:0,U2:1},2)},
+      // Kieszeń bufora jak w 20a; clears: reset przy refCount = 0 (kulka gaśnie, kieszeń zostaje pusta).
+      {id:'replay',x:g.opX,w:g.opW,label:'shareReplay(1)',color:'op',splitBalls:true,splitAt:.5,splitGuides:false,hubFan:false,rowTint:true,
+        buffer:{size:1,label:'bufor',alone:t.hold,clears:resets.map(([,at])=>at)},...tile('operator',{U1:0,A:0,B:1,U2:2,C:2},3)},
+      ...p.runs.map(r=>{const y=pos(r).y;return laneReceiver(r.id,r.id,pos(r),{rowTint:true,ready:false,born:r.born,laneTerminalText:{cancelled:'×'},
+        ...(tall?{}:{h:L.rowH-6,top:y-L.rowH/2+3,rowH:L.rowH-6})});})],
+    edges:[{id:'interval-replay',from:'interval',to:'replay',subscriber:'U1',logicalStart:t.subscribeA,fixedStart:true,cancelPulse:true},
+      ...(C?[{id:'interval-replay-2',from:'interval',to:'replay',subscriber:'U2',logicalStart:C.subscribe,fixedStart:true,cancelPulse:true}]:[]),
+      ...p.runs.map(r=>({id:edge(r),from:'replay',to:r.id,subscriber:r.id,logicalStart:r.subscribe,fixedStart:true,cancelPulse:true,
+        ...(r.replay?{replayHold:t.replayHold}:{})}))],
+    schedule:{'interval-replay':{start:p.connectedA,connectDuration:t.link,...unsubscribe(p.clear1),
+        events:recent(p.e1,1).map(e=>value(e.k,fill('A'),e.at,p.arrival(e.at)))},
+      ...(C?{'interval-replay-2':{start:C.connected,connectDuration:t.link,...unsubscribe(p.clear2),
+        events:recent(p.e2,1).map(e=>value(e.k,fill('C'),e.at,p.arrival(e.at)))}}:{}),
+      ...Object.fromEntries(p.runs.map(r=>[edge(r),{start:r.subscribe,connectDuration:t.link,...unsubscribe(r.unsubscribeAt),
+        // B najpierw dostaje wartość z bufora (replay, logicalAt = zestawienie subskrypcji), potem kolejne na żywo.
+        events:[...(r.replay?[value(r.replay.k,fill(r.id),r.replay.at,r.replay.at+t.travel,r.connected)]:[]),
+          ...recent(r.events,3).map(e=>value(e.k,fill(r.id),p.departure(e.at),p.delivered(e.at),e.at))]}]))},
+    trays:p.runs.map(r=>laneTray(r.id,pos(r),3,ball)),
+    callouts,
+    timeline:[...p.runs.filter(r=>r.unsubscribeAt!==null).map(r=>({type:'unsubscribe-call',edge:edge(r),at:r.calledAt})),
+      ...(p.pauseCall===undefined?[]:[{type:'interval-pause',at:p.pauseCall}]),...(p.resumeAt===undefined?[]:[{type:'interval-resume',at:p.resumeAt}]),
+      ...resets.map(([k,at])=>({type:'buffer-reset',edge:upstream(k),at}))],
+  };
+}
+
 function buildFlattenGraph(scene) {
   const all=scene.operatorName==='concatAll',sourceY=50,operatorX=all?780:720;
   const nodes=[

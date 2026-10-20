@@ -19,7 +19,7 @@ Sceny MAIN z pytaniami zaczynają od nieruchomego READY. Prawo / Page Down uruch
 
 W oknie prelegenta (`S`) podgląd następnego slajdu domyślnie pokazuje dużą nazwę, np. **switchMap**, i krótki podtytuł. Wskazuje kolejny slajd, także podczas ręcznych postojów bieżącej animacji. Przełącznik **Podgląd: Tytuł / Slajd** w prawym dolnym rogu tego pola przywraca standardowy podgląd. Wybór jest zapamiętywany w przeglądarce. Notatki pozostają w standardowym polu Notes. Opcjonalne `data-speaker-title` na sekcji ustawia własny podpis wyłącznie dla prelegenta.
 
-Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 38 slajdów daje 56 stron PDF (także pięć stanów kodu `05b-http-kod`: bez wyróżnienia i cztery wyróżnione fragmenty, oraz trzy stany pełnego kodu `04b-map-kod`: bez wyróżnienia i dwa kolejne wyróżnienia).
+Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 39 slajdów daje 57 stron PDF (także pięć stanów kodu `05b-http-kod`: bez wyróżnienia i cztery wyróżnione fragmenty, oraz trzy stany pełnego kodu `04b-map-kod`: bez wyróżnienia i dwa kolejne wyróżnienia).
 
 Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przywraca ekran panoramiczny 1280×720. `W` przeładowuje stronę w drugim formacie, zostając na tym samym slajdzie i fragmencie; animacja wraca do stanu tego fragmentu. Linki do EXTRAS i powrót do pytań zachowują wybrany format. Druk działa w obu: `?print-pdf` (4:3) lub `?print-pdf&ratio=16:9`. W 4:3 slajdy wykorzystują pełną wysokość: większe zdjęcia i kody QR, wyższe diagramy, większy tekst i kapsułki w animacjach (×1,15), etykiety kafelków do ×1,3 oraz większy tytuł (64 px; za długi zmniejsza się, by został w jednej linii), kod (42 px, długi łańcuch przechodzi do nowej linii przed .pipe/.subscribe) i podpis.
 
@@ -35,12 +35,12 @@ Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorz
 
 Otwarcie do tytułu pozostaje bez zmian: społeczność, historia meet.js, fotografie i autor. Po tytule pokazujemy HTTP, Cold, interval, Subject — ręczną emisję, ręczny multicast HTTP i odłączanie źródła interval, a dopiero potem pytania o znane operatory i share. Budżet **30–35 minut dotyczy tylko części właściwej**; otwarcie, pytania i dogrywka są dodatkowo.
 
-MAIN ma **35 slajdów (22 animowane)**. EXTRAS zawiera **3 slajdy animowane**. Całość obejmuje 30 bazowych slajdów HTML i 38 slajdów po rozwinięciu wariantów. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
+MAIN ma **36 slajdów (23 animowane)**. EXTRAS zawiera **3 slajdy animowane**. Całość obejmuje 31 bazowych slajdów HTML i 39 slajdów po rozwinięciu wariantów. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
 
 Kolejność po slajdzie tytułowym:
 
 1. Pierwsze slajdy techniczne pokazują komplet podstawowych zachowań Observable: HTTP — subscribe, next, complete (`05-zrodla-2`) → kod źródłowy httpGet krok po kroku (`05b-http-kod`) → Cold: jedna definicja, trzy wykonania, error (`04a-dwa-tory`) → interval na żywo — cold, osobne wykonanie każdego odbiorcy, unsubscribe (`05-zrodla`) → Subject — ręczne next, późny subskrybent bez historii i complete (`05-zrodla-5`) → Subject: ręczny multicast HTTP (`05-zrodla-3`) → Subject — kto odłączy źródło? (`05-zrodla-4`). Po nich „Jakie znasz operatory RxJS?” (`02-znane-operatory`) → HTTP GET + map: obiekt User → „Paweł Kondraciuk” (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`), wstęp do share + HTTP.
-2. Jedna historia Cold → Subject → share na tych samych przykładach: cold — trzy subskrypcje, trzy HTTP, B kończy się błędem (`04a-dwa-tory`) → Subject + HTTP: jeden HTTP, trzech odbiorców (`05-zrodla-3`) → Subject + interval: odbiorcy odchodzą, źródło nadal działa (`05-zrodla-4`) → pytanie o znane operatory → HTTP GET + map (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`) → share + HTTP: jeden HTTP, trzech odbiorców (`04a-dwa-tory-2`) → share + interval: ostatni odbiorca odłącza źródło (`04a-dwa-tory-3`) → share + HTTP: późny odbiorca uruchamia nowy request (`20-sharereplay`) → shareReplay(1) na interval: odbiorcy odchodzą, źródło pracuje dalej (`20a-sharereplay-interval`) → shareReplay z refCount: true + HTTP: późny odbiorca dostaje wynik z bufora (`20-sharereplay-2`). Powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
+2. Jedna historia Cold → Subject → share na tych samych przykładach: cold — trzy subskrypcje, trzy HTTP, B kończy się błędem (`04a-dwa-tory`) → Subject + HTTP: jeden HTTP, trzech odbiorców (`05-zrodla-3`) → Subject + interval: odbiorcy odchodzą, źródło nadal działa (`05-zrodla-4`) → pytanie o znane operatory → HTTP GET + map (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`) → share + HTTP: jeden HTTP, trzech odbiorców (`04a-dwa-tory-2`) → share + interval: ostatni odbiorca odłącza źródło (`04a-dwa-tory-3`) → share + HTTP: późny odbiorca uruchamia nowy request (`20-sharereplay`) → shareReplay(1) na interval: odbiorcy odchodzą, źródło pracuje dalej (`20a-sharereplay-interval`) → shareReplay z refCount: true na interval: ostatni odbiorca czyści bufor i odłącza źródło, późny C zaczyna od zera (`20b-sharereplay-refcount`) → shareReplay z refCount: true + HTTP: późny odbiorca dostaje wynik z bufora (`20-sharereplay-2`). Powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
 3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap (cztery *Map obok siebie) → distinctUntilChanged przed switchMap (`11a-distinct-switchmap`, jedyny distinctUntilChanged w MAIN).
 4. catchError na zewnątrz → catchError wewnątrz → wspólne porównanie debounceTime i auditTime (`16-czas-cztery`).
 5. Cztery pytania podsumowania → „Pytania?” → rozmowa z salą albo dodatkowy przykład.
@@ -592,7 +592,7 @@ Semantyka zastępowania błędu: [implementacja catchError w RxJS 7.8.2](https:/
 
 ### shareReplay(1): kto zatrzyma interval? — `20a-sharereplay-interval`
 
-**MAIN — między share z późnym odbiorcą (`20-sharereplay`) a shareReplay z refCount: true na HTTP (`20-sharereplay-2`). Cel: 45–60 s.** Wygląd, bufor i animacje identyczne jak na „shareReplay: późny odbiorca dostaje wynik”: kod `interval(1000).pipe(` / `  shareReplay(1))`, kafelek `interval(1000)` z torem `#1`, `shareReplay(1)` z kieszenią „bufor” pod spodem, odbiorcy A/B z inboxami. Każda wartość wjeżdża do wiersza shareReplay(1) i rozdziela się: kulka do odbiorcy i kulka do bufora; bez odbiorców jedzie tylko do bufora. Późny odbiorca dostaje najpierw kulkę wyjeżdżającą z kieszeni, potem kolejne na żywo. Liczniki Odbiorcy i Upstream.
+**MAIN — między share z późnym odbiorcą (`20-sharereplay`) a shareReplay z refCount: true na interval (`20b-sharereplay-refcount`). Cel: 45–60 s.** Wygląd, bufor i animacje identyczne jak na „shareReplay: późny odbiorca dostaje wynik”: kod `interval(1000).pipe(` / `  shareReplay(1))`, kafelek `interval(1000)` z torem `#1`, `shareReplay(1)` z kieszenią „bufor” pod spodem, odbiorcy A/B z inboxami. Każda wartość wjeżdża do wiersza shareReplay(1) i rozdziela się: kulka do odbiorcy i kulka do bufora; bez odbiorców jedzie tylko do bufora. Późny odbiorca dostaje najpierw kulkę wyjeżdżającą z kieszeni, potem kolejne na żywo. Liczniki Odbiorcy i Upstream.
 
 **Scena na żywo — interval emituje bez przerwy, także między krokami:**
 
@@ -604,7 +604,25 @@ Semantyka zastępowania błędu: [implementacja catchError w RxJS 7.8.2](https:/
 | 3 | `subscribed-b` | `.subscribe()` B: najpierw ostatnia wartość z bufora, potem kolejne na żywo; bez drugiego upstreamu. |
 | 4 | `unsub-b` | `.unsubscribe()` B: znów zero odbiorców, interval nadal pracuje, bufor się aktualizuje. |
 
-Kolejne „dalej” zmienia slajd, lewo cofa ostatnią akcję. Konkretne liczby zależą od chwili kliknięcia; druk i hash używają umownych chwil akcji. Bez complete i bez odłączenia upstreamu. Notatki per checkpoint w `template[data-checkpoint-notes="20a-sharereplay-interval"]`; finished prowadzi do shareReplay({ bufferSize: 1, refCount: true }) na HTTP.
+Kolejne „dalej” zmienia slajd, lewo cofa ostatnią akcję. Konkretne liczby zależą od chwili kliknięcia; druk i hash używają umownych chwil akcji. Bez complete i bez odłączenia upstreamu. Notatki per checkpoint w `template[data-checkpoint-notes="20a-sharereplay-interval"]`; finished prowadzi do shareReplay({ bufferSize: 1, refCount: true }) na tym samym interval.
+
+### shareReplay z refCount: kiedy znika bufor? — `20b-sharereplay-refcount`
+
+**MAIN — między shareReplay(1) na interval (`20a-sharereplay-interval`) a shareReplay z refCount: true na HTTP (`20-sharereplay-2`). Cel: 60–75 s.** Wygląd jak `20a`: kod `interval(1000).pipe(` / `  shareReplay({ bufferSize: 1, refCount: true }))`, kafelek `interval(1000)` z wierszami wykonań `#1` i `#2`, `shareReplay(1)` z kieszenią „bufor”, odbiorcy A/B/C. Liczniki Odbiorcy i Upstream.
+
+**Scena na żywo — każde „dalej” to jedna akcja; szybkie „dalej” w trakcie animacji tylko ją kończy:**
+
+| Krok | „Dalej” | Co się dzieje |
+| --- | --- | --- |
+| 0 | READY | Same definicje, pusta kieszeń, Odbiorcy 0 / Upstream 0. |
+| 1 | `subscribed-a` | `.subscribe()` A: połączenie #1 z interval, emisje płyną do A i do bufora. |
+| 2 | `subscribed-b` | Pauza animacji (napis „pauza animacji” nad interval): interval nie emituje, ostatnia wartość dojeżdża do bufora. `.subscribe()` B dostaje ją z kieszeni; nadal jeden upstream (2 / 1). |
+| 3 | `resumed` | interval znowu emituje do A i B. Pytanie: kiedy bufor zostanie wyczyszczony — przy unsubscribe czy przy kolejnym subscribe? |
+| 4 | `unsub-all` | `subA.unsubscribe()`, `subB.unsubscribe()`: refCount = 0, shareReplay od razu robi reset — kulka w buforze gaśnie, × biegnie do interval #1 (0 / 0). |
+| 5 | `subscribed-c` | `.subscribe()` C: pusty bufor, nowe wykonanie interval #2 liczy od 0 (1 / 1). |
+| 6 | `unsub-c` | `.unsubscribe()` C: ponowny reset, interval #2 odłączony, koniec sceny; następne „dalej” zmienia slajd. |
+
+Odpowiedź na pytanie (RxJS 7.8.2): bufor znika przy unsubscribe ostatniego odbiorcy. `shareReplay({ refCount: true })` to `share()` z `ReplaySubject`, `resetOnRefCountZero: true` i `resetOnComplete: false`: przy refCount 0 stary ReplaySubject przepada, nowy powstaje przy następnej subskrypcji. Gdy źródło wcześniej wysłało complete (HTTP na następnym slajdzie), resetu nie ma i bufor zostaje. Konkretne liczby zależą od chwili kliknięcia; druk i hash używają umownych chwil akcji. Notatki per checkpoint w `template[data-checkpoint-notes="20b-sharereplay-refcount"]`.
 
 ### Cztery pytania przed kolejnym pipe — `25-podsumowanie`
 

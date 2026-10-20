@@ -14,6 +14,7 @@ cards("01-tytul","RxJS — operatory, które znasz, ale bałeś się zagadać",[
 add("04-operator","Operator to funkcja","",1,[],[],"");
 add("04a-dwa-tory","Cold: jedna definicja, trzy wykonania","",1,[],[],"");
 add("20a-sharereplay-interval","shareReplay(1): kto zatrzyma interval?","",1,[],[],"");
+add("20b-sharereplay-refcount","shareReplay z refCount: kiedy znika bufor?","",1,[],[],"");
 add("x02-combinelatest-withlatestfrom","combineLatest — ostatnie wartości z wielu źródeł","",1,[],[],"",{group:"bonus"});
 add("x03-retry-backoff","retry — nie udało się? Spróbuj później","",1,[],[],"",{group:"bonus"});
 add("x04-defer","defer — nie wywołuj mnie jeszcze","",1,[],[],"",{group:"bonus"});
