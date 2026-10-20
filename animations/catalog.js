@@ -15,9 +15,7 @@ add("04-operator","Operator to funkcja","",1,[],[],"");
 add("04a-dwa-tory","Cold: jedna definicja, trzy wykonania","",1,[],[],"");
 add("20a-sharereplay-interval","shareReplay(1): kto zatrzyma interval?","",1,[],[],"");
 add("20b-sharereplay-refcount","shareReplay z refCount: kiedy znika bufor?","",1,[],[],"");
-add("x02-combinelatest-withlatestfrom","combineLatest — ostatnie wartości z wielu źródeł","",1,[],[],"",{group:"bonus"});
 add("x03-retry-backoff","retry — nie udało się? Spróbuj później","",1,[],[],"",{group:"bonus"});
-add("x04-defer","defer — nie wywołuj mnie jeszcze","",1,[],[],"",{group:"bonus"});
 add("05-zrodla","Skąd płyną wartości?","timer · HTTP · Subject",20,[
  R("timer",[E(2,"0","source"),E(6,"1","source"),E(10,"2","source"),E(14,"3","source")]),
  R("HTTP",[E(7,"dane","http")],[B(1,7,"request")],{completeAt:7}),
@@ -74,7 +72,6 @@ add("20-sharereplay","Co dostaje spóźniony odbiorca?","share() vs shareReplay(
  R("replay · HTTP",[E(6,"dane","http")],[B(1,6,"HTTP #1")]),
  R("replay · odbiorca B",[E(10,"dane","b")])
 ],[[0,"HTTP kończy się odpowiedzią w 6. sekundzie."],[6,"shareReplay zachowuje wynik zakończonego źródła."],[10,"B dołącza: share uruchamia nowe HTTP, shareReplay odtwarza bufor."],[16,"refCount: true nie usuwa automatycznie wyniku po poprawnym complete."]],"Semantyka RxJS 7.8.2. Domyślny share resetuje po complete; shareReplay ma resetOnComplete=false. To nie jest pełna strategia cache z odświeżaniem.",{metrics:[{label:"HTTP · share",value:t=>(t>=1?1:0)+(t>=10?1:0)},{label:"HTTP · replay",value:t=>t>=1?1:0}]});
-cards("25-podsumowanie","Cztery pytania przed kolejnym pipe",["Czy trzeba?","Kiedy zacząć?","Co z poprzednią pracą?","Czy można współdzielić?"],[[0,""],[3,"distinctUntilChanged"],[6,"debounceTime / auditTime"],[8,"concatMap / mergeMap / switchMap / exhaustMap"],[11,"share / shareReplay"]],"Zakończ pytaniami, które publiczność może zastosować we własnym kodzie. Przywróć tytułową analogię znajomości operatorów.",16);
 // Lifecycle-focused diagrams: variants share the same playback clock.
 const revise=(id,extra)=>Object.assign(D.find(s=>s.id===id),extra);
 const lateRows=replay=>[

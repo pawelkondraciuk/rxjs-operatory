@@ -132,13 +132,7 @@
 .rx-stepped .rx-hide { margin-left:auto; }
 .reveal.overview .rx-step-mode { display:none; }
 @media print { .rx-step-mode, .rx-fragment-steps { display:none !important; } }
-.reveal .extras-start { margin:0 0 26px; font:32px/1.3 Arial,sans-serif; }
-.reveal .extras-start a { display:inline-block; padding:12px 20px; border:2px solid #483566; border-radius:8px; color:#483566; }
-[data-ratio="16-9"] .reveal .extras-start { margin-bottom:20px; font-size:28px; }
 .reveal .extras-back { position: absolute; right: 0; top: 4px; font: 16px Arial, sans-serif; color: #53616b; }
-#x02-combinelatest-withlatestfrom .extras-back { top:76px; }
-#x02-combinelatest-withlatestfrom .rx-step-mode { top:116px; }
-.reveal .extras-slide h2 { text-transform: none; }
 
 @media print {
   .rx-player .rx-toolbar, .extras-back { display: none; }

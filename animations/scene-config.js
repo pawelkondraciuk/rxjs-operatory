@@ -1,4 +1,4 @@
-import { configureQuerySource, configureDebounceSwitch, configureSwitchMapLive, configureFlatten, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureCatchSearch, configureShareReplayOne, configureShareReplayRefCount, configureCombineLatestWithLatestFrom, configureRetryBackoff, configureDefer } from './reference-scenes.js';
+import { configureQuerySource, configureDebounceSwitch, configureSwitchMapLive, configureFlatten, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureCatchSearch, configureShareReplayOne, configureShareReplayRefCount, configureRetryBackoff } from './reference-scenes.js';
 
 import { configureSearchDemo } from './search-demo.js';
 
@@ -11,15 +11,12 @@ export const mainOrder = [
   // Cztery *Map obok siebie, potem plansza wyszukiwarki, źródło query$, switchMap na żywo, debounceTime, distinctUntilChanged
   // przed switchMap i catchError wewnątrz switchMap w tej samej wyszukiwarce.
   '20-sharereplay','20a-sharereplay-interval','20b-sharereplay-refcount','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12-intro-wyszukiwarka','12-query-zrodlo','12a-switchmap-live','12b-debounce-switchmap','11a-distinct-switchmap','11b-catcherror-search',
-  'b04-catcherror','25-podsumowanie','pytania',
+  'b04-catcherror','x03-retry-backoff','25-podsumowanie','pytania',
 ];
-export const extraOrder = [
-  'x02-combinelatest-withlatestfrom',
-  'x03-retry-backoff',
-  'x04-defer',
-];
+// Dawne adresy ?extras nie dodają już żadnych slajdów.
+export const extraOrder = [];
 export const extraIds = new Set(extraOrder);
-const stagedIds = new Set(['20a-sharereplay-interval','20b-sharereplay-refcount','x02-combinelatest-withlatestfrom','x03-retry-backoff','x04-defer','04-operator','04a-dwa-tory-2','04a-dwa-tory-3','05-zrodla','05-zrodla-2','05-zrodla-3','05-zrodla-4','05-zrodla-5','20-sharereplay','20-sharereplay-2']);
+const stagedIds = new Set(['20a-sharereplay-interval','20b-sharereplay-refcount','x03-retry-backoff','04-operator','04a-dwa-tory-2','04a-dwa-tory-3','05-zrodla','05-zrodla-2','05-zrodla-3','05-zrodla-4','05-zrodla-5','20-sharereplay','20-sharereplay-2']);
 
 // Sceny z finish:hold kończą się ok. 2 s po ostatnim zdarzeniu modelu, żeby AUTO nie stało długo.
 const trimmedTails = new Set(['20-sharereplay']);
@@ -57,12 +54,8 @@ export function configureScene(scene) {
   if(id==='20a-sharereplay-interval')configureShareReplayOne(scene);
   // shareReplay z refCount: true na interval: pauza animacji i B z bufora, A/B odchodzą (reset bufora), C od zera (#2).
   if(id==='20b-sharereplay-refcount')configureShareReplayRefCount(scene);
-  // combineLatest: dwa źródła, dwa sloty ostatnich wartości i jeden strumień wynikowy (EXTRAS).
-  if(id==='x02-combinelatest-withlatestfrom')configureCombineLatestWithLatestFrom(scene);
-  // retry({ count, delay }) z trzema ponowieniami i exponential backoff 1/2/4 s (EXTRAS).
+  // retry({ count, delay }) z trzema ponowieniami i exponential backoff 1/2/4 s (MAIN, po catchError na zewnątrz).
   if(id==='x03-retry-backoff')configureRetryBackoff(scene);
-  // defer: from(loadUser()) wywołuje funkcję od razu, defer(() => loadUser()) — przy każdej subskrypcji (EXTRAS).
-  if(id==='x04-defer')configureDefer(scene);
   // Kolorowanie składni kodu na wszystkich slajdach (wspólny renderer kodu w playerze); scena może je wyłączyć (codeSyntax:false).
   scene.codeSyntax??=true;
   scene.group=extraIds.has(scene.id)?'bonus':'main';

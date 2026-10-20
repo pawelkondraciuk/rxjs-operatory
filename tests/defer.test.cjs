@@ -1,13 +1,13 @@
-const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
+const {test}=require('node:test'),assert=require('node:assert/strict');
 const {modules,playbackHarness}=require('./v2-harness.cjs');
 const id='x04-defer';
 
 async function deck(format='4:3'){
- class Slide{constructor(id){this.id=id;this.dataset={animation:id};this.heading={};this.player={setAttribute(){}};}
-  querySelector(s){return s==='h2'?this.heading:this.player;}cloneNode(){return new Slide(this.id);}after(){}}
- const slides=[...fs.readFileSync('index.html','utf8').matchAll(/data-animation="([^"]+)"/g)].map(m=>new Slide(m[1]));
- const m=await modules(['catalog','presentation','engine','renderer','code-syntax','scene-config'],{document:{querySelectorAll:()=>slides}});
- const scene=m.presentation.prepareSlides(m.catalog.scenes,{format}).get(id),c=m.engine.compileScene(scene);
+ const m=await modules(['reference-scenes','engine','renderer']);
+ const scene={id,format,codeSyntax:true};
+ m['reference-scenes'].configureDefer(scene);
+ scene.playback={...scene.playback,controller:'stages'};
+ const c=m.engine.compileScene(scene);
  return {m,scene,c,render:m.renderer.renderScene};
 }
 const at=(c,stop)=>c.stops.find(s=>s.id===stop).time;
@@ -171,18 +171,8 @@ test('MANUAL stops at every checkpoint; AUTO pauses on the from result and on th
  run.controller.finish();assert.equal(run.player.state,'finished');assert.equal(JSON.stringify(run.player.snapshot),final);
 });
 
-test('order, return link, code marks and speaker notes',async()=>{
- const {m,c}=await deck(),order=Array.from(m['scene-config'].extraOrder);
- assert.deepEqual(order,['x02-combinelatest-withlatestfrom','x03-retry-backoff',id]);
- assert.ok(!m['scene-config'].mainOrder.includes(id));
- const html=fs.readFileSync('index.html','utf8');
- assert.ok(html.indexOf(`<section id="${id}"`)>html.indexOf('<section id="x03-retry-backoff"'));
- const template=html.match(new RegExp(`<template data-checkpoint-notes="${id}">([\\s\\S]*?)</template>`))[1];
- assert.deepEqual([...template.matchAll(/data-checkpoint="([^"]+)"/g)].map(m=>m[1]),['ready',...stops,'finished']);
- assert.match(template,/Ale co, jeśli mamy funkcję, która nie zwraca Observable, tylko Promise\?/);
- assert.match(template,/Defer opóźnia nie tylko pracę źródła, ale samo wywołanie funkcji/);
- assert.match(template,/selectedId/);
- assert.match(template,/nie trzeba automatycznie dodawać defer/);
+test('QA model code marks follow the active phase',async()=>{
+ const {c}=await deck();
  const marks=phase=>JSON.parse(JSON.stringify(c.snapshot(phase==='from'?0:at(c,'defer-definition')).codeView.flat().filter(p=>p.mark).map(p=>[p.text,p.mark.id])));
  assert.deepEqual(marks('from'),[['loadUser()','load-user']]);
  assert.deepEqual(marks('defer'),[['defer','defer'],['loadUser()','load-user']]);

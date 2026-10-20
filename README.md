@@ -4,7 +4,7 @@ Polska prezentacja Pawła Kondraciuka o sterowaniu pracą, kolejnością, subskr
 
 Ten README jest mapą treści: opisuje slajdy, zawartość bloczków i speaker notes. Implementację animacji, mapę plików i używane API znajdziesz w [AGENTS.md](AGENTS.md).
 
-Pełny eksport notatek do weryfikacji dla 24 slajdów technicznych MAIN znajduje się w [work/speaker-notes-main.md](work/speaker-notes-main.md). Dokument uwzględnia aktualną kolejność, końcowe tytuły wariantów i wszystkie notatki checkpointów, od slajdu po „A share?” do podsumowania przed „Pytania?”.
+Pełny eksport notatek do weryfikacji dla 25 slajdów technicznych MAIN znajduje się w [work/speaker-notes-main.md](work/speaker-notes-main.md). Dokument uwzględnia aktualną kolejność, końcowe tytuły wariantów i wszystkie notatki checkpointów, od slajdu po „A share?” do podsumowania przed „Pytania?”.
 
 ## Uruchomienie i obsługa
 
@@ -15,13 +15,13 @@ npm run dev
 
 Otwórz adres podany przez serwer ze ścieżką `/rxjs-operatory/`. `npm run build` buduje prezentację, `npm run preview` uruchamia podgląd zbudowanej wersji. `S` otwiera widok prelegenta z notatkami, `Esc` widok wszystkich slajdów. Strzałki i Page Up/Page Down obsługują nawigację Reveal.js; fragmenty odsłaniają zdjęcia i listy.
 
-Sceny MAIN z pytaniami zaczynają od nieruchomego READY. Prawo / Page Down uruchamia kolejny etap do postoju; ponowne naciśnięcie podczas ruchu natychmiast pokazuje koniec tego etapu i zatrzymuje animację. Następny klik uruchamia kolejny etap; lewo cofa. Pomijanie ruchu działa również przyciskiem „dalej” i pilotem. Dopiero następny klik po ostatnim pytaniu uruchamia AUTO na tym samym slajdzie. Automat zatrzymuje się na wyniku FINISHED. U pokazuje dolne sterowanie, A przechodzi z ręcznego do auto lub pauzuje/wznawia auto, M zmienia tryb, [ i ] zmieniają krok, R zaczyna od początku. Sceny wprowadzające z kontrolerem stages w AUTO kończą bieżący etap i pozwalają cofać checkpointy; R przywraca zatrzymany READY. Spacja pauzuje lub wznawia aktywną animację, a zdjęcia i statyczne otwarcie zachowują natywne sterowanie. W pozostałych scenach w AUTO prawo / Page Down najpierw pokazuje nieruchomy wynik całej animacji; dopiero kolejne naciśnięcie zmienia slajd. Dotyczy to również pilota i przycisków „dalej”. Lewo wraca do poprzedniego slajdu. Tryb, postój i pauza są pamiętane przy powrocie. EXTRAS domyślnie powtarzają pokaz, z wyjątkiem rodzin mających własne postoje.
+Sceny MAIN z pytaniami zaczynają od nieruchomego READY. Prawo / Page Down uruchamia kolejny etap do postoju; ponowne naciśnięcie podczas ruchu natychmiast pokazuje koniec tego etapu i zatrzymuje animację. Następny klik uruchamia kolejny etap; lewo cofa. Pomijanie ruchu działa również przyciskiem „dalej” i pilotem. Dopiero następny klik po ostatnim pytaniu uruchamia AUTO na tym samym slajdzie. Automat zatrzymuje się na wyniku FINISHED. U pokazuje dolne sterowanie, A przechodzi z ręcznego do auto lub pauzuje/wznawia auto, M zmienia tryb, [ i ] zmieniają krok, R zaczyna od początku. Sceny wprowadzające z kontrolerem stages w AUTO kończą bieżący etap i pozwalają cofać checkpointy; R przywraca zatrzymany READY. Spacja pauzuje lub wznawia aktywną animację, a zdjęcia i statyczne otwarcie zachowują natywne sterowanie. W pozostałych scenach w AUTO prawo / Page Down najpierw pokazuje nieruchomy wynik całej animacji; dopiero kolejne naciśnięcie zmienia slajd. Dotyczy to również pilota i przycisków „dalej”. Lewo wraca do poprzedniego slajdu. Tryb, postój i pauza są pamiętane przy powrocie.
 
 W oknie prelegenta (`S`) podgląd następnego slajdu domyślnie pokazuje dużą nazwę, np. **switchMap**, i krótki podtytuł. Wskazuje kolejny slajd, także podczas ręcznych postojów bieżącej animacji. Przełącznik **Podgląd: Tytuł / Slajd** w prawym dolnym rogu tego pola przywraca standardowy podgląd. Wybór jest zapamiętywany w przeglądarce. Notatki pozostają w standardowym polu Notes. Opcjonalne `data-speaker-title` na sekcji ustawia własny podpis wyłącznie dla prelegenta.
 
-Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje, łącznie z EXTRAS, w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 42 slajdy dają 60 stron PDF (także pięć stanów kodu `05b-http-kod`: bez wyróżnienia i cztery wyróżnione fragmenty, oraz trzy stany pełnego kodu `04b-map-kod`: bez wyróżnienia i dwa kolejne wyróżnienia).
+Dopisanie `?print-pdf` przed hashem ustawia wszystkie animacje w końcowych nieruchomych kadrach bez kontrolek. Reveal drukuje też kolejne fragmenty pełnego otwarcia na osobnych stronach: obecnie 40 slajdów daje 59 stron PDF (także pięć stanów kodu `05b-http-kod`: bez wyróżnienia i cztery wyróżnione fragmenty, trzy stany pełnego kodu `04b-map-kod`: bez wyróżnienia i dwa kolejne wyróżnienia, oraz dwa checkpointy zakończenia `25-podsumowanie`).
 
-Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przywraca ekran panoramiczny 1280×720. `W` przeładowuje stronę w drugim formacie, zostając na tym samym slajdzie i fragmencie; animacja wraca do stanu tego fragmentu. Linki do EXTRAS i powrót do pytań zachowują wybrany format. Druk działa w obu: `?print-pdf` (4:3) lub `?print-pdf&ratio=16:9`. W 4:3 slajdy wykorzystują pełną wysokość: większe zdjęcia i kody QR, wyższe diagramy, większy tekst i kapsułki w animacjach (×1,15), etykiety kafelków do ×1,3 oraz większy tytuł (64 px; za długi zmniejsza się, by został w jednej linii), kod (42 px, długi łańcuch przechodzi do nowej linii przed .pipe/.subscribe) i podpis.
+Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przywraca ekran panoramiczny 1280×720. `W` przeładowuje stronę w drugim formacie, zostając na tym samym slajdzie i fragmencie; animacja wraca do stanu tego fragmentu. Druk działa w obu: `?print-pdf` (4:3) lub `?print-pdf&ratio=16:9`. W 4:3 slajdy wykorzystują pełną wysokość: większe zdjęcia i kody QR, wyższe diagramy, większy tekst i kapsułki w animacjach (×1,15), etykiety kafelków do ×1,3 oraz większy tytuł (64 px; za długi zmniejsza się, by został w jednej linii), kod (42 px, długi łańcuch przechodzi do nowej linii przed .pipe/.subscribe) i podpis.
 
 `12a-switchmap-live` („Wybór operatora”) po slajdzie źródła query$ czeka z ukrytą nazwą operatora. Pierwsze prawo/Page Down/pilot odsłania switchMap i uruchamia ciągły pokaz; kolejne przechodzi do debounceTime. Lewo wraca do źródła query$. Spacja uruchamia lub pauzuje/wznawia, R i ponowne wejście przywracają zamaskowany READY. Badge pozostaje „Ręczny · M”, dopóki prelegent nie zmieni trybu. Druk, F i Upcoming pokazują #3 (rea) zakończony, #4 (re) anulowany i #5 (r) aktywny.
 
@@ -29,7 +29,7 @@ Domyślny format to 4:3 (scena 1280×960) pod projektor 4:3. `?ratio=16:9` przyw
 
 ## Jak czytać spis
 
-Porównania są osobnymi slajdami. Warianty z sufiksami -2/-3/-4 powstają podczas uruchamiania; pierwszy zachowuje ID bazowe. Poniżej podano kolejność MAIN, a dalszy spis opisuje rodziny tematycznie. Pozycje EXTRAS są oznaczone.
+Porównania są osobnymi slajdami. Warianty z sufiksami -2/-3/-4 powstają podczas uruchamiania; pierwszy zachowuje ID bazowe. Poniżej podano kolejność MAIN, a dalszy spis opisuje rodziny tematycznie.
 
 Każda pozycja opisuje temat, ekran/bloczki i notatki prelegenta. Tabele wariantów podają rzeczywiste tytuły i kod nad diagramem. Speaker notes przy rodzinie dotyczą wszystkich jej wariantów, ponieważ sekcje są klonowane razem z notatkami. Wyjątkiem są trzy slajdy Subject (`05-zrodla-5`, `05-zrodla-3`, `05-zrodla-4`): mają własne notatki przypisane do checkpointów. Notatki przytoczono z ujednoliconymi odstępami; powtarzaną instrukcję obsługi zwykłych animacji opisano wspólnie wyżej.
 
@@ -37,31 +37,30 @@ Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorz
 
 ## Ścieżka MAIN i czas
 
-Otwarcie do tytułu pozostaje bez zmian: społeczność, historia meet.js, fotografie i autor. Po tytule pokazujemy HTTP, Cold, interval, Subject — ręczną emisję, ręczny multicast HTTP i odłączanie źródła interval, a dopiero potem pytania o znane operatory i share. Budżet **30–35 minut dotyczy tylko części właściwej**; otwarcie, pytania i dogrywka są dodatkowo.
+Otwarcie do tytułu pozostaje bez zmian: społeczność, historia meet.js, fotografie i autor. Po tytule pokazujemy HTTP, Cold, interval, Subject — ręczną emisję, ręczny multicast HTTP i odłączanie źródła interval, a dopiero potem pytania o znane operatory i share. Budżet **30–35 minut dotyczy tylko części właściwej**; otwarcie i pytania są dodatkowo.
 
-MAIN ma **39 slajdów (26 animowanych)**. EXTRAS zawiera **3 slajdy animowane**. Całość obejmuje 35 bazowych slajdów HTML i 42 slajdy po rozwinięciu wariantów. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
+Prezentacja ma **40 slajdów (26 scen odtwarzacza)**, z 33 bazowych sekcji HTML po rozwinięciu wariantów. Nie ma slajdów EXTRAS. Warianty powstają przed wyborem ścieżki; końcowe ID zachowują poprzednie znaczenie niezależnie od kolejności.
 
 Kolejność po slajdzie tytułowym:
 
 1. Pierwsze slajdy techniczne pokazują komplet podstawowych zachowań Observable: HTTP — subscribe, next, complete (`05-zrodla-2`) → kod źródłowy httpGet krok po kroku (`05b-http-kod`) → Cold: jedna definicja, trzy wykonania, trzy complete (`04a-dwa-tory`) → interval na żywo — cold, osobne wykonanie każdego odbiorcy, unsubscribe (`05-zrodla`) → Subject — ręczne next, późny subskrybent bez historii i complete (`05-zrodla-5`) → Subject: ręczny multicast HTTP (`05-zrodla-3`) → Subject — kto odłączy źródło? (`05-zrodla-4`). Po nich „Jakie znasz operatory RxJS?” (`02-znane-operatory`) → HTTP GET + map: obiekt User → „Paweł Kondraciuk” (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`), wstęp do share + HTTP.
 2. Jedna historia Cold → Subject → share na tych samych przykładach: cold — trzy subskrypcje, trzy HTTP, trzy complete (`04a-dwa-tory`) → Subject + HTTP: jeden HTTP, trzech odbiorców (`05-zrodla-3`) → Subject + interval: odbiorcy odchodzą, źródło nadal działa (`05-zrodla-4`) → pytanie o znane operatory → HTTP GET + map (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`) → share + HTTP: jeden HTTP, trzech odbiorców (`04a-dwa-tory-2`) → share + interval: ostatni odbiorca odłącza źródło (`04a-dwa-tory-3`) → share + HTTP: późny odbiorca uruchamia nowy request (`20-sharereplay`) → shareReplay(1) na interval: odbiorcy odchodzą, źródło pracuje dalej (`20a-sharereplay-interval`) → shareReplay z refCount: true na interval: ostatni odbiorca czyści bufor i odłącza źródło, późny C zaczyna od zera (`20b-sharereplay-refcount`) → shareReplay z refCount: true + HTTP: późny odbiorca dostaje wynik z bufora (`20-sharereplay-2`). Powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
 3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap (cztery *Map obok siebie) → „Zaprojektujmy wyszukiwarkę” (`12-intro-wyszukiwarka`) → źródło query$ (`12-query-zrodlo`) → switchMap na żywo (`12a-switchmap-live`) → debounceTime + switchMap (`12b-debounce-switchmap`) → distinctUntilChanged przed switchMap (`11a-distinct-switchmap`, jedyny distinctUntilChanged w MAIN) → catchError wewnątrz switchMap w tej samej wyszukiwarce (`11b-catcherror-search`).
-4. catchError na zewnątrz (`b04-catcherror`) → podsumowanie. Osobny wariant „catchError wewnątrz” i porównanie debounce/audit zostały usunięte; lokalną obsługę błędu pokazuje wyszukiwarka (`11b-catcherror-search`).
-5. Cztery pytania podsumowania → „Pytania?” → rozmowa z salą albo dodatkowy przykład.
+4. catchError na zewnątrz (`b04-catcherror`) → retry z backoff 1/2/4 s (`x03-retry-backoff`) → podsumowanie. Osobny wariant „catchError wewnątrz” i porównanie debounce/audit zostały usunięte; lokalną obsługę błędu pokazuje wyszukiwarka (`11b-catcherror-search`).
+5. „To co, zagadamy do tych operatorów?” z odsłanianą puentą → „Pytania?” z kodem QR do feedbacku → rozmowa z salą.
 
 | Część właściwa | Budżet |
 | --- | --- |
 | HTTP, źródła, map/pipe, wykonania, Subject i share/replay | 10 min |
 | map + concatAll, cztery operatory *Map i distinctUntilChanged przed switchMap | 13,5 min |
-| catchError | 4 min |
+| catchError i retry | 5 min |
 | debounceTime w wyszukiwarce | w bloku wyszukiwarki |
 | Podsumowanie | 1,5 min |
 | Rezerwa na interakcję i przejścia | 2 min |
-| **Łącznie** | **31 min** |
+| **Łącznie** | **32 min** |
 
 Na map + concatAll i przejście do concatMap przewidziano około 3 minut z bloku flatteningu. Czasy są planem prelegenta, nie pomiarem odtwarzacza.
 
-**EXTRAS zawiera trzy przygotowane dodatkowe przykłady:** `x02-combinelatest-withlatestfrom`, czyli combineLatest z dwoma źródłami i lokalną pamięcią ostatnich wartości; `x03-retry-backoff`, czyli retry z exponential backoff 1 → 2 → 4 s; oraz `x04-defer`, czyli różnica między `from(loadUser())` a `defer(() => loadUser())`. Prelegent uruchamia pierwszy ręcznie z linku na slajdzie „Pytania?”, a pozostałe znajdują się bezpośrednio po nim. Bezpośredni hash dowolnego dodatku włącza pełną ścieżkę EXTRAS, a link „Powrót do pytań” zachowuje wybrany format.
 
 ## Legenda bloczków
 
@@ -673,7 +672,7 @@ Szybkie dalej kończy wyłącznie bieżący etap, lewo cofa po checkpointach, R 
 
 ### catchError — `b04-catcherror`
 
-**Temat:** miejsce obsługi błędu wpływa na kolejne zapytania. W MAIN po wyszukiwarce z lokalną obsługą błędu pokazujemy catchError na zewnątrz, a następnie podsumowanie.
+**Temat:** miejsce obsługi błędu wpływa na kolejne zapytania. W MAIN po wyszukiwarce z lokalną obsługą błędu pokazujemy catchError na zewnątrz, a następnie retry i podsumowanie.
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
@@ -689,7 +688,7 @@ Szybkie dalej kończy wyłącznie bieżący etap, lewo cofa po checkpointach, R 
 
 > Porównaj ten slajd z poprzednią wyszukiwarką: tam catchError obsługiwał błąd pojedynczego HTTP wewnątrz switchMap, więc kolejne zapytanie działało. Tutaj catchError stoi za switchMap. Klik A uruchamia HTTP, a po błędzie catchError odłącza pierwotny strumień (klik$ i switchMap) i subskrybuje of([]). S1 dostaje [] i complete; klik B nie uruchamia HTTP B. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik: tutaj wynika to z wyboru of([]).
 >
-> Na zewnątrz (per checkpoint): „Zobaczmy, co się stanie, gdy HTTP zwróci błąd, a catchError znajduje się na zewnątrz switchMap.” → „Kliknięcie A szybko uruchamia HTTP, a ten od razu zwraca błąd. Wewnątrz nie ma catchError, więc błąd propaguje się przez switchMap. Interesuje nas, co stanie się dalej.” → „Dopiero tutaj łapie go zewnętrzny catchError. Problem polega na tym, że oryginalny strumień zostaje odsubskrybowany.” → „CatchError przełącza się na zastępcze of([]). Dostajemy pustą tablicę, a potem complete.” → „I teraz klikamy ponownie. Nic się nie dzieje. Nie dlatego, że switchMap zignorował kliknięcie, tylko dlatego, że nie mamy już aktywnej subskrypcji kliknięć.” → „W wyszukiwarce obsłużyliśmy błąd pojedynczego HTTP. CatchError na zewnątrz zastępuje cały strumień po błędzie; tutaj of([]) emituje i kończy wynik. Przejdźmy do czterech pytań podsumowania.”
+> Na zewnątrz (per checkpoint): „Zobaczmy, co się stanie, gdy HTTP zwróci błąd, a catchError znajduje się na zewnątrz switchMap.” → „Kliknięcie A szybko uruchamia HTTP, a ten od razu zwraca błąd. Wewnątrz nie ma catchError, więc błąd propaguje się przez switchMap. Interesuje nas, co stanie się dalej.” → „Dopiero tutaj łapie go zewnętrzny catchError. Problem polega na tym, że oryginalny strumień zostaje odsubskrybowany.” → „CatchError przełącza się na zastępcze of([]). Dostajemy pustą tablicę, a potem complete.” → „I teraz klikamy ponownie. Nic się nie dzieje. Nie dlatego, że switchMap zignorował kliknięcie, tylko dlatego, że nie mamy już aktywnej subskrypcji kliknięć.” → „W wyszukiwarce obsłużyliśmy błąd pojedynczego HTTP. CatchError na zewnątrz zastępuje cały strumień po błędzie; tutaj of([]) emituje i kończy wynik. Teraz zobaczmy retry: zamiast zastępować strumień, ponowimy subskrypcję źródła.”
 
 Semantyka zastępowania błędu: [implementacja catchError w RxJS 7.8.2](https://github.com/ReactiveX/rxjs/blob/7.8.2/src/internal/operators/catchError.ts).
 
@@ -751,54 +750,9 @@ Kolejne „dalej” zmienia slajd, lewo cofa ostatnią akcję. Konkretne liczby 
 
 Odpowiedź na pytanie (RxJS 7.8.2): bufor znika przy unsubscribe ostatniego odbiorcy. `shareReplay({ refCount: true })` to `share()` z `ReplaySubject`, `resetOnRefCountZero: true` i `resetOnComplete: false`: przy refCount 0 stary ReplaySubject przepada, nowy powstaje przy następnej subskrypcji. Gdy źródło wcześniej wysłało complete (HTTP na następnym slajdzie), resetu nie ma i bufor zostaje. Konkretne liczby zależą od chwili kliknięcia; druk i hash używają umownych chwil akcji. Notatki per checkpoint w `template[data-checkpoint-notes="20b-sharereplay-refcount"]`.
 
-### Cztery pytania przed kolejnym pipe — `25-podsumowanie`
-
-**Temat:** pytania pomagające dobrać operatory do rzeczywistej potrzeby.
-
-| ID slajdu | Tytuł na ekranie | Kod nad diagramem |
-| --- | --- | --- |
-| 25-podsumowanie | Cztery pytania przed kolejnym pipe | Brak; karty podsumowania. |
-
-**Na bloczkach:** cztery pojawiające się karty: „Czy trzeba?”, „Kiedy zacząć?”, „Co z poprzednią pracą?”, „Czy można współdzielić?”. Podpisy przypominają kolejno distinctUntilChanged; debounceTime/auditTime; concatMap/mergeMap/switchMap/exhaustMap; share/shareReplay.
-
-**Speaker notes:** narracja przez cztery karty, potem zakończenie z nawiązaniem do tytułu.
-
-- **Czy trzeba?** Zanim wykonamy kolejną operację, sprawdźmy, czy rzeczywiście pojawiła się nowa wartość. Czasem distinctUntilChanged oszczędzi nam cały request.
-- **Kiedy zacząć?** Nie zawsze musimy reagować natychmiast. Czasem warto poczekać na ciszę, a czasem regularnie aktualizować ostatnią wartość.
-- **Co z poprzednią pracą?** Czy nowa operacja ma czekać, działać równolegle, anulować poprzednią, czy zostać zignorowana? Tutaj wybieramy odpowiedni operator *Map.
-- **Czy można współdzielić?** Jeśli kilku odbiorców potrzebuje tych samych danych, zastanówmy się, czy naprawdę każdy musi uruchamiać własne wykonanie.
-- **Zakończenie:** Nie chodzi o zapamiętanie wszystkich operatorów RxJS. Chodzi o to, żeby rozumieć, jakie decyzje podejmują za nas — wtedy z operatorami, które znamy, możemy wreszcie spokojnie zagadać.
-
-## Pytania i dodatki
-
-### Pytania? — `pytania`
-
-**Temat:** zakończenie głównej części i wejście do dodatku.
-
-**Na ekranie:** koniec MAIN i link do pierwszego dodatkowego przykładu: combineLatest (`x02-combinelatest-withlatestfrom`). Pilot nie przechodzi automatycznie z MAIN do dodatków. Wszystkie trzy dodatki mają link „Powrót do pytań”.
-
-**Speaker notes:** Zaproś do pytań. Jeśli chcesz rozwinąć temat, otwórz dodatkowy przykład combineLatest.
-
-### combineLatest — ostatnie wartości z wielu źródeł — `x02-combinelatest-withlatestfrom`
-
-**Pierwszy slajd EXTRAS, zaraz po „Pytania?”.** Dwa kontrolowane źródła przekazują wartości do jednego wykonania `combineLatest`. Kod: `combineLatest([userId$, language$])`.
-
-**Na bloczkach:** `userId$` i `language$` stoją jeden pod drugim i mają osobne przewody do fioletowego `combineLatest`. Operator ma jeden fioletowy nagłówek i trzy przylegające pasy: pomarańczowy id i niebieski lang ze slotami ostatnich wartości przy prawej krawędzi oraz jeden fioletowy pas wyjściowy S1. Osie wejść są wyrównane z execution lanes źródeł. Kompaktowy odbiorca z ikoną i oznaczeniem S1 stoi na osi wyjścia; trzy dwukolorowe pary mieszczą się w jednej poziomej historii. Niższe nagłówki źródeł pozwalają ustawić je blisko siebie bez kolizji. READY ma puste sloty i brak połączeń. Subskrypcja S1 najpierw dociera do operatora, który następnie podłącza oba źródła. Nie ma panelu prac, timerów, complete, error ani unsubscribe.
-
-| Checkpoint | Stan operatora | Historia S1 |
-| --- | --- | --- |
-| `subscribed` | `id: —`, `lang: —`; dwa aktywne wejścia | pusta |
-| `user-42` | `id: 42`, `lang: —` | pusta |
-| `language-pl` | `id: 42`, `lang: PL` | `[42, PL]` |
-| `language-en` | `id: 42`, `lang: EN` | `[42, PL]`, `[42, EN]` |
-| `user-43` | `id: 43`, `lang: EN` | `[42, PL]`, `[42, EN]`, `[43, EN]` |
-| `summary` | ostatnie wartości 43 i EN; połączenia aktywne | trzy dwukolorowe pary |
-
-`userId$` jest pomarańczowy, a `language$` niebieski przez cały przepływ. Wynik jest jedną zwartą parą z dwoma kolorowymi segmentami, zarówno podczas przelotu, jak i w historii. Speaker notes podkreślają warunek pierwszej wartości ze wszystkich źródeł oraz późniejszą reakcję na każdą zmianę dowolnego wejścia.
-
 ### retry — nie udało się? Spróbuj później — `x03-retry-backoff`
 
-**Drugi slajd EXTRAS, bezpośrednio po combineLatest.** Kod używa współczesnego API `retry({ count, delay })`: `count: 3` pozwala na trzy ponowienia poza pierwszym wykonaniem, czyli maksymalnie cztery requesty HTTP. Funkcja `delay` zwraca `timer(1000 * 2 ** (retryCount - 1))`, dlatego kolejne odstępy wynoszą 1, 2 i 4 sekundy.
+**MAIN — bezpośrednio po catchError na zewnątrz, przed podsumowaniem.** Kod używa współczesnego API `retry({ count, delay })`: `count: 3` pozwala na trzy ponowienia poza pierwszym wykonaniem, czyli maksymalnie cztery requesty HTTP. Funkcja `delay` zwraca `timer(1000 * 2 ** (retryCount - 1))`, dlatego kolejne odstępy wynoszą 1, 2 i 4 sekundy.
 
 **Na bloczkach:** jeden niezmienny pipeline HTTP GET → retry → pełny odbiorca A, bez dolnego panelu. A pojawia się przy subskrypcji i subskrybuje tylko raz. Pod jednym niebieskim nagłówkiem HTTP GET rośnie stos wykonań tego samego cold Observable: najnowsze jest zawsze na górze, a wcześniejsze płynnie przesuwają się niżej i pozostają jako historia. Pierwsze trzy wiersze `#1–#3` kończą się czerwonym error; `#4` pokazuje User i complete. Tylko górne wykonanie ma aktywny port i przewód do jednego operatora retry; historyczne wiersze nie mają własnych odbiorców ani przewodów.
 
@@ -806,17 +760,28 @@ Po każdym z trzech błędów czerwony impuls kończy się na retry i nie docier
 
 Checkpointy: request-1, error-1, request-2, error-2, request-3, error-3 (pytanie o następne 8 s), request-4, success i summary. Finał: Requesty HTTP 4, Aktywne 0; A otrzymał `next(User) → complete`, bez trzech pośrednich błędów. Notatki przypominają o terminalnym error po wyczerpaniu prób, maksymalnym opóźnieniu, jitterze i ponawianiu wyłącznie odpowiednich błędów przejściowych.
 
-### defer — nie wywołuj mnie jeszcze — `x04-defer`
+### To co, zagadamy do tych operatorów? — `25-podsumowanie`
 
-**Trzeci slajd EXTRAS, bezpośrednio po retry.** Pokazuje moment wywołania funkcji fabrykującej źródło. `loadUser()` to `fetch('/api/users/42').then(response => response.json())` — zwraca Promise i uruchamia request już w chwili wywołania. Jeden diagram ma dwie kolejne fazy, nigdy widoczne jednocześnie.
+**Temat:** minimalistyczne zakończenie wracające do żartu z tytułu prezentacji. Po retry, przed „Pytania?” z QR.
 
-**Faza 1 — `const user$ = from(loadUser());`.** READY: niebieski nagłówek `from(loadUser())` i wiersz wykonania `HTTP #1` w stanie `pending`, który już się wypełnia, choć nie ma odbiorców ani przewodów; chwilowe `loadUser()` #1 nad kafelkiem, `loadUser()` w kodzie wyróżnione. Liczniki: Wywołania loadUser() 1, Requesty HTTP 1. A (fiolet), potem B (pomarańcz) subskrybują — impuls `.subscribe()` biegnie do `from`, w kafelku rosną ich wiersze subskrypcji, ale nie powstaje drugi request. Promise się rozwiązuje (`✓ resolved`): jedna kulka „{…}” wychodzi z wiersza `HTTP #1` do portów A i B; oba pola dostają User i `✓ complete`. To nie `share()` — współdzielona jest operacja rozpoczęta wcześniej.
+**Na ekranie:** kremowe tło, duży czarny tytuł serif u góry i dużo wolnego miejsca. Środek rezerwuje trzy równe wiersze na przyszłe pytania z niewielkimi fioletowymi ikonami; obecnie wszystkie są puste, bez placeholderów. Pod subtelną linią pojawia się wyśrodkowana puenta: **„Bo to, że działa, nie znaczy, że robi to, czego oczekujesz.”**
 
-**Faza 2 — `const user$ = defer(() => loadUser());`.** Diagram, kod i liczniki zaczynają od zera: sam nagłówek `defer(() => loadUser())`, bez wykonań i odbiorców, liczniki 0/0 (fioletowe wyróżnienie `defer`). Subskrypcja A wywołuje fabrykę (`loadUser()` #1): w wierszu A startuje HTTP #1. Subskrypcja B — zanim HTTP #1 się skończy — wywołuje ją drugi raz (`loadUser()` #2): dwa requesty trwają równolegle. A dostaje User i complete, gdy B jeszcze czeka; potem B. Finał: 2 wywołania, 2 requesty.
+| Checkpoint | Na ekranie i sterowanie |
+| --- | --- |
+| 0 | Tytuł, pusty środek; linia i puenta ukryte. |
+| 1 | Jedno „dalej” odsłania linię i puentę (opacity, 300 ms) bez przesuwania układu. Slajd zatrzymuje się. |
 
-Postoje: from-a, from-b, from-complete, defer-definition, defer-a, defer-b, defer-a-complete, defer-b-complete, summary. MANUAL zatrzymuje się na każdym. AUTO zatrzymuje się dwa razy: na wyniku `from` (from-complete) i na pustej definicji `defer` (defer-definition); kolejne „dalej” odtwarza resztę do FINISHED. Cofanie przez granicę faz przywraca dokładny kadr wyniku `from`. Wyjście ze slajdu resetuje scenę. Bez error, retry i unsubscribe.
+Natywny fragment Reveal: kolejne „dalej” prowadzi do „Pytania?”, „wstecz” ukrywa puentę. Przy ograniczeniu ruchu ujawnienie jest natychmiastowe. Bez odtwarzacza i badge’a trybu. W przyszłości trzy pytania dostaną osobne fragmenty przed puentą.
 
-Notatki zawierają tabelę 1/1 vs 2/2 oraz praktyczny przykład bez animacji: ``defer(() => httpGet<User>(`/api/users/${selectedId}`))`` odczytuje aktualne `selectedId` dopiero przy subskrypcji (A → 42, zmiana na 43, B → 43); sama zmiana zmiennej niczego nie emituje ani nie subskrybuje, a zwykły `httpGet` ze stałym URL nie wymaga defer, bo już jest cold.
+**Speaker notes:** na wejściu wróć do tytułowego pytania; po odsłonięciu wypowiedz puentę i zatrzymaj się na tej myśli. Następnie zaproś do pytań i feedbacku na kolejnym slajdzie.
+
+## Pytania i feedback
+
+### Pytania? — `pytania`
+
+**Ostatni slajd prezentacji.** Duże „Pytania?” (150 px w 4:3, 130 px w 16:9), pod nim czarno-biały kod QR (380/320 px) do [formularza feedbacku na Crossweb](https://crossweb.pl/feedback/aks-lwt/). QR jest również klikalnym linkiem. Bez linków do dodatków i dalszych slajdów. Gotowy SVG z białym marginesem znajduje się w `public/feedback-qr.svg` i działa także offline oraz w druku.
+
+**Speaker notes:** zaproś do pytań i poproś o feedback przez QR.
 
 ## Gdzie jest źródło treści
 

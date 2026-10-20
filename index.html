@@ -768,53 +768,14 @@ return new Observable(subscriber => {
                         <div data-checkpoint="caught"><p><strong>2 — Przechwycenie</strong></p><p>Dopiero tutaj łapie go zewnętrzny catchError. Problem polega na tym, że oryginalny strumień zostaje odsubskrybowany.</p></div>
                         <div data-checkpoint="fallback"><p><strong>3 — Fallback</strong></p><p>CatchError przełącza się na zastępcze of([]). Dostajemy pustą tablicę, a potem complete.</p></div>
                         <div data-checkpoint="click-b"><p><strong>4 — Kolejne kliknięcie</strong></p><p>I teraz klikamy ponownie. Nic się nie dzieje. Nie dlatego, że switchMap zignorował kliknięcie, tylko dlatego, że nie mamy już aktywnej subskrypcji kliknięć.</p></div>
-                        <div data-checkpoint="finished"><p><strong>5 — Podsumowanie</strong></p><p>W wyszukiwarce obsłużyliśmy błąd pojedynczego HTTP. CatchError na zewnątrz zastępuje cały strumień po błędzie; tutaj of([]) emituje i kończy wynik. Przejdźmy do czterech pytań podsumowania.</p></div>
+                        <div data-checkpoint="finished"><p><strong>5 — Podsumowanie</strong></p><p>W wyszukiwarce obsłużyliśmy błąd pojedynczego HTTP. CatchError na zewnątrz zastępuje cały strumień po błędzie; tutaj of([]) emituje i kończy wynik. Teraz zobaczmy retry: zamiast zastępować strumień, ponowimy subskrypcję źródła.</p></div>
                     </template>
 				</section>
-<section id="25-podsumowanie" class="animation-slide" data-animation="25-podsumowanie">
-					<h2>Cztery pytania przed kolejnym pipe</h2>
-					<div class="rx-player" aria-label="Cztery pytania przed kolejnym pipe"></div>
-					<aside class="notes">
-						<p><strong>Wstęp:</strong> Zostawmy na koniec cztery pytania, które warto zadać przed dopisaniem kolejnego operatora do pipe.</p>
-						<p><strong>Czy trzeba?</strong> Zanim wykonamy kolejną operację, sprawdźmy, czy rzeczywiście pojawiła się nowa wartość. Czasem distinctUntilChanged oszczędzi nam cały request.</p>
-						<p><strong>Kiedy zacząć?</strong> Nie zawsze musimy reagować natychmiast. Czasem warto poczekać na ciszę, a czasem regularnie aktualizować ostatnią wartość.</p>
-						<p><strong>Co z poprzednią pracą?</strong> Czy nowa operacja ma czekać, działać równolegle, anulować poprzednią, czy zostać zignorowana? Tutaj wybieramy odpowiedni operator *Map.</p>
-						<p><strong>Czy można współdzielić?</strong> Jeśli kilku odbiorców potrzebuje tych samych danych, zastanówmy się, czy naprawdę każdy musi uruchamiać własne wykonanie.</p>
-						<p><strong>Zakończenie:</strong> Nie chodzi o zapamiętanie wszystkich operatorów RxJS. Chodzi o to, żeby rozumieć, jakie decyzje podejmują za nas. Wtedy to są już operatory, które nie tylko znacie, ale z którymi wreszcie możecie spokojnie zagadać.</p>
-						<p>Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.</p>
-					</aside>
-				</section>
-
-					<section id="pytania" class="extras-slide">
-						<h2>Pytania?</h2>
-						<p class="extras-start"><a href="?extras#/x02-combinelatest-withlatestfrom">combineLatest — ostatnie wartości z wielu źródeł</a></p>
-						<aside class="notes">Koniec części właściwej. Po pytaniach można przejść do trzech dodatkowych przykładów: combineLatest, retry z exponential backoff oraz defer. Linki powrotne prowadzą z powrotem do tego slajdu.</aside>
-					</section>
-
-				<section id="x02-combinelatest-withlatestfrom" class="animation-slide" data-extras data-animation="x02-combinelatest-withlatestfrom">
-					<h2>combineLatest — ostatnie wartości z wielu źródeł</h2>
-					<div class="rx-player" aria-label="combineLatest — ostatnie wartości z wielu źródeł"></div>
-					<aside class="notes">
-                        <p><strong>Pierwszy EXTRAS:</strong> dwa kontrolowane źródła przekazują wartości do combineLatest. Cztery zdarzenia wejściowe: userId 42, language PL, language EN, userId 43. Bez complete, error i unsubscribe.</p>
-                        <p><strong>Notatki per checkpoint:</strong> szablon poniżej (ready, subscribed, user-42, language-pl, language-en, user-43, summary, finished).</p>
-                    </aside>
-					<template data-checkpoint-notes="x02-combinelatest-withlatestfrom">
-                        <div data-checkpoint="ready"><p><strong>0 — Definicja</strong></p><p>Mamy dwa strumienie: identyfikator użytkownika i język interfejsu. Chcemy zawsze znać ich aktualną kombinację.</p><p><code>combineLatest([...])</code> jest tutaj funkcją tworzącą wynikowy Observable, a nie operatorem wewnątrz <code>.pipe()</code>.</p></div>
-                        <div data-checkpoint="subscribed"><p><strong>1 — Subskrypcja</strong></p><p>S1 subskrybuje wynik combineLatest. Operator tworzy dwie subskrypcje wejściowe — po jednej do każdego źródła.</p><p>Dwa wejściowe pasy mają osobne, puste sloty id i lang. Trzeci, fioletowy pas to jedno wspólne wyjście S1.</p></div>
-                        <div data-checkpoint="user-42"><p><strong>2 — userId$ emituje 42</strong></p><p>CombineLatest zapamiętał ID, ale jeszcze nie może niczego wyemitować. Nie zna języka.</p><p>Stan to id: 42 i lang: —. Historia S1 pozostaje pusta.</p></div>
-                        <div data-checkpoint="language-pl"><p><strong>3 — language$ emituje PL</strong></p><p>Teraz oba źródła mają przynajmniej jedną wartość. Dostajemy pierwszą parę.</p><p>S1 zapisuje [42, PL].</p></div>
-                        <div data-checkpoint="language-en"><p><strong>4 — language$ emituje EN</strong></p><p>Zmienił się tylko język. CombineLatest bierze ostatnie ID i nowy język. Nie czeka na kolejną zmianę ID.</p><p>S1 zachowuje [42, PL] i dostaje [42, EN].</p></div>
-                        <div data-checkpoint="user-43"><p><strong>5 — userId$ emituje 43</strong></p><p>Teraz zmienia się identyfikator. Język pozostaje ten sam, ale ponownie dostajemy aktualną parę.</p><p>S1 ma [42, PL], [42, EN] i [43, EN].</p></div>
-                        <div data-checkpoint="summary"><p><strong>6 — Podsumowanie</strong></p><p>CombineLatest ma dwie subskrypcje wejściowe i przechowuje ostatnią wartość każdego źródła. Gdy oba źródła wyemitują przynajmniej raz, każda kolejna emisja jednego z nich tworzy nową kombinację.</p><p>Końcowy stan to id: 43 i lang: EN. Obie subskrypcje wejściowe nadal są aktywne.</p></div>
-                        <div data-checkpoint="finished"><p><strong>Stan końcowy</strong></p><p>S1 otrzymał trzy pary: [42, PL], [42, EN] i [43, EN]. Operator pamięta wyłącznie najnowsze 43 oraz EN.</p></div>
-                    </template>
-				</section>
-
-				<section id="x03-retry-backoff" class="animation-slide" data-extras data-animation="x03-retry-backoff">
+				<section id="x03-retry-backoff" class="animation-slide" data-animation="x03-retry-backoff">
 					<h2>retry — nie udało się? Spróbuj później</h2>
 					<div class="rx-player" aria-label="retry — nie udało się? Spróbuj później"></div>
 					<aside class="notes">
-                        <p><strong>Drugi EXTRAS:</strong> jeden stały pipeline HTTP GET → retry → A. A subskrybuje raz, a kolejne wykonania tego samego cold HTTP odkładają się pod wspólnym nagłówkiem. Trzy błędy są przechwytywane, odstępy rosną 1 → 2 → 4 s, a czwarte wykonanie zwraca User i complete.</p>
+                        <p><strong>MAIN — po catchError na zewnątrz:</strong> jeden stały pipeline HTTP GET → retry → A. A subskrybuje raz, a kolejne wykonania tego samego cold HTTP odkładają się pod wspólnym nagłówkiem. Trzy błędy są przechwytywane, odstępy rosną 1 → 2 → 4 s, a czwarte wykonanie zwraca User i complete.</p>
                         <p><strong>Notatki per checkpoint:</strong> szablon poniżej (ready, request-1, error-1, request-2, error-2, request-3, error-3, request-4, success, summary, finished).</p>
                     </aside>
 					<template data-checkpoint-notes="x03-retry-backoff">
@@ -831,32 +792,33 @@ return new Observable(subscriber => {
                         <div data-checkpoint="finished"><p><strong>Warto dopowiedzieć</strong></p><p>Jeśli również ostatnia dozwolona próba się nie uda, retry przekaże terminalny error do A.</p><p>W produkcji często dodaje się maksymalne opóźnienie i jitter, żeby wielu klientów nie ponawiało requestów jednocześnie. Nie każdy błąd powinien być ponawiany — zwykle interesują nas błędy przejściowe, a nie walidacyjne.</p></div>
                     </template>
 				</section>
+                <section id="25-podsumowanie" class="closing-slide">
+                    <div class="closing-layout">
+                        <h2>To co, zagadamy<br>
+                            do tych operatorów?</h2>
+                        <!-- Trzy miejsca na przyszłe pytania. Dodaj ikonę i tekst do każdego
+                             wiersza, a fragmenty pytań umieść przed fragmentem puenty. -->
+                        <div class="closing-questions">
+                            <div class="closing-question"></div>
+                            <div class="closing-question"></div>
+                            <div class="closing-question"></div>
+                        </div>
+                        <div class="closing-takeaway fragment" data-fragment-index="0">
+                            <p>Bo to, że działa, nie znaczy,<br>
+                                że robi to, czego oczekujesz.</p>
+                            <aside class="notes"><p><strong>1 — Puenta</strong></p><p>Bo to, że działa, nie znaczy, że robi to, czego oczekujesz.</p><p>Zatrzymaj się na tej myśli. Kolejne „dalej” prowadzi do „Pytania?” z QR do feedbacku; „wstecz” ukrywa puentę.</p></aside>
+                        </div>
+                    </div>
+                    <aside class="notes"><p><strong>0 — Powrót do tytułu</strong></p><p>To co, zagadamy do tych operatorów?</p><p>Na razie środkowa część pozostaje pusta — trzy pytania ustalimy później. Jedno „dalej” odsłania puentę i zatrzymuje slajd.</p></aside>
+                </section>
 
-				<section id="x04-defer" class="animation-slide" data-extras data-animation="x04-defer">
-					<h2>defer — nie wywołuj mnie jeszcze</h2>
-					<div class="rx-player" aria-label="defer — nie wywołuj mnie jeszcze"></div>
-					<aside class="notes">
-                        <p><strong>Trzeci EXTRAS:</strong> jeden diagram w dwóch fazach. Najpierw <code>from(loadUser())</code>: funkcja wykonuje się przy tworzeniu Observable, HTTP #1 trwa bez subskrypcji, A i B obserwują ten sam Promise. Potem <code>defer(() =&gt; loadUser())</code>: definicja nic nie uruchamia, każda subskrypcja wywołuje fabrykę — dwa Promise, dwa HTTP.</p>
-                        <p><strong>Notatki per checkpoint:</strong> szablon poniżej (ready, from-a, from-b, from-complete, defer-definition, defer-a, defer-b, defer-a-complete, defer-b-complete, summary, finished).</p>
-                    </aside>
-					<template data-checkpoint-notes="x04-defer">
-                        <div data-checkpoint="ready"><p><strong>0 — Utworzenie Observable</strong></p><p>Widzieliśmy już, że HTTP oparte na Observable potrafi być lazy. Ale co, jeśli mamy funkcję, która nie zwraca Observable, tylko Promise?</p><p><code>loadUser()</code> to <code>fetch('/api/users/42').then(response =&gt; response.json())</code>. Wywołujemy loadUser już podczas tworzenia Observable. Funkcja zwraca Promise, ale request już wystartował. From opakowuje ten konkretny Promise.</p><p>Nie ma żadnego subscribe, a HTTP #1 już trwa (pending). Wywołania loadUser(): 1, Requesty HTTP: 1.</p></div>
-                        <div data-checkpoint="from-a"><p><strong>1 — A subskrybuje</strong></p><p>Impuls subscribe biegnie od A do from. A zaczyna obserwować istniejący Promise.</p><p>Nie powstaje kolejny request — licznik nadal 1.</p></div>
-                        <div data-checkpoint="from-b"><p><strong>2 — B subskrybuje</strong></p><p>A i B mogą mieć osobne subskrypcje Observable, ale nadal obserwują zakończenie tej samej operacji Promise. Nie wywołujemy loadUser ponownie.</p><p>Requesty HTTP: 1.</p></div>
-                        <div data-checkpoint="from-complete"><p><strong>3 — Promise rozwiązany</strong></p><p>Jedyny request kończy się sukcesem, Promise zostaje rozwiązany obiektem User, a from emituje go do A i B. Obaj dostają User i complete.</p><p>To nie jest share(): nikt tu nie zarządza subskrypcjami. Współdzielona jest operacja, która wystartowała wcześniej — samo from(Promise) nie czyni jej leniwą. loadUser(): 1 wywołanie, HTTP: 1.</p><p>AUTO zatrzymuje się tutaj; następny krok przechodzi do defer.</p></div>
-                        <div data-checkpoint="defer-definition"><p><strong>4 — defer: tylko definicja</strong></p><p>Teraz zamiast wywołać funkcję od razu, przekazujemy ją do defer. To funkcja fabrykująca źródło, która będzie wykonywana przy każdej subskrypcji.</p><p>loadUser() nie zostało wywołane: nie ma Promise, HTTP ani odbiorców. Liczniki: 0 i 0. AUTO też tu czeka — porównaj z READY wariantu from.</p></div>
-                        <div data-checkpoint="defer-a"><p><strong>5 — A subskrybuje</strong></p><p>A subskrybuje i dopiero wtedy wykonujemy loadUser. Powstaje Promise A i HTTP #1 — wiersz A pod nagłówkiem defer.</p><p>Wywołania loadUser(): 1, Requesty HTTP: 1.</p></div>
-                        <div data-checkpoint="defer-b"><p><strong>6 — B subskrybuje</strong></p><p>B subskrybuje i wykonujemy ją drugi raz. Dwa wywołania oznaczają dwa requesty.</p><p>HTTP #1 jeszcze trwa, a już rusza niezależne HTTP #2 z własnym Promise B. Oba pracują równolegle. Liczniki: 2 i 2.</p></div>
-                        <div data-checkpoint="defer-a-complete"><p><strong>7 — HTTP A kończy się</strong></p><p>HTTP #1 rozwiązuje Promise A: A dostaje User, potem complete.</p><p>B nadal czeka na własny request — jego wynik nie zależy od A.</p></div>
-                        <div data-checkpoint="defer-b-complete"><p><strong>8 — HTTP B kończy się</strong></p><p>HTTP #2 rozwiązuje Promise B: B dostaje User i complete.</p></div>
-                        <div data-checkpoint="summary"><p><strong>9 — Podsumowanie</strong></p><p>Defer opóźnia nie tylko pracę źródła, ale samo wywołanie funkcji, która to źródło tworzy.</p><table><thead><tr><th>Wariant</th><th>Wywołania loadUser()</th><th>HTTP</th></tr></thead><tbody><tr><td><code>from(loadUser())</code></td><td>1</td><td>1</td></tr><tr><td><code>defer(() =&gt; loadUser())</code></td><td>2</td><td>2</td></tr></tbody></table><p>defer nie zamienia każdego Observable w cold — odracza wykonanie funkcji fabrykującej źródło.</p></div>
-                        <div data-checkpoint="finished"><p><strong>Praktyczny przykład (bez animacji)</strong></p><pre><code>let selectedId = 42;
-
-const user$ = defer(() =&gt;
-  httpGet&lt;User&gt;(`/api/users/${selectedId}`)
-);</code></pre><p>Nawet gdy httpGet zwraca cold Observable, defer może być przydatny. Tutaj zależy nam, żeby odczytać aktualne selectedId dopiero podczas subskrypcji.</p><p>A subskrybuje przy selectedId = 42 → HTTP dla 42. Zmieniamy selectedId = 43. B subskrybuje → HTTP dla 43. Bez defer URL byłby zbudowany wcześniej i obie subskrypcje użyłyby wcześniejszego ID.</p><p>Sama zmiana zmiennej nie wywołuje kolejnej emisji ani subskrypcji. Przy zwykłym <code>httpGet&lt;User&gt;(stałyUrl)</code> nie trzeba automatycznie dodawać defer — taki HTTP Observable już jest cold.</p></div>
-                    </template>
-				</section>
+					<section id="pytania" class="questions-slide">
+                        <h2>Pytania?</h2>
+                        <a class="feedback-qr" href="https://crossweb.pl/feedback/aks-lwt/" aria-label="Otwórz formularz feedbacku">
+                            <img src="/feedback-qr.svg" width="380" height="380" alt="Kod QR do formularza feedbacku na Crossweb">
+                        </a>
+                        <aside class="notes">Zaproś do pytań i poproś o feedback. Kod QR prowadzi do https://crossweb.pl/feedback/aks-lwt/. To ostatni slajd prezentacji.</aside>
+                    </section>
 
 
 			</div>

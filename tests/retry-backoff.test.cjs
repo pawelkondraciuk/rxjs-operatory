@@ -98,7 +98,7 @@ test('code keeps RxJS 7 retry config and highlights httpGet, retry and timer',as
  assert.deepEqual(Array.from(c.snapshot(0).codeView.flat().filter(part=>part.mark),part=>part.mark.id),['retry-http','retry-op','retry-timer']);
 });
 
-test('MANUAL: next during a countdown finishes the stage; rewind/reset are deterministic and notes/order include the third EXTRA',async()=>{
+test('MANUAL: next during a countdown finishes the stage; rewind/reset are deterministic and notes/order place retry in MAIN after catchError',async()=>{
  const {scene,c,m}=await deck(),h=await playbackHarness(),{player,controller}=h.create({scene});
  controller.seek(at(c,'error-1'));controller.next();h.advance(300);assert.ok(player.time<5.9,'odliczanie trwa');
  controller.next();assert.equal(player.time,at(c,'request-2'),'drugie dalej kończy etap odliczania');assert.equal(player.isPlaying,false);
@@ -110,7 +110,10 @@ test('MANUAL: next during a countdown finishes the stage; rewind/reset are deter
  const auto=await playbackHarness(),autoRun=auto.create({scene});
  autoRun.controller.setMode('auto');auto.advance(27000);
  assert.equal(autoRun.player.state,'finished');assert.equal(autoRun.player.snapshot.executionCounts.started,4);
- assert.deepEqual(Array.from(m['scene-config'].extraOrder).slice(-2),[id,'x04-defer']);
+ const main=Array.from(m['scene-config'].mainOrder);
+ assert.deepEqual(main.slice(main.indexOf('b04-catcherror'),main.indexOf('b04-catcherror')+3),['b04-catcherror',id,'25-podsumowanie']);
+ assert.ok(!m['scene-config'].extraIds.has(id));
+ assert.equal(scene.group,'main');
  const html=fs.readFileSync('index.html','utf8');
  for(const checkpoint of ['ready','request-1','error-1','request-2','error-2','request-3','error-3','request-4','success','summary','finished'])
   assert.match(html,new RegExp(`data-checkpoint="${checkpoint}"`));

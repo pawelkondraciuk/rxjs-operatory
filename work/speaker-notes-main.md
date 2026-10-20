@@ -1,6 +1,6 @@
 # Speaker notes — slajdy techniczne RxJS
 
-Pełny eksport notatek z `index.html` do weryfikacji. Zakres: **24 slajdów technicznych aktualnej ścieżki MAIN**, od pierwszego slajdu po „A share?” — „HTTP: od definicji do wykonania” — do „Cztery pytania przed kolejnym pipe”, przed „Pytania?”.
+Pełny eksport notatek z `index.html` do weryfikacji. Zakres: **25 slajdów aktualnej ścieżki MAIN**, od pierwszego slajdu po „A share?” — „HTTP: od definicji do wykonania” — do „To co, zagadamy do tych operatorów?”, przed „Pytania?”.
 
 Kolejność pochodzi z `mainOrder` w [animations/scene-config.js](../animations/scene-config.js). Tytuły pobrano z końcowych konfiguracji scen po rozwinięciu wariantów przez `prepareSlides`.
 
@@ -31,7 +31,8 @@ Eksport zachowuje oryginalne brzmienie wszystkich akapitów, w tym instrukcje pr
 21. **distinctUntilChanged — znowu to samo?** — `11a-distinct-switchmap`
 22. **catchError — wyszukiwarka działa dalej** — `11b-catcherror-search`
 23. **catchError na zewnątrz** — `b04-catcherror`
-24. **Cztery pytania przed kolejnym pipe** — `25-podsumowanie`
+24. **retry — nie udało się? Spróbuj później** — `x03-retry-backoff`
+25. **To co, zagadamy do tych operatorów?** — `25-podsumowanie`
 
 ## 1. HTTP: od definicji do wykonania
 
@@ -1150,7 +1151,7 @@ I teraz klikamy ponownie. Nic się nie dzieje. Nie dlatego, że switchMap zignor
 
 **5 — Podsumowanie**
 
-W wyszukiwarce obsłużyliśmy błąd pojedynczego HTTP. CatchError na zewnątrz zastępuje cały strumień po błędzie; tutaj of([]) emituje i kończy wynik. Przejdźmy do czterech pytań podsumowania.
+W wyszukiwarce obsłużyliśmy błąd pojedynczego HTTP. CatchError na zewnątrz zastępuje cały strumień po błędzie; tutaj of([]) emituje i kończy wynik. Teraz zobaczmy retry: zamiast zastępować strumień, ponowimy subskrypcję źródła.
 
 ### Bazowe notatki sekcji — kontekst do weryfikacji
 
@@ -1158,25 +1159,118 @@ Porównaj ten slajd z poprzednią wyszukiwarką: tam catchError obsługiwał bł
 
 Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.
 
-## 24. Cztery pytania przed kolejnym pipe
+## 24. retry — nie udało się? Spróbuj później
+
+**ID:** `x03-retry-backoff`
+**Źródło:** [index.html — sekcja x03-retry-backoff](../index.html#x03-retry-backoff)
+
+### Notatki per checkpoint — wyświetlane w prezentacji
+
+#### `ready`
+
+**0 — Definicja**
+
+Wiemy już, że subskrypcja cold HTTP uruchamia request. Ale co zrobić, gdy request nie powiedzie się z powodu chwilowego problemu z siecią?
+
+Widać definicje HTTP GET i retry oraz kod. Nie ma jeszcze odbiorcy ani wykonania HTTP. Requesty HTTP: 0, Aktywne: 0.
+
+#### `request-1`
+
+**1 — A subskrybuje**
+
+A pojawia się i tworzy jedną główną subskrypcję. Impuls przechodzi przez retry, a pierwsza subskrypcja źródła uruchamia HTTP #1 natychmiast.
+
+Mamy jedną subskrypcję A, ale HTTP może zostać wykonane kilka razy. Requesty HTTP: 1, Aktywne: 1.
+
+#### `error-1`
+
+**2 — Pierwszy błąd**
+
+Retry przechwytuje błąd. Nie kończy jeszcze całego Observable, tylko przygotowuje ponowną subskrypcję źródła.
+
+A nie dostaje error. Prawo uruchamia pełne odliczanie 1 sekundy; w trakcie backoff żaden HTTP nie działa.
+
+#### `request-2`
+
+**3 — Retry po 1 sekundzie**
+
+To ważne: retry nie powtarza poprzedniej wartości i nie używa ponownie odpowiedzi. Poprzednie wykonanie się zakończyło. Teraz mamy nową subskrypcję tego samego cold HTTP.
+
+#1 przesuwa się do historii, #2 zajmuje pierwszy wiersz. A nie subskrybuje ponownie. Requesty HTTP: 2.
+
+#### `error-2`
+
+**4 — Drugi błąd**
+
+Drugi error również kończy się na retry. A nadal czeka.
+
+Poprzednio czekaliśmy 1 sekundę, teraz czekamy 2 sekundy. Natychmiastowe ponawianie mogłoby dodatkowo obciążyć serwer, który już ma problemy.
+
+#### `request-3`
+
+**5 — Retry po 2 sekundach**
+
+Po pełnym odliczaniu retry po raz kolejny subskrybuje źródło. #3 trafia bezpośrednio pod jeden nagłówek HTTP GET, a zakończone #2 i #1 zostają poniżej.
+
+Requesty HTTP: 3, Aktywne: 1.
+
+#### `error-3`
+
+**6 — Trzeci błąd**
+
+W naszym przykładzie opóźnienie podwaja się po każdym kolejnym błędzie: 1, 2, 4 sekundy.
+
+Pytanie do publiczności: pierwszy raz czekaliśmy sekundę, potem dwie, teraz cztery. Ile czekalibyśmy przy następnym ponowieniu?
+
+#### `request-4`
+
+**7 — Retry po 4 sekundach**
+
+Odpowiedź: 8 sekund, gdyby limit ponowień na to pozwalał.
+
+Tutaj po pełnych 4 sekundach powstaje HTTP #4. count: 3 oznacza maksymalnie trzy ponowienia, czyli do czterech wykonań HTTP łącznie.
+
+#### `success`
+
+**8 — Sukces**
+
+Wreszcie czwarty request się udaje. Odbiorca A dostaje jeden User i complete. Wszystkie poprzednie błędy zostały obsłużone wewnątrz retry.
+
+#4 pozostaje zielone na szczycie stosu, a trzy wcześniejsze wykonania pozostają czerwone. Requesty HTTP: 4, Aktywne: 0.
+
+#### `summary`
+
+**9 — Podsumowanie**
+
+Jeden HTTP GET ma historię czterech wykonań: #1 error → 1 s; #2 error → 2 s; #3 error → 4 s; #4 User + complete. A otrzymał next(User) → complete i nie otrzymał trzech pośrednich błędów.
+
+retry ponownie subskrybuje to samo źródło; exponential backoff wydłuża oczekiwanie przed kolejną próbą.
+
+#### `finished`
+
+**Warto dopowiedzieć**
+
+Jeśli również ostatnia dozwolona próba się nie uda, retry przekaże terminalny error do A.
+
+W produkcji często dodaje się maksymalne opóźnienie i jitter, żeby wielu klientów nie ponawiało requestów jednocześnie. Nie każdy błąd powinien być ponawiany — zwykle interesują nas błędy przejściowe, a nie walidacyjne.
+
+## 25. To co, zagadamy do tych operatorów?
 
 **ID:** `25-podsumowanie`  
-**Źródło:** [index.html — sekcja 25-podsumowanie](../index.html#L803)
+**Źródło:** [index.html — sekcja 25-podsumowanie](../index.html#L795)
 
-### Notatki wspólne sekcji — wyświetlane w prezentacji
+### Checkpoint 0 — Powrót do tytułu
 
-Zakończ pytaniami, które publiczność może zastosować we własnym kodzie. Przywróć tytułową analogię znajomości operatorów.
+To co, zagadamy do tych operatorów?
 
-Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.
+Na razie środkowa część pozostaje pusta — trzy pytania ustalimy później. Jedno „dalej” odsłania puentę i zatrzymuje slajd.
 
-### Treść kart na slajdzie — uzupełnienie kontekstu
+### Checkpoint 1 — Puenta
 
-- **Czy trzeba?** — distinctUntilChanged.
-- **Kiedy zacząć?** — debounceTime / auditTime.
-- **Co z poprzednią pracą?** — concatMap / mergeMap / switchMap / exhaustMap.
-- **Czy można współdzielić?** — share / shareReplay.
+Bo to, że działa, nie znaczy, że robi to, czego oczekujesz.
+
+Zatrzymaj się na tej myśli. Kolejne „dalej” prowadzi do „Pytania?” z QR do feedbacku; „wstecz” ukrywa puentę.
 
 ## Uwagi do weryfikacji — poza oryginalnymi notatkami
 
 1. **Slajd 8 — Subject + interval, checkpoint `unsub-b`:** zdanie „Interval nadal działa, bo mamy jeszcze trzeciego odbiorcę” sugeruje zależność od odbiorców Subjecta. Proponowane brzmienie: „Interval nadal działa. Trzeci odbiorca wciąż dostaje wartości”. O pracy źródła decyduje osobna subskrypcja `connection`.
-2. **Slajd 24 — podsumowanie:** oryginalna notatka zawiera tylko ogólną wskazówkę zakończenia oraz sterowanie. Cztery pytania są treścią kart slajdu, nie rozpisaną wypowiedzią prelegenta.

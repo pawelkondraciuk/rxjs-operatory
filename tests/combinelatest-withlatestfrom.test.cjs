@@ -1,13 +1,13 @@
-const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
+const {test}=require('node:test'),assert=require('node:assert/strict');
 const {modules,playbackHarness}=require('./v2-harness.cjs');
 const id='x02-combinelatest-withlatestfrom';
 
 async function deck(format='4:3'){
- class Slide{constructor(id){this.id=id;this.dataset={animation:id};this.heading={};this.player={setAttribute(){}};}
-  querySelector(s){return s==='h2'?this.heading:this.player;}cloneNode(){return new Slide(this.id);}after(){}}
- const slides=[...fs.readFileSync('index.html','utf8').matchAll(/data-animation="([^"]+)"/g)].map(m=>new Slide(m[1]));
- const m=await modules(['catalog','presentation','engine','renderer'],{document:{querySelectorAll:()=>slides}});
- const scene=m.presentation.prepareSlides(m.catalog.scenes,{format}).get(id),c=m.engine.compileScene(scene);
+ const m=await modules(['reference-scenes','engine','renderer']);
+ const scene={id,format,codeSyntax:true};
+ m['reference-scenes'].configureCombineLatestWithLatestFrom(scene);
+ scene.playback={...scene.playback,controller:'stages'};
+ const c=m.engine.compileScene(scene);
  return {m,scene,c,render:m.renderer.renderScene};
 }
 const stop=(c,id)=>c.snapshot(c.stops.find(s=>s.id===id).time);
@@ -108,7 +108,7 @@ test('input value is stored before the corresponding output leaves combineLatest
  assert.ok(emitted.at>pl+.4);
 });
 
-test('manual/auto rewind, notes, order and return link remain correct',async()=>{
+test('QA model manual/auto rewind remains correct',async()=>{
  const {scene}=await deck(),h=await playbackHarness(),{player,controller}=h.create({scene});
  assert.equal(player.state,'ready');controller.next();h.advance(4000);
  assert.equal(controller.state.checkpointIndex,1);assert.equal(player.isPlaying,false);
@@ -121,17 +121,5 @@ test('manual/auto rewind, notes, order and return link remain correct',async()=>
  assert.equal(JSON.stringify(player.snapshot),final);
  controller.reset();player.playContinuously();h.advance(30000);
  assert.equal(player.state,'finished');assert.deepEqual(values(player.snapshot,'s1'),['[42, PL]','[42, EN]','[43, EN]']);
- const sc=await modules(['scene-config']),order=Array.from(sc['scene-config'].extraOrder);
- assert.deepEqual(order,[id,'x03-retry-backoff','x04-defer']);assert.ok(!sc['scene-config'].mainOrder.includes(id));
- const html=fs.readFileSync('index.html','utf8');
- assert.ok(html.indexOf(`<section id="${id}"`)>html.indexOf('<section id="pytania"'));
- assert.match(html,new RegExp(`class="extras-start"><a href="\\?extras#/${id}"`),'pytania prowadzą do pierwszego dodatku');
- const template=html.match(new RegExp(`<template data-checkpoint-notes="${id}">([\\s\\S]*?)</template>`))[1];
- assert.deepEqual([...template.matchAll(/data-checkpoint="([^"]+)"/g)].map(m=>m[1]),
-  ['ready','subscribed','user-42','language-pl','language-en','user-43','summary','finished']);
- assert.match(template,/jeszcze nie może niczego wyemitować/);
- assert.match(template,/każda kolejna emisja jednego z nich tworzy nową kombinację/);
- assert.doesNotMatch(template,/withLatestFrom|S2/);
- const css=fs.readFileSync('animations/reveal.css','utf8');
- assert.match(css,/#x02-combinelatest-withlatestfrom \.extras-back \{ top:76px; \}/);
+
 });
