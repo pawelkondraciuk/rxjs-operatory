@@ -1,6 +1,7 @@
 import { configureScene, mainOrder, extraOrder, extraIds } from './scene-config.js';
 // Każdy wariant jest osobnym slajdem, dostępnym przyciskiem pilota „dalej”.
 // format ('4:3' | '16:9') trafia do sceny, żeby grafy mogły dobrać wysokość ramki.
+const esc = text => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 export function prepareSlides(scenes, { format = '4:3' } = {}) {
   const byId = new Map(scenes.map(scene => [scene.id, scene]));
   const titles = {
@@ -39,8 +40,13 @@ export function prepareSlides(scenes, { format = '4:3' } = {}) {
       byId.set(id, scene);
       target.id = id;
       target.dataset.animation = id;
-      target.querySelector('h2').textContent = scene.title;
-      target.querySelector('.rx-player').setAttribute('aria-label', scene.title);
+      // scene.titleAnswerAfter (opt-in): część tytułu po „ — ” jest odpowiedzią na pytanie slajdu; main.js odsłania ją
+      // dopiero po minięciu wskazanego postoju (span .rx-title-answer[data-after-stop]).
+      const [lead, ...answer] = scene.title.split(' — '), hidden = scene.titleAnswerAfter && answer.length;
+      if (hidden) target.querySelector('h2').innerHTML = esc(lead) +
+        `<span class="rx-title-answer" data-after-stop="${esc(scene.titleAnswerAfter)}">${esc(' — ' + answer.join(' — '))}</span>`;
+      else target.querySelector('h2').textContent = scene.title;
+      target.querySelector('.rx-player').setAttribute('aria-label', hidden ? lead : scene.title);
       if (i) previous.after(target);
       previous = target;
     });

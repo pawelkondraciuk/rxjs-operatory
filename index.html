@@ -572,7 +572,7 @@ return new Observable(subscriber => {
 
 				<section id="09-concatmap" class="animation-slide" data-animation="09-concatmap">
 					<h2>concatMap — Po kolei</h2>
-					<div class="rx-player" aria-label="concatMap — Po kolei"></div>
+					<div class="rx-player" aria-label="concatMap"></div>
 					<aside class="notes"><ul><li><strong>Porównanie:</strong> concatMap otwiera serię czterech slajdów z tym samym problemem: A pracuje długo, B przychodzi w połowie, C po zakończeniu A. Tylko tutaj pokazujemy całą subskrypcję S1.</li><li><strong>Pytanie:</strong> A pracuje, przychodzi B — czekamy czy drugi request? Czekamy: B w kolejce, bez projekcji, inner i HTTP.</li><li><strong>Wniosek:</strong> Jedna praca naraz; kolejność zachowana, kolejka zwiększa opóźnienie.</li></ul></aside>
 					<template data-checkpoint-notes="09-concatmap">
                         <div data-checkpoint="ready"><p><strong>0 — Start</strong></p><p>Teraz dochodzimy do operatorów, które dla każdej wartości mogą uruchomić osobną pracę. Funkcja projekcji zwraca Observable, a operator decyduje, kiedy go zasubskrybować.</p><p>Na górze jest jeden pipeline: id$ → concatMap → S1. Poniżej widzimy wykonania HTTP: każda wartość ma identyfikator wykonania (#1, #2, #3) i kulkę wartości wejścia, a każde uruchomione inner Observable to osobny, znany już pipeline: własny kafelek HTTP GET i własny inner subscriber — osobna wewnętrzna subskrypcja.</p></div>
@@ -587,7 +587,7 @@ return new Observable(subscriber => {
 
 				<section id="10-mergemap" class="animation-slide" data-animation="10-mergemap">
 					<h2>mergeMap — Równocześnie</h2>
-					<div class="rx-player" aria-label="mergeMap — Równocześnie"></div>
+					<div class="rx-player" aria-label="mergeMap"></div>
 					<aside class="notes"><ul><li><strong>Porównanie:</strong> Te same A/B/C i ten sam HTTP co w concatMap; S1 jest już zestawione.</li><li><strong>Pytanie:</strong> Czy musimy czekać na A? Nie — drugi inner i drugi HTTP równolegle.</li><li><strong>Wniosek:</strong> B wraca przed A; wyniki w kolejności odpowiedzi, nie wejść.</li></ul></aside>
 					<template data-checkpoint-notes="10-mergemap">
                         <div data-checkpoint="ready"><p><strong>0 — Wprowadzenie</strong></p><p>Zostawiamy identyczną sytuację. A pracuje i pojawia się B. Ale tym razem mamy mergeMap.</p><p>S1 już subskrybuje — nie powtarzamy tej animacji. Dalej: A startuje i dochodzi do połowy.</p></div>
@@ -599,7 +599,7 @@ return new Observable(subscriber => {
 
 				<section id="11-switchmap" class="animation-slide" data-animation="11-switchmap">
 					<h2>switchMap — Najnowsza subskrypcja</h2>
-					<div class="rx-player" aria-label="switchMap — Najnowsza subskrypcja"></div>
+					<div class="rx-player" aria-label="switchMap"></div>
 					<aside class="notes"><ul><li><strong>Porównanie:</strong> Te same A/B/C co w concatMap i mergeMap; S1 jest już zestawione.</li><li><strong>Pytanie:</strong> Co z A? Anulowane: unsubscribe inner A (szary impuls ×), bez complete.</li><li><strong>Pułapka:</strong> ABORT klienta ≠ cofnięcie operacji serwera; unsubscribe ≠ complete. S1 nadal działa.</li></ul></aside>
 					<template data-checkpoint-notes="11-switchmap">
                         <div data-checkpoint="ready"><p><strong>0 — Wprowadzenie</strong></p><p>A już pracuje. Teraz przychodzi B.</p><p>S1 już subskrybuje — dalej: A startuje i dochodzi do połowy.</p></div>
@@ -612,7 +612,7 @@ return new Observable(subscriber => {
 
 				<section id="12-exhaustmap" class="animation-slide" data-animation="12-exhaustmap">
 					<h2>exhaustMap — Jestem zajęty</h2>
-					<div class="rx-player" aria-label="exhaustMap — Jestem zajęty"></div>
+					<div class="rx-player" aria-label="exhaustMap"></div>
 					<aside class="notes"><ul><li><strong>Porównanie:</strong> Te same A/B/C; po kolejkowaniu, równoległości i anulowaniu — ignorowanie.</li><li><strong>Pytanie:</strong> A co, jeśli nie chcemy przyjmować kolejnej pracy? B pominięte: bez projekcji, requestu i kolejki.</li><li><strong>Wniosek:</strong> Po zakończeniu A exhaustMap przyjmuje C.</li></ul></aside>
 					<template data-checkpoint-notes="12-exhaustmap">
                         <div data-checkpoint="ready"><p><strong>0 — Wprowadzenie</strong></p><p>A pracuje. Przychodzi B. Poznaliśmy już kolejkowanie, równoległość i anulowanie.</p><p>S1 już subskrybuje — dalej: A startuje i dochodzi do połowy.</p></div>

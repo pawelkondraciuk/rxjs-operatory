@@ -1629,7 +1629,8 @@ function configureComparison(scene,mode) {
     switchMap:{id:'answer',event:ev('disconnected',{edge:'inner0-op'}),offset:.35,caption:'switchMap: unsubscribe inner A — anulowane, bez complete. S1 działa dalej'},
     exhaustMap:{id:'answer',event:arrivedB,offset:comparison.decide+.4,caption:'exhaustMap: B pominięte. Bez projekcji, bez HTTP, bez kolejki'},
   }[mode];
-  Object.assign(scene,{preconnected:!first,code:`id$.pipe(${mode}(id => httpGet(url(id))))`,
+  // Podtytuł po myślniku („Po kolei”…) zdradza odpowiedź: tytuł pokazuje go dopiero po postoju pytania.
+  Object.assign(scene,{preconnected:!first,titleAnswerAfter:'question',code:`id$.pipe(${mode}(id => httpGet(url(id))))`,
     captions:[[0,first?'Projekcja zwraca Observable; concatMap decyduje, kiedy go zasubskrybować.':`Ten sam problem, inny operator: S1 już subskrybuje id$ przez ${mode}.`],
       [comparison.input[0].at,'A: projekcja tworzy inner, HTTP A startuje.'],
       [comparison.input[1].at,question],

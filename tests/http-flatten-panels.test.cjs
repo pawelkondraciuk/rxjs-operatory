@@ -304,3 +304,22 @@ test('speaker notes of concatAll and the four strategies follow their checkpoint
   if(id!=='08-map-strumienie')assert.match(notes.find(n=>n[1]==='question')[2],/\?/,id);
  }
 });
+
+test('09–12 titles hide the operator answer until the question stop has passed',async()=>{
+ const fs=require('node:fs'),main=fs.readFileSync('main.js','utf8'),css=fs.readFileSync('animations/reveal.css','utf8');
+ const {scene,compile}=await family();
+ for(const id of ['09-concatmap','10-mergemap','11-switchmap','12-exhaustmap']){
+  const s=scene(id);assert.equal(s.titleAnswerAfter,'question',id);
+  assert.ok(compile(s).stops.some(stop=>stop.id==='question'),id);
+ }
+ assert.equal(scene('08-map-strumienie').titleAnswerAfter,undefined);
+ // prepareSlides buduje h2: nazwa operatora + ukryty span z odpowiedzią po „ — ”.
+ const heading={},player={setAttribute(k,v){this[k]=v;}},slide={id:'10-mergemap',dataset:{animation:'10-mergemap'},
+  querySelector:sel=>sel==='h2'?heading:player};
+ const m=await modules(['catalog','presentation'],{document:{querySelectorAll:()=>[slide]}});
+ m.presentation.prepareSlides(m.catalog.scenes);
+ assert.equal(heading.innerHTML,'mergeMap<span class="rx-title-answer" data-after-stop="question"> — Równocześnie</span>');
+ assert.equal(player['aria-label'],'mergeMap');
+ assert.match(css,/\.rx-title-answer \{[^}]*opacity:0/);assert.match(css,/\.rx-title-answer\.rx-shown \{ opacity:1/);
+ assert.match(main,/player\.time > stop\.time/);
+});

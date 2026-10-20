@@ -34,6 +34,10 @@
 [data-ratio="16-9"] .rx-player { grid-template-rows:60px 330px 90px; height:480px; }
 [data-ratio="16-9"] .rx-player.rx-expanded, [data-ratio="16-9"] .rx-player.rx-function { grid-template-rows:60px 480px 72px; height:612px; }
 [data-ratio="16-9"] .rx-player .rx-code { font-size:26px; }
+.reveal .animation-slide h2 .rx-title-answer { margin-left:.28em; opacity:0; transition:opacity .4s; }
+.reveal .animation-slide h2 .rx-title-answer.rx-shown { opacity:1; }
+@media (prefers-reduced-motion: reduce) { .reveal .animation-slide h2 .rx-title-answer { transition:none; } }
+@media print { .reveal .animation-slide h2 .rx-title-answer { transition:none; } }
 [data-ratio="16-9"] .reveal .animation-slide h2 { font-size:44px; height:76px; white-space:normal; }
 [data-ratio="16-9"] .rx-player .rx-caption { font-size:26px; }
 [data-ratio="16-9"] .rx-player .rx-metric { font-size:21px; }

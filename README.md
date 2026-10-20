@@ -445,6 +445,8 @@ Góra bez zmian: id$ → operator → kompaktowy Odbiorca, jeden główny tor S1
 
 **Wspólny postój `question`:** S1 aktywne, HTTP A pracuje (pasek ok. 46% — identyczny na czterech slajdach), kulka B czeka na porcie wejścia operatora, a #2 · B ma tylko identyfikator i znak „?”: bez „w kolejce”, „pominięte”, projekcji, kafelka HTTP GET, inner subscribera, portów i progressu. Następne „dalej” (osobny ręczny postój `answer`) dopiero uruchamia reakcję operatora; AUTO włącza się po odpowiedzi.
 
+**Tytuł bez spoilera:** do postoju `question` tytuł pokazuje samą nazwę operatora (np. „concatMap”). Podtytuł po myślniku („Po kolei”, „Równocześnie”, „Najnowsza subskrypcja”, „Jestem zajęty”) pojawia się (fade 0,4 s), gdy animacja ruszy dalej od pytania; cofnięcie do pytania znowu go ukrywa. Druk, F i FINISHED pokazują pełny tytuł. Miejsce na podtytuł jest zarezerwowane, więc nazwa się nie przesuwa.
+
 **Subskrypcja główna:** tylko concatMap pokazuje pełną sekwencję (subscribe → A → projekcja → inner HTTP). mergeMap, switchMap i exhaustMap zaczynają w READY od zestawionego S1; jedno „dalej” prowadzi przez emisję A, start HTTP A i dotarcie B wprost do pytania.
 
 ### concatMap — `09-concatmap`

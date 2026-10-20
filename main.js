@@ -191,8 +191,21 @@ function playerFor(slide) {
     } : { step: stepAnimation }));
     autoFinish.observe(slide, players.get(slide));
     if (!notesPreview) players.get(slide).subscribe(() => notesMirror.notify(slide));
+    syncTitleAnswers(slide, players.get(slide));
+    players.get(slide).subscribe(() => syncTitleAnswers(slide, players.get(slide)));
   }
   return players.get(slide);
+}
+
+// Podtytuł z odpowiedzią (h2 .rx-title-answer[data-after-stop]) pojawia się dopiero, gdy animacja minie wskazany
+// postój (pytanie), więc tytuł nie zdradza działania operatora; cofnięcie do pytania znowu go ukrywa.
+function syncTitleAnswers(slide, player) {
+  slide.querySelectorAll('.rx-title-answer[data-after-stop]').forEach(answer => {
+    const stop = player.stops.find(s => s.id === answer.dataset.afterStop);
+    const shown = !stop || player.state === 'finished' || player.time > stop.time + 1e-6;
+    answer.classList.toggle('rx-shown', shown);
+    answer.setAttribute('aria-hidden', String(!shown));
+  });
 }
 
 // Ramka current-slide kopiuje kadr głównego okna (ta sama animacja), upcoming i brak lustra — nieruchomy checkpoint.
