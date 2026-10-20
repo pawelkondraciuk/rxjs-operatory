@@ -25,8 +25,8 @@ Eksport zachowuje oryginalne brzmienie wszystkich akapitów, w tym instrukcje pr
 15. **switchMap — Najnowsza subskrypcja** — `11-switchmap`
 16. **exhaustMap — Jestem zajęty** — `12-exhaustmap`
 17. **distinctUntilChanged — czy coś się zmieniło?** — `11a-distinct-switchmap`
-18. **catchError wewnątrz** — `b04-catcherror-2`
-19. **catchError na zewnątrz** — `b04-catcherror`
+18. **catchError na zewnątrz** — `b04-catcherror`
+19. **catchError wewnątrz** — `b04-catcherror-2`
 20. **debounceTime i auditTime: cisza czy okno?** — `16-czas-cztery`
 21. **Cztery pytania przed kolejnym pipe** — `25-podsumowanie`
 
@@ -953,9 +953,66 @@ Pięć emisji, trzy requesty. distinctUntilChanged nie jest cache'em — po pros
 
 Jeden potok id$ → distinctUntilChanged → switchMap → S1; wejścia A, A, B, B, A. Slajd stoi po exhaustMap, zamyka rodzinę *Map. distinctUntilChanged pamięta tylko ostatnią przepuszczoną wartość (jedna kulka w lane operatora), osobno dla każdej subskrypcji, i porównuje przez ===. Powtórzenia gasną w operatorze: bez nowego HTTP i bez anulowania trwającego. Do switchMap trafia A, B, A — 3 requesty zamiast 5. To nie jest cache: A po B przechodzi. 60–90 s.
 
-## 18. catchError wewnątrz
+## 18. catchError na zewnątrz
 
-**ID:** `b04-catcherror-2`  
+**ID:** `b04-catcherror`
+
+**Źródło:** [index.html — sekcja b04-catcherror](../index.html#L679)
+
+### Notatki per checkpoint — wyświetlane w prezentacji
+
+#### `ready`
+
+**0 — Start**
+
+Zobaczmy, co się stanie, gdy HTTP zwróci błąd, a catchError znajduje się na zewnątrz switchMap.
+
+#### `click-a`
+
+**1 — HTTP A**
+
+Pierwsze kliknięcie uruchamia request HTTP A.
+
+#### `error`
+
+**2 — Błąd**
+
+HTTP emituje błąd. Wewnątrz nie ma catchError, więc błąd propaguje się przez switchMap.
+
+#### `caught`
+
+**3 — Przechwycenie**
+
+Dopiero tutaj łapie go zewnętrzny catchError. Problem polega na tym, że oryginalny strumień zostaje odsubskrybowany.
+
+#### `fallback`
+
+**4 — Fallback**
+
+CatchError przełącza się na zastępcze of([]). Dostajemy pustą tablicę, a potem complete.
+
+#### `click-b`
+
+**5 — Kolejne kliknięcie**
+
+I teraz klikamy ponownie. Nic się nie dzieje. Nie dlatego, że switchMap zignorował kliknięcie, tylko dlatego, że nie mamy już aktywnej subskrypcji kliknięć.
+
+#### `finished`
+
+**6 — Podsumowanie**
+
+CatchError na zewnątrz zastępuje cały strumień po błędzie. Tutaj of([]) emituje i kończy wynik. Na kolejnym slajdzie przeniesiemy catchError do środka, aby obsłużyć błąd pojedynczej operacji.
+
+### Bazowe notatki sekcji — kontekst do weryfikacji
+
+Porównaj położenie catchError: wewnątrz pipe każdego HTTP albo osobny operator za switchMap. Każde kliknięcie tworzy nową subskrypcję http.get(url(id)). W obu wariantach catchError subskrybuje of([]), które emituje i kończy się. Wewnątrz kończy się tylko inner A: kolejne kliknięcie uruchamia HTTP B z własnym catchError i przekazuje wynik B. Na zewnątrz catchError odłącza pierwotny strumień (klik$ i switchMap), a S1 dostaje [] i complete; klik B nie uruchamia HTTP B. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik: tutaj wynika to z wyboru of([]).
+
+Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.
+
+## 19. catchError wewnątrz
+
+**ID:** `b04-catcherror-2`
+
 **Źródło:** [index.html — sekcja b04-catcherror](../index.html#L679)
 
 ### Notatki per checkpoint — wyświetlane w prezentacji
@@ -964,7 +1021,7 @@ Jeden potok id$ → distinctUntilChanged → switchMap → S1; wejścia A, A, B,
 
 **0 — Definicja**
 
-Zobaczmy, co się stanie, gdy HTTP zwróci błąd, ale catchError znajduje się wewnątrz switchMap.
+Przed chwilą catchError znajdował się na zewnątrz switchMap i po błędzie strumień kliknięć został odłączony. Teraz przenosimy catchError do środka, do pipe każdego HTTP. Zobaczmy, co się zmieni.
 
 #### `subscribe`
 
@@ -1007,61 +1064,6 @@ Ale czy cały strumień kliknięć nadal działa? Sprawdźmy. Klikamy ponownie.
 **7 — Sukces B**
 
 I proszę — drugi request działa normalnie. Obsłużyliśmy błąd lokalnie, nie kończąc zewnętrznego Observable.
-
-### Bazowe notatki sekcji — kontekst do weryfikacji
-
-Porównaj położenie catchError: wewnątrz pipe każdego HTTP albo osobny operator za switchMap. Każde kliknięcie tworzy nową subskrypcję http.get(url(id)). W obu wariantach catchError subskrybuje of([]), które emituje i kończy się. Wewnątrz kończy się tylko inner A: kolejne kliknięcie uruchamia HTTP B z własnym catchError i przekazuje wynik B. Na zewnątrz catchError odłącza pierwotny strumień (klik$ i switchMap), a S1 dostaje [] i complete; klik B nie uruchamia HTTP B. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik: tutaj wynika to z wyboru of([]).
-
-Tryb ręczny: prawo uruchamia kolejny postój, lewo cofa. Klik po ostatnim pytaniu włącza AUTO na tym samym slajdzie. MAIN zatrzymuje wynik; dodatki mogą powtarzać pokaz. W AUTO prawo najpierw pokazuje wynik, a następne przechodzi dalej; lewo wraca do poprzedniego slajdu. M: tryb ręczny/auto, U: sterowanie, A: automat/pauza, R: od początku.
-
-## 19. catchError na zewnątrz
-
-**ID:** `b04-catcherror`  
-**Źródło:** [index.html — sekcja b04-catcherror](../index.html#L679)
-
-### Notatki per checkpoint — wyświetlane w prezentacji
-
-#### `ready`
-
-**0 — Start**
-
-Przed chwilą catchError znajdował się wewnątrz switchMap. Teraz przenosimy go na zewnątrz. Zobaczmy, co się zmieni.
-
-#### `click-a`
-
-**1 — HTTP A**
-
-Pierwsze kliknięcie uruchamia request. Na razie zachowanie jest dokładnie takie samo.
-
-#### `error`
-
-**2 — Błąd**
-
-HTTP emituje błąd. Ale wewnątrz nie mamy już catchError, więc błąd propaguje się przez switchMap.
-
-#### `caught`
-
-**3 — Przechwycenie**
-
-Dopiero tutaj łapie go zewnętrzny catchError. Problem polega na tym, że oryginalny strumień zostaje odsubskrybowany.
-
-#### `fallback`
-
-**4 — Fallback**
-
-CatchError przełącza się na zastępcze of([]). Dostajemy pustą tablicę, a potem complete.
-
-#### `click-b`
-
-**5 — Kolejne kliknięcie**
-
-I teraz klikamy ponownie. Nic się nie dzieje. Nie dlatego, że switchMap zignorował kliknięcie, tylko dlatego, że nie mamy już aktywnej subskrypcji kliknięć.
-
-#### `finished`
-
-**6 — Podsumowanie**
-
-CatchError wewnątrz ratuje pojedynczą operację. CatchError na zewnątrz zastępuje cały strumień po błędzie. Samo umiejscowienie operatora zmienia zachowanie aplikacji.
 
 ### Bazowe notatki sekcji — kontekst do weryfikacji
 

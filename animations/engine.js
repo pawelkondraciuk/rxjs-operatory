@@ -444,6 +444,8 @@ export function compileScene(scene) {
         .map(v=>({value:v.value,color:v.color||'a',y:laneY(n,out.subscriber),at:v.at})));
       // node.buffer: ta sama wartość trafia też do kieszeni bufora (zapis równolegle z rozesłaniem).
       if(outputs.length&&n.buffer)outputs.push({value:e.value,color:e.color||'a',at:Math.min(...outputs.map(o=>o.at)),buffer:true});
+      // buffer.alone (opt-in, np. shareReplay bez odbiorców): wartość bez wyjść i tak wjeżdża do kieszeni po tylu sekundach.
+      else if(n.buffer?.alone)outputs.push({value:e.value,color:e.color||'a',at:e.arrival+n.buffer.alone,buffer:true});
       return outputs.length?{arrival:e.arrival,departure:Math.min(...outputs.map(o=>o.at)),value:e.value,color:e.color||'a',
         y:laneY(n,input.subscriber),left,right,x,outputs}:null;
     })).concat(emitsOf(n,left,right)).filter(Boolean);

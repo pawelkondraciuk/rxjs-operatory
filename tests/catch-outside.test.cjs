@@ -109,7 +109,7 @@ test('catchError outside: checkpoints follow the narration and speaker notes, co
  const html=fs.readFileSync('index.html','utf8');
  const template=html.match(/<template data-checkpoint-notes="b04-catcherror">([\s\S]*?)<\/template>/)[1];
  assert.deepEqual([...template.matchAll(/data-checkpoint="([^"]+)"/g)].map(m=>m[1]),['ready',...ids,'finished']);
- assert.match(template,/Przed chwilą catchError znajdował się wewnątrz switchMap/);
+ assert.match(template,/catchError znajduje się na zewnątrz switchMap/);
  for(const time of [0,...c.stops.map(s=>s.time),c.duration]){
   const frame=JSON.stringify(c.snapshot(time));c.snapshot(c.duration);c.snapshot(0);
   assert.equal(JSON.stringify(c.snapshot(time)),frame);

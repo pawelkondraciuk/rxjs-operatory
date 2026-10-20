@@ -42,7 +42,7 @@ Kolejność po slajdzie tytułowym:
 1. Pierwsze slajdy techniczne pokazują komplet podstawowych zachowań Observable: HTTP — subscribe, next, complete (`05-zrodla-2`) → kod źródłowy httpGet krok po kroku (`05b-http-kod`) → Cold: jedna definicja, trzy wykonania, error (`04a-dwa-tory`) → interval na żywo — cold, osobne wykonanie każdego odbiorcy, unsubscribe (`05-zrodla`) → Subject — ręczne next, późny subskrybent bez historii i complete (`05-zrodla-5`) → Subject: ręczny multicast HTTP (`05-zrodla-3`) → Subject — kto odłączy źródło? (`05-zrodla-4`). Po nich „Jakie znasz operatory RxJS?” (`02-znane-operatory`) → HTTP GET + map: obiekt User → „Paweł Kondraciuk” (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`), wstęp do share + HTTP.
 2. Jedna historia Cold → Subject → share na tych samych przykładach: cold — trzy subskrypcje, trzy HTTP, B kończy się błędem (`04a-dwa-tory`) → Subject + HTTP: jeden HTTP, trzech odbiorców (`05-zrodla-3`) → Subject + interval: odbiorcy odchodzą, źródło nadal działa (`05-zrodla-4`) → pytanie o znane operatory → HTTP GET + map (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`) → share + HTTP: jeden HTTP, trzech odbiorców (`04a-dwa-tory-2`) → share + interval: ostatni odbiorca odłącza źródło (`04a-dwa-tory-3`) → share + HTTP: późny odbiorca uruchamia nowy request (`20-sharereplay`) → shareReplay(1) na interval: odbiorcy odchodzą, źródło pracuje dalej (`20a-sharereplay-interval`) → shareReplay z refCount: true + HTTP: późny odbiorca dostaje wynik z bufora (`20-sharereplay-2`). Powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
 3. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap (cztery *Map obok siebie) → distinctUntilChanged przed switchMap (`11a-distinct-switchmap`, jedyny distinctUntilChanged w MAIN).
-4. catchError wewnątrz/na zewnątrz → wspólne porównanie debounceTime i auditTime (`16-czas-cztery`).
+4. catchError na zewnątrz → catchError wewnątrz → wspólne porównanie debounceTime i auditTime (`16-czas-cztery`).
 5. Cztery pytania podsumowania → „Pytania?” → rozmowa z salą albo dodatkowy przykład.
 
 | Część właściwa | Budżet |
@@ -530,27 +530,27 @@ Postoje: first (przed drugim A, HTTP A ~45%), question (drugie A w operatorze), 
 
 ### catchError — `b04-catcherror`
 
-**Temat:** miejsce obsługi błędu wpływa na kolejne zapytania. W MAIN najpierw wewnątrz (`-2`), potem na zewnątrz.
+**Temat:** miejsce obsługi błędu wpływa na kolejne zapytania. W MAIN najpierw na zewnątrz, potem wewnątrz (`-2`).
 
 | ID slajdu | Tytuł na ekranie | Kod nad diagramem |
 | --- | --- | --- |
-| b04-catcherror-2 | catchError wewnątrz | `klik$.pipe(switchMap(id =>`<br>`  httpGet(url(id)).pipe(catchError(() => of([])))))` |
 | b04-catcherror | catchError na zewnątrz | `klik$.pipe(switchMap(id =>`<br>`  httpGet(url(id))), catchError(() => of([])))` |
+| b04-catcherror-2 | catchError wewnątrz | `klik$.pipe(switchMap(id =>`<br>`  httpGet(url(id)).pipe(catchError(() => of([])))))` |
 
 **Na bloczkach i w animacji:**
 
-- Wewnątrz (wygląd MAIN switchMap): góra „klik$” → „switchMap” → kompaktowy odbiorca S1, jeden tor S1 przez cały czas aktywny (bez complete). Pod linią podziału (bez napisu) instancja na każdy inner jak w 09–12: kafelek HTTP GET z lane #1 · A (#2 · B), kabel, kafelek catchError, kabel i inner subscriber — w jednym rzędzie. Bez kontenera.
-- Przebieg wewnątrz (czas modelu): subscribe S1 w 0,3 s, klik A w 1 s uruchamia HTTP A. W 4 s HTTP A kończy się błędem: czerwony impuls biegnie tylko do catchError, etap HTTP pokazuje „error”, do S1 nic nie dociera. catchError pokazuje chwilową pigułkę `of([])`, w 4,5 s emituje kulkę [] (przez switchMap do S1), w 5 s inner A kończy się complete (zielony etap catchError). Klik B w 6,5 s tworzy #2 · B i nowy HTTP, który w 9 s zwraca B → S1 i kończy inner B. S1 ma [] i B, nadal słucha kliknięć. Licznik requestów HTTP: 1, potem 2.
-- Postoje wewnątrz: subscribe, click-a, request, error, fallback, click-b, potem AUTO do sukcesu B. Notatki per checkpoint w `template[data-checkpoint-notes="b04-catcherror-2"]` (0–7, 60–90 s).
 - Na zewnątrz (ten sam design): góra „klik$” → „switchMap” → „catchError” → kompaktowy odbiorca S1 — cztery kafelki z execution lanes, porty i kable toru S1 na jednej wysokości. Pod linią podziału (bez napisu) instancja jak w 09–12: `#1 · A`, turkusowy kafelek HTTP GET z lane (progress na pełną wysokość) i krótki kabel do inner subscribera; bez etapu catchError w dole i bez kontenera.
 - Przebieg na zewnątrz (czas modelu): S1 subskrybuje w 0,3 s, klik A w 1 s tworzy inner #1 i HTTP A. W 4 s HTTP A emituje error (bez complete): lane HTTP i inner subscriber czerwone (! error), czerwony impuls biegnie do inner subscribera, a potem przez switchMap do zewnętrznego catchError. Po jego dotarciu catchError odłącza pierwotny strumień: szary impuls × od switchMap do klik$, wiersze klik$ i switchMap szare (teardown, bez czerwieni i complete). Następnie w wierszu catchError chwilowo widać `of([])`: catchError subskrybuje Observable zastępczy, kulka [] (kolor S1) dociera do S1 w 5,5 s, a zielony impuls complete w 6 s (catchError i S1 zielone). Klik B w 7,3 s pojawia się w szarym wierszu klik$ i gaśnie: nie dociera do switchMap, nie ma projekcji, inner ani HTTP. Licznik requestów HTTP: 1.
 - Postoje na zewnątrz: click-a, error, caught, fallback, click-b, potem AUTO do podsumowania. Notatki per checkpoint w `template[data-checkpoint-notes="b04-catcherror"]` (start, HTTP A, błąd, przechwycenie, fallback, kolejne kliknięcie, podsumowanie).
+- Wewnątrz (wygląd MAIN switchMap): góra „klik$” → „switchMap” → kompaktowy odbiorca S1, jeden tor S1 przez cały czas aktywny (bez complete). Pod linią podziału (bez napisu) instancja na każdy inner jak w 09–12: kafelek HTTP GET z lane #1 · A (#2 · B), kabel, kafelek catchError, kabel i inner subscriber — w jednym rzędzie. Bez kontenera.
+- Przebieg wewnątrz (czas modelu): subscribe S1 w 0,3 s, klik A w 1 s uruchamia HTTP A. W 4 s HTTP A kończy się błędem: czerwony impuls biegnie tylko do catchError, etap HTTP pokazuje „error”, do S1 nic nie dociera. catchError pokazuje chwilową pigułkę `of([])`, w 4,5 s emituje kulkę [] (przez switchMap do S1), w 5 s inner A kończy się complete (zielony etap catchError). Klik B w 6,5 s tworzy #2 · B i nowy HTTP, który w 9 s zwraca B → S1 i kończy inner B. S1 ma [] i B, nadal słucha kliknięć. Licznik requestów HTTP: 1, potem 2.
+- Postoje wewnątrz: subscribe, click-a, request, error, fallback, click-b, potem AUTO do sukcesu B. Notatki per checkpoint w `template[data-checkpoint-notes="b04-catcherror-2"]` (0–7, 60–90 s).
 
 **Speaker notes:**
 
 > Porównaj położenie catchError: wewnątrz pipe każdego HTTP albo osobny operator za switchMap. Każde kliknięcie tworzy nową subskrypcję httpGet(url(id)). W obu wariantach catchError subskrybuje of([]), które emituje i kończy się. Wewnątrz kończy się tylko inner A: kolejne kliknięcie uruchamia HTTP B z własnym catchError i przekazuje wynik B. Na zewnątrz catchError odłącza pierwotny strumień (klik$ i switchMap), a S1 dostaje [] i complete; klik B nie uruchamia HTTP B. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik: tutaj wynika to z wyboru of([]).
 >
-> Na zewnątrz (per checkpoint): „Przed chwilą catchError znajdował się wewnątrz switchMap. Teraz przenosimy go na zewnątrz. Zobaczmy, co się zmieni.” → „Pierwsze kliknięcie uruchamia request. Na razie zachowanie jest dokładnie takie samo.” → „HTTP emituje błąd. Ale wewnątrz nie mamy już catchError, więc błąd propaguje się przez switchMap.” → „Dopiero tutaj łapie go zewnętrzny catchError. Problem polega na tym, że oryginalny strumień zostaje odsubskrybowany.” → „CatchError przełącza się na zastępcze of([]). Dostajemy pustą tablicę, a potem complete.” → „I teraz klikamy ponownie. Nic się nie dzieje. Nie dlatego, że switchMap zignorował kliknięcie, tylko dlatego, że nie mamy już aktywnej subskrypcji kliknięć.” → „CatchError wewnątrz ratuje pojedynczą operację. CatchError na zewnątrz zastępuje cały strumień po błędzie. Samo umiejscowienie operatora zmienia zachowanie aplikacji.”
+> Na zewnątrz (per checkpoint): „Zobaczmy, co się stanie, gdy HTTP zwróci błąd, a catchError znajduje się na zewnątrz switchMap.” → „Pierwsze kliknięcie uruchamia request HTTP A.” → „HTTP emituje błąd. Wewnątrz nie ma catchError, więc błąd propaguje się przez switchMap.” → „Dopiero tutaj łapie go zewnętrzny catchError. Problem polega na tym, że oryginalny strumień zostaje odsubskrybowany.” → „CatchError przełącza się na zastępcze of([]). Dostajemy pustą tablicę, a potem complete.” → „I teraz klikamy ponownie. Nic się nie dzieje. Nie dlatego, że switchMap zignorował kliknięcie, tylko dlatego, że nie mamy już aktywnej subskrypcji kliknięć.” → „CatchError na zewnątrz zastępuje cały strumień po błędzie. Tutaj of([]) emituje i kończy wynik. Na kolejnym slajdzie przeniesiemy catchError do środka, aby obsłużyć błąd pojedynczej operacji.”
 
 Semantyka zastępowania błędu: [implementacja catchError w RxJS 7.8.2](https://github.com/ReactiveX/rxjs/blob/7.8.2/src/internal/operators/catchError.ts).
 
@@ -592,18 +592,19 @@ Semantyka zastępowania błędu: [implementacja catchError w RxJS 7.8.2](https:/
 
 ### shareReplay(1): kto zatrzyma interval? — `20a-sharereplay-interval`
 
-**MAIN — między share z późnym odbiorcą (`20-sharereplay`) a shareReplay z refCount: true na HTTP (`20-sharereplay-2`). Cel: 45–60 s.** Kod w jednej linii: `const shared$ = interval(1000).pipe(shareReplay(1));` (marki `interval` i `shareReplay(1)`; ta druga świeci, gdy operator pracuje bez odbiorców). Diagram: interval(1000) → shareReplay(1) z jedną kulką pamięci w nagłówku → odbiorcy A/B; liczniki Odbiorcy i Upstream.
+**MAIN — między share z późnym odbiorcą (`20-sharereplay`) a shareReplay z refCount: true na HTTP (`20-sharereplay-2`). Cel: 45–60 s.** Wygląd, bufor i animacje identyczne jak na „shareReplay: późny odbiorca dostaje wynik”: kod `interval(1000).pipe(` / `  shareReplay(1))`, kafelek `interval(1000)` z torem `#1`, `shareReplay(1)` z kieszenią „bufor” pod spodem, odbiorcy A/B z inboxami. Każda wartość wjeżdża do wiersza shareReplay(1) i rozdziela się: kulka do odbiorcy i kulka do bufora; bez odbiorców jedzie tylko do bufora. Późny odbiorca dostaje najpierw kulkę wyjeżdżającą z kieszeni, potem kolejne na żywo. Liczniki Odbiorcy i Upstream.
 
-| Krok | Checkpoint | Stan na postoju |
+**Scena na żywo — interval emituje bez przerwy, także między krokami:**
+
+| Krok | „Dalej” | Co się dzieje |
 | --- | --- | --- |
-| 0 | READY | Same definicje, pusty bufor, Odbiorcy 0 / Upstream 0. |
-| 1 | `subscribed-a` | `const subA = shared$.subscribe(…)`: jedno połączenie z interval, A dostaje 0, 1, 2; bufor 2. |
-| 2 | `unsub-a` | `subA.unsubscribe()`: × kończy się na shareReplay(1), interval emituje dalej bez odbiorców — bufor 3; Odbiorcy 0 / Upstream 1. |
-| 3 | `subscribed-b` | `const subB = shared$.subscribe(…)`: B dostaje najpierw 3 z bufora, potem 4 na żywo; bez drugiego upstreamu. |
-| 4 | `unsub-b` | `subB.unsubscribe()`: znów zero odbiorców, interval nadal pracuje — bufor 5. |
-| — | FINISHED (AUTO) | Bufor 6, 7; podpis „Zero odbiorców, bufor: 7. shareReplay(1) nie zatrzyma interval — refCount: false”. |
+| 0 | READY | Same definicje, pusta kieszeń, Odbiorcy 0 / Upstream 0. |
+| 1 | `subscribed-a` | `.subscribe()` A: jedno połączenie z interval i start emisji; od teraz wartości płyną cały czas do A i do bufora. |
+| 2 | `unsub-a` | `.unsubscribe()` A: × kończy się na shareReplay(1); interval emituje dalej, wartości trafiają tylko do bufora; 0 / 1. |
+| 3 | `subscribed-b` | `.subscribe()` B: najpierw ostatnia wartość z bufora, potem kolejne na żywo; bez drugiego upstreamu. |
+| 4 | `unsub-b` | `.unsubscribe()` B: znów zero odbiorców, interval nadal pracuje, bufor się aktualizuje. |
 
-Bez complete i bez teardownu upstreamu. Notatki per checkpoint w `template[data-checkpoint-notes="20a-sharereplay-interval"]`; finished prowadzi do shareReplay({ bufferSize: 1, refCount: true }) na HTTP.
+Kolejne „dalej” zmienia slajd, lewo cofa ostatnią akcję. Konkretne liczby zależą od chwili kliknięcia; druk i hash używają umownych chwil akcji. Bez complete i bez odłączenia upstreamu. Notatki per checkpoint w `template[data-checkpoint-notes="20a-sharereplay-interval"]`; finished prowadzi do shareReplay({ bufferSize: 1, refCount: true }) na HTTP.
 
 ### Cztery pytania przed kolejnym pipe — `25-podsumowanie`
 
