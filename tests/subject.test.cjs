@@ -5,7 +5,7 @@ const values=(frame,id)=>Array.from(frame.histories.find(h=>h.anchor===id).value
 const node=(frame,id)=>frame.nodes.find(n=>n.id===id);
 const lanes=(frame,id)=>Array.from(node(frame,id).laneStates,l=>`${l.role}:${l.subscriber}:${l.state}`);
 const fieldOf=(svg,id)=>svg.slice(svg.indexOf(`data-field="${id}"`),svg.indexOf('</g>',svg.indexOf(`data-field="${id}"`)));
-const stopIds=['defined','connect-http','multicast','complete','subscribed-c'];
+const stopIds=['defined','multicast','complete','subscribed-c'];
 const fields=[['A','user.firstName','Paweł'],['B','user.lastName','Kondraciuk'],['C','user.city','Białystok']];
 const codeText=['const subject$ = new Subject<User>();',"const http$ = httpGet<User>('/api/users/42');",'','http$.subscribe(subject$);'];
 // Krycie i aktywność fragmentów kodu w klatce: linia → [opacity…].
@@ -73,7 +73,7 @@ test('defined: the http$ line and the HTTP GET header appear without an executio
  assert.doesNotMatch(render(f),/data-callout|NaN|Infinity/);
 });
 
-test('connect-http: the http$.subscribe(subject$) line appears, then the subscribe impulse runs from Subject to HTTP; no big snapshot',async()=>{
+test('subscribe step: the http$.subscribe(subject$) line appears, then the subscribe impulse runs from Subject to HTTP without a stop; no big snapshot',async()=>{
  const {c,ev,at,render}=await subject();
  const shownAt=c.events.find(e=>e.type==='manual-connect').at,start=ev('subscribe','http-subject'),connected=ev('connected','http-subject');
  assert.ok(at('defined')<shownAt&&shownAt+.3<=start,'linia subscribe pojawia się po postoju defined, przed impulsem');
@@ -81,14 +81,15 @@ test('connect-http: the http$.subscribe(subject$) line appears, then the subscri
  assert.equal(c.snapshot(start-1e-6).executionCounts.started,0,'request dopiero po subscribe');
  for(const t of [0,at('defined'),(start+connected)/2,...c.stops.map(s=>s.time),c.duration])
   assert.equal((c.snapshot(t).callouts||[]).length,0,'bez migawki nad diagramem — instrukcja jest tylko w kodzie');
- const stop=c.snapshot(at('connect-http'));
+ assert.ok(!c.stops.some(s=>s.time>at('defined')&&s.time<ev('deliver-next','http-subject')),'od defined bez postoju aż do rozesłania');
+ const subscribed=connected+.35,stop=c.snapshot(subscribed);
  assert.ok(lineShown(stop,3));
  const accent=markOf(stop,'subscribe');
  assert.equal(accent.text,'.subscribe(subject$)');assert.equal(accent.mark.quiet,true);assert.equal(accent.mark.line,'#238F83','kolor impulsu subskrypcji (tor U)');
- assert.equal(accent.active,true,'akcent subscribe widoczny na postoju');
+ assert.equal(accent.active,true,'akcent subscribe widoczny po zestawieniu subskrypcji');
  assert.equal(markOf(c.snapshot(start-.1),'subscribe').active,true,'akcent od pojawienia się linii');
- assert.equal(markOf(c.snapshot(at('connect-http')+1.5),'subscribe').active,false,'akcent chwilowy');
- assert.equal(markOf(c.snapshot(at('connect-http')+1.5),'subscribe').opacity,1,'linia zostaje na stałe');
+ assert.equal(markOf(c.snapshot(subscribed+1.5),'subscribe').active,false,'akcent chwilowy');
+ assert.equal(markOf(c.snapshot(subscribed+1.5),'subscribe').opacity,1,'linia zostaje na stałe');
  assert.doesNotMatch(render(stop),/data-callout/);
  const cable=c.snapshot((start+connected)/2).edges.find(e=>e.id==='http-subject');
  assert.ok(cable.visible&&cable.progress>0&&cable.progress<1&&cable.offset<0,'kabel rośnie od Subjecta w lewo');
@@ -111,10 +112,10 @@ test('code marks match share(): Subject purple, httpGet turquoise; subscribe has
  assert.equal(JSON.stringify(codeOpacity(end)),'[[1,1,1],[1,1,1],[],[1,1,1]]');
 });
 
-test('request: no stop while one HTTP execution makes progress (A/B wait); a short request goes straight to the multicast stop',async()=>{
+test('request: no stop while subscribe and one HTTP execution run (A/B wait); after defined the next step goes straight to the multicast stop',async()=>{
  const {c,at,ev}=await subject(),connected=ev('connected','http-subject'),response=ev('source-next','http-subject');
  assert.ok(response-connected<=2.5,'krótki request');
- assert.ok(!c.stops.some(s=>s.time>at('connect-http')&&s.time<response),'bez postoju podczas requestu');
+ assert.ok(!c.stops.some(s=>s.time>at('defined')&&s.time<response),'bez postoju podczas subscribe i requestu');
  const f=c.snapshot((connected+response)/2);
  assert.ok(node(f,'http').laneStates[0].progress>.3&&node(f,'http').laneStates[0].progress<.7);
  assert.equal(f.executionCounts.started,1);assert.equal(f.executionCounts.active,1);
@@ -191,9 +192,9 @@ test('Subject keeps lane colours, horizontal receiver connections and the Cold f
   return format=>m.engine.compileScene(m.presentation.prepareSlides(m.catalog.scenes,{format}).get('04a-dwa-tory'));
  })();
  for(const format of ['4:3','16:9']){
-  const {c,at}=await subject(format),end=c.snapshot(c.duration),coldEnd=cold(format).snapshot(cold(format).duration);
+  const {c,at,ev}=await subject(format),end=c.snapshot(c.duration),coldEnd=cold(format).snapshot(cold(format).duration);
   const colors={A:'#7457D9',B:'#D8840F',C:'#2F7ED8',U:'#238F83'};
-  for(const time of [0,at('connect-http')+1.5,at('multicast'),c.duration]){
+  for(const time of [0,ev('connected','http-subject')+1.85,at('multicast'),c.duration]){
    const f=c.snapshot(time);
    for(const n of f.nodes){
     assert.ok(n.socketDots.every(d=>d.color===colors[d.subscriber]));

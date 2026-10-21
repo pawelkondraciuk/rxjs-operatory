@@ -1,6 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules}=require('./v2-harness.cjs');
-const ids=['ready','defined','connect-http','multicast','complete','subscribed-c','finished'];
+const ids=['ready','defined','multicast','complete','subscribed-c','finished'];
 function slide(id='05-zrodla-3'){
  const html=fs.readFileSync('index.html','utf8');
  const source=html.match(/<template data-checkpoint-notes="05-zrodla-3">([\s\S]*?)<\/template>/)[1];
@@ -18,7 +18,7 @@ test('Subject checkpoint notes use native Reveal fragment notes and keep READY s
  assert.equal(m.prepareCheckpointNotes(s),true);
  assert.deepEqual(s.entries.map(n=>n.dataset.checkpoint),ids);
  assert.match(s.note.innerHTML,/0 — Wprowadzenie/);
- assert.doesNotMatch(s.note.innerHTML,/6 — Podsumowanie/);
+ assert.doesNotMatch(s.note.innerHTML,/5 — Podsumowanie/);
  for(const [i,marker] of s.markers.entries()){
   assert.equal(marker.children.length,1);assert.equal(marker.children[0].className,'notes');
   assert.equal(marker.children[0].innerHTML,s.entries[i+1].innerHTML);
@@ -31,11 +31,11 @@ test('checkpoint notes leave other variants untouched and print uses the final e
   const s=slide(id);assert.equal(m.prepareCheckpointNotes(s),false);assert.equal(s.note.innerHTML,'existing variant notes');
   assert.ok(s.markers.every(marker=>marker.children.length===0));
  }
- const s=slide();s.markers=[];m.prepareCheckpointNotes(s,{printMode:true});assert.match(s.note.innerHTML,/6 — Podsumowanie/);
+ const s=slide();s.markers=[];m.prepareCheckpointNotes(s,{printMode:true});assert.match(s.note.innerHTML,/5 — Podsumowanie/);
 });
 test('missing checkpoint notes fail explicitly instead of retaining a stale explanation',async()=>{
  const {['checkpoint-notes']:m}=await modules(['checkpoint-notes']);const s=slide();
- s.entries.splice(3,1);assert.throws(()=>m.prepareCheckpointNotes(s),/brak notatki checkpointu multicast/);
+ s.entries.splice(2,1);assert.throws(()=>m.prepareCheckpointNotes(s),/brak notatki checkpointu multicast/);
 });
 
 test('Notes receiver restores the requested frame only for a matching template and trusted parent',async()=>{
@@ -50,7 +50,7 @@ test('Notes receiver restores the requested frame only for a matching template a
  assert.equal(listeners.length,1);assert.equal(listeners[0].capture,true);
  const send=(indexf,extra={})=>listeners[0].fn({source:parent,origin:view.location.origin,data:JSON.stringify({method:'setState',args:[{indexh:14,indexv:0,indexf}]}),stopImmediatePropagation:()=>calls.push(['stop']),...extra});
  send(3);assert.deepEqual(calls,[['stop'],['restore'],['state',3],['seek',4]]);
- calls.length=0;send(5);assert.equal(calls.at(-1)[1],20);
+ calls.length=0;send(4);assert.equal(calls.at(-1)[1],20);
  calls.length=0;send(-1);assert.equal(calls.at(-1)[1],0);
  calls.length=0;send(4,{origin:'http://untrusted'});send(4,{source:{}});assert.equal(calls.length,0);
  s.id='05-zrodla';send(4);assert.equal(calls.length,0);

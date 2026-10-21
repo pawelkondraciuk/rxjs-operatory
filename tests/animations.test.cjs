@@ -217,8 +217,8 @@ test('flatten strategies use identical inputs, queue values before projection an
 test('concatAll reveals the inner after the Observable leaves map and arrives at concatAll',async()=>{
   const {scenes,engine:{compileScene}}=await harness();
   const model=compileScene(scenes.get('08-map-strumienie'));
-  assert.equal(model.events.filter(e=>e.type==='inner-create').length,1,'jeden inner');
-  for(const [i,value] of ['A'].entries()) {
+  assert.equal(model.events.filter(e=>e.type==='inner-create').length,2,'dwa innery: A$ i B$');
+  for(const [i,value] of ['A','B'].entries()) {
     const creation=model.events.find(e=>e.type==='inner-create'&&e.node==='inner'+i);
     const mapped=model.events.find(e=>e.type==='deliver-next'&&e.edge==='source-projection'&&e.value===value);
     const arrival=model.events.find(e=>e.type==='deliver-next'&&e.edge==='projection-op'&&e.value===value+'$');
@@ -276,15 +276,15 @@ test('the sequential Observable example has no interlevel wires or waiting rows 
   }
 });
 
-test('after six manual stops the single HTTP request holds the same frame as finish()',async()=>{
+test('after eight manual stops both HTTP requests hold the same frame as finish()',async()=>{
   const {player,callbacks}=await harness(),{api}=player('08-map-strumienie');
-  assert.equal(api.stops.length,6);
+  assert.equal(api.stops.length,8);
   api.seek(api.stops.at(-2).time);api.playContinuously();
   for(let now=0;now<30000;now+=50){const pending=[...callbacks.values()];callbacks.clear();pending.forEach(fn=>fn(now));}
   assert.equal(api.state,'finished');assert.equal(api.time,api.duration);assert.equal(callbacks.size,0);
-  assert.equal(api.snapshot.executionCounts.started,1);assert.equal(api.snapshot.executionCounts.active,0);
-  assert.equal(api.snapshot.innerWorkPanels[0].rows.length,1);
-  assert.equal(api.snapshot.innerWorkPanels[0].rows[0].receiver.state,'completed');
+  assert.equal(api.snapshot.executionCounts.started,2);assert.equal(api.snapshot.executionCounts.active,0);
+  assert.equal(api.snapshot.innerWorkPanels[0].rows.length,2);
+  assert.ok(api.snapshot.innerWorkPanels[0].rows.every(r=>r.receiver.state==='completed'));
   const final=JSON.stringify(api.snapshot);api.seek(0);api.finish();assert.equal(JSON.stringify(api.snapshot),final);
   api.seek(api.stops[0].time);assert.equal(api.snapshot.executionCounts.started,0);
   assert.equal(api.snapshot.tokens.find(t=>t.phase==='transform').value,'A$');

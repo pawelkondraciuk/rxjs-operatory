@@ -71,19 +71,34 @@ test('shareReplay: late B subscribes after complete and receives 42 from the buf
  assert.equal(pocket(c.snapshot(c.duration)).values[0].color,'#cbbff2');
 });
 
-test('shareReplay: one next runs the faster HTTP, A and late B without intermediate pauses',async()=>{
- const {scene,c}=await replay();assert.deepEqual(Array.from(c.stops),[]);
- const request=c.plan.records.get('http-replay');
+test('shareReplay: one stop right after B subscribes (ball still in the buffer), slower replay and a slightly slower first delivery',async()=>{
+ const {scene,c}=await replay();assert.deepEqual(Array.from(c.stops,s=>s.id),['subscribed-b']);
+ const request=c.plan.records.get('http-replay'),toA=c.plan.records.get('replay-A'),toB=c.plan.records.get('replay-B');
  assert.ok(request.events[0].at-(request.start+request.connectDuration)<=1.01);
- for(const r of c.plan.records.values())for(const e of r.events)assert.ok(e.arrival-e.at<=.401);
+ // Przekazanie 42 z HTTP do A odrobinę wolniej niż dawne 0,4 s.
+ for(const r of [request,toA])for(const e of r.events)assert.ok(Math.abs(e.arrival-e.at-.6)<1e-6);
+ // Postój: subskrypcja B zestawiona, kulka leży w buforze, nic nie leci, B pusty, migawka subscribe już zgasła.
+ const stop=c.stops[0].time,connected=at(c,'connected','replay-B'),v=toB.events[0],frame=c.snapshot(stop);
+ assert.ok(stop>connected&&stop<v.at-1.2,'po subscribe B, przed wyjęciem kulki z bufora');
+ assert.equal(frame.tokens.length,0);assert.deepEqual(buffered(frame),['42']);assert.deepEqual(balls(frame,'B'),[]);
+ assert.equal(lane(frame,'B','B').state,'running');assert.equal((frame.callouts||[]).length,0);
+ assert.equal(frame.executionCounts.started,1,'bez nowego HTTP');
+ // Wolniejsze przekazanie z bufora: 1,2 s wyjazdu z kieszeni i 0,8 s przelotu do B.
+ assert.ok(Math.abs(v.arrival-v.at-.8)<1e-6);
+ assert.deepEqual(Array.from(c.snapshot(v.at-1.1).tokens,t=>t.phase),['replay']);
+ assert.equal(c.snapshot(v.at-1.3).tokens.length,0);
  const h=await playbackHarness(),navigation=[],{player,controller}=h.create({scene,controls:{stageOptions:{onNavigate:d=>navigation.push(d)}}});
  assert.equal(player.time,0);assert.equal(player.isPlaying,false);
+ controller.next();h.advance(30000);assert.equal(player.time,stop);assert.equal(player.isPlaying,false);
+ assert.deepEqual(balls(player.snapshot,'B'),[]);
  controller.next();h.advance(30000);assert.equal(player.state,'finished');assert.equal(player.snapshot.executionCounts.started,1);
  assert.deepEqual(balls(player.snapshot,'B'),['42']);controller.next();assert.deepEqual(navigation,[1]);
- controller.reset();controller.next();h.advance(100);controller.next();assert.equal(player.state,'finished');
+ controller.reset();controller.next();h.advance(100);controller.next();assert.equal(player.time,stop,'szybkie dalej kończy tylko etap');
+ controller.next();h.advance(100);controller.next();assert.equal(player.state,'finished');
+ controller.previous();assert.equal(player.time,stop);assert.deepEqual(balls(player.snapshot,'B'),[]);
  controller.reset();controller.setMode('manual');controller.setMode('auto');h.advance(30000);assert.equal(player.state,'finished');
  const html=fs.readFileSync('index.html','utf8'),template=html.match(/<template data-checkpoint-notes="20-sharereplay-2">([\s\S]*?)<\/template>/)[1];
- assert.deepEqual([...template.matchAll(/data-checkpoint="([^"]+)"/g)].map(m=>m[1]),['ready','finished']);
+ assert.deepEqual([...template.matchAll(/data-checkpoint="([^"]+)"/g)].map(m=>m[1]),['ready','subscribed-b','finished']);
 });
 
 test('shareReplay: ports share Y, the buffer pocket hangs under the operator and rewind is deterministic in both formats',async()=>{

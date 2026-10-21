@@ -10,7 +10,7 @@ const manual=stops=>({entry:'manual',stops,afterLastManualStop:'start-auto',fini
 // zamienia User w string „Paweł Kondraciuk” — wejście i wynik projekcji mają wspólne logicalAt. Czasy (schedule)
 // wyłącznie rozciągają ilustrację; ten sam obiekt User co na Cold i Subject + HTTP wraca na share + HTTP po pytaniu „A share?”.
 function mapSequence(scene) {
-  const timing={pipeline:.65,handoff:.05,subscribe:1,mapHold:.6,request:2.6,travel:1.4,transform:2,receivedHold:.5,gap:.3,terminal:1.6,settle:1,
+  const timing={pipeline:.65,handoff:.05,subscribe:1,mapHold:.6,request:2,travel:1.4,transform:2,receivedHold:.5,gap:.3,terminal:1.6,settle:1,
     reveal:.3,laneReveal:.35,...scene.timing};
   for(const [key,value] of Object.entries(timing)) {
     if(!Number.isFinite(value)||value<=0)throw new Error(`${scene.id}: nieprawidłowy czas ilustracji ${key}`);
@@ -36,12 +36,11 @@ function mapSequence(scene) {
 const operatorBalls={user:'{…}',text:'"…"'};
 
 export function configureOperator(scene) {
-  const sequence=mapSequence(scene),{timing,pipeline,value,complete,finished,duration,mapConnected,subscribed}=sequence;
+  const sequence=mapSequence(scene),{timing,pipeline,value,complete,finished,duration,mapConnected}=sequence;
   const fill=laneSubscribers.A.fill,example="httpGet<User>('/api/users/42')";
   const captions={
     pipeline:'pipe składa definicję: map zamieni User na imię i nazwisko. HTTP nadal nie działa',
     'subscribed-map':'A subskrybuje map. Subskrypcja idzie od odbiorcy w stronę źródła — HTTP jeszcze nie działa',
-    request:'map subskrybuje HTTP. Dopiero teraz startuje request',
     arrived:'HTTP wyemitował User — wartość wraca w przeciwnym kierunku i dotarła do map',
     mapped:'map synchronicznie zamienia User w string „Paweł Kondraciuk”',
     received:'A dostaje jeden string: Paweł Kondraciuk',
@@ -66,9 +65,7 @@ export function configureOperator(scene) {
       {id:'pipeline',time:pipeline,caption:captions.pipeline},
       // Impuls subscribe A dotarł do map i stoi (mapHold); map jeszcze nie subskrybuje HTTP, Requesty HTTP: 0.
       {id:'subscribed-map',time:sequence.seconds(mapConnected+.3),caption:captions['subscribed-map']},
-      // map → HTTP zestawione, request trwa (postęp widoczny, odpowiedź jeszcze nie wyszła).
-      {id:'request',time:sequence.seconds(subscribed+.8),caption:captions.request},
-      // Odpowiedź: User leci z HTTP do wejścia map.
+      // Jeden etap bez postoju podczas requestu: map → HTTP, request, odpowiedź; User leci z HTTP do wejścia map.
       {id:'arrived',time:value.arrival,caption:captions.arrived},
       // Kulka stoi na środku wiersza map i ma już nową wartość (zmiana w połowie projekcji).
       {id:'mapped',time:sequence.seconds(value.arrival+timing.transform*.62),caption:captions.mapped},
@@ -521,7 +518,9 @@ export function configureShareReplayLate(scene) {
       [at.response,'HTTP zwraca 42. shareReplay(1) przekazuje je do A i zapisuje w buforze'],
       [at.b,'B subskrybuje po complete. Bez nowego HTTP: 42 wychodzi z bufora']],
     metrics:[{label:'Requesty HTTP',count:'started'}],
-    playback:{entry:'manual',finish:'hold',controller:'stages',stops:[]},
+    // Jedyny postój: B zestawił subskrypcję, kulka jeszcze leży w buforze (pytanie, co dostanie B).
+    playback:{entry:'manual',finish:'hold',controller:'stages',
+      stops:[{id:'subscribed-b',event:{type:'connected',edge:'replay-B'},offset:.4,caption:'B subskrybuje po complete. Co teraz dostanie?'}]},
   });
 }
 
@@ -536,12 +535,14 @@ export function shareReplayLateGraph(scene) {
     nodes:[{id:'http',x:g.httpX,w:g.httpW,label:'HTTP GET',workLanes:true,progressUntilNext:true,...laneTile('source',top,{U1:0},1)},
       // buffer: kieszeń pod kafelkiem; splitAt .5 — kulka staje w wierszu A i rozgałęzia się do A i do bufora.
       {id:'replay',x:g.opX,w:g.opW,label:'shareReplay(1)',color:'op',splitBalls:true,splitAt:.5,splitGuides:false,hubFan:false,rowTint:true,
-        buffer:{size:1,label:'bufor'},...laneTile('operator',top,{U1:0,A:0,B:1},2)},
+        buffer:{size:1,label:'bufor',move:1.2},...laneTile('operator',top,{U1:0,A:0,B:1},2)},
       ...receivers.map(r=>laneReceiver(r.id,r.id,r.pos,{rowTint:true}))],
-    edges:[{id:'http-replay',from:'http',to:'replay',subscriber:'U1',logicalStart:at.a,logicalEnd:complete(at.complete),events:scene.rows[0].events},
-      {id:'replay-A',from:'replay',to:'A',subscriber:'A',logicalStart:at.a,logicalEnd:complete(at.complete),hold:.35,events:scene.rows[1].events},
-      // B: odtworzenie z bufora w chwili subskrypcji (replayHold — wyjęcie z kieszeni) i complete zakończonego źródła.
-      {id:'replay-B',from:'replay',to:'B',subscriber:'B',logicalStart:at.b,logicalEnd:complete(at.b),connect:.5,replayHold:.35,events:scene.rows[2].events}],
+    // Przekazanie 42 z HTTP do A i bufora trochę wolniej niż reszta pokazu (travel .6, hold .5).
+    edges:[{id:'http-replay',from:'http',to:'replay',subscriber:'U1',logicalStart:at.a,logicalEnd:complete(at.complete),travel:.6,events:scene.rows[0].events},
+      {id:'replay-A',from:'replay',to:'A',subscriber:'A',logicalStart:at.a,logicalEnd:complete(at.complete),hold:.5,travel:.6,events:scene.rows[1].events},
+      // B: odtworzenie z bufora po subskrypcji i complete zakończonego źródła. replayHold 1,8: kulka leży w buforze
+      // 0,6 s po connected (postój subscribed-b), potem powoli wyjeżdża z kieszeni (buffer.move 1,2) i leci do B (0,8).
+      {id:'replay-B',from:'replay',to:'B',subscriber:'B',logicalStart:at.b,logicalEnd:complete(at.b),connect:.5,replayHold:1.8,travel:.8,events:scene.rows[2].events}],
     executions:[{id:'http-1',node:'http',edge:'http-replay',duration:at.response-at.a}],
     trays:receivers.map(r=>laneTray(r.id,r.pos,1)),
     callouts:[subscribeCallout('A','replay-A','http-replay',{x:g.recvX,y:top/2}),
@@ -713,7 +714,7 @@ export function configureSubject(scene) {
   const connected=at.subscribe+at.link,arrival=at.next+at.travel,split=arrival+at.hold,delivered=split+at.travel;
   const upstreamEnd=at.complete+at.terminal,downstreamEnd=upstreamEnd+at.terminal;
   // Wyróżnienia jak na share(): Subject (operator) fioletowo, httpGet turkusowo; .subscribe(subject$) bez stałego tła,
-  // chwilowo w kolorze toru U — od pojawienia się linii do chwili po zestawieniu subskrypcji HTTP (widoczne na postoju).
+  // chwilowo w kolorze toru U — od pojawienia się linii do chwili po zestawieniu subskrypcji HTTP.
   const subjectMark={id:'subject',bg:'rgba(216,179,230,.45)',line:'#b384c6'},httpMark={id:'http',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'};
   const subscribeMark={id:'subscribe',bg:'rgba(35,143,131,.16)',line:subjectUpstream.color,quiet:true};
   const defined={type:'node-create',node:'http'},connect={type:'manual-connect',edge:'http-subject'};
@@ -737,8 +738,8 @@ export function configureSubject(scene) {
       [at.connect,'http$.subscribe(subject$): subskrybujemy HTTP, a Subject jest Observerem']],
     playback:manual([
       {id:'defined',event:defined,offset:at.defined,caption:'Definicja http$: nagłówek HTTP GET bez wykonania. Request jeszcze nie istnieje'},
-      {id:'connect-http',event:ev('connected','http-subject'),offset:.35,caption:'Subject jest Observerem: http$.subscribe(subject$) podłącza HTTP'},
-      // Jeden etap: request, odpowiedź i dotarcie User do Subjecta; postój, gdy Subject rozdzielił go na dwie kulki przy portach A/B.
+      // Jeden etap: linia http$.subscribe(subject$), impuls subscribe, request, odpowiedź i dotarcie User do Subjecta;
+      // postój, gdy Subject rozdzielił go na dwie kulki przy portach A/B.
       {id:'multicast',event:ev('source-next','subject-A'),offset:-.05,caption:'Jeden request, jeden obiekt User. Subject rozsyła go do A i B'},
       // Kolejny etap: kulki dolatują do pól, potem complete z HTTP przez Subject do A/B.
       {id:'complete',event:ev('disconnected','subject-B'),offset:.8,caption:'A i B mają dane i complete. HTTP oraz Subject są zakończone'},
@@ -920,23 +921,24 @@ export function configureSubjectInterval(scene,kind='subject') {
   });
   Object.assign(scene,subjectIntervalVariant(scene,{from:0,to:t.window,closedAt:null,actions:[]}));
 }
-// share + interval: A/B już podłączeni → unsubscribe A → unsubscribe B i upstream → późny C, nowe #2 od 0.
+// share + interval: A/B już podłączeni → unsubscribe A → unsubscribe B (pauza na pytanie: połączenie z interval #1
+// nadal widoczne) → share() odłącza upstream → późny C, nowe #2 od 0.
 export function configureShareInterval(scene) {
-  const t=subjectIntervalTiming,defaults=[3,6,12];
+  const t=subjectIntervalTiming,defaults=[3,6,9,12];
   Object.assign(scene,{intervalHub:'share',graph:shareIntervalGraph,playerLayout:'function',ink:'#26323B',
     playerClass:'rx-lanes rx-flat-tiles',title:'share() — kto odłączy źródło?',rows:[],
-    live:{start:0,window:t.window,keep:t.keep,margin:t.margin,actions:['unsub-A','unsub-B','C'],defaults,
-      actionGap:3,settle:5,autoplay:true,variant:shareIntervalVariant}});
+    live:{start:0,window:t.window,keep:t.keep,margin:t.margin,actions:['unsub-A','unsub-B','disconnect','C'],defaults,
+      actionGap:3,settle:5,autoplay:true,pauseAfterActions:['unsub-B'],variant:shareIntervalVariant}});
   const ref=shareIntervalVariant(scene,{from:0,to:t.window,closedAt:null,actions:defaults});
-  scene.live.defaultClose=ref.shareIntervalPlan.busy[2]+.1;
-  scene.playback={entry:'manual',finish:'hold',live:true,stops:['unsub-a','unsub-b','subscribed-c'].map((id,i)=>
+  scene.live.defaultClose=ref.shareIntervalPlan.busy[3]+.1;
+  scene.playback={entry:'manual',finish:'hold',live:true,stops:['unsub-a','unsub-b','disconnect','subscribed-c'].map((id,i)=>
     ({id,time:ref.shareIntervalPlan.busy[i]}))};
   Object.assign(scene,shareIntervalVariant(scene,{from:0,to:t.window,closedAt:null,actions:[]}));
 }
 
 function shareIntervalVariant(scene,{from,to,closedAt,actions=[]}) {
   const t=subjectIntervalTiming,end=closedAt??to,link=.5,reveal=.3,busy=[];
-  const [callA,callB,callC]=actions,emit=k=>t.first+k*t.period;
+  const [callA,callB,callD,callC]=actions,emit=k=>t.first+k*t.period;
   const received=at=>at+2*t.travel+t.hold;
   const lastBefore=(time,first=t.first)=>Math.ceil((time-first)/t.period)-1;
   const maxFirst=callB===undefined?Infinity:lastBefore(callB);
@@ -947,8 +949,13 @@ function shareIntervalVariant(scene,{from,to,closedAt,actions=[]}) {
       doneAt:unsubscribeAt===null?undefined:unsubscribeAt+t.cancel+t.calloutHold};
   });
   if(callA!==undefined)busy.push(runs[0].doneAt);
-  const cancelAt=callB===undefined?undefined:Math.max(runs[0].unsubscribeAt+t.cancel,runs[1].unsubscribeAt+t.cancel,
-    maxFirst>=0?emit(maxFirst)+t.travel:callB);
+  // Po odejściu B: ostatnia wysłana wartość dociera do share() i gaśnie (dropBalls 0,5 s), × B kończy się na share().
+  // Pauza na pytanie: odbiorców 0, połączenie z interval #1 nadal zestawione, bez nowych emisji.
+  const lastArrival=callB===undefined?undefined:maxFirst>=0?emit(maxFirst)+t.travel:callB;
+  const questionAt=callB===undefined?undefined:Math.max(runs[0].doneAt,runs[1].doneAt,lastArrival+.5);
+  if(questionAt!==undefined)busy.push(questionAt);
+  // Akcja disconnect: share() odłącza upstream — × biegnie od share() do interval #1.
+  const cancelAt=callD===undefined?undefined:Math.max(callD,runs[0].unsubscribeAt+t.cancel,runs[1].unsubscribeAt+t.cancel,lastArrival);
   const stoppedAt=cancelAt===undefined?undefined:cancelAt+t.cancel+t.calloutHold;
   if(stoppedAt!==undefined)busy.push(stoppedAt);
   let connectedC,firstC;
@@ -961,16 +968,17 @@ function shareIntervalVariant(scene,{from,to,closedAt,actions=[]}) {
   const count=(time,first,max=Infinity)=>Math.max(0,Math.min(max+1,Math.floor((time-first)/t.period)+1));
   const mark={id:'share',bg:'rgba(216,179,230,.45)',line:'#b384c6'};
   const lines=[[{text:'const shared$ = interval(1000).pipe('},{text:'share()',mark,
-    active:cancelAt===undefined?[]:[{from:{type:'disconnected',edge:'share-B'},to:{type:'disconnected',edge:'interval-share'}}]},{text:');'}]];
+    active:cancelAt===undefined?[]:[{from:{type:'inner-unsubscribe',edge:'interval-share'},to:{type:'disconnected',edge:'interval-share'}}]},{text:');'}]];
   // F/druk musi dokończyć spóźnione subscribe C nawet w trakcie poprzedniego unsubscribe.
-  const settledEnd=closedAt!==null&&closedAt!==undefined&&runs.length===3?Math.max(end,busy[2]+.1):end;
-  return {...scene,duration:settledEnd,shareIntervalPlan:{from,end:settledEnd,runs,maxFirst,cancelAt,stoppedAt,connectedC,firstC,busy},liveBusyUntil:busy,
+  const settledEnd=closedAt!==null&&closedAt!==undefined&&runs.length===3?Math.max(end,busy[3]+.1):end;
+  return {...scene,duration:settledEnd,shareIntervalPlan:{from,end:settledEnd,runs,maxFirst,questionAt,cancelAt,stoppedAt,connectedC,firstC,busy},liveBusyUntil:busy,
     code:lines[0].map(p=>p.text).join(''),codeLines:lines,codeFrames:[],
     metrics:[{label:'Emisje interval',value:time=>count(time,t.first,maxFirst)+(firstC===undefined?0:count(time,firstC))},
       {label:'Odbiorcy share()',value:time=>runs.filter(r=>time>=r.connected&&(r.unsubscribeAt===null||time<r.unsubscribeAt)).length}],
     captions:[[0,'A i B współdzielą jedno wykonanie interval #1'],
       ...(callA===undefined?[]:[[callA,'A się odłącza. B nadal słucha — interval emituje dalej']]),
-      ...(callB===undefined?[]:[[callB,'B, ostatni odbiorca, odchodzi'],[stoppedAt,'share() odłączył interval #1. Brak odbiorców i nowych emisji']]),
+      ...(callB===undefined?[]:[[callB,'B, ostatni odbiorca, odchodzi'],[runs[1].unsubscribeAt+t.cancel,'share() nie ma już odbiorców. Co stanie się z interval #1?']]),
+      ...(callD===undefined?[]:[[cancelAt,'share() sam odłącza interval #1'],[stoppedAt,'share() odłączył interval #1. Brak odbiorców i nowych emisji']]),
       ...(callC===undefined?[]:[[runs[2].born,'Późny C subskrybuje share(): nowe wykonanie interval #2 od zera'],
         [received(firstC)+.3,'C odbiera nowe wartości od 0. share() nie odtwarza historii']])].sort((a,b)=>a[0]-b[0])};
 }
@@ -1130,10 +1138,10 @@ const shareReplayOneActions=['unsub-A','B','unsub-B'];
 const shareReplayOneMarks={interval:{id:'interval',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},op:{id:'share-replay',bg:'rgba(216,179,230,.45)',line:'#b384c6'}};
 export function configureShareReplayOne(scene) {
   const t=shareReplayOneTiming,upstreamConnected=t.subscribeA+2*t.link,start=upstreamConnected+t.first;
-  // Kod jak w 20-sharereplay-2: źródło w pierwszej linii, shareReplay w drugiej.
-  const lines=[[{text:'interval(1000)',mark:shareReplayOneMarks.interval},{text:'.pipe('}],
-    [{text:'  '},{text:'shareReplay(1)',mark:shareReplayOneMarks.op}],[{text:')'}]];
-  Object.assign(scene,{graph:shareReplayOneGraph,playerLayout:'function',ink:'#26323B',playerClass:'rx-flat-tiles rx-code-steps',
+  // Kod w jednej linii (jak share + interval), marki jak w 20-sharereplay-2.
+  const lines=[[{text:'interval(1000)',mark:shareReplayOneMarks.interval},{text:'.pipe('},
+    {text:'shareReplay(1)',mark:shareReplayOneMarks.op},{text:')'}]];
+  Object.assign(scene,{graph:shareReplayOneGraph,playerLayout:'function',ink:'#26323B',playerClass:'rx-flat-tiles',
     title:'shareReplay(1): kto zatrzyma interval?',code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
     rows:[R('interval(1000)'),R('shareReplay(1)'),R('Odbiorca A'),R('Odbiorca B')],
     // Pierwsze „dalej” gra od READY bez postoju aż do emisji (subscribed-a = live.start, nie jest postojem przed emisją).
@@ -1306,7 +1314,7 @@ function shareReplayRefVariant(scene,{from,to,closedAt,actions=[]}) {
   const resetMark=(edge,at)=>at===undefined?[]:[{from:{type:'buffer-reset',edge},to:{type:'disconnected',edge}}];
   const lines=[[{text:'interval(1000)',mark:shareReplayOneMarks.interval},{text:'.pipe('}],
     [{text:'  '},{text:'shareReplay({ bufferSize: 1, refCount: true })',mark:{...shareReplayOneMarks.op,
-      active:[...resetMark('interval-replay',clear1),...resetMark('interval-replay-2',clear2)]}}],[{text:')'}]];
+      active:[...resetMark('interval-replay',clear1),...resetMark('interval-replay-2',clear2)]}},{text:')'}]];
   const caption=[[0,'shareReplay({ bufferSize: 1, refCount: true }) na interval: definicja i pusty bufor'],
     [t.subscribeA,'A subskrybuje: shareReplay podłącza się do interval (#1)'],
     [base(0),'interval emituje. shareReplay przekazuje wartość A i zapisuje ją w buforze'],
@@ -1646,9 +1654,10 @@ export function configureFlatten(scene,mode) {
   }
 }
 
-// Proste wprowadzenie: jedna wartość A, jeden inner Observable (A$) i jeden HTTP #1, bez kolejki. Harmonogram
-// rozdziela pojawienie się definicji innera, subscribe, next i complete na ręczne kroki, bez zmiany synchronicznej
-// semantyki map. id$ kończy się dopiero po complete innera, więc complete S1 następuje bez aktywnych innerów.
+// Proste wprowadzenie: wartość A, inner Observable (A$) i HTTP #1, bez kolejki. Harmonogram rozdziela pojawienie się
+// definicji innera, subscribe, next i complete na ręczne kroki, bez zmiany synchronicznej semantyki map. Po complete
+// innera #1 id$ nadal działa: emituje B → B$ → HTTP #2 (też bez kolejki). id$ kończy się dopiero po complete innera #2,
+// więc complete S1 następuje bez aktywnych innerów.
 function configureConcatAllIntro(scene) {
   const timing={subscribe:.4,travel:.6,transform:.6,request:.8,terminal:.4,reveal:.3,hold:.2};
   const seconds=value=>Math.round(value*1e9)/1e9;
@@ -1660,20 +1669,21 @@ function configureConcatAllIntro(scene) {
     const complete=after(received,timing.reveal,timing.hold),completed=after(complete,timing.terminal);
     return {emitted,arrived,mapped,created,subscribe,connected,response,innerReceived,received,complete,completed};
   };
-  const subscribed=after(.3,3*timing.subscribe),a=sequence(after(subscribed,.3));
-  const sourceComplete=after(a.completed,.55);
-  const duration=after(sourceComplete,3*timing.terminal,.35),outerComplete=2.5;
-  const jobs=[{at:1,value:'A',color:'a'}].map(v=>({...v,start:v.at,end:v.at+timing.request,dur:timing.request}));
+  const subscribed=after(.3,3*timing.subscribe),a=sequence(after(subscribed,.3)),b=sequence(after(a.completed,.55));
+  const sourceComplete=after(b.completed,.55);
+  // Czas modelu: B dopiero po complete innera #1 (A kończy się w 1,8), id$ kończy się po innerze #2.
+  const duration=after(sourceComplete,3*timing.terminal,.35),outerComplete=3.2;
+  const jobs=[{at:1,value:'A',color:'a'},{at:2,value:'B',color:'b'}].map(v=>({...v,start:v.at,end:v.at+timing.request,dur:timing.request}));
   const results=jobs.map(job=>E(job.end,job.value,job.color));
   const rows=[R('wejście',jobs.map(job=>E(job.at,job.value,job.color)),[],{completeAt:outerComplete}),
     R('map',jobs.map(job=>E(job.at,job.value+'$',job.color)),[],{completeAt:outerComplete}),
     ...jobs.map((job,i)=>R(job.value+'$',[results[i]],[B(job.start,job.end,job.value,'work',{duration:job.dur})],{completeAt:job.end})),
     R('wynik',results,[],{completeAt:outerComplete})];
-  const summary='map tworzy Observable, concatAll go subskrybuje. id$ i inner zakończone — S1 dostaje complete.';
+  const summary='map tworzy Observable, concatAll je subskrybuje. id$ i oba innery zakończone — S1 dostaje complete.';
   Object.assign(scene,{rows,jobs,duration,timing,
     graph:concatAllIntroGraph,
-    concatAllIntro:{timing,runs:[a],sourceComplete,outerComplete},
-    captions:[[0,'map może zwrócić Observable. Prześledźmy jedną wartość i jeden request HTTP.'],[duration,summary]],
+    concatAllIntro:{timing,runs:[a,b],sourceComplete,outerComplete},
+    captions:[[0,'map może zwrócić Observable. Prześledźmy wartość i request HTTP.'],[duration,summary]],
     playback:{entry:'manual',finish:'hold',stops:[
       {id:'first',event:{type:'deliver-next',edge:'source-projection',value:'A'},offset:timing.transform*.65,
         caption:'Subskrypcja zestawiona. map zamienił A w A$: Observable jest wartością, HTTP jeszcze nie działa.'},
@@ -1685,6 +1695,11 @@ function configureConcatAllIntro(scene) {
         caption:'HTTP #1 emituje wynik A, concatAll przekazuje go do S1. HTTP nie wysłał jeszcze complete.'},
       {id:'complete-a',event:{type:'disconnected',edge:'inner0-op'},offset:.15,
         caption:'HTTP #1 kończy inner przez complete. Główna subskrypcja nadal czeka na id$.'},
+      // id$ nie jest zakończone: kolejna wartość B to kolejny inner i kolejny request.
+      {id:'active-b',event:{type:'inner-subscribe',node:'inner1'},
+        caption:'id$ wciąż działa: B → B$, concatAll subskrybuje B$ i rusza HTTP #2.'},
+      {id:'complete-b',event:{type:'disconnected',edge:'inner1-op'},offset:.15,
+        caption:'Wynik B dotarł do S1, HTTP #2 zakończył inner. Dopóki id$ nie wyśle complete, mogą przyjść kolejne requesty.'},
       {id:'complete',time:duration,caption:summary},
     ]},timeline:[]});
 }
@@ -1714,13 +1729,14 @@ function concatAllIntroGraph(scene) {
     graph.nodes.find(node=>node.id==='inner'+i).lifecycleRow={...scene.rows[i+2],
       spans:[B(p.connected,p.complete,job.value,'work')],completeAt:p.complete};
   }
-  // Nie ma kolejki: jedna wartość. Utworzone A$ czeka tylko na ilustrację subscribe.
+  // Nie ma kolejki: B przychodzi po complete A$. Utworzone X$ czeka tylko na ilustrację subscribe.
   for(const work of graph.panels[0].works)delete work.queueObservable;
   return graph;
 }
 
-// Podpisy i postoje porównania. concatMap pokazuje pełną subskrypcję S1; pozostałe trzy zaczynają od zestawionego S1
-// (preconnected) i jednym „dalej” dochodzą do tego samego pytania. Odpowiedź zawsze wymaga kolejnego „dalej”.
+// Podpisy i postoje porównania. Wszystkie cztery zaczynają od zestawionego S1 (preconnected). concatMap ma osobne kroki
+// emisji A i startu HTTP A; pozostałe trzy jednym „dalej” dochodzą do tego samego pytania. Odpowiedź zawsze wymaga
+// kolejnego „dalej”.
 function configureComparison(scene,mode) {
   const first=mode==='concatMap',question='A wciąż pracuje. Przychodzi B. Co teraz?';
   const ev=(type,extra)=>({type,...extra}),arrivedB=ev('deliver-next',{edge:'source-op',value:'B'});
@@ -1731,8 +1747,8 @@ function configureComparison(scene,mode) {
     exhaustMap:{id:'answer',event:arrivedB,offset:comparison.decide+.4,caption:'exhaustMap: B pominięte. Bez projekcji, bez HTTP, bez kolejki'},
   }[mode];
   // Podtytuł po myślniku („Po kolei”…) zdradza odpowiedź: tytuł pokazuje go dopiero po postoju pytania.
-  Object.assign(scene,{preconnected:!first,titleAnswerAfter:'question',code:`id$.pipe(${mode}(id => httpGet(url(id))))`,
-    captions:[[0,first?'Projekcja zwraca Observable; concatMap decyduje, kiedy go zasubskrybować.':`Ten sam problem, inny operator: S1 już subskrybuje id$ przez ${mode}.`],
+  Object.assign(scene,{preconnected:true,titleAnswerAfter:'question',code:`id$.pipe(${mode}(id => httpGet(url(id))))`,
+    captions:[[0,first?'S1 już subskrybuje id$ przez concatMap. Projekcja zwróci Observable; concatMap decyduje, kiedy go zasubskrybować.':`Ten sam problem, inny operator: S1 już subskrybuje id$ przez ${mode}.`],
       [comparison.input[0].at,'A: projekcja tworzy inner, HTTP A startuje.'],
       [comparison.input[1].at,question],
       [comparisonInput(mode)[2].at,{concatMap:'C przychodzi, gdy nic nie czeka: od razu nowy HTTP.',mergeMap:'C uruchamia kolejny HTTP.',
@@ -1740,7 +1756,6 @@ function configureComparison(scene,mode) {
       [scene.rows.at(-1).completeAt,'id$ i wszystkie inner zakończone. Wynik: complete.']],
     playback:manual([
       ...(first?[
-        {id:'subscribe',modelTime:.3,caption:'.subscribe(): S1 subskrybuje concatMap, a concatMap — id$.'},
         {id:'first',event:ev('deliver-next',{edge:'source-op',value:'A'}),caption:'A dotarło do concatMap. Projekcja: id => httpGet(url(A))'},
         {id:'active',event:ev('inner-subscribe',{node:'inner0'}),offset:.05,caption:'concatMap subskrybuje inner A: HTTP A startuje.'}]:[]),
       {id:'question',event:arrivedB,offset:.35,caption:question},

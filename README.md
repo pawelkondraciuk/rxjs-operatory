@@ -235,16 +235,15 @@ httpGet<User>('/api/users/42')
 | 0 | READY | Kod `httpGet<User>('/api/users/42')`, nagłówek HTTP GET i odbiorca A (ikona inbox, litera A, puste pole `fullName`). Brak wykonania i requestu. |
 | 1 | pipeline | Fade-in 0,3 s: druga linia `.pipe(map(...))` i kafelek map. Pipe składa definicję, nie uruchamia HTTP (Requesty 0). |
 | 2 | subscribed-map | Chwilowe `.subscribe()` A; impuls subscribe dotarł od A do map i tam stoi (ręczna pauza). Wiersz A w map, HTTP GET bez wykonania (Requesty 0). „Subskrypcja idzie od odbiorcy do źródła, a wartości wracają w przeciwnym kierunku.” |
-| 3 | request | map subskrybuje HTTP — impuls biegnie dalej w lewo; dopiero teraz startuje request (Requesty 1, postęp widoczny, odpowiedź jeszcze nie wyszła). |
-| 4 | arrived | HTTP emituje jedną kulkę „{…}” (cały User, bez JSON-a) — postój, gdy dotarła do wejścia map. |
-| 5 | mapped | Kulka stoi w środku wiersza map i zmienia się w „"…"” (string); ta sama subskrypcja, bez nowej pracy. |
-| 6 | received | Wynik dociera do A; pole `fullName` pokazuje pełne „Paweł Kondraciuk”. |
-| 7 | complete | Zielony impuls z HTTP przez map do A; wiersze HTTP GET, map i A zielenieją, a przy A (nad długim wynikiem, w linii etykiety pola) pojawia się `✓ complete` — bez napisu w HTTP GET i map. Map nie zatrzymuje complete i nie wywołuje drugiego requestu. |
+| 3 | arrived | Jeden etap bez postoju w trakcie requestu: map subskrybuje HTTP (impuls biegnie dalej w lewo, Requesty 1), request z postępem, potem HTTP emituje jedną kulkę „{…}” (cały User, bez JSON-a) — postój, gdy dotarła do wejścia map. |
+| 4 | mapped | Kulka stoi w środku wiersza map i zmienia się w „"…"” (string); ta sama subskrypcja, bez nowej pracy. |
+| 5 | received | Wynik dociera do A; pole `fullName` pokazuje pełne „Paweł Kondraciuk”. |
+| 6 | complete | Zielony impuls z HTTP przez map do A; wiersze HTTP GET, map i A zielenieją, a przy A (nad długim wynikiem, w linii etykiety pola) pojawia się `✓ complete` — bez napisu w HTTP GET i map. Map nie zatrzymuje complete i nie wywołuje drugiego requestu. |
 | — | FINISHED | Podpis „Jeden request, jeden User, jeden string. complete zakończył wykonanie”. |
 
 **Speaker notes** (`template[data-checkpoint-notes="04-operator"]`): „Załóżmy, że pobieramy dane użytkownika z HTTP. Dostajemy cały obiekt, ale nasz widok potrzebuje tylko pełnego imienia i nazwiska” → pipe nie uruchamia HTTP → subscribe uruchamia jeden request → „Operator map dostaje pojedynczą wartość i synchronicznie ją przekształca. Tutaj z obiektu User tworzymy string” (map działa dla każdej kolejnej emisji, nasze HTTP emituje jedną) → „HTTP wykonał jeden request i wyemitował jeden obiekt. Map przekształcił go w jeden string. To nadal jedno wykonanie Observable” → „Map nie zmienia sposobu zakończenia — complete przechodzi dalej do odbiorcy” → przejście do „myMap od środka”: zobaczymy w kodzie subskrypcję biegnącą w lewo i emisję płynącą w prawo. Po „A share?” wracamy do surowego `user$ = httpGet<User>('/api/users/42')`, bez map.
 
-Kontroler `stages`: → zaczyna lub kończy etap, ← cofa checkpoint także w AUTO, Spacja pauzuje/wznawia, M zmienia tryb, R przywraca zatrzymany READY. Tempo ilustracji: etap pipe 0,65 s, pojawienie odbiorcy 0,3 s, subscribe 1 s (0,5 s na odcinek, między odcinkami postój 0,6 s na map — `timing.mapHold`), request 2,6 s, przelot 1,4 s, projekcja 2 s, zatrzymanie odbioru 0,5 s, terminal 1,6 s, cisza 1 s przed FINISHED.
+Kontroler `stages`: → zaczyna lub kończy etap, ← cofa checkpoint także w AUTO, Spacja pauzuje/wznawia, M zmienia tryb, R przywraca zatrzymany READY. Tempo ilustracji: etap pipe 0,65 s, pojawienie odbiorcy 0,3 s, subscribe 1 s (0,5 s na odcinek, między odcinkami postój 0,6 s na map — `timing.mapHold`), request 2 s, przelot 1,4 s, projekcja 2 s, zatrzymanie odbioru 0,5 s, terminal 1,6 s, cisza 1 s przed FINISHED.
 
 ### myMap od środka — `04b-map-kod`
 
@@ -291,7 +290,7 @@ READY (bez zmian względem poprzedniej wersji): sam nagłówek HTTP GET, trzy pu
 
 **share(): wspólny request i późny odbiorca (`-2`).** READY pokazuje definicję user$, HTTP GET i dwa pola A (`user.firstName`) oraz B (`user.lastName`). Pierwszy krok (`share-added`) dopisuje `.pipe(share())`. Następny krok odtwarza bez pośrednich postojów subskrypcję A, dołączenie B do trwającego HTTP #1, odpowiedź User do obu pól i complete. Postęp HTTP trwa 1,2 s; imię i nazwisko pokazują Paweł i Kondraciuk. Postój `complete`: 0 odbiorców, 1 request; ⏸ PAUZA również w AUTO i pytanie „A co, jeśli ktoś zasubskrybuje po zakończeniu requestu?”. Kolejne prawo w jednym etapie ujawnia C (`user.city`), uruchamia HTTP #2 (postęp także 1,2 s), pokazuje Białystok i complete (`complete-c`). A/B zachowują dane i zakończone subskrypcje. Żaden request ani dostarczenie jego wyniku nie wymaga osobnego kliknięcia w trakcie. Łącznie trzy postoje: share-added, complete, complete-c. Requesty kończą na 2, Odbiorcy na 0; potem FINISHED i share + interval. Osobny `20-sharereplay` pozostaje tylko modelem QA.
 
-**share(): kto odłączy źródło? (`-3`) — 30–45 sekund.** READY ma tylko A/B i jedno już działające wykonanie interval #1, kod `const shared$ = interval(1000).pipe(share());`. Pierwsze „dalej” wywołuje `subA.unsubscribe()` — B nadal odbiera. Drugie to `subB.unsubscribe()`: ostatni odbiorca odchodzi, share() odłącza upstream (× do interval), #1 szarzeje i przestaje emitować, bez complete. Odbiorców 0, licznik emisji stoi dowolnie długo. Trzecie „dalej” ujawnia późnego C i pokazuje jego subscribe przez share() do źródła: powstaje interval #2, liczący od 0; C nie dostaje historii A/B. Dawne #1 i A/B pozostają odłączeni. Emisje do C trwają na żywo, następne prawo zmienia slajd. Szybkie prawo jedynie kończy bieżącą animację, lewo cofa ostatnią akcję; reset przywraca A/B i #1. Postoje: unsub-a, unsub-b, subscribed-c. Druk/F pokazują zatrzymane #1 i aktywne #2 z C; jeden wspólny renderer i zegar. Notatki per checkpoint; dalej shareReplay(1) na interval.
+**share(): kto odłączy źródło? (`-3`) — 45–60 sekund.** READY ma tylko A/B i jedno już działające wykonanie interval #1, kod `const shared$ = interval(1000).pipe(share());`. Pierwsze „dalej” wywołuje `subA.unsubscribe()` — B nadal odbiera. Drugie to `subB.unsubscribe()`: ostatni odbiorca odchodzi, × B kończy się na share() i scena staje (⏸ PAUZA także w AUTO): Odbiorców 0, połączenie share() → interval #1 nadal zestawione, bez nowych emisji — pytanie do publiczności „Co się wydarzy?”. Trzecie „dalej” (`disconnect`) pokazuje odpowiedź: share() sam odłącza upstream (× do interval), #1 szarzeje i przestaje emitować, bez complete; licznik emisji stoi dowolnie długo. To rozdzielenie ilustracji — w RxJS odłączenie następuje synchronicznie przy unsubscribe B. Czwarte „dalej” ujawnia późnego C i pokazuje jego subscribe przez share() do źródła: powstaje interval #2, liczący od 0; C nie dostaje historii A/B. Dawne #1 i A/B pozostają odłączeni. Emisje do C trwają na żywo, następne prawo zmienia slajd. Szybkie prawo jedynie kończy bieżącą animację, lewo cofa ostatnią akcję; reset przywraca A/B i #1. Postoje: unsub-a, unsub-b, disconnect, subscribed-c. Druk/F pokazują zatrzymane #1 i aktywne #2 z C; jeden wspólny renderer i zegar. Notatki per checkpoint; dalej shareReplay(1) na interval.
 
 **Dawny wariant share za map z unsubscribe A (`lanesMode: 'share-unsub'`).** Nie jest już slajdem; ścieżka `lanesGraph` (HTTP GET → map → share() → odbiorcy, kod `httpGet<number>(url)` / `  .pipe(map(x => x * 2), share())`) zostaje dla scenariuszy `shareScenario` i testów mechanizmu.
 
@@ -379,13 +378,12 @@ Diagram HTTP GET → Subject → pola A/B, z miejscem na późnego C (HTTP 177/2
 | Krok | Checkpoint | Stan |
 | --- | --- | --- |
 | 1 | defined | Definicja http$ i sam nagłówek HTTP GET, bez wykonania. |
-| 2 | connect-http | Dopisane http$.subscribe(subject$), jeden request HTTP podłączony ręcznie. |
-| 3 | multicast | Jeden User rozdziela się na dwie identyczne kulki do A/B. |
-| 4 | complete | A: Paweł, B: Kondraciuk; oba pola z complete. HTTP i Subject zakończone, 0 odbiorców. City nadal nie ma. |
-| 5 | subscribed-c | Dopiero teraz pojawia się user.city; C subskrybuje zakończony Subject. Dostaje samo complete, bez wartości i bez nowego requestu. Pole pozostaje puste z ✓ complete. |
-| 6 | FINISHED | A/B zachowują dane i statusy, C ma tylko complete; 1 request, 0 aktywnych odbiorców. |
+| 2 | multicast | Dopisane http$.subscribe(subject$), impuls subscribe i jeden request HTTP bez postoju; jeden User rozdziela się na dwie identyczne kulki do A/B. |
+| 3 | complete | A: Paweł, B: Kondraciuk; oba pola z complete. HTTP i Subject zakończone, 0 odbiorców. City nadal nie ma. |
+| 4 | subscribed-c | Dopiero teraz pojawia się user.city; C subskrybuje zakończony Subject. Dostaje samo complete, bez wartości i bez nowego requestu. Pole pozostaje puste z ✓ complete. |
+| 5 | FINISHED | A/B zachowują dane i statusy, C ma tylko complete; 1 request, 0 aktywnych odbiorców. |
 
-MANUAL zatrzymuje się po każdym z pięciu etapów; następny krok po complete dodaje city i pokazuje subscribe oraz natychmiastowe complete. AUTO odtwarza tę samą kolejność. Subject nie odtwarza historii i nie uruchamia HTTP po późnej subskrypcji. Jeden next z HTTP trafia tylko do A/B. Późny C pozostaje poza licznikiem aktywnych odbiorców zakończonego Subjecta. Notatki READY, każdego checkpointu i FINISHED są w index.html; po podsumowaniu przechodzimy do Subject + interval.
+MANUAL zatrzymuje się po każdym z czterech etapów (bez postoju podczas subscribe i requestu); następny krok po complete dodaje city i pokazuje subscribe oraz natychmiastowe complete. AUTO odtwarza tę samą kolejność. Subject nie odtwarza historii i nie uruchamia HTTP po późnej subskrypcji. Jeden next z HTTP trafia tylko do A/B. Późny C pozostaje poza licznikiem aktywnych odbiorców zakończonego Subjecta. Notatki READY, każdego checkpointu i FINISHED są w index.html; po podsumowaniu przechodzimy do Subject + interval.
 
 **Subject — kto odłączy źródło? (`05-zrodla-4`) — 45–60 sekund.** Bezpośrednio po Subject: ręczny multicast HTTP (`05-zrodla-3`) i przed „Jakie znasz operatory RxJS?” (`02-znane-operatory`): wracamy do Subjecta, z interval zamiast HTTP. Kod przez cały slajd: `const subject$ = new Subject<number>();` oraz `const connection = interval(1000).subscribe(subject$);` (bez kodu subskrypcji A/B/C). Diagram interval(1000) → Subject → A/B/C w wyglądzie torów Subject + HTTP (te same wysokości nagłówka 79 i wierszy 89, top 178/102, viewBox 1240×612/460): interval x/w 212/310 z jednym wierszem `#1` (turkus `#238F83`), Subject 592/230 z wierszami A/B/C, kompaktowi odbiorcy 1000/366 wyrównani z wierszami Subject (A fioletowy, B pomarańczowy, C niebieski); wszystkie kable poziome, wejście `#1` trafia w wiersz A. Odbiorca pokazuje ostatnią odebraną liczbę (kulka r 34, font 30, kolor emisji `#1`).
 
@@ -440,9 +438,9 @@ Etapy to zwykłe fragmenty Reveal: prawo/lewo w przód i w tył, hash zapamiętu
 | --- | --- | --- |
 | 08-map-strumienie | A jeśli wartością jest Observable? | `id$.pipe(map(id => httpGet(url(id))), concatAll())` |
 
-**Na bloczkach:** id$ → map → concatAll → odbiorca S1, wszystkie definicje oraz S1 widoczne od wejścia. Proste wprowadzenie: źródło emituje jedną wartość A. map tworzy zimne Observable A$ przy tym samym logicalAt co wartość wejścia. Na dole powstaje jeden pipeline #1 → A$ → HTTP GET → inner #1. Nie ma drugiego innera, kolejki ani placeholderów — kolejkowanie pokazuje dopiero concatMap.
+**Na bloczkach:** id$ → map → concatAll → odbiorca S1, wszystkie definicje oraz S1 widoczne od wejścia. Proste wprowadzenie: źródło emituje A, a po complete innera #1 także B. map tworzy zimne Observable A$ / B$ przy tym samym logicalAt co wartość wejścia. Na dole powstaje pipeline #1 → A$ → HTTP GET → inner #1, a po emisji B — #2 → B$ → HTTP GET → inner #2. B przychodzi, gdy nic nie pracuje, więc nie ma kolejki ani placeholderów — kolejkowanie pokazuje dopiero concatMap. Drugi request pokazuje, że dopóki źródło nie wyśle complete, mogą przychodzić kolejne wartości i kolejne requesty.
 
-**Widok początkowy i sześć ręcznych kroków:**
+**Widok początkowy i osiem ręcznych kroków:**
 
 | Krok | Checkpoint | Stan na postoju |
 | --- | --- | --- |
@@ -452,13 +450,15 @@ Etapy to zwykłe fragmenty Reveal: prawo/lewo w przód i w tył, hash zapamiętu
 | 4 | `active` | concatAll subskrybuje A$: inner #1 subskrybuje HTTP GET i rusza HTTP #1; liczniki 1/1, odpowiedź jeszcze nie wysłana. |
 | 5 | `received` | Odpowiedź A przechodzi przez inner #1 i concatAll do S1; HTTP jeszcze bez complete. |
 | 6 | `complete-a` | HTTP #1 kończy inner #1 przez complete; główny tor nadal aktywny (id$ jeszcze trwa); liczniki 1/0. |
-| 7 | `complete` | Complete id$ przez map i concatAll do S1 — źródło zakończone, żaden inner nie jest aktywny; FINISHED. |
+| 7 | `active-b` | id$ nadal bez complete: emisja B → B$ w map → concatAll subskrybuje B$, rusza HTTP #2; liczniki 2/1. |
+| 8 | `complete-b` | Wynik B dociera do S1 (A, B), HTTP #2 kończy inner #2; S1 nadal czeka na id$; liczniki 2/0. |
+| 9 | `complete` | Complete id$ przez map i concatAll do S1 — źródło zakończone, żaden inner nie jest aktywny; FINISHED. |
 
-Każde prawo uruchamia kolejny etap; ponowne prawo podczas ruchu kończy bieżący etap. Po kroku 7 kolejne prawo zmienia slajd, bez dodatkowego przekazania do AUTO. Lewo i R przywracają deterministycznie poprzedni checkpoint i READY. AUTO odtwarza cały przebieg, druk pokazuje finał. Tempo tego slajdu: subscribe i complete 0,4 s na odcinek, przelot i projekcja 0,6 s, praca HTTP 0,8 s, pojawienie się wiersza 0,3 s. Postoje zatrzymują wyłącznie ilustrację.
+Każde prawo uruchamia kolejny etap; ponowne prawo podczas ruchu kończy bieżący etap. Po kroku 9 kolejne prawo zmienia slajd, bez dodatkowego przekazania do AUTO. Lewo i R przywracają deterministycznie poprzedni checkpoint i READY. AUTO odtwarza cały przebieg, druk pokazuje finał. Tempo tego slajdu: subscribe i complete 0,4 s na odcinek, przelot i projekcja 0,6 s, praca HTTP 0,8 s, pojawienie się wiersza 0,3 s. Postoje zatrzymują wyłącznie ilustrację.
 
-**Wniosek w FINISHED:** „map tworzy Observable, concatAll go subskrybuje. id$ i inner zakończone — S1 dostaje complete.” Liczniki: „Innery uruchomione” = 1, „Aktywne” = 0.
+**Wniosek w FINISHED:** „map tworzy Observable, concatAll je subskrybuje. id$ i oba innery zakończone — S1 dostaje complete.” Liczniki: „Innery uruchomione” = 2, „Aktywne” = 0.
 
-**Speaker notes:** osobne notatki dla READY, sześciu checkpointów i FINISHED w `template[data-checkpoint-notes="08-map-strumienie"]`. Wyjaśniają tworzenie Observable bez requestu, subskrypcję uruchamiającą HTTP oraz rozdzielenie next i complete. Przejście: co, jeśli kolejna wartość przyjdzie podczas trwającego HTTP? Kolejkowanie pokaże concatMap. Na oba przykłady około 3 minut.
+**Speaker notes:** osobne notatki dla READY, ośmiu checkpointów i FINISHED w `template[data-checkpoint-notes="08-map-strumienie"]`. Wyjaśniają tworzenie Observable bez requestu, subskrypcję uruchamiającą HTTP, rozdzielenie next i complete oraz to, że po complete innera #1 źródło może emitować dalej (B → HTTP #2), dopóki samo nie wyśle complete. Przejście: co, jeśli kolejna wartość przyjdzie podczas trwającego HTTP? Kolejkowanie pokaże concatMap. Na oba przykłady około 3 minut.
 
 ### Wspólny problem 09–12: A pracuje, przychodzi B
 
@@ -470,7 +470,7 @@ Góra bez zmian: id$ → operator → kompaktowy Odbiorca, jeden główny tor S1
 
 **Tytuł bez spoilera:** do postoju `question` tytuł pokazuje samą nazwę operatora (np. „concatMap”). Podtytuł po myślniku („Po kolei”, „Równocześnie”, „Najnowsza subskrypcja”, „Jestem zajęty”) pojawia się (fade 0,4 s), gdy animacja ruszy dalej od pytania; cofnięcie do pytania znowu go ukrywa. Druk, F i FINISHED pokazują pełny tytuł. Miejsce na podtytuł jest zarezerwowane, więc nazwa się nie przesuwa.
 
-**Subskrypcja główna:** tylko concatMap pokazuje pełną sekwencję (subscribe → A → projekcja → inner HTTP). mergeMap, switchMap i exhaustMap zaczynają w READY od zestawionego S1; jedno „dalej” prowadzi przez emisję A, start HTTP A i dotarcie B wprost do pytania.
+**Subskrypcja główna:** wszystkie cztery slajdy zaczynają w READY od zestawionego S1 (bez animacji subscribe). concatMap pokazuje osobno emisję A (projekcja) i start HTTP A; mergeMap, switchMap i exhaustMap jednym „dalej” prowadzą przez emisję A, start HTTP A i dotarcie B wprost do pytania.
 
 ### concatMap — `09-concatmap`
 
@@ -480,12 +480,12 @@ Góra bez zmian: id$ → operator → kompaktowy Odbiorca, jeden główny tor S1
 | --- | --- | --- |
 | 09-concatmap | concatMap — Po kolei | `id$.pipe(concatMap(id => httpGet(url(id))))` |
 
-**Na bloczkach:** postoje subscribe, first (A dociera, projekcja), active (inner A subskrybowany, HTTP A startuje), question, answer. Odpowiedź: #2 · B przechodzi w „w kolejce” (przerywany placeholder) — wartość bez projekcji, inner, kafelka HTTP GET i inner subscribera. Po complete A placeholder płynnie zmienia się w nowy kafelek HTTP GET B z własnym inner subscriberem w tym samym slocie: projekcja, subskrypcja, progress. B kończy się przed przyjściem C (4,8 s vs 5,2 s modelu), więc C trafia na pustą kolejkę i od razu dostaje swój HTTP; gdyby przyszło w trakcie B, czekałoby w kolejce. Wynik A, B, C.
+**Na bloczkach:** S1 zasubskrybowany od READY; postoje first (A dociera, projekcja), active (inner A subskrybowany, HTTP A startuje), question, answer. Odpowiedź: #2 · B przechodzi w „w kolejce” (przerywany placeholder) — wartość bez projekcji, inner, kafelka HTTP GET i inner subscribera. Po complete A placeholder płynnie zmienia się w nowy kafelek HTTP GET B z własnym inner subscriberem w tym samym slocie: projekcja, subskrypcja, progress. B kończy się przed przyjściem C (4,8 s vs 5,2 s modelu), więc C trafia na pustą kolejkę i od razu dostaje swój HTTP; gdyby przyszło w trakcie B, czekałoby w kolejce. Wynik A, B, C.
 
 **Speaker notes (per checkpoint, szablon `data-checkpoint-notes`):**
 
 - **Start:** Operatory, które dla każdej wartości mogą uruchomić osobną pracę. Projekcja zwraca Observable, operator decyduje, kiedy go zasubskrybować.
-- **subscribe / A / HTTP A:** jedna główna subskrypcja S1; projekcja tylko tworzy Observable (własny kafelek HTTP GET), request rusza dopiero, gdy inner subscriber — go zasubskrybuje.
+- **READY / A / HTTP A:** jedna główna subskrypcja S1, zestawiona już w READY; projekcja tylko tworzy Observable (własny kafelek HTTP GET), request rusza dopiero, gdy inner subscriber — go zasubskrybuje.
 - **A pracuje, przychodzi B:** Uruchomimy drugi request czy poczekamy?
 - **Odpowiedź:** concatMap kolejkowuje B. Dopóki A się nie skończy, nie wywołujemy nawet projekcji dla B.
 - **Wynik:** Kolejność zachowana, kolejka zwiększa opóźnienie.
@@ -725,11 +725,11 @@ Semantyka zastępowania błędu: [implementacja catchError w RxJS 7.8.2](https:/
 
 **MAIN — po obu pokazach shareReplay na interval, przed map + concatAll.** Osobny wariant share został połączony ze slajdem `04a-dwa-tory-2`; ID shareReplay pozostaje bez zmian.
 
-HTTP GET → shareReplay(1) → A/B, jedna kieszeń bufora. READY pozostaje nieruchomy. Jedno prawo uruchamia całą historię bez pośrednich postojów: A subskrybuje → HTTP zwraca 42 do A i bufora → complete → późny B → 42 z bufora i complete. Request trwa około 1 s, przeloty i terminale 0,4 s na odcinek, rozdzielenie i odtworzenie z bufora 0,35 s. Zostaje jeden request i bufor zakończonego źródła, również przy refCount: true. FINISHED czeka na następne prawo; szybkie prawo podczas ruchu pokazuje wynik końcowy. Notatki READY opisują ciągły pokaz, FINISHED — różnicę względem share().
+HTTP GET → shareReplay(1) → A/B, jedna kieszeń bufora. READY pozostaje nieruchomy. Pierwsze prawo: A subskrybuje → HTTP zwraca 42 do A i bufora → complete → późny B subskrybuje i scena staje (`subscribed-b`, ⏸ pytanie „Co teraz dostanie B?”): subskrypcja B zestawiona, 42 leży w buforze, nic nie leci, bez nowego HTTP. Drugie prawo: 42 powoli wyjeżdża z kieszeni (1,2 s) i leci do B (0,8 s), potem complete. Request trwa około 1 s; przekazanie 42 z HTTP do shareReplay i do A — przeloty 0,6 s, rozdzielenie 0,5 s; terminale 0,4 s. Zostaje jeden request i bufor zakończonego źródła, również przy refCount: true. FINISHED czeka na następne prawo; szybkie prawo podczas ruchu kończy bieżący etap. Notatki: READY, subscribed-b (pytanie) i FINISHED — różnica względem share().
 
 ### shareReplay(1): kto zatrzyma interval? — `20a-sharereplay-interval`
 
-**MAIN — między share() + interval (`04a-dwa-tory-3`) a shareReplay z refCount: true na interval (`20b-sharereplay-refcount`). Cel: 45–60 s.** Oba slajdy shareReplay na interval wyrównują pierwszą linię kodu do wysokości jednoliniowego kodu share + interval; blok jest odsunięty od tytułu i zachowuje trzy linie w obu formatach. Wygląd, bufor i animacje identyczne jak na „shareReplay: późny odbiorca dostaje wynik”: kod w trzech liniach: `interval(1000).pipe(` / `  shareReplay(1)` / `)`, kafelek `interval(1000)` z torem `#1`, `shareReplay(1)` z kieszenią „bufor” pod spodem, odbiorcy A/B z inboxami. Każda wartość wjeżdża do wiersza shareReplay(1) i rozdziela się: kulka do odbiorcy i kulka do bufora; bez odbiorców jedzie tylko do bufora. Późny odbiorca dostaje najpierw kulkę wyjeżdżającą z kieszeni, potem kolejne na żywo. Liczniki Odbiorcy i Upstream.
+**MAIN — między share() + interval (`04a-dwa-tory-3`) a shareReplay z refCount: true na interval (`20b-sharereplay-refcount`). Cel: 45–60 s.** Kod w jednej linii: `interval(1000).pipe(shareReplay(1))`, w tym samym miejscu co jednoliniowy kod share + interval (slajd shareReplay z refCount: true na interval wyrównuje do niej pierwszą z dwóch linii). Wygląd, bufor i animacje identyczne jak na „shareReplay: późny odbiorca dostaje wynik”: kafelek `interval(1000)` z torem `#1`, `shareReplay(1)` z kieszenią „bufor” pod spodem, odbiorcy A/B z inboxami. Każda wartość wjeżdża do wiersza shareReplay(1) i rozdziela się: kulka do odbiorcy i kulka do bufora; bez odbiorców jedzie tylko do bufora. Późny odbiorca dostaje najpierw kulkę wyjeżdżającą z kieszeni, potem kolejne na żywo. Liczniki Odbiorcy i Upstream.
 
 **Scena na żywo — interval emituje bez przerwy, także między krokami:**
 
@@ -745,12 +745,11 @@ Kolejne „dalej” zmienia slajd, lewo cofa ostatnią akcję. Konkretne liczby 
 
 ### shareReplay z refCount: kiedy znika bufor? — `20b-sharereplay-refcount`
 
-Ta sama scena interval i bufor ostatniej wartości. Kod ma trzy linie:
+Ta sama scena interval i bufor ostatniej wartości. Kod ma dwie linie (zamykający nawias pipe bezpośrednio za shareReplay):
 
 ```ts
 interval(1000).pipe(
-  shareReplay({ bufferSize: 1, refCount: true })
-)
+  shareReplay({ bufferSize: 1, refCount: true }))
 ```
 
 READY: definicje i pusty bufor. Pierwsze prawo podłącza A i uruchamia emisje. Dalej: pauza ilustracji i B z bufora (`subscribed-b`), wznowienie (`resumed`), odłączenie A i potem B (`unsub-all`). **Nowa pauza występuje wyłącznie po B**: obaj odłączeni, Odbiorcy 0 / Upstream 1, bufor pełny, zwykłe aktywne połączenie interval → shareReplay. ❓ SALA: czy interval będzie nadal emitował, czy nastąpi unsubscribe? Kadr jest zamrożony, bez nowych emisji i bez podpowiedzi.
@@ -840,7 +839,7 @@ Podgląd developerski: /work/animation-review.html (lokalna konfiguracja Vite ma
 
 Slajdy MAIN 08–12 korzystają ze wspólnego adaptera `configureHttpWorkPanel` na bazie `flattenGraph`. Góra pokazuje jeden S1 z execution lanes, pastelowymi nagłówkami i kolorowymi poziomymi połączeniami. Źródło nie trzyma historii emisji; do czterech odpowiedzi HTTP mieści się w kompaktowym odbiorcy. Kulki mają białe litery i pełną paletę A indygo #6D4CD3 / B pomarańcz #B85D05 / C niebieski #087FAD / D malinowy #B73770. Tę samą paletę mają porty, paski i linie prac; progress jest łagodniejszy, complete jasnozielone.
 
-Dół: poziomy separator i do trzech wewnętrznych pipeline'ów jeden pod drugim (na wprowadzeniu `08-map-strumienie` jedno wykonanie). Każde utworzone i subskrybowane inner to pełny rząd: **ID wykonania (#1) → kulka wartości wejścia (A / A$) → HTTP GET (nagłówek + pełny execution lane z postępem i stanem tekstem) → opcjonalny operator (catchError) → inner subscriber** — pełny lane jak odbiorca główny, z ikoną, etykietą „inner #1”, odebraną wartością i statusem (`✓ complete`, `! error`, `× odłączono`). Standardowe kolumny rodziny *Map i catchError są wspólne dla wszystkich wykonań: ID od x 50, kulka, HTTP GET 180–480, catchError 540–780, subscriber 840–1210 (pod odbiorcą głównym); bez operatora kabel HTTP → subscriber jest po prostu dłuższy. Wartość bez utworzonego inner ma ID, kulkę i neutralny placeholder o wysokości lane: „?” (pytanie), „W KOLEJCE” (concatMap — wartość przed projekcją) albo przygaszone „POMINIĘTE” (exhaustMap) — bez HTTP GET, subscribera i portów. switchMap zachowuje cały anulowany pipeline #1 (szary impuls × od subscribera do HTTP, ID szare, `× odłączono`, bez complete). distinctUntilChanged odrzuca duplikaty w górnym operatorze, bez dolnego wiersza; jego wyszukiwarka korzysta z kolumn poprzedniego slajdu debounceTime (ID x 40, kulka x 180, HTTP x 280, subscriber x 720). Nie ma napisu nad pracami, ramki sekcji ani przewodów między poziomami; wynik inner logicznie wraca przez górny operator.
+Dół: poziomy separator i do trzech wewnętrznych pipeline'ów jeden pod drugim (na wprowadzeniu `08-map-strumienie` dwa wykonania, jedno po drugim). Każde utworzone i subskrybowane inner to pełny rząd: **ID wykonania (#1) → kulka wartości wejścia (A / A$) → HTTP GET (nagłówek + pełny execution lane z postępem i stanem tekstem) → opcjonalny operator (catchError) → inner subscriber** — pełny lane jak odbiorca główny, z ikoną, etykietą „inner #1”, odebraną wartością i statusem (`✓ complete`, `! error`, `× odłączono`). Standardowe kolumny rodziny *Map i catchError są wspólne dla wszystkich wykonań: ID od x 50, kulka, HTTP GET 180–480, catchError 540–780, subscriber 840–1210 (pod odbiorcą głównym); bez operatora kabel HTTP → subscriber jest po prostu dłuższy. Wartość bez utworzonego inner ma ID, kulkę i neutralny placeholder o wysokości lane: „?” (pytanie), „W KOLEJCE” (concatMap — wartość przed projekcją) albo przygaszone „POMINIĘTE” (exhaustMap) — bez HTTP GET, subscribera i portów. switchMap zachowuje cały anulowany pipeline #1 (szary impuls × od subscribera do HTTP, ID szare, `× odłączono`, bez complete). distinctUntilChanged odrzuca duplikaty w górnym operatorze, bez dolnego wiersza; jego wyszukiwarka korzysta z kolumn poprzedniego slajdu debounceTime (ID x 40, kulka x 180, HTTP x 280, subscriber x 720). Nie ma napisu nad pracami, ramki sekcji ani przewodów między poziomami; wynik inner logicznie wraca przez górny operator.
 
 **Kod na wszystkich slajdach** ma subtelne kolorowanie składni (źródła i `httpGet`, operatory RxJS, literały, parametry funkcji, typy, słowa kluczowe) jako osobną warstwę pod pastelowymi wyróżnieniami fragmentów powiązanych z kafelkami; jasne tło i duże fonty bez zmian.
 

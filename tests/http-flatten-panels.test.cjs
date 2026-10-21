@@ -11,7 +11,7 @@ const rows=(c,t)=>c.snapshot(t).innerWorkPanels[0].rows;
 
 test('the five HTTP slides share S1, frameless rows, palette and one response per completed request',async()=>{
  const {definitions,scene,compile,render}=await family();
- const expected={concatAll:['A'],concatMap:['A','B','C'],mergeMap:['B','A','C'],switchMap:['B','C'],exhaustMap:['A','C']};
+ const expected={concatAll:['A','B'],concatMap:['A','B','C'],mergeMap:['B','A','C'],switchMap:['B','C'],exhaustMap:['A','C']};
  for(const format of ['4:3','16:9'])for(const [id,mode]of definitions){
   const s=scene(id,format),c=compile(s),f=c.snapshot(c.duration),panel=f.panels[0],receiver=f.nodes.find(n=>n.id==='observer');
   assert.equal(s.http,true);assert.equal(panel.frameless,true);
@@ -31,14 +31,14 @@ test('the five HTTP slides share S1, frameless rows, palette and one response pe
  }
 });
 
-test('map + concatAll: six manual steps separate creation, subscription, response and complete for one HTTP request',async()=>{
+test('map + concatAll: eight manual steps separate creation, subscription, response and complete; B after inner #1 complete starts HTTP #2',async()=>{
  const {scene,compile,render}=await family();
  for(const format of ['4:3','16:9']){
   const s=scene('08-map-strumienie',format),c=compile(s),ready=c.snapshot(0);
   const frames=Object.fromEntries(c.stops.map(stop=>[stop.id,c.snapshot(stop.time)]));
   const time=id=>c.stops.find(stop=>stop.id===id).time;
   assert.equal(s.code,'id$.pipe(map(id => httpGet(url(id))), concatAll())');
-  assert.deepEqual(Array.from(c.stops,stop=>stop.id),['first','created','active','received','complete-a','complete']);
+  assert.deepEqual(Array.from(c.stops,stop=>stop.id),['first','created','active','received','complete-a','active-b','complete-b','complete']);
   assert.equal(s.playback.entry,'manual');assert.equal(s.playback.afterLastManualStop,undefined);assert.equal(s.playback.finish,'hold');
   assert.equal(time('complete'),c.duration);
   assert.ok(c.stops.every((stop,i)=>!i||stop.time>c.stops[i-1].time));
@@ -66,7 +66,18 @@ test('map + concatAll: six manual steps separate creation, subscription, respons
   assert.equal(frames['complete-a'].executionCounts.active,0);assert.equal(frames['complete-a'].executionCounts.started,1);
   assert.equal(frames['complete-a'].innerWorkPanels[0].rows[0].receiver.state,'completed');
   assert.equal(frames['complete-a'].nodes.find(n=>n.id==='observer').notification,null);
-  for(const [i,value]of ['A'].entries()){
+  assert.equal(frames['complete-a'].innerWorkPanels[0].rows.length,1,'B$ jeszcze nie istnieje');
+  // B dopiero po complete innera #1: id$ nadal działa, więc powstaje kolejny inner i kolejny request.
+  const firstDone=c.plan.records.get('inner0-op').end;
+  assert.ok(c.plan.records.get('source-projection').events[1].at>firstDone.at+firstDone.duration,'emisja B po complete innera #1');
+  assert.deepEqual(Array.from(frames['active-b'].innerWorkPanels[0].rows,r=>r.id+':'+r.value+':'+r.state),['#1:A$:completed','#2:B$:active']);
+  assert.equal(frames['active-b'].executionCounts.started,2);assert.equal(frames['active-b'].executionCounts.active,1);
+  assert.equal(frames['active-b'].nodes.find(n=>n.id==='source').notification,null,'id$ jeszcze bez complete');
+  assert.deepEqual(Array.from(frames['complete-b'].histories[0].values,v=>v.value),['A','B']);
+  assert.equal(frames['complete-b'].executionCounts.active,0);
+  assert.ok(frames['complete-b'].innerWorkPanels[0].rows.every(r=>r.receiver.state==='completed'));
+  assert.equal(frames['complete-b'].nodes.find(n=>n.id==='observer').notification,null,'S1 czeka na complete id$');
+  for(const [i,value]of ['A','B'].entries()){
    const input=c.plan.records.get('source-projection').events[i],mapped=c.plan.records.get('projection-op').events[i];
    assert.equal(input.logicalAt,mapped.logicalAt);assert.equal(mapped.value,value+'$');
    const before=c.snapshot(input.arrival+(mapped.at-input.arrival)*.25),after=c.snapshot(input.arrival+(mapped.at-input.arrival)*.75);
@@ -81,28 +92,28 @@ test('map + concatAll: six manual steps separate creation, subscription, respons
    assert.equal(subscription.connectDuration,.4);
    assert.ok(Math.abs(response.at-(subscription.start+subscription.connectDuration)-.8)<1e-8);
   }
-  // id$ kończy się dopiero po complete innera: complete S1 bez aktywnych innerów.
-  assert.equal(c.plan.records.get('source-projection').events.length,1);
-  assert.ok(c.plan.records.get('source-projection').end.at>=c.plan.records.get('inner0-op').end.at+c.plan.records.get('inner0-op').end.duration);
+  // id$ kończy się dopiero po complete innera #2: complete S1 bez aktywnych innerów.
+  assert.equal(c.plan.records.get('source-projection').events.length,2);
+  assert.ok(c.plan.records.get('source-projection').end.at>=c.plan.records.get('inner1-op').end.at+c.plan.records.get('inner1-op').end.duration);
   assert.equal(frames['complete-a'].nodes.find(n=>n.id==='source').notification,null);
   const final=frames.complete;
   assert.ok(final.innerWorkPanels[0].rows.every(row=>row.receiver.state==='completed'));
   assert.ok(final.nodes.filter(n=>['source','projection','op','observer'].includes(n.id)).every(n=>n.notification==='complete'));
-  assert.deepEqual(Array.from(final.metrics,m=>[m.label,m.value]),[['Innery uruchomione',1],['Aktywne',0]]);
-  assert.equal(c.events.filter(e=>e.type==='inner-create').length,1);
+  assert.deepEqual(Array.from(final.metrics,m=>[m.label,m.value]),[['Innery uruchomione',2],['Aktywne',0]]);
+  assert.equal(c.events.filter(e=>e.type==='inner-create').length,2);
   assert.ok(!c.events.some(e=>['queue-add','queue-pop','inner-unsubscribe','stream-error'].includes(e.type)));
   for(const t of [...c.checkpoints,...Array.from({length:Math.ceil(c.duration*10)},(_,i)=>i/10)]){
    const f=c.snapshot(t),expected=JSON.stringify(f);
-   assert.ok(f.innerWorkPanels[0].rows.length<=1);
+   assert.ok(f.innerWorkPanels[0].rows.length<=2);
    assert.ok(f.innerWorkPanels[0].rows.every(r=>!['queued','pending'].includes(r.state)));
-   assert.doesNotMatch(render(f),/W KOLEJCE|data-inner-placeholder|inner #2|B\$|C\$|Kolejka/);
+   assert.doesNotMatch(render(f),/W KOLEJCE|data-inner-placeholder|C\$|Kolejka/);
    assert.ok(f.executionCounts.active<=1);
    c.snapshot(c.duration);c.snapshot(0);assert.equal(JSON.stringify(c.snapshot(t)),expected);
   }
  }
 });
 
-test('concatAll manual playback holds all seven frames, fast next finishes the current step, reset and AUTO preserve the final frame',async()=>{
+test('concatAll manual playback holds every manual frame, fast next finishes the current step, reset and AUTO preserve the final frame',async()=>{
  const {scene}=await family(),s=scene('08-map-strumienie'),h=await playbackHarness(),{player}=h.create({scene:s});
  for(const stop of player.stops){
   player.playTo(stop.time);h.advance(20000);
@@ -150,17 +161,22 @@ test('the four strategies stop at the same moment: A works at half, B arrived, i
  assert.ok(progress[0]>.4&&progress[0]<.6,String(progress[0]));
 });
 
-test('only concatMap animates the main subscription; the other three start with S1 already connected',async()=>{
+test('all four strategies start with S1 already connected; concatMap goes straight to the emission of A',async()=>{
  const {scene,compile}=await family();
  for(const [id]of comparison){
   const c=compile(scene(id)),f=c.snapshot(0),ids=Array.from(c.stops,s=>s.id),concat=id==='09-concatmap';
-  assert.deepEqual(ids.slice(0,concat?4:1),concat?['subscribe','first','active','question']:['question'],id);
+  assert.deepEqual(ids.slice(0,concat?3:1),concat?['first','active','question']:['question'],id);
   const wires=f.edges.filter(e=>e.visible&&e.subscriber==='S1');
-  assert.equal(wires.length,concat?0:2,id);
-  if(!concat){
-   assert.ok(wires.every(e=>e.progress===1&&e.phase==='subscribed'));
-   assert.ok(f.nodes.filter(n=>['source','op','observer'].includes(n.id)).every(n=>n.visible&&n.opacity===1));
-   assert.equal(rows(c,0).length,0);
+  assert.equal(wires.length,2,id);
+  assert.ok(wires.every(e=>e.progress===1&&e.phase==='subscribed'));
+  assert.ok(f.nodes.filter(n=>['source','op','observer'].includes(n.id)).every(n=>n.visible&&n.opacity===1));
+  assert.equal(rows(c,0).length,0);
+  assert.ok(c.events.filter(e=>e.type==='connected'&&!/^inner/.test(e.edge||'')).every(e=>e.at<0),id+': bez animacji subscribe');
+  if(concat){
+   // Pierwsze „dalej”: emisja A aż do concatMap, bez etapu subscribe.
+   const first=c.snapshot(c.stops[0].time);
+   assert.equal(first.executionCounts.started,0);
+   assert.ok(c.events.some(e=>e.type==='deliver-next'&&e.edge==='source-op'&&e.value==='A'&&e.at<=c.stops[0].time));
   }
   for(const t of [0,...c.stops.map(s=>s.time)]){
    const expected=JSON.stringify(c.snapshot(t));c.snapshot(c.duration);c.snapshot(0);assert.equal(JSON.stringify(c.snapshot(t)),expected);

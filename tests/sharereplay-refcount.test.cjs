@@ -32,7 +32,7 @@ async function until(stage,format='4:3',controls){
 test('READY: definitions, empty buffer, refCount: true in code; stops follow the actions',async()=>{
  const {scene:s,compile,render}=await scene(),f=compile(s).snapshot(0);
  assert.equal(s.title,'shareReplay z refCount: kiedy znika bufor?');
- assert.equal(s.code,'interval(1000).pipe(\n  shareReplay({ bufferSize: 1, refCount: true })\n)');
+ assert.equal(s.code,'interval(1000).pipe(\n  shareReplay({ bufferSize: 1, refCount: true }))','zamykający nawias pipe za shareReplay, dwie linie');
  assert.equal(s.playback.controller,'stages');assert.ok(s.live&&!s.live.autoplay);
  assert.deepEqual(Array.from(s.live.actions),['B','resume','unsub-all','reset','C','unsub-C']);
  assert.deepEqual(Array.from(s.playback.stops,x=>x.id),['subscribed-a','subscribed-b','resumed','unsub-all','reset','subscribed-c','unsub-c']);

@@ -48,7 +48,7 @@ test('every checkpoint of the eight slides uses the same columns; texts stay ins
  }
 });
 
-test('concatAll introduction: one HTTP pipeline completes without placeholders or a second inner',async()=>{
+test('concatAll introduction: HTTP pipelines #1 and #2 run one after another, without placeholders or a queue',async()=>{
  const {compile,render}=await deck(),c=compile('08-map-strumienie');
  const active=c.snapshot(at(c,'active')),svg=render(active);
  assert.deepEqual(Array.from(active.innerWorkPanels[0].rows,r=>r.id+':'+r.value+':'+r.state),['#1:A$:active']);
@@ -56,8 +56,9 @@ test('concatAll introduction: one HTTP pipeline completes without placeholders o
  assert.match(rowSvg(svg,'#1'),/data-inner-receiver="#1"[\s\S]*>inner #1</);
  const done=render(c.snapshot(c.duration));
  assert.match(rowSvg(done,'#1'),/data-stage-state="completed"[\s\S]*data-receiver-state="completed"[\s\S]*>✓ complete</);
- assert.doesNotMatch(done,/data-inner-work="#2"/);
- for(const t of [0,...c.checkpoints,c.duration])assert.doesNotMatch(render(c.snapshot(t)),/data-inner-placeholder|W KOLEJCE|data-inner-work="#2"/);
+ assert.match(rowSvg(done,'#2'),/data-stage-state="completed"[\s\S]*data-receiver-state="completed"[\s\S]*>✓ complete</);
+ assert.doesNotMatch(render(active),/data-inner-work="#2"/,'#2 dopiero po emisji B');
+ for(const t of [0,...c.checkpoints,c.duration])assert.doesNotMatch(render(c.snapshot(t)),/data-inner-placeholder|W KOLEJCE/);
 });
 
 test('switchMap and distinct: cancelled pipelines keep their tiles, grey out and show × odłączono without complete; duplicates create no row',async()=>{
