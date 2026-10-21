@@ -26,7 +26,9 @@ async function harness() {
     await m.link((specifier,parent)=>load(path.resolve(path.dirname(parent.identifier),specifier)));
     return m;
   }
-  const modules=await Promise.all(['catalog','presentation','player','lifecycle','flow','engine','resolver'].map(name=>load(`animations/${name}.js`)));
+  // Ładowanie po kolei (jak v2-harness): równoległe link() współdzielonych zależności bywa niedeterministyczne.
+  const modules=[];
+  for(const name of ['catalog','presentation','player','lifecycle','flow','engine'])modules.push(await load(`animations/${name}.js`));
   for(const m of modules)await m.evaluate();
   const scenes=modules[1].namespace.prepareSlides(modules[0].namespace.scenes);
   function player(id,controls) {
@@ -37,7 +39,7 @@ async function harness() {
     }};
     return {api:modules[2].namespace.createPlayer(root,scenes.get(id),controls),elements};
   }
-  return {scenes,player,lifecycle:modules[3].namespace,flow:modules[4].namespace,engine:modules[5].namespace,resolver:modules[6].namespace,callbacks};
+  return {scenes,player,lifecycle:modules[3].namespace,flow:modules[4].namespace,engine:modules[5].namespace,callbacks};
 }
 
 test('all slide variants render through every event and termination without invalid geometry',async()=>{
@@ -58,35 +60,8 @@ test('all slide variants render through every event and termination without inva
       frames++;
     }
   }
-  assert.ok(frames>1000);
-  assert.equal(scenes.get('07-hot-cold-2').comparisonMode,'shared');
-  assert.equal(scenes.get('16-czas-cztery-4').seriesIndices[0],4);
-});
-
-test('four time operators keep distinct emission times and receiver histories',async()=>{
-  const {scenes,engine}=await harness();
-  const scene=scenes.get('15-debounce-audit');
-  const expected=[
-    [[11.8,'G'],[16.5,'I'],[21.5,'J']],
-    [[4.5,'D'],[9.5,'G'],[15.5,'I'],[21.5,'J']],
-    [[1,'A'],[6,'E'],[12,'H'],[18,'J']],
-    [[3.5,'C'],[7,'E'],[10.5,'G'],[14,'I'],[21,'J']],
-  ];
-  assert.equal(scene.rows.length,5);
-  scene.rows.slice(1).forEach((row,i)=>{
-    assert.deepEqual(Array.from(row.events,e=>[e.at,e.value]),expected[i],row.label);
-    assert.equal(row.completeAt,undefined,'ongoing source does not complete');
-  });
-  const compiled=engine.compileScene(scene);
-  const received=frame=>Array.from(frame.histories,h=>Array.from(h.values,e=>e.value));
-  assert.deepEqual(received(compiled.snapshot(0)),[[],[],[],[]]);
-  assert.deepEqual(received(compiled.snapshot(compiled.stops[0].time)),[[],['D'],['A'],['C']]);
-  const final=compiled.snapshot(compiled.duration);
-  assert.deepEqual(received(final),expected.map(events=>events.map(e=>e[1])));
-  for(const history of final.histories){
-    const sink=final.nodes.find(n=>n.id===history.anchor);
-    assert.ok(history.y-23>sink.y-sink.h/2 && history.y+23<sink.y+sink.h/2);
-  }
+  assert.ok(frames>300);
+  assert.equal(scenes.get('20-sharereplay-2').comparisonMode,'shared');
 });
 
 test('legend directions, terminal colors and final value delivery',async()=>{
@@ -100,38 +75,21 @@ test('legend directions, terminal colors and final value delivery',async()=>{
   assert.equal(connectionState(6,0,{at:3,kind:'complete'}).done,true);
 });
 
-test('only receiver changes terminal color; refCount removes the correct subscriptions',async()=>{
-  const {player}=await harness();
-  const complete=player('07-hot-cold');complete.api.finish();
-  let svg=complete.elements.get('.rx-stage').innerHTML;
-  assert.match(svg,/data-node="receiver0"[^]*?fill="#087438"/);
-  assert.match(svg,/data-node="work0"[^]*?fill="#ffc15c"/);
-  assert.doesNotMatch(svg,/data-connection=/);
-  for(const [id,alive] of [['22-refcount',true],['22-refcount-2',false]]){
-    const p=player(id);p.api.finish();svg=p.elements.get('.rx-stage').innerHTML;
-    assert.equal(svg.includes('data-connection="timer-hub"'),alive);
-    assert.doesNotMatch(svg,/data-connection="hub-view/);
-  }
-  const error=player('b05-finalize-2');error.api.finish();
-  assert.match(error.elements.get('.rx-stage').innerHTML,/data-node="sink0"[^]*?fill="#b51e2e"/);
-});
-
-test('playback loops, pause cancels frames, restart resets, controls can be hidden',async()=>{
-  const {player,callbacks}=await harness();const {api,elements}=player('b09-pairwise');
+test('playback pause cancels frames, restart resets, controls can be hidden',async()=>{
+  const {player,callbacks}=await harness();const {api,elements}=player('09-concatmap');
   assert.equal(elements.get('.rx-toolbar').hidden,true);
   api.toggleControls();assert.equal(elements.get('.rx-toolbar').hidden,false);
   api.hideControls();assert.equal(elements.get('.rx-toolbar').hidden,true);
-  api.restart();
-  for(let now=0;now<=(api.duration+3)*1000;now+=250){const pending=[...callbacks.values()];callbacks.clear();pending.forEach(fn=>fn(now));}
-  assert.ok(Number(elements.get('input').value)<3);
-  assert.equal(elements.get('.rx-play').textContent,'Pauza');
+  api.playContinuously();
+  for(let now=0;now<1000;now+=250){const pending=[...callbacks.values()];callbacks.clear();pending.forEach(fn=>fn(now));}
+  assert.equal(api.isPlaying,true);
   api.pause();assert.equal(callbacks.size,0);
   api.restart();assert.equal(elements.get('input').value,'0');
 });
 
 test('manual stops deliver only after travel; snapshots survive seeking backwards',async()=>{
   const {player,callbacks}=await harness();
-  for(const id of ['04-operator','08-map-strumienie','11-switchmap','19-share']) {
+  for(const id of ['04-operator','08-map-strumienie','11-switchmap']) {
     const {api}=player(id);
     const initial=JSON.stringify(api.snapshot);
     let now=0;
@@ -148,46 +106,41 @@ test('manual stops deliver only after travel; snapshots survive seeking backward
   }
 });
 
-test('map keeps its accepted chronology and highlights the currently handling node',async()=>{
+test('operator function delivers one mapped User string and complete without source history',async()=>{
   const {player}=await harness();const {api}=player('04-operator');
-  for(const start of [5,9,13]) {
-    for(const [offset,node,phase] of [[.1,'source','emitting'],[.6,null,'to-map'],[1.25,'map','in-map'],[1.75,null,'to-observer'],[2.5,'observer',null]]) {
-      api.seek(start+offset);
-      assert.deepEqual(Array.from(api.snapshot.nodes.filter(n=>n.active),n=>n.id),node?[node]:[]);
-      if(phase)assert.ok(api.snapshot.tokens.some(t=>t.phase===phase));
-    }
-  }
-  api.seek(7.49);assert.equal(api.snapshot.histories[0].values.length,0);
-  api.seek(7.5);assert.equal(api.snapshot.histories[0].values[0].value,'10');
-  api.finish();assert.deepEqual(Array.from(api.snapshot.histories[0].values,v=>v.value),['10','20','30']);
-  assert.ok(api.snapshot.edges.every(e=>!e.visible));
-  assert.equal(api.snapshot.nodes.find(n=>n.id==='source').notification,null);
+  api.seek(api.stops.find(s=>s.id==='received').time);
+  assert.deepEqual(Array.from(api.snapshot.histories[0].values,v=>v.value),['"…"']);
+  api.finish();assert.deepEqual(Array.from(api.snapshot.histories[0].values,v=>v.value),['"…"']);
+  assert.ok(api.snapshot.edges.every(e=>e.done));
+  assert.ok(api.snapshot.nodes.every(n=>!n.showProgress));
+  assert.equal(api.snapshot.nodes.find(n=>n.id==='observer').notification,'complete');
+  assert.equal(api.snapshot.nodes.find(n=>n.id==='source').notification,'complete');
+  assert.equal(api.snapshot.histories.length,1);
 });
 
-test('manual to auto continues from the stop and holds FINISHED without orphan RAF',async()=>{
+test('manual to auto continues from the first result and holds FINISHED without orphan RAF',async()=>{
   const {player,callbacks}=await harness();const {api}=player('04-operator');
-  api.seek(7.5);api.playContinuously();
+  api.controller.seek(api.stops.at(-1).time);api.controller.next();
+  assert.equal(api.controller.mode,'auto');
   for(let now=0;now<30000;now+=50){const pending=[...callbacks.values()];callbacks.clear();pending.forEach(fn=>fn(now));}
   assert.equal(api.time,api.duration);assert.equal(api.state,'finished');assert.equal(callbacks.size,0);
-  api.reset();assert.equal(api.time,0);assert.equal(api.state,'playing');api.pause();
+  api.controller.reset();assert.equal(api.time,0);assert.equal(api.state,'ready');assert.equal(callbacks.size,0);
 });
 
-test('concatAll queues created Observables, switchMap pauses before cancel then aborts without delivery',async()=>{
+test('concatAll has one active inner; switchMap pauses before cancel then aborts without delivery',async()=>{
   const {player}=await harness();
   const concat=player('08-map-strumienie').api;
-  concat.seek(concat.stops.at(-1).time);
+  concat.seek(concat.stops.find(s=>s.id==='active').time);
   assert.equal(concat.snapshot.nodes.find(n=>n.id==='inner0').workState,'active');
-  for(const id of ['inner1','inner2']) {
-    const n=concat.snapshot.nodes.find(n=>n.id===id);
-    assert.ok(n.visible);assert.equal(n.workState,'queued');assert.equal(n.showProgress,false);
-    assert.equal(concat.snapshot.edges.find(e=>e.from===id).visible,false);
-  }
-  const sw=player('11-switchmap').api;sw.seek(sw.stops.at(-1).time);
+  assert.deepEqual(Array.from(concat.snapshot.nodes.filter(n=>n.inner&&n.visible),n=>n.id),['inner0']);
+  assert.ok(!concat.snapshot.nodes.some(n=>n.workState==='queued'));
+  // Pytanie switchMap: A nadal pracuje, B dotarło, ale jeszcze nie anulowało A ani nie utworzyło inner.
+  const sw=player('11-switchmap').api;sw.seek(sw.stops.find(s=>s.id==='question').time);
   assert.equal(sw.snapshot.nodes.find(n=>n.id==='inner0').workState,'active');
   assert.equal(sw.snapshot.nodes.find(n=>n.id==='inner1').visible,false);
   sw.finish();const a=sw.snapshot.nodes.find(n=>n.id==='inner0');
   assert.equal(a.workState,'canceled');assert.ok(a.progress>0&&a.progress<1);assert.equal(a.notification,null);
-  assert.ok(sw.snapshot.histories.find(h=>h.anchor==='observer').values.every(v=>v.value!=='A'&&v.value!=='B'));
+  assert.deepEqual(Array.from(sw.snapshot.histories.find(h=>h.anchor==='observer').values,v=>v.value),['B','C']);
 });
 
 test('subscription travels receiver → share → source; values travel source → share → receivers',async()=>{
@@ -206,19 +159,15 @@ test('subscription travels receiver → share → source; values travel source �
   assert.ok(first.end.at>=upstream.end.at+transitionDuration);
 });
 
-test('READY shows participants and a value never occupies consecutive connections simultaneously',async()=>{
+test('a shared value never occupies consecutive connections simultaneously',async()=>{
   const {player}=await harness();
-  const {api,elements}=player('07-hot-cold-2');
-  api.seek(1.15);
-  let svg=elements.get('.rx-stage').innerHTML;
-  const opacity=Number(svg.match(/data-node="hub" opacity="([^"]+)"/)[1]);
-  assert.equal(opacity,1);
-  assert.doesNotMatch(svg,/data-connection="work0-hub"/);
+  const {api,elements}=player('20-sharereplay-2');
+  let svg;
   let sawInput=false,sawOutput=false;
   for(let t=0;t<api.duration;t+=.1){
     api.seek(t);svg=elements.get('.rx-stage').innerHTML;
-    const input=svg.includes('data-value-on="work0-hub"');
-    const output=svg.includes('data-value-on="hub-receiver0"');
+    const input=svg.includes('data-value-on="http-replay"');
+    const output=svg.includes('data-value-on="replay-A"');
     assert.ok(!(input&&output),`simultaneous value at ${t}`);
     if(input)sawInput=true;
     if(output){assert.ok(sawInput);sawOutput=true;}
@@ -230,10 +179,13 @@ test('every variant has deterministic READY, question, FINISHED and fixed geomet
   const {scenes,engine:{compileScene}}=await harness();
   for(const scene of scenes.values()) {
     const engine=compileScene(scene),initial=engine.snapshot(0);
-    const shape=f=>JSON.stringify(f.nodes.map(n=>[n.id,n.x,n.y,n.w,n.h]));
+    // Scena z fazami (scene.phases) zastępuje cały diagram przy przejściu: geometria stała w obrębie fazy.
+    const initialOf=frame=>frame.phase===undefined?initial:engine.snapshot(engine.plan.phases.find(p=>p.name===frame.phase).offset);
+    // Rosnący kafelek torów (laneSlots) zachowuje górę, x i szerokość; wysokość rośnie z wierszami wykonań.
+    const shape=f=>JSON.stringify(f.nodes.map(n=>n.laneSlots?[n.id,n.x,n.y-n.h/2,n.w,'rows']:[n.id,n.x,n.y,n.w,n.h]));
     for(const time of [0,...engine.stops.map(s=>s.time),engine.duration]) {
       const frame=engine.snapshot(time);
-      assert.equal(shape(frame),shape(initial),scene.id);
+      assert.equal(shape(frame),shape(initialOf(frame)),scene.id);
       const copy=JSON.stringify(frame);engine.snapshot(engine.duration);engine.snapshot(0);
       assert.equal(JSON.stringify(engine.snapshot(time)),copy,scene.id);
       for(const node of frame.nodes) {
@@ -246,81 +198,34 @@ test('every variant has deterministic READY, question, FINISHED and fixed geomet
   }
 });
 
-test('catchError confines the error to its scope and only inner recovery accepts the next click',async()=>{
-  const {scenes,engine:{compileScene}}=await harness();
-  for(const [id,inside] of [['b04-catcherror',false],['b04-catcherror-2',true]]) {
-    const engine=compileScene(scenes.get(id)),initial=engine.snapshot(0);
-    const node=(frame,id)=>frame.nodes.find(n=>n.id===id);
-    const history=frame=>frame.histories.find(h=>h.anchor==='observer').values.map(v=>v.value).join(',');
-    assert.equal(node(initial,'http-a').visible,false);
-    assert.equal(node(initial,'observer').notification,null);
-    const first=engine.snapshot(engine.stops[0].time);
-    assert.equal(node(first,'http-a').workState,'active');
-    const error=engine.snapshot(engine.stops[1].time);
-    assert.equal(node(error,'http-a').workState,'errored');
-    assert.equal(history(error),'');
-    assert.equal(node(error,'observer').notification,null,'error must not reach observer');
-    const recovery=engine.events.find(e=>e.type==='deliver-next'&&e.node==='observer'&&e.value==='[]');
-    assert.ok(recovery);
-    assert.equal(history(engine.snapshot(recovery.at-.01)),'','history waits for token arrival');
-    assert.equal(history(engine.snapshot(recovery.at)),'[]');
-    const question=engine.snapshot(engine.stops[2].time);
-    assert.equal(node(question,'observer').notification,inside?null:'complete');
-    if(inside)assert.equal(node(question,'http-b').visible,false,'B is not created ahead of its click');
-    const finish=engine.snapshot(engine.duration);
-    assert.equal(history(finish),inside?'[],B':'[]');
-    assert.equal(node(finish,'observer').notification,inside?null:'complete');
-    assert.equal(finish.metrics[0].value,inside?2:1);
-    assert.equal(finish.edges.find(e=>e.id==='clicks-switch').visible,inside);
-    assert.equal(engine.events.some(e=>e.type==='inner-create'&&e.node==='http-b'),inside);
-    assert.equal(engine.events.some(e=>e.type==='stream-error'&&e.node==='switch'),!inside);
-    assert.equal(finish.tokens.some(t=>t.phase==='unobserved'&&t.value==='B'),!inside);
-    assert.equal(engine.snapshot(engine.plan.timeOf(8)-.01).tokens.some(t=>t.phase==='unobserved'),false);
-    assert.equal(JSON.stringify(engine.snapshot(engine.stops[2].time)),JSON.stringify(question),'rewind after B');
-  }
-});
+// Oba warianty catchError mają graf MAIN switchMap: tests/catch-inside.test.cjs i tests/catch-outside.test.cjs.
 
 test('flatten strategies use identical inputs, queue values before projection and never create ignored inner',async()=>{
   const {scenes,player}=await harness();
   const ids=['09-concatmap','10-mergemap','11-switchmap','12-exhaustmap'];
-  const input=JSON.stringify(scenes.get(ids[0]).rows[0].events);
-  for(const id of ids)assert.equal(JSON.stringify(scenes.get(id).rows[0].events),input,id);
+  // A i B identyczne we wszystkich czterech (pytanie); switchMap ma krótszy finał — C przychodzi wcześniej.
+  const input=JSON.stringify(scenes.get(ids[0]).rows[0].events.slice(0,2));
+  for(const id of ids)assert.equal(JSON.stringify(scenes.get(id).rows[0].events.slice(0,2)),input,id);
+  for(const id of ids.filter(id=>id!=='11-switchmap'))assert.equal(JSON.stringify(scenes.get(id).rows[0].events),JSON.stringify(scenes.get(ids[0]).rows[0].events),id);
   const concat=player(ids[0]).api;concat.seek(concat.stops.at(-1).time);
   assert.equal(concat.snapshot.nodes.find(n=>n.id==='inner1').visible,false);
   const exhaust=player(ids[3]).api;exhaust.finish();
-  assert.deepEqual(Array.from(exhaust.snapshot.nodes.filter(n=>n.inner),n=>n.id),['inner0','inner3']);
-  assert.deepEqual(Array.from(exhaust.snapshot.histories.find(h=>h.anchor==='observer').values,v=>v.value),['A1','A2','D1','D2']);
+  assert.deepEqual(Array.from(exhaust.snapshot.nodes.filter(n=>n.inner),n=>n.id),['inner0','inner2']);
+  assert.deepEqual(Array.from(exhaust.snapshot.histories.find(h=>h.anchor==='observer').values,v=>v.value),['A','C']);
 });
 
-test('concatAll creates references only after the input arrives at projection',async()=>{
+test('concatAll reveals the inner after the Observable leaves map and arrives at concatAll',async()=>{
   const {scenes,engine:{compileScene}}=await harness();
   const model=compileScene(scenes.get('08-map-strumienie'));
-  const creation=model.events.find(e=>e.type==='inner-create'&&e.node==='inner1');
-  const arrival=model.events.find(e=>e.type==='deliver-next'&&e.edge==='source-projection'&&e.value==='B');
-  assert.equal(creation.at,arrival.at);
-  assert.equal(model.snapshot(arrival.at-.01).nodes.find(n=>n.id==='inner1').visible,false);
-});
-
-test('microtask collects synchronous IDs once; buffer windows and in-flight deduplication are independent',async()=>{
-  const {resolver:{planEnrichment,planResolver}}=await harness();
-  const micro=planEnrichment();
-  assert.deepEqual(Array.from(micro.ids),['A','B','C']);assert.equal(micro.microtasks,1);
-  assert.ok(micro.events.findIndex(e=>e.type==='microtask-flush')>micro.events.findIndex(e=>e.type==='sync-end'));
-  assert.equal(planEnrichment(['X'],['X']).microtasks,0);
-  const plan=planResolver();
-  assert.equal(plan.batches.length,1);assert.equal(plan.batches[0].at,.25);
-  assert.deepEqual(Array.from(plan.batches[0].ids),['A','B','C','D','E']);
-  assert.equal(plan.events.filter(e=>e.type==='queue-add'&&e.value==='C').length,1);
-  assert.deepEqual(Array.from(plan.results,r=>Array.from(r.ids)),[['A','B','C'],['C','D','E']]);
-  assert.ok(plan.results.every(r=>r.at===.65));
-  const limited=planResolver({maxBatchSize:3});
-  assert.equal(limited.batches.length,2);assert.equal(limited.batches[0].reason,'size');assert.equal(limited.batches[0].at,.05);
-  assert.equal(limited.batches[1].at,.30); // restart bufora po wcześniejszym flush
-  const late=planResolver({calls:[{at:.3,ids:['A']}],destroyAt:1.2});
-  assert.equal(late.batches[0].at,.5); // okno od subskrypcji, nie .3 + .25
-  const failure=planResolver({errorIds:['C']});assert.equal(failure.results.length,0);
-  assert.equal(failure.events.filter(e=>e.type==='resolve-error').length,2);
-  assert.equal(planResolver({calls:[{at:0,ids:[]}]}).results.length,1);
+  assert.equal(model.events.filter(e=>e.type==='inner-create').length,2,'dwa innery: A$ i B$');
+  for(const [i,value] of ['A','B'].entries()) {
+    const creation=model.events.find(e=>e.type==='inner-create'&&e.node==='inner'+i);
+    const mapped=model.events.find(e=>e.type==='deliver-next'&&e.edge==='source-projection'&&e.value===value);
+    const arrival=model.events.find(e=>e.type==='deliver-next'&&e.edge==='projection-op'&&e.value===value+'$');
+    assert.equal(creation.at,arrival.at,value);
+    assert.ok(mapped.at<arrival.at,value);
+    assert.equal(model.snapshot(arrival.at-.01).nodes.find(n=>n.id==='inner'+i).visible,false,value);
+  }
 });
 
 test('simultaneous values remain ordered and do not overlap on one edge',async()=>{
@@ -355,25 +260,33 @@ test('work panel shows queued input immediately and holds an aborted progress ba
   const sw=player('11-switchmap');sw.api.finish();
   const canceled=sw.api.snapshot.nodes.find(n=>n.id==='inner0');
   assert.equal(canceled.workState,'canceled');assert.ok(canceled.progress>0&&canceled.progress<1);
-  assert.match(sw.elements.get('.rx-stage').innerHTML,/data-execution="A"[^]*?ABORT \(klient\)/);
-  assert.equal(sw.api.snapshot.nodes.find(n=>n.id==='inner3').workState,'completed');
+  assert.match(sw.elements.get('.rx-stage').innerHTML,/data-inner-work="#1"[^]*?anulowane/);
+  assert.equal(sw.api.snapshot.nodes.find(n=>n.id==='inner2').workState,'completed');
 });
 
-test('internal work has no subscription wires and queued Observables are grey from their first frame',async()=>{
+test('the sequential Observable example has no interlevel wires or waiting rows at any transition',async()=>{
   const {scenes,engine:{compileScene},player}=await harness();
   const model=compileScene(scenes.get('08-map-strumienie'));
-  for(const id of ['inner1','inner2']) {
-    const birth=model.events.find(e=>e.type==='inner-create'&&e.node===id).at;
-    for(const dt of [0,.01,.1]) {
-      const node=model.snapshot(birth+dt).nodes.find(n=>n.id===id);
-      assert.equal(node.workState,'queued');assert.equal(node.fill,'#e7ecef');
-      assert.equal(node.showProgress,false);
-    }
-  }
   const p=player('08-map-strumienie');
-  for(const stop of p.api.stops) {
-    p.api.seek(stop.time);
+  for(const t of model.checkpoints) {
+    p.api.seek(t);
+    assert.ok(p.api.snapshot.innerWorkPanels[0].rows.every(r=>['#1','#2'].includes(r.id)&&!['queued','pending'].includes(r.state)));
     assert.doesNotMatch(p.elements.get('.rx-stage').innerHTML,/data-connection="inner/);
     assert.doesNotMatch(p.elements.get('.rx-stage').innerHTML,/data-value-on="inner/);
   }
+});
+
+test('after eight manual stops both HTTP requests hold the same frame as finish()',async()=>{
+  const {player,callbacks}=await harness(),{api}=player('08-map-strumienie');
+  assert.equal(api.stops.length,8);
+  api.seek(api.stops.at(-2).time);api.playContinuously();
+  for(let now=0;now<30000;now+=50){const pending=[...callbacks.values()];callbacks.clear();pending.forEach(fn=>fn(now));}
+  assert.equal(api.state,'finished');assert.equal(api.time,api.duration);assert.equal(callbacks.size,0);
+  assert.equal(api.snapshot.executionCounts.started,2);assert.equal(api.snapshot.executionCounts.active,0);
+  assert.equal(api.snapshot.innerWorkPanels[0].rows.length,2);
+  assert.ok(api.snapshot.innerWorkPanels[0].rows.every(r=>r.receiver.state==='completed'));
+  const final=JSON.stringify(api.snapshot);api.seek(0);api.finish();assert.equal(JSON.stringify(api.snapshot),final);
+  api.seek(api.stops[0].time);assert.equal(api.snapshot.executionCounts.started,0);
+  assert.equal(api.snapshot.tokens.find(t=>t.phase==='transform').value,'A$');
+  api.seek(0);assert.equal(api.state,'ready');assert.equal(api.snapshot.executionCounts.started,0);assert.equal(callbacks.size,0);
 });

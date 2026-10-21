@@ -1,11 +1,11 @@
 import { defineConfig, loadEnv } from 'vite';
 
-export default defineConfig(({ command, mode }) => {
+export default defineConfig(({ command, mode, isPreview }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const domain = env.DEV_DOMAIN;
 
   return {
-    base: command === 'build' ? '/rxjs-operatory/' : '/',
+    base: command === 'build' || isPreview ? '/rxjs-operatory/' : '/',
 
     server: {
       host: '127.0.0.1',

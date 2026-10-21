@@ -1,49 +1,118 @@
-import { configureFlatten, configureConcurrency, flattenGraph, configureFlattenPlayback } from './reference-scenes.js';
-import { configureCatch } from './catch-scenes.js';
+import { configureQuerySource, configureDebounceSwitch, configureSwitchMapLive, configureFlatten, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureCatchSearch, configureShareReplayOne, configureShareReplayRefCount, configureRetryBackoff, configureTimeFour } from './reference-scenes.js';
 
-export const extraIds = new Set(['b01-defer','b02-first-take','b03-buffertime','b05-finalize','b06-forkjoin','b07-zip','b08-merge','b09-pairwise',
-  '12a-complete','13-limit','16-czas-cztery','17-latest','19-share','21-share-miejsce','21a-share-pozycja','23-angular-alias','24-signals']);
+import { configureSearchDemo } from './search-demo.js';
+import { configureUsageStats } from './usage-stats.js';
+
+// Końcowe ID po rozwinięciu wariantów; otwarcie do tytułu pozostaje w kolejności HTML.
+export const mainOrder = [
+  // Slajdy techniczne: HTTP (subscribe/next/complete) z kodem źródłowym httpGet (05b-http-kod) i Cold (jedna definicja,
+  // trzy wykonania), interval (cold: osobne wykonanie każdego odbiorcy, unsubscribe), Subject (ręczne next i complete), Subject + HTTP, Subject + interval.
+  // Potem pytanie o znane operatory, operator, kod myMap, pytanie o share oraz historia share HTTP → późny odbiorca share
+  // (pytanie publiczności: subskrypcja po zakończeniu requestu) → share + interval → shareReplay.
+  '05-zrodla-2','05b-http-kod','04a-dwa-tory','05-zrodla','05-zrodla-5','05-zrodla-3','05-zrodla-4','02-znane-operatory','04-operator','04b-map-kod','03-a-share','04a-dwa-tory-2','04a-dwa-tory-3',
+  // Cztery *Map obok siebie, potem plansza wyszukiwarki, źródło query$, switchMap na żywo, debounceTime, distinctUntilChanged
+  // przed switchMap i catchError wewnątrz switchMap w tej samej wyszukiwarce.
+  '20a-sharereplay-interval','20b-sharereplay-refcount','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12-intro-wyszukiwarka','12-query-zrodlo','12a-switchmap-live','12b-debounce-switchmap','11a-distinct-switchmap','11b-catcherror-search',
+    // Statystyki wywołań operatorów (lekkie przejście) przed podsumowaniem.
+  'b04-catcherror','x03-retry-backoff','16-czas-cztery','24-rxjs-liczby','25-podsumowanie','pytania',
+];
+// Dawne adresy ?extras nie dodają już żadnych slajdów.
+export const extraOrder = [];
+export const extraIds = new Set(extraOrder);
+const stagedIds = new Set(['20a-sharereplay-interval','20b-sharereplay-refcount','x03-retry-backoff','04-operator','04a-dwa-tory-2','04a-dwa-tory-3','05-zrodla','05-zrodla-2','05-zrodla-3','05-zrodla-4','05-zrodla-5','20-sharereplay','20-sharereplay-2']);
+
+// Sceny z finish:hold kończą się ok. 2 s po ostatnim zdarzeniu modelu, żeby AUTO nie stało długo.
+const trimmedTails = new Set(['20-sharereplay']);
+function trimTail(scene) {
+  const times=[...scene.rows.flatMap(r=>[...r.events.map(e=>e.at),
+    ...r.spans.filter(p=>!['state','subscription'].includes(p.kind)).map(p=>p.end),...(r.completeAt===undefined?[]:[r.completeAt])]),
+    ...(scene.captions||[]).map(([at])=>at)];
+  scene.duration=Math.min(scene.duration,Math.max(...times)+2);
+}
 
 // Applies AFTER variants are resolved, so a variant never inherits stale stop times.
 export function configureScene(scene) {
   const id=scene.rendererId||scene.id;
+  if(id==='12-intro-wyszukiwarka')configureSearchDemo(scene);
+  // RxJS w liczbach: wykres czterech *Map i trzy ciekawostki; postój (także w AUTO) po każdym odsłonięciu.
+  if(id==='24-rxjs-liczby')configureUsageStats(scene);
+  if(id==='12-query-zrodlo')configureQuerySource(scene);
+  if(id==='12a-switchmap-live')configureSwitchMapLive(scene);
+  if(id==='12b-debounce-switchmap')configureDebounceSwitch(scene);
   if(['09-concatmap','10-mergemap','12-exhaustmap'].includes(id))configureFlatten(scene,{
     '09-concatmap':'concatMap','10-mergemap':'mergeMap','12-exhaustmap':'exhaustMap'}[id]);
-  if(id==='12a-complete'){
-    scene.jobs=scene.jobs.map(job=>({...job,dur:6}));
-    scene.rows=scene.rows.map(row=>({...row,spans:row.spans.map(span=>['work','cancel'].includes(span.kind)?{...span,duration:6}:span)}));
-    scene.graph=flattenGraph;configureFlattenPlayback(scene);
+  // Wyszukiwarka: distinct od READY usuwa duplikat → trzy sukcesy → po kliknięciu HTTP error.
+  if(id==='11a-distinct-switchmap')configureDistinctSwitch(scene);
+  // Ta sama wyszukiwarka z catchError wewnątrz switchMap: error HTTP #1 → of([]) → angular działa (HTTP #2).
+  if(id==='11b-catcherror-search')configureCatchSearch(scene);
+  // MAIN: catchError na zewnątrz; wariant wewnętrzny zachowany jako model QA.
+  if(id==='b04-catcherror')(scene.catchInside?configureCatchInside:configureCatchOutside)(scene);
+  if(id==='05-zrodla'&&scene.sourceExample===0)configureInterval(scene);
+  if(id==='05-zrodla'&&scene.sourceExample===1)configureHttp(scene);
+  if(id==='04a-dwa-tory')configureLanes(scene);
+  if(id==='05-zrodla'&&scene.sourceExample===2)configureSubject(scene);
+  // Subject + interval: odbiorcy odchodzą, connection z interval zostaje (scena na żywo z akcjami).
+  if(id==='05-zrodla'&&scene.sourceExample===3)configureSubjectInterval(scene);
+  // Subject — ręczna emisja: next(1)/next(2), complete A/B, późny C tylko z complete i ignorowane next(3).
+  if(id==='05-zrodla'&&scene.sourceExample===4)configureSubjectManual(scene);
+  // shareReplay(1) na interval (MAIN, przed shareReplay z refCount: true): A i B odchodzą, interval pracuje dalej.
+  if(id==='20a-sharereplay-interval')configureShareReplayOne(scene);
+  // shareReplay z refCount: true na interval: pauza animacji i B z bufora, A/B odchodzą (reset bufora), C od zera (#2).
+  if(id==='20b-sharereplay-refcount')configureShareReplayRefCount(scene);
+  // retry({ count, delay }) z trzema ponowieniami i exponential backoff 1/2/4 s (MAIN, po catchError na zewnątrz).
+  if(id==='x03-retry-backoff')configureRetryBackoff(scene);
+  // Cztery operatory czasowe po retry: trzy rundy par (debounce/throttle, throttle/audit, audit/sample) od zera.
+  if(id==='16-czas-cztery')configureTimeFour(scene);
+  const entryConnections={
+    '12b-debounce-switchmap':['source-debounce','debounce-op','op-observer'],
+    '11a-distinct-switchmap':['source-debounce','debounce-distinct','distinct-op','op-observer'],
+    '11b-catcherror-search':['source-debounce','debounce-distinct','distinct-op','op-observer'],
+    'b04-catcherror':['source-op','op-catch','catch-observer'],
+    'x03-retry-backoff':['source-retry-1','retry-observer'],
+  }[scene.id];
+  if(entryConnections&&!scene.catchInside){
+    const original=scene.graph;
+    scene.graph=current=>{
+      const graph=typeof original==='function'?original(current):original;
+      const selected=edge=>entryConnections.includes(edge.id||edge.from+'-'+edge.to);
+      const endpoints=new Set(graph.edges.filter(selected).flatMap(edge=>[edge.from,edge.to]));
+      return {...graph,nodes:graph.nodes.map(node=>endpoints.has(node.id)?{...node,ready:true,born:0}:node),
+        edges:graph.edges.map(edge=>selected(edge)?{...edge,logicalStart:0,preconnected:true}:edge),
+        ...(graph.schedule?{schedule:Object.fromEntries(Object.entries(graph.schedule).map(([id,record])=>
+          [id,entryConnections.includes(id)?{...record,start:-(record.connectDuration||.5)}:record]))}:{})};
+    };
   }
-  if(id==='13-limit')configureConcurrency(scene);
-  if(id==='b04-catcherror')configureCatch(scene);
-  scene.group=extraIds.has(id)?'bonus':'main';
-  if(scene.flattenLayout||scene.playback?.stops)return scene;
+  // Kolorowanie składni kodu na wszystkich slajdach (wspólny renderer kodu w playerze); scena może je wyłączyć (codeSyntax:false).
+  scene.codeSyntax??=true;
+  scene.group=extraIds.has(scene.id)?'bonus':'main';
+  if(trimmedTails.has(id))trimTail(scene);
+  if(id==='20-sharereplay'){
+    scene.playerLayout='expanded';
+    scene.metrics=[{label:'requesty',count:'started'}];
+  }
+  // Oba warianty 20 mają wygląd torów: share (HTTP GET → share() → A/B) i shareReplay z kieszenią bufora.
+  if(scene.id==='20-sharereplay')configureShareLate(scene);
+  if(scene.id==='20-sharereplay-2')configureShareReplayLate(scene);
+  if(scene.flattenLayout||scene.playback?.stops){
+    if(stagedIds.has(scene.id))scene.playback={...scene.playback,controller:'stages'};
+    return scene;
+  }
   const question={
-    '05-zrodla':scene.sourceExample===2?12:scene.sourceExample===1?1:2,
-    '06-subskrypcja':6,'06a-cold-hot':6,'07-hot-cold':3,'18-async':1,
-    '20-sharereplay':10,'22-refcount':10,
-    '14-distinct':5,'15-debounce-audit':5,
+    '20-sharereplay':10,
   }[id];
-  const first={'05-zrodla':scene.sourceExample===0?{id:'subscribe',event:{type:'connected',edge:'source-sink'},caption:'Subscribe połączyło źródło i odbiorcę. Teraz czekamy na pierwszy next.'}:null,
-      '07-hot-cold':{id:'first',modelTime:1,caption:'Pierwszy odbiorca subskrybuje.'},
-      '06a-cold-hot':{id:'first',modelTime:0,caption:'A subskrybuje. B jeszcze nie słucha.'},
+  const first={
       '20-sharereplay':{id:'first',modelTime:6,caption:'Pierwsze HTTP wyemitowało odpowiedź i zakończyło się.'},
-      '22-refcount':{id:'first',modelTime:2,caption:'Dwa widoki korzystają z aktywnego timera.'},
     }[id];
   if(question!==undefined)scene.playback={entry:'manual',finish:'hold',afterLastManualStop:'start-auto',stops:[
     ...(first?[first]:[]),
-    {id:'question',modelTime:question,caption:{
-      '05-zrodla':scene.sourceExample===2?'B dotarło. Wcześniejsze A nie wraca.':'Pierwszy krok gotowy. Dalej uruchamia resztę pokazu.',
-      '06-subskrypcja':'Dopiero subscribe uruchomiło HTTP. Deklaracja nie wykonała requestu.',
-      '06a-cold-hot':'B dołączył. Czy dostanie własny timer, czy wspólne kolejne wartości?',
-      '07-hot-cold':'Obaj odbiorcy już subskrybują. Ile wykonań HTTP?',
-      '18-async':'A i B subskrybują ten sam user$. Ile requestów uruchomili?',
+    // Pytanie nie może pokazywać odpowiedzi. 20: tuż przed wylotem wartości z bufora shareReplay.
+    {id:'question',...({
+      '20-sharereplay':{event:{type:'connected',edge:'hub-receiver1'},offset:-.001},
+    }[id]||{modelTime:question}),caption:{
       '20-sharereplay':'B dołączył po complete. Nowe HTTP czy zachowany bufor?',
-      '22-refcount':'Odbiorców: 0. Czy źródło nadal pracuje?',
-      '14-distinct':'Powtórzone ID: czy trzeba uruchomić nowe HTTP?',
-      '15-debounce-audit':'Throttle: A. Sample: C. Audit: D. Dlaczego debounce nadal czeka?',
     }[id]},
   ]};
   else scene.playback={entry:'auto',finish:scene.group==='bonus'?'loop':'hold'};
+  if(stagedIds.has(scene.id))scene.playback={...scene.playback,controller:'stages'};
   return scene;
 }

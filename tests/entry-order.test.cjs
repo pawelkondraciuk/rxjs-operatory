@@ -1,0 +1,100 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
+const {modules}=require('./v2-harness.cjs');
+// Wszystkie warianty z index.html (4:3), jak w main.js.
+async function deck(){
+ class Slide{
+  constructor(id){this.id=id;this.dataset={animation:id};this.heading={};this.player={setAttribute(){}};}
+  querySelector(s){return s==='h2'?this.heading:this.player;}
+  cloneNode(){return new Slide(this.id);}
+  after(){}
+ }
+ const slides=[...fs.readFileSync('index.html','utf8').matchAll(/data-animation="([^"]+)"/g)].map(m=>new Slide(m[1]));
+ const m=await modules(['catalog','presentation','engine'],{document:{querySelectorAll:()=>slides}});
+ const scenes=new Map([...m.presentation.prepareSlides(m.catalog.scenes,{format:'4:3'})].filter(([id])=>id!=='01-tytul'));
+ return {scenes,compile:m.engine.compileScene};
+}
+const samples=c=>[...new Set([...c.checkpoints,...Array.from({length:Math.ceil(c.duration*10)+1},(_,i)=>Math.min(c.duration,i/10))])];
+
+test('connections, tokens and histories appear only with fully visible tiles',async()=>{
+ const {scenes,compile}=await deck();
+ for(const scene of scenes.values()){
+  const c=compile(scene);
+  for(const t of samples(c)){
+   const f=c.snapshot(t),op=new Map(f.nodes.map(n=>[n.id,n.visible?(n.opacity??1):0]));
+   for(const e of f.edges.filter(e=>e.visible))assert.ok(op.get(e.from)>.999&&op.get(e.to)>.999,`${scene.id} @${t} ${e.id}`);
+   for(const k of f.tokens.filter(k=>k.edge)){const e=f.edges.find(x=>x.id===k.edge);if(e)assert.ok(op.get(e.from)>0&&op.get(e.to)>0,`${scene.id} @${t} ${k.value}`);}
+   for(const h of f.histories.filter(h=>h.values.length&&op.has(h.anchor)))assert.ok(op.get(h.anchor)>0,`${scene.id} @${t} ${h.anchor}`);
+  }
+ }
+});
+
+test('a tile shows complete or error only once it sends it, or receives it as a receiver',async()=>{
+ const {scenes,compile}=await deck();
+ for(const scene of scenes.values()){
+  const c=compile(scene),records=[...c.plan.records.values()];
+  for(const t of samples(c))for(const n of c.snapshot(t).nodes){
+   if(!n.visible||n.workRow||!/complete|error/.test(n.status||''))continue;
+   const sent=records.filter(r=>r.a.id===n.id&&r.end&&['complete','error'].includes(r.end.kind)).map(r=>r.end.at);
+   const got=records.filter(r=>r.b.id===n.id&&r.end&&['complete','error'].includes(r.end.kind)).map(r=>r.end.at+(r.end.duration||0));
+   const own=sent.length?Math.min(...sent):got.length?Math.min(...got):-Infinity;
+   assert.ok(t>=own-1e-6,`${scene.id} ${n.id} „${n.status}” @${t}, terminal @${own}`);
+  }
+ }
+});
+
+test('the error source shows the error before operators downstream, and the outer source is detached after it arrives',async()=>{
+ const {scenes,compile}=await deck();
+ const c=compile(scenes.get('b04-catcherror'));
+ const find=(type,edge)=>c.events.find(e=>e.type===type&&e.edge===edge).at;
+ const sent=find('stream-error','inner0-op'),arrived=find('disconnected','inner0-op');
+ const caught=find('disconnected','op-catch'),detach=find('inner-unsubscribe','source-op');
+ assert.ok(detach>=caught&&caught>arrived,`klik$ odłączony @${detach}, błąd w catchError @${caught}, w switchMap @${arrived}`);
+ const f=c.snapshot(sent+.05),row=f.innerWorkPanels[0].rows[0];
+ assert.equal(row.stages[0].state,'errored');assert.equal(row.receiver.state,'active','inbox dostaje error dopiero po dotarciu');
+ const op=f.nodes.find(n=>n.id==='op');
+ assert.notEqual(op.workState,'errored');assert.equal(op.laneStates[0].state,'running');
+});
+
+test('„subskrybuje” needs a drawn connection: not before it, not after unsubscribe starts',async()=>{
+ const {scenes,compile}=await deck();
+ for(const scene of scenes.values()){
+  const c=compile(scene),records=[...c.plan.records.values()];
+  for(const t of samples(c))for(const n of c.snapshot(t).nodes.filter(n=>n.visible&&n.status==='subskrybuje'&&!n.workRow&&!n.inner)){
+   const wires=records.filter(r=>r.b.id===n.id&&!r.internal);
+   if(!wires.length)continue;
+   assert.ok(wires.some(r=>t>=r.start+r.connectDuration&&!(r.end&&t>=r.end.at)),`${scene.id} ${n.id} @${t}`);
+  }
+ }
+});
+
+test('model captions appear with their first visible effect, not while the value is still leaving the source',async()=>{
+ const {scenes,compile}=await deck();
+ const flat=compile(scenes.get('09-concatmap')),a=flat.events.find(e=>e.type==='deliver-next'&&e.edge==='source-op'&&e.value==='A').at;
+ assert.notEqual(flat.snapshot(a-.05).caption,'A uruchamia pierwszą pracę.');
+});
+
+test('subscription chains have no gaps: a receiver never waits for its upstream link to start later',async()=>{
+ const {scenes,compile}=await deck();
+ for(const scene of scenes.values()){
+  const records=[...compile(scene).plan.records.values()];
+  for(const r of records.filter(r=>!r.gateWork))for(const down of records.filter(d=>d.a.id===r.b.id)){
+   if(r.retryAttempt)continue; // retry zarządza kolejnymi subskrypcjami źródła po błędzie i backoff
+   if(scene.id.startsWith('20-sharereplay')&&r.id==='http2-hub')continue; // share po resecie: nowe HTTP dla B
+   if(r.subscriber&&down.subscriber&&r.subscriber!==down.subscriber)continue; // osobne tory subskrybentów
+   assert.ok(r.logicalStart<=down.logicalStart+1e-6,`${scene.id}: ${down.id} @${down.logicalStart}, ${r.id} @${r.logicalStart}`);
+  }
+ }
+});
+
+test('held scenes finish shortly after the last change',async()=>{
+ const {scenes,compile}=await deck();
+ for(const scene of scenes.values()){
+  if(scene.playback?.finish!=='hold'||scene.kind==='cards')continue;
+  const c=compile(scene);
+  // Zmiana obrazu: zdarzenie, postój albo nowy podpis.
+  let caption=c.snapshot(0).caption,changed=0;
+  for(let t=0;t<=c.duration;t+=.1){const now=c.snapshot(t).caption;if(now!==caption){caption=now;changed=t;}}
+  const last=Math.max(changed,...c.events.map(e=>Math.max(e.at,e.until??0)),...c.stops.map(s=>s.time));
+  assert.ok(c.duration-last<=3,`${scene.id}: ${(c.duration-last).toFixed(1)} s bezruchu`);
+ }
+});

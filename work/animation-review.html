@@ -1,15 +1,18 @@
 <!doctype html><html lang="pl"><meta charset="utf-8"><title>Przegląd animacji RxJS</title>
-<style>body{margin:0;background:#faf7ed;color:#16232b;font-family:Arial}#screen{width:1280px;height:720px;box-sizing:border-box;padding:16px 32px}h2{font:bold 42px Georgia;margin:0;height:60px}nav{display:flex;gap:12px;position:fixed;bottom:12px;left:32px;right:32px}button,select{font:18px Arial;padding:8px}#report{position:absolute;top:600px;font:18px Arial}</style>
+<style>body{margin:0;background:#faf7ed;color:#16232b;font-family:Arial}#screen{width:1280px;height:960px;box-sizing:border-box;padding:16px 32px}h2{font:bold 42px Georgia;margin:0;height:60px}nav{display:flex;gap:12px;position:fixed;bottom:12px;left:32px;right:32px}button,select{font:18px Arial;padding:8px}#report{position:absolute;top:840px;font:18px Arial}[data-ratio="16-9"] #screen{height:720px}[data-ratio="16-9"] #report{top:600px}</style>
 <div id="variants" hidden></div><main id="screen"><h2></h2><div class="rx-player"></div><output id="report"></output></main>
-<nav><select aria-label="Scena"></select><button id="ready">Początek</button><button id="question">Pytanie</button><button id="finish">Koniec</button><button id="play">Odtwórz</button><button id="pause">Pauza</button><button id="audit">Sprawdź wszystkie kadry</button></nav>
+<nav><select aria-label="Scena" id="scene"></select><select aria-label="Format" id="format"><option value="4:3">4:3</option><option value="16:9">16:9</option></select><button id="ready">Początek</button><button id="question">Pytanie</button><button id="finish">Koniec</button><button id="play">Odtwórz</button><button id="pause">Pauza</button><button id="audit">Sprawdź wszystkie kadry</button></nav>
 <script type="module">
 import {scenes} from '../animations/catalog.js';
 import {prepareSlides} from '../animations/presentation.js';
 import {createPlayer} from '../animations/player.js';
 import '../animations/reveal.css';
+import {formatFromSearch,toggledFormatUrl} from '../animations/format.js';
+const format=formatFromSearch(location.search);document.documentElement.dataset.ratio=format.replace(':','-');
+const formatSelect=document.querySelector('#format');formatSelect.value=format;formatSelect.onchange=()=>location.replace(toggledFormatUrl(location.href));
 const variants=document.querySelector('#variants');
 variants.innerHTML=scenes.filter(s=>s.id!=='01-tytul').map(s=>`<section data-animation="${s.id}"><h2></h2><div class="rx-player"></div></section>`).join('');
-const byId=prepareSlides(scenes),select=document.querySelector('select'),root=document.querySelector('#screen .rx-player'),heading=document.querySelector('#screen h2'),report=document.querySelector('#report');
+const byId=prepareSlides(scenes,{format}),select=document.querySelector('#scene'),root=document.querySelector('#screen .rx-player'),heading=document.querySelector('#screen h2'),report=document.querySelector('#report');
 select.innerHTML=[...variants.querySelectorAll('section')].map(s=>`<option value="${s.id}">${s.id} — ${byId.get(s.id).title}</option>`).join('');
 let player;
 function choose(){player?.pause();const scene=byId.get(select.value);heading.textContent=scene.title;player=createPlayer(root,scene);report.textContent='';}

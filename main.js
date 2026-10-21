@@ -11,37 +11,62 @@ import Notes from 'reveal.js/plugin/notes';
 import { scenes } from './animations/catalog.js';
 import { createPlayer } from './animations/player.js';
 import './animations/reveal.css';
-import { prepareSlides } from './animations/presentation.js';
+import { prepareSlides, arrangeSlides } from './animations/presentation.js';
 import { compileScene } from './animations/engine.js';
 import { installRevealStages } from './animations/reveal-stages.js';
 import { installAutoFinishGuard } from './animations/reveal-auto-finish.js';
 import { installSpeakerPreview } from './animations/speaker-preview.js';
+import { prepareCheckpointNotes, installCheckpointNotesReceiver, installNotesKeyBridge, installNotesMirror, isNotesPreview, showNotesPreviewFrame } from './animations/checkpoint-notes.js';
+import { FORMATS, formatFromSearch, withFormat, toggledFormatUrl } from './animations/format.js';
+import { prepareCodeWalk } from './animations/code-walk.js';
 
 const params = new URLSearchParams(location.search);
 const printMode = params.has('print-pdf');
-// Menu i istniejące bezpośrednie linki otwierają dodatki świadomie.
-// Zwykła nawigacja głównej ścieżki kończy się na pytaniach.
-const requestedId = location.hash.slice(2).split('/')[0];
-const extras = [...document.querySelectorAll('[data-extras]')];
-const extraLink = extras.some(slide => requestedId === slide.id || requestedId.startsWith(slide.id + '-'));
-if (!params.has('extras') && !printMode && !extraLink) extras.forEach(slide => slide.remove());
-const sceneById = prepareSlides(scenes);
+// Ramki podglądu w oknie Notes (bieżący i następny slajd) pokazują nieruchomy kadr checkpointu:
+// bez własnego RAF, autoplay i korekt fragmentów, które plugin Notes odsyłałby do głównego okna.
+const notesPreview = isNotesPreview();
+// Domyślnie projektor 4:3; ?ratio=16:9 (lub klawisz W) przełącza na ekran panoramiczny.
+const format = formatFromSearch(location.search);
+document.documentElement.dataset.ratio = format.replace(':', '-');
+// Najpierw warianty otrzymują stabilne ID; dopiero potem wybieramy ścieżkę.
+const requestedParts = location.hash.slice(2).split('/');
+const requestedId = requestedParts[0];
+const requestedFragment = Number(requestedParts[/^\d+$/.test(requestedId) ? 2 : 1]);
+const sceneById = prepareSlides(scenes, { format });
+const route = arrangeSlides(sceneById, { extras: params.has('extras'), printMode, requestedId });
+// Kod źródłowy krok po kroku: okno kodu budowane przed inicjalizacją Reveal (etapy to zwykłe fragmenty).
+document.querySelectorAll('[data-code-walk]').forEach(prepareCodeWalk);
+// Bezpośredni hash dodatku ma taki sam URL ścieżki jak wejście przez menu.
+// Usunięcie query przy powrocie powoduje przeładowanie i przywraca sam MAIN.
+if (route.extras && !params.has('extras') && !printMode) {
+  const url = new URL(location.href);
+  url.searchParams.set('extras', '');
+  history.replaceState(history.state, '', url);
+}
+// Obejmuje również linki powrotne utworzone przy podziale wariantów.
+document.querySelectorAll('a[href^="?"], a[href^="./"]').forEach(link => {
+  link.setAttribute('href', withFormat(link.getAttribute('href'), format));
+});
 
 const deck = new Reveal({
   plugins: [Markdown, Highlight, Notes],
   hash: true,
+  fragmentInURL: true,
   slideNumber: true,
-  // Zoptymalizowane wymiary pod projektory panoramiczne (16:9)
-  width: 1280,
-  height: 720,
+  // Wspólna szerokość 1280; wysokość 960 (4:3) albo 720 (16:9).
+  ...FORMATS[format],
   margin: 0.05,
   minScale: 0.2,
   maxScale: 2.0,
   view: 'slide',
   navigationMode: 'linear',
+  // Podgląd nie nawiguje sam (strzałki Reveal); klawisze idą do głównego okna przez installNotesKeyBridge.
+  ...(notesPreview ? { controls: false } : {}),
 });
 
 installSpeakerPreview(deck);
+// Główne okno udostępnia gotowe kadry odtwarzaczy ramce current-slide okna Notes.
+const notesMirror = installNotesMirror(deck);
 
 const players = new Map();
 let activePlayer;
@@ -57,7 +82,7 @@ function stateFor(slide = deck.getCurrentSlide()) {
 }
 
 // Etapy są fragmentami Reveal, tak samo jak zdjęcia na wcześniejszych slajdach.
-// Każda scena deklaruje semantyczne postoje; ostatni fragment uruchamia AUTO.
+// Każda scena deklaruje semantyczne postoje; opcjonalny ostatni fragment uruchamia AUTO.
 const stopsBySlide = new Map();
 const steppedSlides = printMode ? [] : [...document.querySelectorAll('[data-animation]')].filter(slide => sceneById.get(slide.dataset.animation)?.playback?.stops?.length || sceneById.get(slide.dataset.animation)?.playback?.controller === 'stages');
 for (const slide of steppedSlides) {
@@ -69,7 +94,8 @@ for (const slide of steppedSlides) {
   markers.className = 'rx-fragment-steps';
   markers.setAttribute('aria-hidden', 'true');
   markers.innerHTML = stops.map((stop, index) => `<span class="rx-step fragment" data-fragment-index="${index}" data-time="${stop.time}" data-stop="${stop.id}"></span>`).join('');
-  if (scene.playback.controller === 'stages' || scene.playback.afterLastManualStop === 'start-auto') markers.innerHTML += `<span class="rx-step fragment" data-fragment-index="${stops.length}" data-time="${stops.at(-1)?.time || 0}" data-handoff="true"></span>`;
+  if (scene.playback.navigation==='slide') slide.classList.add('rx-slide-navigation');
+  else if (scene.playback.controller === 'stages' || scene.playback.afterLastManualStop === 'start-auto') markers.innerHTML += `<span class="rx-step fragment" data-fragment-index="${stops.length}" data-time="${stops.at(-1)?.time || 0}" data-handoff="true"></span>`;
   slide.append(markers);
   const button = document.createElement('button');
   button.className = 'rx-step-mode';
@@ -78,6 +104,9 @@ for (const slide of steppedSlides) {
   button.addEventListener('click', toggleMode);
   slide.append(button);
 }
+// Szablony notatek są wybierane po rozwinięciu wariantów i utworzeniu markerów.
+for (const slide of document.querySelectorAll('[data-animation]')) prepareCheckpointNotes(slide, { printMode });
+
 function isStaged(slide = deck.getCurrentSlide()) { return sceneById.get(slide?.dataset.animation)?.playback?.controller === 'stages'; }
 function isStepped(slide = deck.getCurrentSlide()) { return slide?.classList.contains('rx-stepped'); }
 function fragmentTime(slide = deck.getCurrentSlide()) {
@@ -123,6 +152,20 @@ function stepAnimation(direction) {
 }
 function toggleAnimation() { if (activePlayer?.controller) { if (activePlayer.controller.mode === 'manual') activePlayer.controller.setMode('auto'); else activePlayer.controller.toggle(); return; } if (isStepped() && stateFor().mode === 'manual') setMode('auto'); else activePlayer?.toggle(); }
 steppedSlides.forEach(updateMode);
+// Tytuły animacji są duże (4:3: 64 px), ale długi tytuł zmniejszamy tak, by został w jednej linii obok przycisku trybu.
+function fitTitles() {
+  const context = document.createElement('canvas').getContext('2d');
+  document.querySelectorAll('.animation-slide h2').forEach(title => {
+    if(title.closest('.rx-slide-navigation'))return;
+    title.style.fontSize = '';
+    const style = getComputedStyle(title), size = parseFloat(style.fontSize);
+    const room = FORMATS[format].width - (title.closest('.rx-stepped') ? 230 : 0) - 8;
+    context.font = `${style.fontWeight} ${size}px ${style.fontFamily}`;
+    const width = context.measureText(title.textContent).width;
+    if (width > room) title.style.fontSize = Math.max(44, Math.floor(size * room / width)) + 'px';
+  });
+}
+if (format === '4:3') fitTitles();
 const autoFinish = installAutoFinishGuard(deck, {
   slides: printMode ? [] : [...document.querySelectorAll('[data-animation]')].filter(slide => {
     const scene = sceneById.get(slide.dataset.animation);
@@ -130,7 +173,7 @@ const autoFinish = installAutoFinishGuard(deck, {
   }),
   getPlayer: slide => players.get(slide),
   getMode: slide => stateFor(slide).mode,
-  isEnabled: () => !printMode,
+  isEnabled: () => !printMode && !notesPreview,
 });
 
 function playerFor(slide) {
@@ -147,14 +190,47 @@ function playerFor(slide) {
       step: stepAnimation, reset: resetAnimation, toggle: toggleAnimation,
     } : { step: stepAnimation }));
     autoFinish.observe(slide, players.get(slide));
+    if (!notesPreview) players.get(slide).subscribe(() => notesMirror.notify(slide));
+    syncTitleAnswers(slide, players.get(slide));
+    players.get(slide).subscribe(() => syncTitleAnswers(slide, players.get(slide)));
   }
   return players.get(slide);
 }
 
+// Podtytuł z odpowiedzią (h2 .rx-title-answer[data-after-stop]) pojawia się dopiero, gdy animacja minie wskazany
+// postój (pytanie), więc tytuł nie zdradza działania operatora; cofnięcie do pytania znowu go ukrywa.
+function syncTitleAnswers(slide, player) {
+  slide.querySelectorAll('.rx-title-answer[data-after-stop]').forEach(answer => {
+    const stop = player.stops.find(s => s.id === answer.dataset.afterStop);
+    const shown = !stop || player.state === 'finished' || player.time > stop.time + 1e-6;
+    answer.classList.toggle('rx-shown', shown);
+    answer.setAttribute('aria-hidden', String(!shown));
+  });
+}
+
+// Ramka current-slide kopiuje kadr głównego okna (ta sama animacja), upcoming i brak lustra — nieruchomy checkpoint.
+function showPreviewFrame(slide) {
+  showNotesPreviewFrame(slide, playerFor(slide), { still: stateFor(slide).mode === 'static' });
+  notesMirror.pull?.();
+}
+
 function activate(slide) {
+  if (notesPreview) {
+    activeSlide = slide;
+    activePlayer = playerFor(slide);
+    activePlayer?.hideControls();
+    showPreviewFrame(slide);
+    return;
+  }
   suspendedPlaying = false;
   if (activeSlide && activePlayer) stateFor(activeSlide).wasPlaying = activePlayer.isPlaying;
   if (activePlayer?.controller) activePlayer.controller.suspend('slide'); else activePlayer?.pause();
+  // Scena na żywo (interval) po wyjściu zatrzymuje wykonanie i wraca do READY; nie wznawia się po powrocie.
+  // Ponowna aktywacja tego samego slajdu (np. przy inicjalizacji Reveal) nie jest wyjściem.
+  if (activeSlide !== slide) {
+    activePlayer?.cleanup();
+    if (activePlayer?.live || activePlayer?.resetOnExit) activePlayer.controller.reset();
+  }
   activePlayer?.hideControls();
   activeSlide = slide;
   activePlayer = playerFor(slide);
@@ -162,11 +238,18 @@ function activate(slide) {
   const state = stateFor(slide);
   if (printMode) activePlayer?.finish();
   else if (activePlayer?.controller) {
+    // Odtwórz stabilny checkpoint z hasha przed synchronizacją fragmentów stages.
+    const requestedSlide = requestedId === slide.id || deck.getSlides()[Number(requestedId)] === slide;
+    if (!state.visited && requestedSlide && Number.isInteger(requestedFragment) && requestedFragment >= 0) {
+      const marker = slide.querySelectorAll('.rx-step')[requestedFragment];
+      if (marker) activePlayer.controller.seekCheckpoint(Number(marker.dataset.time), marker.dataset.handoff === 'true');
+    }
     const blocked = deck.isOverview() || deck.isPaused() || document.hidden;
     if (blocked) activePlayer.controller.suspend('environment');
     else {
       activePlayer.controller.resume('environment'); activePlayer.controller.resume('slide');
-      if (!state.visited && state.mode === 'auto') activePlayer.controller.next();
+      if (!state.visited && state.mode === 'auto' && activePlayer.state !== 'finished') activePlayer.controller.next();
+      autoplayLive();
     }
   }
   else if (isStepped(slide) && state.mode === 'manual') {
@@ -183,11 +266,15 @@ function activate(slide) {
   autoFinish.sync(slide);
 }
 
+// Scena na żywo z autoplay (Subject + interval) startuje już działająca: emisje ruszają przy wejściu na slajd.
+function autoplayLive() {
+  if (activePlayer?.live?.autoplay && !activePlayer.isPlaying && activePlayer.state !== 'finished') activePlayer.controller.toggle();
+}
 let suspendedPlaying = false;
-function suspend() { if (activePlayer?.controller) { activePlayer.controller.suspend('environment'); return; } suspendedPlaying ||= Boolean(activePlayer?.isPlaying); activePlayer?.pause(); }
+function suspend() { if (notesPreview) return; if (activePlayer?.controller) { activePlayer.controller.suspend('environment'); return; } suspendedPlaying ||= Boolean(activePlayer?.isPlaying); activePlayer?.pause(); }
 function resume() {
-  if (!printMode && !deck.isOverview() && !deck.isPaused() && !document.hidden) {
-    if (activePlayer?.controller) { activePlayer.controller.resume('environment'); return; }
+  if (!printMode && !notesPreview && !deck.isOverview() && !deck.isPaused() && !document.hidden) {
+    if (activePlayer?.controller) { activePlayer.controller.resume('environment'); if (activePlayer.state === 'ready') autoplayLive(); return; }
     if (suspendedPlaying) {
       if (isStepped() && stateFor().mode === 'manual') activePlayer?.playTo(fragmentTime());
       else if (activePlayer?.state !== 'finished') activePlayer?.play();
@@ -197,6 +284,7 @@ function resume() {
 }
 
 deck.on('fragmentshown', event => {
+  if (notesPreview) { if (event.fragment.closest('.rx-fragment-steps')) showPreviewFrame(event.fragment.closest('section')); return; }
   if (isStaged() || printMode || restoringSlide || stateFor().mode !== 'manual' || !event.fragment.closest('.rx-fragment-steps') || event.fragment.closest('section') !== activeSlide) return;
   if (activePlayer?.finishStep()) {
     // Reveal już odsłoniło kolejny fragment. Zatrzymaj bieżący etap i oddaj mu fragment.
@@ -210,9 +298,19 @@ deck.on('fragmentshown', event => {
   playerFor(deck.getCurrentSlide())?.playTo(fragmentTime());
 });
 deck.on('fragmenthidden', event => {
+  if (notesPreview) { if (event.fragment.closest('.rx-fragment-steps')) showPreviewFrame(event.fragment.closest('section')); return; }
   if (isStaged() || printMode || restoringSlide || stateFor().mode !== 'manual' || !event.fragment.closest('.rx-fragment-steps') || event.fragment.closest('section') !== activeSlide) return;
   stateFor().fragmentIndex = activeSlide.querySelectorAll('.rx-step.visible').length - 1;
   playerFor(deck.getCurrentSlide())?.seek(fragmentTime());
+});
+
+// Ostatni ręczny postój może już być finałem. Wtedy Reveal nie ma kolejnego fragmentu,
+// który przechwyciłby szybkie „dalej”: najpierw kończymy rozpoczęty etap, potem zmieniamy slajd.
+deck.on('beforeslidechange', event => {
+  if (!activePlayer || printMode || notesPreview || restoringSlide || isStaged() || deck.isOverview() || deck.isPaused() || stateFor().mode !== 'manual') return;
+  const current = deck.getIndices(activeSlide);
+  const forward = event.indexh > current.h || event.indexh === current.h && event.indexv > (current.v || 0);
+  if (forward && fragmentTime() === activePlayer.duration && activePlayer.finishStep()) event.preventDefault();
 });
 
 deck.on('slidechanged', event => activate(event.currentSlide));
@@ -236,8 +334,21 @@ deck.addKeyBinding({ keyCode: 219, key: '[', description: 'Animacja: poprzedni k
 deck.addKeyBinding({ keyCode: 221, key: ']', description: 'Animacja: następny krok' }, animationAction(() => stepAnimation(1)));
 deck.addKeyBinding({ keyCode: 82, key: 'R', description: 'Animacja: od początku' }, animationAction(resetAnimation));
 deck.addKeyBinding({ keyCode: 85, key: 'U', description: 'Pokaż / ukryj sterowanie animacją' }, animationAction(player => player?.toggleControls()));
+// Format zmienia wymiary sceny i grafów, więc wymaga przeładowania; hash zachowuje slajd i fragment.
+if (!printMode) deck.addKeyBinding({ keyCode: 87, key: 'W', description: 'Format 4:3 / 16:9 (przeładowanie)' }, () => {
+  const url = new URL(location.href);
+  url.hash = deck.getSlidePath(); // Także przed opóźnionym zapisem URL przez Reveal.
+  location.replace(toggledFormatUrl(url.href));
+});
 
-const stageReveal = installRevealStages(deck, { getController: slide => players.get(slide)?.controller, isEnabled: () => !printMode });
+const stageReveal = installRevealStages(deck, {
+  getController: slide => players.get(slide)?.controller,
+  getPlayer: slide => stateFor(slide).mode === 'static' ? null : players.get(slide),
+  getManualTarget: slide => isStepped(slide) && stateFor(slide).mode === 'manual' ? fragmentTime(slide) : null,
+  isEnabled: () => !printMode && !notesPreview,
+});
+installCheckpointNotesReceiver(deck, stageReveal, { getPlayer: playerFor });
+installNotesKeyBridge(deck);
 
 // Po użyciu suwaka pilot nadal zmienia slajdy, zamiast przesuwać suwak.
 document.addEventListener('keydown', event => {
@@ -256,4 +367,14 @@ if (printMode) {
     playerFor(slide).finish();
   });
 }
-deck.initialize().then(() => { activate(deck.getCurrentSlide()); stageReveal.refresh(); });
+// Strzałki Reveal mają stały rozmiar w pikselach ekranu i nachodzą na prawy dół skalowanego slajdu (liczniki animacji).
+// Stopka odtwarzacza dostaje prawy margines równy tej części slajdu, którą zasłaniają; bez strzałek (druk, podgląd Notes) — 0.
+function reserveControls() {
+  const slides = document.querySelector('.reveal .slides').getBoundingClientRect();
+  const arrows = [...document.querySelectorAll('.reveal .controls :is(.navigate-left, .navigate-right)')]
+    .filter(button => button.offsetParent && getComputedStyle(button).display !== 'none').map(button => button.getBoundingClientRect().left);
+  const scale = slides.width / FORMATS[format].width, overlap = arrows.length ? slides.right - Math.min(...arrows) : 0;
+  document.documentElement.style.setProperty('--rx-controls-reserve', `${overlap > 0 ? Math.ceil(overlap / scale + 12) : 0}px`);
+}
+deck.on('resize', reserveControls);
+deck.initialize().then(() => { activate(deck.getCurrentSlide()); stageReveal.refresh(); reserveControls(); });

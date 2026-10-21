@@ -75,3 +75,41 @@ test('reduced motion retains READY, stage times and checkpoint progression',asyn
  a.controller.next();b.controller.next();normal.advance(1000);reduced.advance(1000);assert.equal(a.player.time,b.player.time);assert.equal(a.controller.state.target,b.controller.state.target);
  normal.advance(3000);reduced.advance(3000);assert.equal(a.player.time,2);assert.equal(b.player.time,2);assert.equal(a.player.isPlaying,false);assert.equal(b.player.isPlaying,false);
 });
+test('Space pauses legacy AUTO without replacing native arrows and keeps FINISHED frozen',async()=>{
+ const h=await harness(),{deck,stage,ordinary,bindings}=revealMock();
+ const {player}=h.create({playback:{controller:undefined,entry:'auto',finish:'hold'}});
+ const adapter=h.install(deck,{getController:()=>null,getPlayer:s=>s===stage?player:null});adapter.refresh();
+ assert.deepEqual([...bindings.keys()],[32]);player.play();h.advance(500);deck.press(32);
+ const paused=player.time;assert.equal(player.isPlaying,false);assert.equal(h.frames.size,0);
+ h.advance(1000);assert.equal(player.time,paused);deck.press(32);assert.equal(player.isPlaying,true);
+ player.finish();deck.press(32);assert.equal(player.state,'finished');assert.equal(h.frames.size,0);
+ deck.press(39);assert.deepEqual(deck.navigation,['native:39']);
+ deck.show(ordinary);assert.equal(bindings.size,0);deck.press(32);assert.equal(deck.navigation.at(-1),'native:32');adapter.destroy();
+});
+test('Space on a legacy MANUAL scene resumes its target, then delegates the next checkpoint to Reveal',async()=>{
+ const h=await harness(),{deck,stage,bindings}=revealMock();
+ const {player}=h.create({playback:{controller:undefined,entry:'manual',finish:'hold'}});
+ let target=0,steps=0;deck.next=()=>{steps++;target+=2;player.playTo(target);};
+ const adapter=h.install(deck,{getController:()=>null,getPlayer:()=>player,getManualTarget:()=>target});adapter.refresh();
+ deck.press(32);assert.equal(steps,1);h.advance(500);deck.press(32);
+ assert.ok(player.time>0&&player.time<2);assert.equal(player.isPlaying,false);
+ deck.press(32);assert.equal(steps,1);h.advance(3000);
+ assert.equal(player.time,2);assert.equal(player.isPlaying,false);assert.equal(h.frames.size,0);
+ deck.press(32);assert.equal(steps,2);assert.equal(player.isPlaying,true);h.advance(3000);
+ assert.equal(player.time,4);assert.equal(bindings.size,1);adapter.destroy();
+});
+test('Space binding follows stage/legacy transitions and is absent in overview, pause and print',async()=>{
+ const h=await harness(),{deck,stage,ordinary,bindings}=revealMock(),staged=h.create();
+ const legacy=h.create({playback:{controller:undefined,entry:'auto',finish:'hold'}});
+ let enabled=true;
+ const adapter=h.install(deck,{getController:s=>s===stage?staged.controller:null,getPlayer:s=>s===ordinary?legacy.player:null,isEnabled:()=>enabled});
+ adapter.refresh();assert.equal(bindings.has(39),true);deck.press(32);assert.equal(staged.player.isPlaying,true);
+ staged.controller.suspend('slide');deck.show(ordinary);assert.deepEqual([...bindings.keys()],[32]);
+ deck.press(32);assert.equal(legacy.player.isPlaying,true);legacy.player.pause();
+ for(const [flag,shown,hidden] of [['overview','overviewshown','overviewhidden'],['paused','paused','resumed']]){
+  deck[flag]=true;deck.emit(shown);assert.equal(bindings.size,0);
+  deck[flag]=false;deck.emit(hidden);assert.deepEqual([...bindings.keys()],[32]);assert.equal(legacy.player.isPlaying,false);
+ }
+ enabled=false;adapter.refresh();assert.equal(bindings.size,0);deck.show(stage);assert.equal(bindings.size,0);
+ enabled=true;adapter.refresh();assert.equal(bindings.has(39),true);adapter.destroy();assert.equal(bindings.size,0);
+});

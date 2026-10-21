@@ -1,15 +1,11 @@
-import { configureScene } from './scene-config.js';
+import { configureScene, mainOrder, extraOrder, extraIds } from './scene-config.js';
 // Każdy wariant jest osobnym slajdem, dostępnym przyciskiem pilota „dalej”.
-export function prepareSlides(scenes) {
+// format ('4:3' | '16:9') trafia do sceny, żeby grafy mogły dobrać wysokość ramki.
+const esc = text => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+export function prepareSlides(scenes, { format = '4:3' } = {}) {
   const byId = new Map(scenes.map(scene => [scene.id, scene]));
   const titles = {
-    '06a-cold-hot': ['Cold: własny timer dla każdego', 'Hot: dołączasz do działającego źródła'],
-    '07-hot-cold': ['Bez share: dwie subskrypcje, dwa HTTP', 'Z share: dwie subskrypcje, jedno HTTP'],
-    '12a-complete': ['concatMap: complete czeka na kolejkę', 'switchMap: complete czeka na ostatni inner'],
-    '18-async': ['Dwie subskrypcje: dwa wykonania HTTP', 'Dwie subskrypcje z share: jedno HTTP'],
     '20-sharereplay': ['share: późny odbiorca uruchamia HTTP', 'shareReplay: późny odbiorca dostaje wynik'],
-    '21-share-miejsce': ['Bez share: obliczenia dla każdego odbiorcy', 'map przed share: jedno wspólne obliczenie'],
-    '22-refcount': ['refCount: false — timer działa po odejściu', 'refCount: true — ostatni odbiorca odłącza źródło'],
   };
   for (const slide of [...document.querySelectorAll('[data-animation]')]) {
     const original = byId.get(slide.dataset.animation);
@@ -21,60 +17,74 @@ export function prepareSlides(scenes) {
         comparisonMode: mode, title: titles[original.id][i],
       }));
     } else if (original.id === '05-zrodla') {
-      variants = [0,1,2].map(i => ({ ...original, sourceExample:i, duration:i===1?11:20,
-        title:['timer: wartości w czasie','HTTP: odpowiedź i complete','Subject: odbierasz od chwili subskrypcji'][i],
-        code:['timer(2000, 4000)','http.get(\'/api/data\')','subject$.subscribe(observer)'][i],
-        captions:[[[0,'Timer emituje kolejne wartości do odbiorcy.'],[14,'Źródło pozostaje aktywne.']],[[0,'Subskrypcja uruchamia HTTP.'],[7,'Odpowiedź, a następnie complete.']],[[0,'Subject nie przechowuje historii.'],[4,'A zostało wyemitowane bez tego odbiorcy.'],[8,'Odbiorca subskrybuje.'],[12,'Dostaje B; wcześniejsze A do niego nie wraca.']]][i],
+      // Warianty 0 (interval na żywo), 1 (HTTP), 2 (Subject + HTTP), 3 (Subject + interval) i 4 (Subject — ręczna emisja)
+      // konfiguruje configureScene.
+      variants = [0,1,2,3,4].map(i => ({ ...original, sourceExample:i, duration:i===1?11:20,
+        title:['interval: strumień bez końca','HTTP: odpowiedź i complete','Subject: odbierasz od chwili subskrypcji','Subject — kto odłączy źródło?','Subject — ręczna emisja'][i],
+        code:['interval(1000)','httpGet(\'/api/data\')','subject$.subscribe(observer)','',''][i],
+        captions:[[],[],[[0,'Subject może emitować bez odbiorcy.'],[4,'A bez subskrypcji.'],[8,'Odbiorca subskrybuje.'],[12,'Dostaje B.'],[16,'Dostaje C. Trzy emisje, dwa odbiory.']],[],[]][i],
       }));
-    } else if (original.id === '21a-share-pozycja') {
-      variants = [false,true].map(after => ({ ...original, mapAfterShare:after,
-        title:after?'map za share: osobne obliczenia':'map przed share: wspólne obliczenie',
-        code:after?'subject$.pipe(share(), map(expensive))':'subject$.pipe(map(expensive), share())',
-        captions:[[0,'Dwóch odbiorców subskrybuje przed pierwszą emisją.'],[2,after?'Każdy odbiorca wykonuje własne map(expensive).':'Wynik jednego map(expensive) trafia do obu odbiorców.']],
-        metrics:[original.metrics[after?1:0]],
-      }));
-    } else if (original.id === 'b04-catcherror') {
-      variants = [false,true].map(inside => ({ ...original, catchInside:inside }));
-    } else if (original.id === '16-czas-cztery') {
-      variants = [1, 2, 3, 4].map(i => ({ ...original, seriesIndices: [i],
-        title: ['','debounceTime: czekamy na ciszę','auditTime: ostatnia wartość okna','throttleTime: pierwsza wartość okna','sampleTime: odczyt w stałym rytmie'][i],
-        code: `${original.rows[i].label}(3500)`,
-        captions: [[0, ['','Każde zdarzenie odlicza 3,5 s od nowa.','Pierwsze zdarzenie otwiera okno 3,5 s.','Pierwsza wartość przechodzi. Następne w oknie pomijamy.','Co 3,5 s pobieramy najnowszą wartość, jeśli pojawiła się nowa.'][i]], [12, ['','Emisja następuje dopiero po 3,5 s ciszy.','Na końcu okna emitujemy ostatnią otrzymaną wartość.','Domyślnie: leading = true, trailing = false.','Brak nowych zdarzeń oznacza brak kolejnej emisji.'][i]]],
-      }));
-    } else if (original.id === 'b02-first-take') {
-      variants = [[0, 1], [2, 3]].map((indices, i) => ({ ...original, duration:8, rows: indices.map(j => {
-        const r=original.rows[j],shift=i?8:0;
-        return {...r,completeAt:r.completeAt===undefined?undefined:r.completeAt-shift,events:r.events.map(e=>({...e,at:e.at-shift}))};
-      }),
-        title: i ? 'Puste źródło: take(1) kończy, first() zgłasza błąd' : 'Pierwsza wartość: take(1) i first()',
-        code: i ? 'EMPTY.pipe(take(1)) / EMPTY.pipe(first())' : "of('A').pipe(take(1)) / of('A').pipe(first())",
-        captions: i ? [[0,'Źródło kończy się bez żadnej wartości.'],[3,'take(1): complete. first(): EmptyError.']] : [[0,'Źródło wyemituje A.'],[3,'Oba operatory przekazują A, a następnie complete.']],
-      }));
-    } else if (original.id === 'b05-finalize') {
-      variants = original.rows.map(r => {
-        const shift=r.spans[0].start-1;
-        return { ...original, duration:10,
-          rows:[{...r,events:[],completeAt:r.completeAt===undefined?undefined:r.completeAt-shift,spans:r.spans.map(p=>({...p,start:p.start-shift,end:p.end-shift}))}],
-          title:`finalize po ${r.label}`,
-          captions:[[0,`Zakończenie przez ${r.label}.`],[6,'Sprzątanie uruchamia się również w tym przypadku.']],
-          metrics:[{label:'finalize',value:t=>t>=6?'cleanup()':'czeka'}],
-        };
-      });
+    } else if (original.id === '04a-dwa-tory') {
+      // Tory wykonania: cold (trzy pola widoku, trzy requesty user$), share() (A/B współdzielą #1, późny C uruchamia #2)
+      // i share + interval (odpowiednik Subject + interval: ostatni odbiorca odłącza źródło).
+      variants = ['cold', 'share', 'share-interval'].map(mode => ({ ...original, lanesMode: mode,
+        title: { cold: 'Cold: jedna definicja, trzy wykonania', share: 'share(): wspólny request i późny odbiorca',
+          'share-interval': 'share() — kto odłączy źródło?' }[mode] }));
     } else variants = [original];
 
     let previous = slide;
     variants.forEach((variant, i) => {
-      const target = i ? slide.cloneNode(true) : slide;
+      const target = i && original.id!=='20-sharereplay' ? slide.cloneNode(true) : slide;
+      if(original.id==='20-sharereplay'&&i===0){
+        byId.set(original.id,configureScene({...variant,id:original.id,rendererId:original.id,format}));
+        return;
+      }
       const id = i ? `${original.id}-${i + 1}` : original.id;
-      const scene = configureScene({ ...variant, id, rendererId: original.id });
+      const scene = configureScene({ ...variant, id, rendererId: original.id, format });
       byId.set(id, scene);
       target.id = id;
       target.dataset.animation = id;
-      target.querySelector('h2').textContent = scene.title;
-      target.querySelector('.rx-player').setAttribute('aria-label', scene.title);
-      if (i) previous.after(target);
+      // scene.titleAnswerAfter (opt-in): część tytułu po „ — ” jest odpowiedzią na pytanie slajdu; main.js odsłania ją
+      // dopiero po minięciu wskazanego postoju (span .rx-title-answer[data-after-stop]).
+      const [lead, ...answer] = scene.title.split(' — '), hidden = scene.titleAnswerAfter && answer.length;
+      if (hidden) target.querySelector('h2').innerHTML = esc(lead) +
+        `<span class="rx-title-answer" data-after-stop="${esc(scene.titleAnswerAfter)}">${esc(' — ' + answer.join(' — '))}</span>`;
+      else target.querySelector('h2').textContent = scene.title;
+      target.querySelector('.rx-player').setAttribute('aria-label', hidden ? lead : scene.title);
+      if (i && target!==slide) previous.after(target);
       previous = target;
     });
   }
   return byId;
+}
+
+// Wywołuj po prepareSlides: jedna bazowa sekcja może mieć warianty w obu ścieżkach.
+export function arrangeSlides(sceneById, { extras = false, printMode = false, requestedId = '' } = {}) {
+  const container = document.querySelector('.reveal .slides');
+  const includeExtras = extras || printMode || extraIds.has(requestedId);
+  const slides = new Map([...container.querySelectorAll('section[id]')].map(slide => [slide.id, slide]));
+  for (const id of [...mainOrder, ...extraOrder]) {
+    const slide = slides.get(id);
+    if (!slide) continue;
+    const bonus = extraIds.has(id);
+    const back = slide.querySelector('.extras-back');
+    if (bonus) {
+      slide.setAttribute('data-extras', '');
+      if (!includeExtras) { slide.remove(); continue; }
+      if (!back) {
+        const link = document.createElement('a');
+        link.className = 'extras-back';
+        link.href = './#/pytania';
+        link.textContent = 'Powrót do pytań';
+        slide.append(link);
+      }
+    } else {
+      slide.removeAttribute('data-extras');
+      back?.remove();
+    }
+    container.append(slide);
+    const scene = sceneById.get(id);
+    if (scene) scene.group = bonus ? 'bonus' : 'main';
+  }
+  return { extras: includeExtras };
 }

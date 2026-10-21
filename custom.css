@@ -40,47 +40,12 @@
   margin-top: 16px;
 }
 
-/* Szeroki kontekst ReactiveX po slajdzie tytułowym */
-.reveal .reactivex-landscape-slide h2 {
-  margin: 0 0 12px;
-  font-size: 1.55em;
-  text-transform: none;
-}
-
-.reveal .reactivex-landscape-intro {
-  margin: 0 0 34px;
-  color: #59616a;
-  font-size: 0.72em;
-}
-
-.reactivex-language-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px 20px;
-  max-width: 1050px;
-  margin: 0 auto;
-}
-
-.reactivex-language-grid span {
-  display: grid;
-  place-items: center;
-  min-height: 66px;
-  border: 1px solid rgba(78, 87, 97, 0.16);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.62);
-  color: #25333b;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 0.72em;
-  font-weight: 700;
-  box-shadow: 0 4px 14px rgba(51, 47, 37, 0.05);
-}
-
 /* Dolna sekcja prelegenta bezpośrednio na tle slajdu (bez białego boksu) */
 .speaker-intro-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 50px;
+  margin-top: 120px;
   padding: 10px 10px;
   width: 100%;
   box-sizing: border-box;
@@ -224,8 +189,8 @@
 
 .reveal .community-qr img {
   display: block;
-  width: 320px;
-  height: 320px;
+  width: 420px;
+  height: 420px;
   max-width: none;
   max-height: none;
   margin: 0;
@@ -253,7 +218,7 @@
   justify-content: center;
   align-items: center;
   width: 100%;
-  height: 510px;
+  height: 790px;
 }
 
 .photo-box-hero {
@@ -312,8 +277,8 @@
   border-radius: 12px;
   margin: 0 !important;
   /* Limit dotyczy zdjęcia, a ramka obejmuje jego rzeczywiste proporcje. */
-  max-width: 954px !important;
-  max-height: 480px !important;
+  max-width: 1200px !important;
+  max-height: 760px !important;
 }
 
 /* =========================================
@@ -357,7 +322,7 @@
 
 .talk-image-wrapper {
   width: 100%;
-  height: 330px;
+  height: 420px;
   flex-shrink: 0;
   border-radius: 12px;
   overflow: hidden;
@@ -410,7 +375,7 @@
   display: flex;
   justify-content: center;
   gap: 64px;
-  margin-top: 48px;
+  margin-top: 96px;
   font: 56px/1.3 Consolas, ui-monospace, monospace;
   color: #7a5a3a;
 }
@@ -452,9 +417,13 @@
   margin: 0 0 18px !important;
 }
 
+/* Wysokość obszaru pod nagłówkiem; wspólna z osią czasu, żeby Reveal
+   wyśrodkował oba slajdy identycznie i nagłówki stały w miejscu. */
+:root { --trivia-stage-height: 780px; }
+
 .trivia-stack-container {
-  width: 1120px;
-  height: 540px;
+  width: 1240px;
+  height: var(--trivia-stage-height);
   margin: 0 auto;
 }
 
@@ -488,28 +457,30 @@
   overflow: hidden;
 }
 
+/* Tytuł i podtytuł mają klasy .trivia-answer-title i .trivia-date
+   (jak JavaScript Białystok #1); tu tylko kolor i krój podtytułu. */
 .timeline-header {
   text-align: center;
-  margin-bottom: 10px;
   flex-shrink: 0;
 }
 
-.timeline-header h2 {
-  font-size: 1.5em !important;
-  font-weight: 700 !important;
-  color: #111111 !important;
-  margin: 0 0 4px 0 !important;
-  text-transform: none !important;
-  letter-spacing: -0.015em;
-}
-
-.timeline-subtitle {
-  font-size: 0.5em !important;
+.timeline-header .timeline-subtitle {
   font-weight: 600;
   color: #666666;
-  margin: 0 !important;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+/* Oś czasu i legenda w obszarze o wysokości stosu zdjęć wzorca;
+   padding-top ustala tylko pionową pozycję osi czasu pod podtytułem. */
+.timeline-stage {
+  width: 100%;
+  height: var(--trivia-stage-height);
+  padding-top: 24px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 /* Wrapper — pełna szerokość, bez scrollbara na prezentacji */
@@ -517,7 +488,7 @@
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  flex: 1;
+  flex: none;
   display: flex;
   align-items: flex-start;
 }
@@ -605,10 +576,10 @@
   justify-content: center;
   gap: 4px;
   font-size: 18px;
-  line-height: 22px;
+  line-height: 26px;
   font-variant-numeric: tabular-nums;
-  padding: 4px 2px;
-  margin: 0 0 4px !important;
+  padding: 6px 2px;
+  margin: 0 0 6px !important;
 }
 
 .timeline-dates .tl-num {
@@ -628,7 +599,7 @@
   justify-content: center;
   gap: 4px;
   width: 100%;
-  padding: 4px 2px;
+  padding: 6px 2px;
   box-sizing: border-box;
   border-radius: inherit;
   color: inherit;
@@ -675,3 +646,128 @@
   color: #555555;
   margin: 12px 0 0;
 }
+
+/* =========================================
+   Format 16:9 (?ratio=16:9, klawisz W): dotychczasowe rozmiary.
+   Bazowe wartości powyżej wykorzystują wysokość sceny 4:3 (1280×960).
+   ========================================= */
+[data-ratio="16-9"] .reveal .community-qr img { width: 320px; height: 320px; }
+[data-ratio="16-9"] .photo-stack-container { height: 510px; }
+[data-ratio="16-9"] .reveal .photo-box-hero-with-title img,
+[data-ratio="16-9"] .reveal .trivia-photo-frame img { max-width: 954px !important; max-height: 480px !important; }
+[data-ratio="16-9"] { --trivia-stage-height: 540px; }
+[data-ratio="16-9"] .trivia-stack-container { width: 1120px; }
+[data-ratio="16-9"] .talk-image-wrapper { height: 330px; }
+[data-ratio="16-9"] .known-operators-list { margin-top: 48px; }
+[data-ratio="16-9"] .speaker-intro-card { margin-top: 50px; }
+[data-ratio="16-9"] .timeline-dates li { line-height: 22px; padding: 4px 2px; margin: 0 0 4px !important; }
+[data-ratio="16-9"] .reveal .timeline-dates li:has(> a) { padding: 0; }
+[data-ratio="16-9"] .reveal .timeline-dates li > a { padding: 4px 2px; }
+
+/* Powrót do tytułu: stałe miejsce na trzy pytania i odsłanianą puentę. */
+.reveal .closing-layout {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 32px;
+  width: 1120px;
+  height: 840px;
+  margin: 0 auto;
+  color: var(--r-heading-color);
+  text-align: center;
+}
+.reveal .closing-slide h2 {
+  margin: 0;
+  font-size: 88px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  text-transform: none;
+}
+.reveal .closing-questions {
+  display: grid;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  text-align: left;
+}
+.reveal .closing-question {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  font-size: 44px;
+  line-height: 1.25;
+}
+.reveal .closing-question-icon {
+  width: 32px;
+  height: 32px;
+  color: #7457D9;
+}
+.reveal .closing-takeaway {
+  border-top: 1px solid rgba(122, 90, 58, 0.22);
+  padding-top: 32px;
+}
+.reveal .closing-takeaway p {
+  margin: 0;
+  font-size: 60px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.reveal .closing-takeaway.fragment {
+  transition: opacity 300ms ease;
+}
+[data-ratio="16-9"] .reveal .closing-layout {
+  height: 640px;
+  gap: 24px;
+}
+[data-ratio="16-9"] .reveal .closing-slide h2 { font-size: 76px; }
+[data-ratio="16-9"] .reveal .closing-takeaway { padding-top: 24px; }
+[data-ratio="16-9"] .reveal .closing-takeaway p { font-size: 54px; }
+@media (prefers-reduced-motion: reduce) {
+  .reveal .closing-takeaway.fragment { transition: none; }
+}
+
+/* Końcowy slajd: pytania do sali, strona prelegenta i formularz feedbacku. */
+.reveal .questions-slide h2 {
+  font-size: 150px;
+  line-height: 1.1;
+  text-transform: none;
+  margin: 0 0 24px;
+}
+.reveal .questions-slide .questions-website {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 32px;
+  font-size: 36px;
+  line-height: 1.3;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+.reveal .questions-slide .feedback-qr {
+  display: block;
+  width: 380px;
+  margin: 0 auto;
+  line-height: 0;
+}
+.reveal .questions-slide .feedback-qr img {
+  display: block;
+  width: 380px;
+  height: 380px;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  background: #fff;
+}
+[data-ratio="16-9"] .reveal .questions-slide h2 {
+  font-size: 130px;
+  margin-bottom: 16px;
+}
+[data-ratio="16-9"] .reveal .questions-slide .questions-website {
+  margin-bottom: 24px;
+  font-size: 30px;
+}
+[data-ratio="16-9"] .reveal .questions-slide .feedback-qr,
+[data-ratio="16-9"] .reveal .questions-slide .feedback-qr img {
+  width: 320px;
+}
+[data-ratio="16-9"] .reveal .questions-slide .feedback-qr img { height: 320px; }

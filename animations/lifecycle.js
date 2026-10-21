@@ -41,8 +41,28 @@ export function connectionState(time, start, end, events = [], connectDuration =
   return { offset: -(1 - clamp((time - start) / connectDuration)), color: palette.wire, phase: 'subscribed' };
 }
 
+// Wyższa scena 4:3: stały układ rośnie proporcjonalnie w pionie (najwyżej ×1,4) i jest wyśrodkowany.
+// Węzły, punkty krawędzi, tacki, panele i tokeny skalują się razem, więc kable trafiają w krawędzie kafelków.
+export function stretchGraph(graph, height) {
+  const factor = Math.min(height/(graph.height||340), 1.4), shift = (height-(graph.height||340)*factor)/2;
+  const y = v => v*factor+shift, size = v => v*factor;
+  return {...graph, height,
+    nodes: graph.nodes.map(n => ({...n, y:y(n.y), h:size(n.h??70),
+      ...(n.labelOffset===undefined?{}:{labelOffset:size(n.labelOffset)}),
+      ...(n.transformOffset===undefined?{}:{transformOffset:size(n.transformOffset)})})),
+    edges: graph.edges.map(e => e.points ? {...e, points:e.points.map(([px,py]) => [px,y(py)])} : e),
+    trays: (graph.trays||[]).map(q => q.y===undefined ? q : {...q, y:y(q.y)}),
+    panels: (graph.panels||[]).map(p => ({...p, y:y(p.y), h:size(p.h),
+      ...(p.from?{from:{...p.from, y:y(p.from.y)}}:{}),
+      ...(p.rowHeight===undefined?{}:{rowHeight:size(p.rowHeight)})})),
+    tokens: (graph.tokens||[]).map(t => t.y===undefined ? t : {...t, y:y(t.y)}),
+  };
+}
+
 // Układ poziomy wykorzystuje szerokość ekranu zamiast pomniejszać pionowy diagram.
+// Wyższy obszar (4:3) dostaje wyższe kafelki i większy odstęp historii.
 export function layoutDiagram(nodes, edges, trays, width = 1240, height = 460) {
+  const tall = height >= 520;
   const links = edges.filter(e => !e.dashed);
   const anchors = trays.map(q => {
     const candidates = nodes.filter(n => n.ri === q.ri || n.output || !links.some(e=>e.a===n));
@@ -67,13 +87,13 @@ export function layoutDiagram(nodes, edges, trays, width = 1240, height = 460) {
       n.x = 20+pitch*(rank+.5);
       n.y = 15+step*(i+.5)-20;
       n.w = Math.min(pitch-75, depth===1?680:310);
-      n.h = column.length>3?54:76;
+      n.h = column.length>3?(tall?64:54):(tall?96:76);
     });
   }
   trays.forEach((q,i) => {
     const n=anchors[i];
     q.anchor=n.id;
-    q.x=n.x;q.y=n.y+n.h/2+56;q.w=Math.min(pitch-40,400);
+    q.x=n.x;q.y=n.y+n.h/2+(tall?66:56);q.w=Math.min(pitch-40,400);
     q.label='';
   });
   return links;

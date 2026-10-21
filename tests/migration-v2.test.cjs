@@ -11,17 +11,20 @@ async function family(){
  const m=await modules(['catalog','presentation','engine','renderer','prototype-scenes'],{document:{querySelectorAll:()=>slides}});
  return {scenes:m.presentation.prepareSlides(m.catalog.scenes),compile:m.engine.compileScene,render:m.renderer.renderScene,prototypes:m['prototype-scenes'].prototypeScenes};
 }
-const ids=['08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12a-complete','12a-complete-2','13-limit'];
+const ids=['08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap'];
 const history=(f,id)=>Array.from(f.histories.find(h=>h.anchor===id).values,e=>e.value);
-test('migrated slides share accepted prototype geometry and retain native Reveal playback',async()=>{
+test('HTTP slides share the accepted panel and retain native Reveal playback',async()=>{
  const {scenes,compile,prototypes}=await family();
  for(const [id,mode]of [['09-concatmap','concatMap'],['10-mergemap','mergeMap'],['11-switchmap','switchMap'],['12-exhaustmap','exhaustMap']]){
-  const real=scenes.get(id),prototype=prototypes.find(s=>s.id==='prototype-'+mode),c=compile(real),p=compile(prototype);
-  const shape=f=>JSON.stringify({nodes:f.nodes.map(n=>[n.id,n.x,n.y,n.w,n.h]),panels:f.panels,histories:f.histories.map(h=>[h.anchor,h.x,h.y,h.w,h.columns,h.lines,h.lineStep])});
-  assert.equal(shape(c.snapshot(0)),shape(p.snapshot(0)),id);
-  assert.deepEqual(history(c.snapshot(c.duration),'observer'),history(p.snapshot(p.duration),'observer'));
+  const real=scenes.get(id),prototype={...prototypes.find(s=>s.id==='prototype-'+mode),format:real.format},c=compile(real),p=compile(prototype);
+  assert.equal(c.snapshot(0).panels[0].frameless,true);
+  assert.equal(p.snapshot(0).innerWorkPanels,undefined); // Prototypy pozostają przy poprzednich modelach.
+  // Porównanie 09–12: te same A/B/C; S1 zasubskrybowany od READY we wszystkich, odpowiedź na osobnym ręcznym postoju.
+  const expected={concatMap:['A','B','C'],mergeMap:['B','A','C'],switchMap:['B','C'],exhaustMap:['A','C']}[mode];
+  assert.deepEqual(history(c.snapshot(c.duration),'observer'),expected);
   assert.equal(real.playback.controller,undefined);assert.equal(real.playback.entry,'manual');
-  assert.deepEqual(Array.from(c.stops,s=>s.id),['subscribe','first','active','question']);
+  assert.deepEqual(Array.from(c.stops,s=>s.id),{concatMap:['first','active','question','answer'],
+    mergeMap:['question','answer','c-result'],switchMap:['question','answer','started']}[mode]||['question','answer']);
  }
  for(const id of ids){
   const scene=scenes.get(id),c=compile(scene);
@@ -31,40 +34,27 @@ test('migrated slides share accepted prototype geometry and retain native Reveal
   assert.equal(c.snapshot(c.duration).nodes.find(n=>n.id==='observer').notification,'complete');
  }
 });
-test('real concatMap queue is visible at the question, while concatAll queues existing unsubscribed Observables',async()=>{
+test('concatMap introduces the queue after the sequential Observable example in concatAll',async()=>{
  const {scenes,compile,render}=await family(),c=compile(scenes.get('09-concatmap'));
  const q=c.snapshot(c.stops.at(-1).time),queued=q.nodes.find(n=>n.id==='queued1');
  assert.equal(queued.label,'B (wartość)');assert.equal(queued.opacity,1);assert.equal(q.executionCounts.started,1);
  assert.equal(q.executions.some(e=>e.id==='B'),false);
- const done=render(c.snapshot(c.duration));assert.equal((done.match(/data-inner-state="completed"/g)||[]).length,4);
- assert.doesNotMatch(done,/data-queue=|PRACE WEWNĘTRZNE|EMISJE|ODBIÓR/);
+ const done=render(c.snapshot(c.duration));assert.equal((done.match(/data-inner-state="completed"/g)||[]).length,3);
+ assert.doesNotMatch(done,/PRACE WEWNĘTRZNE|data-queue=|EMISJE|ODBIÓR/);assert.match(done,/data-panel-divider="true"/);
  const all=compile(scenes.get('08-map-strumienie')),f=all.snapshot(all.stops.at(-1).time),svg=render(f);
- assert.equal(f.executionCounts.started,1);assert.match(svg,/<title>B\$ · ◷ w kolejce<\/title>/);
- assert.match(svg,/<title>C\$ · ◷ w kolejce<\/title>/);assert.equal(f.executions.some(e=>e.id==='B'),false);
+ assert.equal(f.executionCounts.started,2);assert.doesNotMatch(svg,/W KOLEJCE|data-inner-placeholder/);
+ assert.deepEqual(Array.from(f.innerWorkPanels[0].rows,r=>r.value),['A$','B$']);
+ assert.equal(f.executionCounts.active,0);
 });
-test('real mergeMap demonstrates chronological reception and C/D overlap',async()=>{
+test('real mergeMap demonstrates chronological reception: B overlaps A and returns first',async()=>{
  const {scenes,compile}=await family(),c=compile(scenes.get('10-mergemap')),f=c.snapshot(c.duration);
- assert.deepEqual(history(f,'observer'),['A1','A2','B1','B2','C1','D1','D2','C2']);
- const sub=c.events.find(e=>e.type==='inner-subscribe'&&e.execution==='D');
- const overlap=c.snapshot(sub.at+.01).executions;assert.equal(overlap.find(e=>e.id==='C').state,'running');assert.equal(overlap.find(e=>e.id==='D').state,'running');
+ assert.deepEqual(history(f,'observer'),['B','A','C']);
+ const sub=c.events.find(e=>e.type==='inner-subscribe'&&e.execution==='B');
+ const overlap=c.snapshot(sub.at+.01).executions;assert.equal(overlap.find(e=>e.id==='A').state,'running');assert.equal(overlap.find(e=>e.id==='B').state,'running');
  const terminal=e=>c.events.find(x=>x.type==='stream-complete'&&x.execution===e).at;
- const delivery=c.events.find(e=>e.type==='deliver-next'&&e.node==='observer'&&e.value==='D1');
- assert.equal(c.events.find(e=>e.type==='reception-order').at,delivery.at);
- assert.match(c.snapshot(delivery.at).caption,/D1 dotarło przed C2/);
- assert.ok(terminal('D')<terminal('C'));assert.equal(f.histories.find(h=>h.anchor==='observer').columns,2);
-});
-test('complete outer waits for remaining work; concurrency limit never exceeds three subscriptions',async()=>{
- const {scenes,compile}=await family();
- for(const id of ['12a-complete','12a-complete-2']){
-  const c=compile(scenes.get(id)),source=c.events.find(e=>e.type==='stream-complete'&&e.edge==='source-op');
-  const f=c.snapshot(source.at+.81);
-  assert.equal(f.nodes.find(n=>n.id==='source').notification,'complete');assert.equal(f.nodes.find(n=>n.id==='observer').notification,null);
-  assert.ok(f.executionCounts.active>0);assert.equal(f.histories.find(h=>h.anchor==='source').columns,1);
- }
- const c=compile(scenes.get('13-limit'));let peak=0;
- for(const event of c.events){const f=c.snapshot(event.at+.001);peak=Math.max(peak,f.executionCounts.active);assert.ok(f.executionCounts.active<=3);}
- assert.equal(peak,3);assert.equal(c.snapshot(c.duration).executionCounts.started,5);
- assert.equal(c.snapshot(0).panels.find(p=>p.id==='jobs').slots,5);
+ const delivery=c.events.find(e=>e.type==='deliver-next'&&e.node==='observer'&&e.value==='B');
+ assert.match(c.snapshot(delivery.at).caption,/B wróciło przed A/);
+ assert.ok(terminal('B')<terminal('A'));assert.equal(f.histories.find(h=>h.anchor==='observer').max,4);
 });
 test('migrated work bars continue during travel and snapshots survive reversing every transition',async()=>{
  const {scenes,compile}=await family();
@@ -90,15 +80,13 @@ test('source and flattening operator turn green at their own complete, not toget
    assert.equal(n.notification,null);
    assert.notEqual(c.snapshot(end.at-.001).nodes.find(n=>n.id===nodeId).fill,'#087438');
    const ended=c.snapshot(end.at).nodes.find(n=>n.id===nodeId);
-   assert.equal(ended.notification,'complete');assert.equal(ended.fill,'#087438');
-   assert.equal(final.nodes.find(n=>n.id===nodeId).fill,'#087438');
+   assert.equal(ended.notification,'complete');
+   if(c.snapshot(0).innerWorkPanels){
+    assert.equal(ended.fill,n.fill);assert.equal(ended.laneStates[0].state,'completed');
+    assert.equal(final.nodes.find(n=>n.id===nodeId).fill,n.fill);
+   }else{assert.equal(ended.fill,'#087438');assert.equal(final.nodes.find(n=>n.id===nodeId).fill,'#087438');}
   }
  }
- const c=compile(scenes.get('12a-complete')),source=c.events.find(e=>e.type==='stream-complete'&&e.edge==='source-op');
- const f=c.snapshot(source.at);
- assert.equal(f.nodes.find(n=>n.id==='source').fill,'#087438');
- assert.notEqual(f.nodes.find(n=>n.id==='op').fill,'#087438');
- assert.ok(f.executionCounts.active>0);
 });
 
 test('unhandled error and cancellation cannot turn source or operator green',async()=>{

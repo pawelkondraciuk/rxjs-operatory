@@ -43,13 +43,23 @@ export function planFlow(nodes, links, modelDuration, timingOverrides) {
       function connect(e) {
         if (finished.has(e)) return finished.get(e);
         pending.delete(e);
+        // edge.preconnected: subskrypcja zestawiona przed READY (scena nie powtarza jej animacji); nie zajmuje czasu ilustracji.
+        if (e.preconnected) {
+          const record=records.get(e.id);
+          record.connectDuration=e.connect??connectDuration;
+          record.start=-1-record.connectDuration;
+          for (const id of [e.a.id,e.b.id]) if (!births.has(id)) births.set(id,record.start);
+          finished.set(e,phase);
+          return phase;
+        }
         const downstream = outgoing(e.b.id).filter(next=>pending.has(next)||finished.has(next));
         const ready = Math.max(phase,...downstream.map(connect));
         const fade = Math.max(reveal(e.b.id,ready),reveal(e.a.id,ready));
         const record=records.get(e.id);
         record.start=ready+fade;
-        record.connectDuration=connectDuration;
-        const done=record.start+connectDuration;
+        // edge.connect: własny czas zestawienia jednego połączenia (np. subscribe inner tempem kroku głównego toru).
+        record.connectDuration=e.connect??connectDuration;
+        const done=record.start+record.connectDuration;
         finished.set(e,done);
         return done;
       }
@@ -71,8 +81,11 @@ export function planFlow(nodes, links, modelDuration, timingOverrides) {
       e.events.filter(v=>v.at===at).forEach((v,i)=>{
         const upstream=dependencies.flatMap(parent=>records.get(parent.id).events.filter(p=>p.logicalAt===at));
         const matching=upstream.filter(p=>String(p.value)===String(v.value));
-        const ready=Math.max(phase,...(matching.length?matching:upstream).map(p=>p.arrival+(timing&&String(p.value)!==String(v.value)?timing.transform:handoff)));
-        const departure=Math.max(ready,record.start+record.connectDuration,i?arrival+gap:0);
+        // edge.hold: opcjonalny postój wartości w kafelku przed wyjściem tą krawędzią (np. rozdzielenie w share).
+        const ready=Math.max(phase,...(matching.length?matching:upstream).map(p=>p.arrival+(timing&&String(p.value)!==String(v.value)?timing.transform:handoff)+(e.hold||0)));
+        // edge.replayHold: wartość bez wejścia w tej partii (odtworzenie z bufora operatora) wychodzi po czasie wyjęcia z bufora.
+        const replay=upstream.length?0:e.replayHold||0;
+        const departure=Math.max(ready+replay,record.start+record.connectDuration+replay,i?arrival+gap:0);
         // Krawędź może mieć własny czas przelotu, np. krótki powrót wyniku inner do operatora.
         arrival=departure+(e.travel??travel);
         record.events.push({...v,logicalAt:v.at,at:departure,arrival});
@@ -81,9 +94,12 @@ export function planFlow(nodes, links, modelDuration, timingOverrides) {
       return arrival;
     }
     phase=Math.max(phase,...values.map(e=>emit(e)));
+    // Wartość z decide: po dotarciu czeka (czas ilustracji), zanim operator pokaże reakcję — miejsce na pytanie.
+    phase=Math.max(phase,...values.flatMap(e=>records.get(e.id).events.filter(v=>v.logicalAt===at&&v.decide).map(v=>v.arrival+v.decide)));
     // Czytelny checkpoint: nowa wartość już dotarła, stara praca jeszcze trwa.
-    // To wyłącznie handoff ilustracji, bez przesuwania czasu modelu.
-    if(values.length&&ending.length)phase+=handoffDuration;
+    // To wyłącznie handoff ilustracji, bez przesuwania czasu modelu. timing.valueTerminalGap (opt-in) wydłuża tę
+    // przerwę, żeby dotarcie ostatniej wartości i terminal tej samej chwili modelu były osobnymi kadrami.
+    if(values.length&&ending.length)phase+=timing?.valueTerminalGap??handoffDuration;
     const terminalEnds = new Map();
     function finish(e, visiting=new Set()) {
       if(terminalEnds.has(e))return terminalEnds.get(e);
@@ -92,9 +108,16 @@ export function planFlow(nodes, links, modelDuration, timingOverrides) {
       const cancelling=e.logicalEnd.kind==='unsubscribe';
       const dependencies=(cancelling?outgoing(e.b.id):incoming(e.a.id))
         .filter(parent=>ending.includes(parent)&&parent.logicalEnd.kind===e.logicalEnd.kind);
-      const departure=Math.max(phase,...dependencies.map(parent=>finish(parent,next)));
-      records.get(e.id).end={...e.logicalEnd,at:departure,logicalAt:e.logicalEnd.at,duration:terminalTravel};
-      const arrival=departure+terminalTravel;
+      // Operator odłącza źródło dopiero po otrzymaniu błędu z innego wejścia (np. inner w switchMap).
+      if(cancelling)dependencies.push(...incoming(e.b.id).filter(parent=>parent!==e&&ending.includes(parent)&&parent.logicalEnd.kind==='error'));
+      // timing.terminalGap (opt-in): terminal zależny od innego (np. complete outer po complete ostatniego inner)
+      // rusza z przerwą po jego dotarciu, a nie w tej samej klatce.
+      const gap=cancelling?0:timing?.terminalGap??0;
+      const departure=Math.max(phase,...dependencies.map(parent=>finish(parent,next)+gap));
+      // edge.terminal (opt-in): własny czas przelotu terminala tej krawędzi.
+      const duration=e.terminal??terminalTravel;
+      records.get(e.id).end={...e.logicalEnd,at:departure,logicalAt:e.logicalEnd.at,duration};
+      const arrival=departure+duration;
       terminalEnds.set(e,arrival);
       return arrival;
     }
