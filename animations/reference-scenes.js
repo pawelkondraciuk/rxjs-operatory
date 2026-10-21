@@ -2355,6 +2355,139 @@ function debounceAuditGraph(scene) {
       caption:'8,5 s: 3,5 s ciszy — debounceTime emituje E do S1. S1: E · S2: C, E'}]};
 }
 
+// Cztery operatory czasowe (MAIN 16-czas-cztery, po retry): trzy rundy na jednym slajdzie (scene.phases), w każdej dwa
+// identyczne potoki source$ → operator(300) → odbiorca. Rundy 1–2: źródło emituje w pętli ABC · DEF (cykl 1200 ms,
+// wielokrotność 300 ms) przez timeFourCycles cykli — praktycznie bez końca; „dalej” przechodzi do kolejnej pary od czystego
+// stanu. Runda 3 (throttleTime trailing-only vs sampleTime) odtwarza raz krótki scenariusz A 350 … E 1100 ms (po pustym
+// takcie), wolniej (300 ms = 3 s), bo różnice czasu są małe (C@650 vs C@600). Operator, który zostaje, stoi w tym samym miejscu (w rundzie 3
+// zmienia konfigurację — podpis w nagłówku), a nowy pojawia się w miejscu usuniętego. Jawny harmonogram (graph.schedule):
+// czas ilustracji = czas modelu, więc timery płyną bez przerw. Bez complete i unsubscribe.
+export const timeFourCycle=[['A',100],['B',180],['C',260],['D',720],['E',820],['F',940]].map(([value,ms])=>({value,ms}));
+// Runda 3: źródło rusza o jeden takt (300 ms) po subskrypcji — najpierw widać pusty takt sample i bezczynny throttle.
+export const timeFourTrailingInputs=[['A',350],['B',450],['C',550],['D',1000],['E',1100]].map(([value,ms])=>({value,ms}));
+const timeFourPeriod=300,timeFourCycleMs=1200,timeFourCycles=20,timeFourTravel=.6,timeFourStore=.45,timeFourPass=.5;
+export const timeFourInputs=Array.from({length:timeFourCycles},(_,k)=>timeFourCycle.map(v=>({...v,ms:v.ms+k*timeFourCycleMs}))).flat();
+const timeFourEnd=timeFourCycles*timeFourCycleMs+timeFourPeriod;
+const timeFourColors={A:'#6D4CD3',B:'#B85D05',C:'#087FAD',D:'#B73770',E:'#0F766E',F:'#4D7C0F'};
+// Emisje operatorów (RxJS 7.8.2): debounce po 300 ms ciszy; throttle (leading: true, trailing: false) przepuszcza pierwszą
+// i blokuje okno; throttle-trailing (leading: false, trailing: true): okno od zdarzenia, na końcu ostatnia wartość i kolejne
+// okno, a okno bez wartości kończy odliczanie; audit oddaje ostatnią z okna otwartego pierwszym wejściem; sample co 300 ms
+// od subskrypcji (stały zegar), tylko nowa wartość.
+export function timeFourOutputs(kind,inputs=timeFourInputs,period=timeFourPeriod,end=timeFourEnd) {
+  const out=[];
+  if(kind==='debounce')inputs.forEach((v,i)=>{const next=inputs[i+1];if(!next||next.ms>=v.ms+period)out.push({value:v.value,ms:v.ms+period});});
+  if(kind==='throttle'){let until=-Infinity;for(const v of inputs)if(v.ms>=until){out.push({...v});until=v.ms+period;}}
+  if(kind==='throttle-trailing'){let open=null,pending=null;
+    const close=until=>{while(open&&until>=open.end){if(pending){out.push({value:pending.value,ms:open.end});open={end:open.end+period};pending=null;}else open=null;}};
+    for(const v of inputs){close(v.ms);if(!open)open={end:v.ms+period};pending=v;}
+    close(Infinity);}
+  if(kind==='audit'){let open=null;
+    for(const v of inputs){if(open&&v.ms>=open.end){out.push({value:open.last,ms:open.end});open=null;}
+      if(!open)open={end:v.ms+period};open.last=v.value;}
+    if(open)out.push({value:open.last,ms:open.end});}
+  if(kind==='sample')for(let tick=period;tick<=end;tick+=period){
+    const fresh=inputs.filter(v=>v.ms<tick&&v.ms>=tick-period).at(-1);if(fresh)out.push({value:fresh.value,ms:tick});}
+  return out;
+}
+const timeFourOps={
+  debounce:{label:'debounceTime(300)',name:'debounceTime',timer:'cisza'},
+  throttle:{label:'throttleTime(300)',name:'throttleTime',timer:'blokada'},
+  'throttle-trailing':{label:'throttleTime(300)',name:'throttleTime',timer:'okno',sub:'leading: false, trailing: true',
+    code:['throttleTime(300, asyncScheduler,','{ leading: false, trailing: true }']},
+  audit:{label:'auditTime(300)',name:'auditTime',timer:'okno'},sample:{label:'sampleTime(300)',name:'sampleTime',timer:'takt'}};
+// Rundy: [górny, dolny] operator; fresh wskazuje wiersz nowego operatora. loop — pętla ABC · DEF, inaczej jednorazowy
+// scenariusz; scale — sekundy ilustracji na ms scenariusza; start — chwila subskrypcji (0 ms) w czasie rundy.
+export const timeFourRounds=[
+  {name:'debounce-throttle',ops:['debounce','throttle'],loop:true,scale:1/150,start:.6,
+    caption:'Debounce czeka na ciszę. Throttle bierze pierwszą wartość z okna.'},
+  {name:'throttle-audit',ops:['audit','throttle'],loop:true,scale:1/150,start:.6,
+    caption:'Throttle bierze pierwszą. Audit oddaje ostatnią z okna.'},
+  // sampleTime od razu zastępuje auditTime; throttleTime zostaje i zmienia konfigurację (leading: false, trailing: true).
+  {name:'throttle-trailing-sample',ops:['sample','throttle-trailing'],loop:false,scale:1/100,start:.6,
+    end:1850,caption:'Throttle liczy od zdarzenia. Sample działa według własnego zegara.'}];
+export function configureTimeFour(scene) {
+  const mark={bg:'rgba(216,179,230,.45)',line:'#b384c6'},config={id:'config',bg:'rgba(255,193,92,.35)',line:'#C98A1E'};
+  const phases=timeFourRounds.map(round=>{
+    const model=ms=>+(ms*round.scale+round.start).toFixed(4),ev=v=>E(model(v.ms),v.value,timeFourColors[v.value]);
+    const source=round.loop?timeFourInputs:timeFourTrailingInputs,end=round.loop?timeFourEnd:round.end;
+    // Wejście: wylot ze źródła travel przed chwilą modelu, dotarcie do operatora = chwila modelu (logicalAt).
+    const input=source.map(v=>{const e=ev(v);return {...e,logicalAt:e.at,at:+(e.at-timeFourTravel).toFixed(4),arrival:e.at};});
+    const arrivalOf=ms=>input.filter(e=>e.logicalAt<=model(ms)+1e-9).at(-1).arrival;
+    // Wyjście: logicalAt = emisja operatora (RxJS); wylot nie wcześniej niż po dojeździe wejścia do kulki pamięci,
+    // a przepuszczenie throttle (leading) przejeżdża przez wiersz (timeFourPass). Czas modelu się nie zmienia.
+    const emitted=kind=>timeFourOutputs(kind,source,timeFourPeriod,end).map(v=>{const e=ev(v),leading=kind==='throttle';
+      const at=+Math.max(e.at+(leading?timeFourPass:0),arrivalOf(v.ms)+(leading?timeFourPass:timeFourStore)).toFixed(4);
+      return {...e,logicalAt:e.at,at,arrival:+(at+timeFourTravel).toFixed(4)};});
+    const outputs=round.ops.map(emitted);
+    const lines=round.ops.flatMap((kind,i)=>{
+      const op=timeFourOps[kind],own={...mark,id:'op'+(i+1)};
+      return op.code?[[{text:'source$.pipe('},{text:op.code[0],mark:own}],[{text:'  '},{text:op.code[1],mark:config},{text:'))'}]]:
+        [[{text:'source$.pipe('},{text:op.label,mark:own},{text:')'}]];
+    });
+    // Rundy w pętli kończą się po ciszy za ostatnim cyklem; runda 3 — gdy throttle już nie odlicza, a sample tyka dalej.
+    const duration=+(model(end)+(round.loop?.8:0)).toFixed(4);
+    return {name:round.name,duration,graph:current=>timeFourGraph(current,round,input,outputs),
+      code:lines.map(line=>line.map(part=>part.text).join('')).join('\n'),codeLines:lines,codeFrames:[],
+      rows:[R('source$',input),...round.ops.map((kind,i)=>R(timeFourOps[kind].label,outputs[i]))],
+      captions:[[0,round.caption]],
+      metrics:round.ops.map((kind,i)=>({label:timeFourOps[kind].name,value:t=>outputs[i].filter(v=>v.arrival<=t).length}))};
+  });
+  // Postój po przejściu: nowa para gotowa, stan wyczyszczony, przed pierwszym wylotem A.
+  const ready=(name,time=.5)=>({scenePhase:name,time});
+  const last=phases.at(-1);
+  Object.assign(scene,{title:'Cztery operatory, jeden strumień',playerLayout:'expanded',playerClass:'rx-flat-tiles rx-catch-inside rx-time-four',
+    checkpoints:[],timeFour:{period:timeFourPeriod},
+    duration:phases.reduce((sum,phase)=>sum+phase.duration,0),phases,
+    graph:phases[0].graph,code:phases[0].code,codeLines:phases[0].codeLines,codeFrames:[],rows:phases[0].rows,captions:phases[0].captions,metrics:phases[0].metrics,
+    playback:{entry:'manual',finish:'hold',afterLastManualStop:'start-auto',controller:'stages',resetOnExit:true,stops:[
+      {id:'round-2',...ready('throttle-audit'),autoPause:true,playOnSkip:true,caption:timeFourRounds[1].caption},
+      {id:'round-3',...ready(last.name,.45),autoPause:true,playOnSkip:true,caption:timeFourRounds[2].caption},
+      // Koniec rundy 3 (jednorazowy scenariusz) jako zwykły postój: animacja staje, następne „dalej” zmienia slajd.
+      {id:'summary',scenePhase:last.name,modelTime:last.duration,caption:timeFourRounds[2].caption}]},
+  });
+}
+
+function timeFourGraph(scene,round,input,outputs) {
+  const frame=frameFor(scene),large=scene.format==='4:3',defH=large?70:56,rowH=large?74:64;
+  const tops=large?[90,360]:[50,270],lane=top=>top+defH+rowH/2;
+  // Tory bez etykiet (S1/S2 zbędne): kolor toru odróżnia wiersze.
+  const subscribers={S1:{color:'#7457D9',fill:'#D9CFF5',ink:'#513A9A',label:''},S2:{color:'#C2610C',fill:'#F6D9BC',ink:'#8A4507',label:''}};
+  const runtime={S1:'#EDE6F8',S2:'#FBEEE2'};
+  const tile=(id,label,x,w,top,subscriber,headerFill,extra={})=>({id,label,x,w,top,defH,rowH,laneSlots:{[subscriber]:0},growRows:true,ready:true,
+    y:top+(defH+rowH)/2,h:defH+rowH,headerFill,runtimeFill:runtime[subscriber],terminalBadge:true,detail:'',statusInside:false,rx:7,...extra});
+  const receiverX=996,receiverW=432;
+  const receiver=(id,top,subscriber)=>({id,label:'',x:receiverX,w:receiverW,y:lane(top),h:rowH,top:lane(top)-rowH/2,defH:0,rowH,laneSlots:{[subscriber]:0},
+    labelOffset:0,ready:true,subscriber,headerFill:'#EAE4F7',runtimeFill:runtime[subscriber],terminalBadge:true,detail:'',statusInside:false,
+    inbox:{size:25,left:16,font:30,label:''},rx:7});
+  const reveal=.35;
+  const operator=(kind,i)=>{
+    const op=timeFourOps[kind],leading=kind==='throttle',trailing=kind==='throttle-trailing';
+    const timer={kind:trailing?'throttle':kind,period:timeFourPeriod*round.scale,label:op.timer,unit:'ms',msScale:1/round.scale,textInset:26,
+      ...(leading?{}:{ball:true}),...(trailing?{leading:false,trailing:true}:{}),...(kind==='sample'?{start:round.start}:{})};
+    // Runda 2 odsłania nowy operator przez fade-in; runda 3 pokazuje całą parę od razu na jej miejscach.
+    const fresh=round.fresh===i?{ready:false,createdAt:.05}:{};
+    return tile('op'+(i+1),op.label,500,440,tops[i],'S'+(i+1),'#D8B3E6',{laneTimer:timer,
+      ...(leading?{transformBalls:true,dropBalls:true}:{}),...(op.sub?{subLabel:op.sub,subLabelSince:.05}:{}),...fresh});
+  };
+  const nodes=round.ops.flatMap((kind,i)=>[tile('src'+(i+1),'source$',123,190,tops[i],'S'+(i+1),'#8FC9D4'),
+    operator(kind,i),receiver('obs'+(i+1),tops[i],'S'+(i+1))]);
+  const schedule={};
+  const edges=round.ops.flatMap((kind,i)=>{
+    // Nowy wiersz rundy: przewody i porty pojawiają się po wejściu operatora (subskrypcja już zestawiona).
+    const s='S'+(i+1),base={subscriber:s,logicalStart:0,logicalEnd:null,preconnected:true,...(round.fresh===i?{revealAt:reveal}:{})};
+    const n=i+1,ready={start:-1.5,connectDuration:.5};
+    schedule[`src${n}-op${n}`]={...ready,events:input.map(e=>({...e}))};
+    // throttle (leading): przepuszczona wartość przejeżdża przez wiersz (transformBalls), zablokowane gasną (dropBalls).
+    schedule[`op${n}-obs${n}`]={...ready,events:outputs[i].map(e=>({...e}))};
+    return [{...base,from:'src'+n,to:'op'+n,events:input.map(e=>({...e,at:e.logicalAt}))},
+      {...base,from:'op'+n,to:'obs'+n,events:outputs[i].map(e=>({...e,at:e.logicalAt}))}];
+  });
+  const tray=(anchor,top)=>({anchor,x:receiverX-receiverW/2+90,y:lane(top),w:330,balls:true,max:5,gap:8,ball:{r:29.5,font:34.2,textFill:'#fff'}});
+  return {layout:'fixed',formatAware:true,width:1240,height:frame.height,nodes,edges,schedule,subscribers,laneWire:5,portRadius:11,
+    ball:{r:25,font:29,textFill:'#fff'},...(large?{textScale:1.4,labelScale:1.6}:{}),
+    trays:[tray('obs1',tops[0]),tray('obs2',tops[1])]};
+}
+
 // retry z exponential backoff (EXTRAS): jedna subskrypcja A, cztery kolejne subskrypcje tego samego cold HTTP.
 // Trzy błędy kończą się na retry; okna 1/2/4 s są częścią jednego deterministycznego zegara sceny.
 // Odliczanie można pominąć („dalej” kończy etap) — scena pokazuje kolejność, a nie mierzy prawdziwy czas.
@@ -2762,7 +2895,7 @@ const runAt=index=>{
 const switchCycle=Array.from({length:switchSize},(_,i)=>runAt(i));
 const countAt=time=>countBy(time,switchCycle.map(run=>run.emitted));
 const requestsAt=time=>countBy(time,switchCycle.map(run=>run.connected));
-export const switchMapLiveStillTime=runAt(4).connected+.4;
+export const switchMapLiveStillTime=Math.max(runAt(2).received,runAt(2).completed)+.2;
 const hiddenSwitchName='         ';
 const switchCode=name=>`query$.pipe(\n  ${name}(query => httpGet(url(query)))\n)`;
 
@@ -2773,15 +2906,18 @@ export function configureSwitchMapLive(scene) {
     codeFrames:[{at:timing.reveal,code:switchCode('switchMap')}],
     playerLayout:'expanded',playerClass:'rx-flat-tiles rx-switchmap-live rx-operator-choice',ink:'#26323B',
     playback:{entry:'manual',finish:'hold',controller:'stages',navigation:'slide',startOnNext:timing.reveal,
-      resetOnExit:true,stillTime:switchMapLiveStillTime,stops:[{id:'revealed',time:timing.reveal}]},
-    live:{start:timing.reveal,window:24,keep:12,margin:3,autoplay:false,variant:switchMapLiveVariant},
+      finishBeforeNavigate:true,resetOnExit:true,stillTime:switchMapLiveStillTime,stops:[
+        {id:'revealed',time:timing.reveal},
+        {id:'finished',time:switchMapLiveStillTime,caption:'Trzy emisje, trzy requesty, jeden wynik. switchMap pilnuje aktualności, nie częstotliwości.'},
+      ]},
   });
-  Object.assign(scene,switchMapLiveVariant(scene,{from:0,to:scene.live.window}));
+  Object.assign(scene,switchMapLiveVariant(scene,{from:0,to:switchMapLiveStillTime,runCount:3}));
 }
 
-export function switchMapLiveVariant(scene,{from=0,to=24}) {
+export function switchMapLiveVariant(scene,{from=0,to=24,runCount}) {
   // Sześć poprzednich wykonań wystarcza na trzy widoczne wiersze i ostatni udany wynik.
-  const first=Math.max(0,countAt(from)-7),last=countAt(to)+1;
+  // MAIN rezerwuje wyłącznie trzy pierwsze wykonania; pełny cykl zostaje dostępny w modelu QA.
+  const first=runCount===undefined?Math.max(0,countAt(from)-7):0,last=runCount===undefined?countAt(to)+1:runCount-1;
   const runs=Array.from({length:last-first+1},(_,i)=>runAt(first+i));
   const source={id:'query',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'};
   const op={id:'switch',bg:'rgba(216,179,230,.6)',line:'#9c64b3'};
@@ -2878,13 +3014,14 @@ function queryInputReadout(graph,scene,value) {
 // Drugi etap wyszukiwarki. Litery co 100 ms i debounce 300 ms; ilustracja 5× wolniejsza.
 // Po drugiej wartości debounce pokaz działa bez końca; przeloty ilustrują komunikację.
 const searchTiming={first:.3,key:.1,scale:5,period:.3,travel:.4,connect:.5,request:2,terminalGap:.7,terminal:.4,nextTyping:1,cancel:.4};
-// Serie: r → re → rea uruchamia długi HTTP (5 s); w trakcie użytkownik dopisuje c i t (react). HTTP rea nadal trwa,
-// dopóki debounceTime czeka na 300 ms ciszy — dopiero emisja react sprawia, że switchMap odsubskrybowuje HTTP rea
-// i uruchamia HTTP react. Dalej: kasowanie reac → rea, re → r, zamiana na a → an → ang i kasowanie an → a.
-// Cykl powtarza się od r (także z anulowaniem rea przez react).
-const searchBursts=[{values:['r','re','rea'],request:5},{values:['reac','react']},{values:['reac','rea']},
-  {values:['re','r']},{values:['a','an','ang']},{values:['an','a']}];
-const searchRepeatBursts=searchBursts;
+// Serie pokazują powtórki: debounceTime pilnuje tylko ciszy, więc ta sama fraza wychodzi kilka razy z rzędu.
+// r → re → rea uruchamia długi HTTP (6 s); w trakcie użytkownik kasuje a, e i w tym samym oknie dopisuje e, a
+// (re → r → re → rea). HTTP rea trwa, dopóki debounceTime czeka na 300 ms ciszy — dopiero ponowna emisja rea sprawia,
+// że switchMap odsubskrybowuje HTTP #1 i uruchamia HTTP #2 dla tej samej frazy. Dalej: skasowanie i wpisanie ang,
+// skasowanie g i dopisanie g (znowu ang). Cykl wraca do rea (ang → … → pusty → rea, też długi i anulowany przez rea).
+const searchBursts=[{values:['r','re','rea'],request:6},{values:['re','r','re','rea']},
+  {values:['re','r','','a','an','ang']},{values:['an','ang']}];
+const searchRepeatBursts=[{values:['an','a','','r','re','rea'],request:6},...searchBursts.slice(1)];
 // Stała kolejność kolorów fraz, wspólna z pokazem distinctUntilChanged.
 const searchValues=['r','re','rea','reac','react','','a','an','ang','angu','angul','angula','angular'];
 const queryColor=value=>colors[Math.max(0,searchValues.indexOf(value))%colors.length];

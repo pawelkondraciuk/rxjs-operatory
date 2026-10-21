@@ -210,9 +210,11 @@ export function compileScene(scene) {
   // potem kabel wraca do koloru toru z mniejszym kryciem. Unsubscribe bez impulsu: kabel szarzeje i gaśnie.
   function laneEdgeState(r,time) {
     const color=subscriberColor(r.subscriber),width=graph.laneWire,base={id:r.id,from:r.a.id,to:r.b.id,subscriber:r.subscriber,
-      points:r.points||geometry(r.a,r.b),visible:!r.internal&&time>=r.start,width};
+      points:r.points||geometry(r.a,r.b),visible:!r.internal&&time>=r.start&&time>=(r.revealAt??-Infinity),width};
     const subscribing=clamp((time-r.start)/(r.connectDuration||transitionDuration));
-    if(!r.end||time<r.end.at)return {...base,phase:'subscribed',color,offset:-(1-subscribing),progress:subscribing,opacity:1};
+    // revealAt (opt-in, czas ilustracji): gotowa subskrypcja nowego kafelka pojawia się fade-in dopiero po jego fade-in.
+    const reveal=r.revealAt===undefined?1:clamp((time-r.revealAt)/fadeDuration);
+    if(!r.end||time<r.end.at)return {...base,phase:'subscribed',color,offset:-(1-subscribing),progress:subscribing,opacity:reveal};
     const duration=r.end.duration||transitionDuration;
     if(r.end.kind==='unsubscribe') {
       const p=clamp((time-r.end.at)/duration);
@@ -234,7 +236,8 @@ export function compileScene(scene) {
     return laneRecords.flatMap(r=>{
       const hidden=hideAt(r),side=r.a.id===n.id?'out':r.b.id===n.id?'in':null;
       if(!side)return [];
-      const opacity=side==='out'?presence(time,connectedAt(r),hidden.out,r.hideAfterTerminal?0:trail):presence(time,r.start,hidden.in,r.hideAfterTerminal?0:trail);
+      const shown=t=>Math.max(t,r.revealAt??-Infinity);
+      const opacity=side==='out'?presence(time,shown(connectedAt(r)),hidden.out,r.hideAfterTerminal?0:trail):presence(time,shown(r.start),hidden.in,r.hideAfterTerminal?0:trail);
       const idle=r.end?.kind==='unsubscribe'&&time>=(side==='out'?hidden.out:hidden.in);
       const points=r.points||geometry(r.a,r.b),y=side==='out'?points[0][1]:points.at(-1)[1];
       return opacity>0?[{side,subscriber:r.subscriber,edge:r.id,y,color:idle?laneIdle:subscriberColor(r.subscriber),opacity,
@@ -362,17 +365,35 @@ export function compileScene(scene) {
     for(const e of arrived){
       const start=startOf(e);
       if(kind==='debounce'||!open||start>=open.end)open={start,end:start+period,value:e.value,color:e.color||'a'};
-      else Object.assign(open,{value:e.value,color:e.color||'a'});
+      else if(kind!=='throttle')Object.assign(open,{value:e.value,color:e.color||'a'});
     }
-    const emitted=open&&out.events.some(v=>(scaled?v.at/timeScale:v.logicalAt)>=open.end-1e-9&&v.at<=time);
+    // sample: stały zegar od laneTimer.start (czas modelu), niezależny od wejść; okno to bieżący takt.
+    if(kind==='sample'){
+      const first=n.laneTimer.start??0,k=Math.floor((logical-first)/period+1e-9);
+      open=logical>=first?{start:first+k*period,end:first+(k+1)*period}:null;
+    }
+    // throttle z trailing (opt-in laneTimer.trailing, np. leading: false, trailing: true): okno startuje od zdarzenia, gdy
+    // operator nie odlicza; kolejne wejścia podmieniają zapamiętaną wartość. Na końcu okna wartość (jeśli jest) wychodzi
+    // i startuje następne okno; okno bez nowej wartości kończy odliczanie — dopiero następne zdarzenie startuje nowe.
+    if(kind==='throttle'&&n.laneTimer.trailing){
+      let pending=false;open=null;
+      const close=until=>{while(open&&until>=open.end-1e-9){if(pending){open={start:open.end,end:open.end+period};pending=false;}else open=null;}};
+      for(const e of arrived){const start=startOf(e);close(start);if(!open)open={start,end:start+period};pending=true;}
+      close(logical);
+    }
+    // throttle: blokada trwa od przepuszczonej wartości (wyjście w tej samej chwili modelu), kolejne wejścia gasną.
+    const emitted=open&&kind!=='sample'&&kind!=='throttle'&&out.events.some(v=>(scaled?v.at/timeScale:v.logicalAt)>=open.end-1e-9&&v.at<=time);
     const active=open&&!emitted&&logical<open.end+1e-9;
     const remaining=active?Math.max(0,open.end-logical):null;
     // ball (opt-in): wejście dojeżdża do kulki pamięci (storeMove), dopiero wtedy zastępuje poprzednią wartość.
     const ball=n.laneTimer.ball,stored=ball?arrived.filter(e=>e.arrival+storeMove<=time).at(-1):arrived.at(-1);
     const keep=active&&stored&&!out.events.some(v=>(scaled?v.at/timeScale:v.logicalAt)>=startOf(stored)&&v.at<=time);
-    const remainingText=unit==='ms'?Math.round(remaining*1000)+' ms':remaining?.toFixed(1).replace('.',',')+' s';
-    return {timer:{label,progress:active?clamp((logical-open.start)/period):0,active:Boolean(active),
-      text:(label?label+': ':'')+(active?remainingText:empty),since:active?open.start:undefined},
+    // msScale (opt-in): milisekundy scenariusza na sekundę modelu (np. 200, gdy 300 ms trwa 1,5 s modelu).
+    const remainingText=unit==='ms'?Math.round(remaining*(n.laneTimer.msScale??1000))+' ms':remaining?.toFixed(1).replace('.',',')+' s';
+    const timer={timer:{label,progress:active?clamp((logical-open.start)/period):0,active:Boolean(active),
+      text:(label?label+': ':'')+(active?remainingText:empty),since:active?open.start:undefined}};
+    if(kind==='throttle'&&!n.laneTimer.trailing)return timer;
+    return {...timer,
       memory:{label:n.laneTimer.memory??'pamięć',empty:'—',...(ball?{ball:true,x:memorySlot(n)}:{}),
         ...(keep?{value:ball?stored.value:open.value,color:ball?stored.color||'a':open.color,since:stored.arrival+(ball?storeMove:0)}:{})}};
   }
@@ -682,8 +703,11 @@ export function compileScene(scene) {
         else progress=clamp((t-span.start)/(span.end-span.start))*share;
       }
       const fill=notification&&!n.terminalBadge?palette[notification]:n.headerFill?n.headerFill:n.subscriber&&graph.subscribers?.[n.subscriber]?graph.subscribers[n.subscriber].tile||graph.subscribers[n.subscriber].fill||subscriberColor(n.subscriber):queued||n.workRow&&!active&&!canceled&&!completed&&!errored?colors.muted:n.work||n.inner?palette.work:receiver?palette.observer:!incoming.length?palette.source:colors[n.color]||colors.op;
+      // enter (opt-in {dy, duration}): nowy kafelek wjeżdża o dy do swojego miejsca razem z fade-in (czas ilustracji).
+      const entering=n.enter?1-clamp((time-births.get(n.id))/(n.enter.duration??fadeDuration)):0;
       return {...n,label:evaluate(n.label,t),visible:time>=births.get(n.id)&&(n.until===undefined||t<n.until),
-        opacity:n.ready||n.instant?1:clamp((time-births.get(n.id))/fadeDuration),fill,status,notification,workState,
+        ...(n.enter?{offsetY:n.enter.dy*entering*entering*(3-2*entering)}:{}),
+        opacity:n.ready||n.instant?1:clamp((time-births.get(n.id))/(n.enter?.duration??fadeDuration)),fill,status,notification,workState,
         active:activity||Boolean(transform&&time<transform.until),progress,showProgress:Boolean(span&&(active||canceled)),transform:transform?.label,
         disabled:evaluate(n.disabled,t),
         ...(laneRecords.length?{socketDots:socketsOf(n,time),laneStates:laneStatesOf(n,time),...growingTile(n,time),...executionStackOf(n,time),
@@ -755,10 +779,11 @@ function compilePhases(scene) {
     const part={name,offset,compiled};offset=+(offset+compiled.duration).toFixed(6);return part;
   });
   const partAt=time=>parts.findLast(part=>time>=part.offset)||parts[0];
-  const shift=(part,time)=>time+part.offset;
+  const shift=(part,time)=>+(time+part.offset).toFixed(6);
   const records=new Map(parts.flatMap(part=>[...part.compiled.plan.records].map(([id,r])=>[id,{...r,phase:part.name}])));
   return {duration:offset,
-    stops:parts.flatMap(part=>part.compiled.stops.map(stop=>({...stop,time:shift(part,stop.time)}))),
+    stops:parts.flatMap(part=>part.compiled.stops.map(stop=>({...stop,time:shift(part,stop.time),
+      ...(stop.playOnSkip?{phaseStart:part.offset}:{})}))),
     checkpoints:[...new Set(parts.flatMap(part=>[part.offset,...part.compiled.checkpoints.map(t=>shift(part,t))]).concat(offset))]
       .filter(t=>t>=0&&t<=offset).sort((a,b)=>a-b),
     events:parts.flatMap(part=>part.compiled.events.map(e=>({...e,id:`${part.name}:${e.id}`,at:shift(part,e.at),phase:part.name}))),

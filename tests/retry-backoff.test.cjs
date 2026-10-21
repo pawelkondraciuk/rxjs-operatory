@@ -111,7 +111,7 @@ test('MANUAL: next during a countdown finishes the stage; rewind/reset are deter
  autoRun.controller.setMode('auto');auto.advance(27000);
  assert.equal(autoRun.player.state,'finished');assert.equal(autoRun.player.snapshot.executionCounts.started,4);
  const main=Array.from(m['scene-config'].mainOrder);
- assert.deepEqual(main.slice(main.indexOf('b04-catcherror'),main.indexOf('b04-catcherror')+3),['b04-catcherror',id,'24-rxjs-liczby']);
+ assert.deepEqual(main.slice(main.indexOf('b04-catcherror'),main.indexOf('b04-catcherror')+3),['b04-catcherror',id,'16-czas-cztery']);
  assert.ok(!m['scene-config'].extraIds.has(id));
  assert.equal(scene.group,'main');
  const html=fs.readFileSync('index.html','utf8');

@@ -175,6 +175,9 @@
 /* catchError wewnątrz i Subject + interval: dwie linie kodu (druga ~52–54 znaki) muszą się zmieścić bez łamania. */
 .rx-player:is(.rx-catch-inside, .rx-two-lines) .rx-code { font-size:36px; }
 [data-ratio="16-9"] .rx-player:is(.rx-catch-inside, .rx-two-lines) .rx-code { font-size:24px; }
+/* 16-czas-cztery: runda z pełną konfiguracją throttleTime ma trzy linie kodu — mniejszy font tylko w tej fazie. */
+.rx-player.rx-time-four .rx-code[data-lines="3"] { font-size:29px; line-height:1.2; }
+[data-ratio="16-9"] .rx-player.rx-time-four .rx-code[data-lines="3"] { font-size:20px; }
 /* Subject + HTTP, share + HTTP i oba shareReplay na interval: stała wysokość pierwszej linii kodu.
    Kod dopisywany (codeLines.show) i stałe trzy linie zaczynają dokładnie tam, gdzie zwykła
    jednoliniowa (środek wiersza kodu), kolejne zajmują puste pasmo nad kafelkami diagramu (top 178/102 viewBox).

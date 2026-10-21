@@ -112,8 +112,8 @@ test('HTML, notatki per checkpoint i miejsce przed podsumowaniem',async()=>{
   assert.deepEqual(plain(notes),['ready',...compiled.stops.map(stop=>stop.id),'finished']);
   assert.match(section,/którego z czterech Map używa się najczęściej/);
   assert.match(section,/To co, zagadamy do tych operatorów\?/);
-  assert.ok(html.indexOf('id="x03-retry-backoff"')<html.indexOf('id="24-rxjs-liczby"'));
+  assert.ok(html.indexOf('id="16-czas-cztery"')<html.indexOf('id="24-rxjs-liczby"'));
   assert.ok(html.indexOf('id="24-rxjs-liczby"')<html.indexOf('id="25-podsumowanie"'));
   const order=m['scene-config'].mainOrder;
-  assert.deepEqual(plain(order.slice(-4)),['x03-retry-backoff','24-rxjs-liczby','25-podsumowanie','pytania']);
+  assert.deepEqual(plain(order.slice(-4)),['16-czas-cztery','24-rxjs-liczby','25-podsumowanie','pytania']);
 });

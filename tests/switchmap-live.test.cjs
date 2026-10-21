@@ -26,16 +26,15 @@ test('READY asks for the operator; the reveal changes code and tile together wit
   assert.equal(code(reveal),'query$.pipe(\n  switchMap(query => httpGet(url(query)))\n)');
   assert.equal(reveal.code,code(reveal));assert.equal(reveal.nodes.find(n=>n.id==='op').label,'switchMap');
   assert.equal(reveal.codeView[1][1].active,true);assert.deepEqual(metrics(reveal),[0,0,0]);
-  assert.deepEqual(Array.from(c.stops,s=>s.id),['revealed']);
+  assert.deepEqual(Array.from(c.stops,s=>s.id),['revealed','finished']);
 });
 
-test('fast typing cancels r/re, rea completes; fast deleting cancels re and completes r, delivering results before inner complete',async()=>{
+test('three queries cancel r/re and complete rea, delivering its result before inner complete without closing the outer pipeline',async()=>{
   const {scene,c}=await fixture(),runs=scene.switchMapLiveRuns;
-  assert.deepEqual(Array.from(runs.slice(0,10),r=>[r.value,r.cancelled]),[['r',true],['re',true],['rea',false],['re',true],['r',false],
-    ['a',true],['an',true],['ang',false],['an',true],['a',false]]);
-  const checked=runs.slice(0,10).filter(run=>run.completed<c.duration);
-  assert.ok(checked.length>=9);
-  for(const run of checked) {
+  assert.equal(scene.live,undefined);
+  assert.deepEqual(Array.from(runs,r=>[r.value,r.cancelled]),[['r',true],['re',true],['rea',false]]);
+  assert.equal(c.events.filter(e=>e.type==='source-next'&&e.edge==='source-op').length,3);
+  for(const run of runs) {
     const edge='inner-'+run.index,next=runs[run.index+1];
     const started=c.events.find(e=>e.type==='inner-subscribe'&&e.edge===edge);
     const end=c.events.find(e=>e.type==='disconnected'&&e.edge===edge);
@@ -62,14 +61,17 @@ test('fast typing cancels r/re, rea completes; fast deleting cancels re and comp
     }
   }
   assert.equal(c.events.some(e=>e.type==='stream-complete'&&!e.edge.startsWith('inner-')),false);
+  assert.equal(c.events.some(e=>e.type==='disconnected'&&!e.edge.startsWith('inner-')),false);
   assert.equal(c.events.some(e=>e.type==='stream-error'),false);
+  near(c.duration,Math.max(runs[2].received,runs[2].completed)+.2);
+  near(c.duration,scene.playback.stillTime);
   const still=c.snapshot(scene.playback.stillTime);
-  assert.deepEqual(Array.from(rows(still),r=>[r.id,r.value,r.state]),[['#3','rea','completed'],['#4','re','cancelled'],['#5','r','active']]);
-  assert.deepEqual(metrics(still),[5,5,1]);assert.equal(still.histories[0].values.at(-1).value,'[#3]');assert.equal(still.readouts[0].value,'r');
+  assert.deepEqual(Array.from(rows(still),r=>[r.id,r.value,r.state]),[['#1','r','cancelled'],['#2','re','cancelled'],['#3','rea','completed']]);
+  assert.deepEqual(metrics(still),[3,3,0]);assert.equal(still.histories[0].values.at(-1).value,'[#3]');assert.equal(still.readouts[0].value,'rea');
 });
 
-test('the repeating cycle types and deletes rea, then ang, and keeps request IDs growing',async()=>{
-  const {scene,compile}=await fixture(),long=scene.live.variant(scene,{from:0,to:80}),c=compile(long),runs=long.switchMapLiveRuns;
+test('the QA repeating model still types and deletes rea, then ang, and keeps request IDs growing',async()=>{
+  const {scene,compile,m}=await fixture(),long=m['reference-scenes'].switchMapLiveVariant(scene,{from:0,to:80}),c=compile(long),runs=long.switchMapLiveRuns;
   const cycle=['r','re','rea','re','r','a','an','ang','an','a'];
   assert.deepEqual(Array.from(runs.slice(0,22),r=>r.value),[...cycle,...cycle,'r','re']);
   runs.slice(0,22).forEach((run,i)=>{
@@ -79,11 +81,11 @@ test('the repeating cycle types and deletes rea, then ang, and keeps request IDs
   });
 });
 
-test('three-row eviction preserves ordering, full queries and stable main geometry in both formats',async()=>{
+test('three visible executions preserve ordering, full queries and stable main geometry in both formats',async()=>{
   for(const format of ['4:3','16:9']) {
     const {scene,c,render}=await fixture(format);
     const geometry=f=>Array.from(f.nodes.filter(n=>['source','op','observer'].includes(n.id)),n=>[n.id,n.x,n.y,n.w,n.h]);
-    for(let t=0;t<=24;t+=.025) {
+    for(let t=0;t<=c.duration;t+=.025) {
       const f=c.snapshot(t),p=f.innerWorkPanels[0],visible=rows(f);
       assert.deepEqual(geometry(f),geometry(c.snapshot(0)));assert.ok(visible.length<=3);
       assert.ok(metrics(f)[2]<=1);
@@ -96,7 +98,7 @@ test('three-row eviction preserves ordering, full queries and stable main geomet
         }
       }
     }
-    for(const t of [0,.3,5.6,9.14,9.15,9.3,9.45,scene.playback.stillTime,12.6,23]) {
+    for(const t of [0,.3,1.8,2.7,3.6,5.6,6.55,scene.playback.stillTime]) {
       const f=c.snapshot(t),svg=render(f),reduced=render(f,{reducedMotion:true});
       assert.ok((svg.match(/data-inner-work="/g)||[]).length<=3);
       assert.ok((reduced.match(/data-inner-work="/g)||[]).length<=3);
@@ -104,13 +106,13 @@ test('three-row eviction preserves ordering, full queries and stable main geomet
     }
     const html=render(c.snapshot(scene.playback.stillTime));
     assert.match(html,/data-inner-ball="rea"[^]*?>rea<\/text>/);
-    assert.match(html,/anulowane/);assert.match(html,/w trakcie/);assert.match(html,/✓ complete/);
+    assert.match(html,/anulowane/);assert.doesNotMatch(html,/w trakcie/);assert.match(html,/✓ complete/);
     assert.match(html,/data-readout="query-input"/);assert.match(html,/>wyniki<\/text>/);assert.doesNotMatch(html,/>S1</);
   }
 });
 
-test('moving compilation windows keep results, counts and IDs with a bounded model',async()=>{
-  const {scene,compile,render}=await fixture(),variant=scene.live.variant;
+test('QA moving compilation windows keep results, counts and IDs with a bounded model',async()=>{
+  const {scene,compile,render,m}=await fixture(),variant=m['reference-scenes'].switchMapLiveVariant;
   const a=compile(variant(scene,{from:14,to:44})),b=compile(variant(scene,{from:20,to:50}));
   for(const t of [23,29,35,40])assert.equal(render(a.snapshot(t)),render(b.snapshot(t)),String(t));
   const longScene=variant(scene,{from:1396,to:1426}),long=compile(longScene),f=long.snapshot(1400);
@@ -121,42 +123,64 @@ test('moving compilation windows keep results, counts and IDs with a bounded mod
   assert.equal(rows(f).find(r=>r.id==='#568').receiver.value,'[#568]');assert.doesNotMatch(render(f),/NaN|Infinity|inner #…/);
 });
 
-test('first next reveals and starts; later next navigates even while paused; reset restores the question',async()=>{
-  const {scene}=await fixture(),h=await playbackHarness(),navigation=[];
-  const {player,controller}=h.create({scene,controls:{stageOptions:{onNavigate:d=>navigation.push(d)}}});
-  assert.equal(player.live.autoplay,false);h.advance(2000);assert.equal(player.time,0);assert.equal(h.frames.size,0);
-  controller.next();assert.equal(player.time,scene.playback.startOnNext);assert.equal(player.isPlaying,true);
-  assert.equal(player.snapshot.nodes.find(n=>n.id==='op').label,'switchMap');assert.equal(controller.mode,'manual');
-  controller.next();assert.deepEqual(navigation,[1],'a fast second next navigates');
-  h.advance(3200);assert.ok(player.time>3);assert.equal(h.frames.size,1);
-  controller.toggle();const time=player.time;h.advance(1500);assert.equal(player.time,time);
-  controller.next();controller.previous();assert.deepEqual(navigation,[1,1,-1]);
-  controller.toggle();h.advance(500);assert.ok(player.time>time);
-  controller.suspend('environment');h.advance(1000);assert.equal(h.frames.size,0);
-  controller.resume('environment');assert.equal(h.frames.size,1);
-  h.advance(90000);assert.ok(player.time>90);assert.equal(h.frames.size,1);
-  controller.suspend('slide');controller.reset();assert.equal(h.frames.size,0);
-  controller.resume('slide');assert.equal(player.time,0);assert.equal(player.isPlaying,false);
-  controller.toggle();assert.equal(player.time,scene.playback.startOnNext);h.advance(2000);
-  controller.reset();assert.equal(player.time,0);assert.equal(player.isPlaying,false);
-  assert.equal(player.snapshot.nodes.find(n=>n.id==='op').label,'');
-  player.finish();assert.equal(player.time,scene.playback.stillTime);assert.equal(player.isPlaying,false);
-  assert.deepEqual(metrics(player.snapshot),[5,5,1]);
+test('first next starts three queries and automatically holds the result in manual and AUTO modes in both formats',async()=>{
+  for(const format of ['4:3','16:9'])for(const mode of ['manual','auto']) {
+    const {scene}=await fixture(format),h=await playbackHarness(),navigation=[];
+    const {player,controller}=h.create({scene,controls:{stageOptions:{mode,onNavigate:d=>navigation.push(d)}}});
+    h.advance(2000);assert.equal(player.time,0);assert.equal(h.frames.size,0);
+    controller.next();assert.equal(player.time,scene.playback.startOnNext);assert.equal(player.isPlaying,true);
+    assert.equal(player.snapshot.nodes.find(n=>n.id==='op').label,'switchMap');assert.equal(controller.mode,mode);
+    h.advance(3200);assert.ok(player.time>3);assert.equal(h.frames.size,1);
+    controller.toggle();const time=player.time;h.advance(1500);assert.equal(player.time,time);
+    controller.toggle();h.advance(500);assert.ok(player.time>time);
+    controller.suspend('environment');h.advance(1000);assert.equal(h.frames.size,0);
+    controller.resume('environment');assert.equal(h.frames.size,1);
+    h.advance(10000);assert.equal(player.state,'finished');assert.equal(h.frames.size,0);
+    assert.equal(player.time,scene.playback.stillTime);assert.deepEqual(metrics(player.snapshot),[3,3,0]);
+    assert.deepEqual(navigation,[]);
+    const final=JSON.stringify(player.snapshot);h.advance(90000);assert.equal(JSON.stringify(player.snapshot),final);
+    controller.toggle();assert.equal(player.state,'finished');assert.equal(h.frames.size,0);
+    controller.next();controller.previous();assert.deepEqual(navigation,[1,-1]);
+    controller.suspend('slide');controller.reset();controller.resume('slide');
+    assert.equal(player.time,0);assert.equal(player.isPlaying,false);assert.equal(h.frames.size,0);
+    assert.equal(player.snapshot.nodes.find(n=>n.id==='op').label,'');
+    controller.toggle();assert.equal(player.time,scene.playback.startOnNext);h.advance(2000);
+    controller.reset();assert.equal(player.time,0);assert.equal(player.isPlaying,false);
+    player.finish();assert.equal(player.state,'finished');assert.deepEqual(metrics(player.snapshot),[3,3,0]);
+  }
 });
 
-test('Reveal fragment, pilot, Notes and restored hashes all use the revealed frame without a second RAF',async()=>{
-  const {scene,m}=await fixture(),h=await playbackHarness(),{deck,stage}=revealMock();stage.markers=stage.markers.slice(0,1);
+test('next during playback or pause shows the final three-query result before allowing navigation',async()=>{
+  for(const paused of [false,true]) {
+    const {scene}=await fixture(),h=await playbackHarness(),navigation=[];
+    const {player,controller}=h.create({scene,controls:{stageOptions:{onNavigate:d=>navigation.push(d)}}});
+    controller.next();if(paused){h.advance(1500);controller.toggle();}
+    controller.next();assert.equal(player.state,'finished');assert.deepEqual(navigation,[]);
+    assert.equal(player.time,scene.playback.stillTime);assert.deepEqual(metrics(player.snapshot),[3,3,0]);
+    assert.equal(h.frames.size,0);controller.next();assert.deepEqual(navigation,[1]);
+  }
+});
+
+test('Reveal fragments, pilot, Notes and restored hashes use the reveal and finished frames without a second RAF',async()=>{
+  const {scene,m}=await fixture(),h=await playbackHarness(),{deck,stage}=revealMock();stage.markers=stage.markers.slice(0,2);
   const {player,controller}=h.create({scene,controls:{stageOptions:{onNavigate:d=>deck.navigation.push(d)}}});
   const binding=h.install(deck,{getController:()=>controller});binding.refresh();
   deck.navigateFragment(0);assert.equal(player.isPlaying,true);assert.equal(deck.fragmentIndex,0);
   assert.equal(player.time,scene.playback.startOnNext);assert.deepEqual(deck.navigation,[]);
-  deck.press(39);deck.press(34);deck.press(37);assert.deepEqual(deck.navigation,[1,1,-1]);
+  deck.navigateFragment(1);assert.equal(player.state,'finished');assert.equal(deck.fragmentIndex,1);
+  assert.deepEqual(deck.navigation,[]);assert.equal(h.frames.size,0);
+  deck.press(34);deck.press(37);assert.deepEqual(deck.navigation,[1,-1]);
   controller.reset();assert.equal(deck.fragmentIndex,-1);assert.equal(h.frames.size,0);
   deck.press(34);assert.equal(player.isPlaying,true);assert.equal(deck.fragmentIndex,0);
+  deck.press(39);assert.equal(player.state,'finished');assert.equal(deck.fragmentIndex,1);
   controller.seekCheckpoint(scene.playback.startOnNext);assert.equal(player.isPlaying,false);
   assert.equal(player.snapshot.nodes.find(n=>n.id==='op').label,'switchMap');assert.equal(h.frames.size,0);
+  controller.seekCheckpoint(scene.playback.stillTime);assert.equal(player.state,'finished');assert.equal(deck.fragmentIndex,1);
+  controller.reset();deck.press(34);h.advance(10000);
+  assert.equal(player.state,'finished');assert.equal(deck.fragmentIndex,1);assert.deepEqual(deck.navigation,[1,-1]);
   m['checkpoint-notes'].showNotesPreviewFrame(stage,player);
   assert.equal(player.time,scene.playback.stillTime);assert.equal(h.frames.size,0);
+  assert.deepEqual(metrics(player.snapshot),[3,3,0]);
   binding.destroy();
 });
 
@@ -193,8 +217,7 @@ test('search HTTP responses identify their execution inside the array and input 
         if(event.edge==='op-observer'||event.edge.startsWith('inner-'))assert.match(event.value,/^\[#\d+\]$/);
       }
       const runs=scene.switchMapLiveRuns||scene.debounceSearchRuns;
-      // Wariant live zawiera również przyszły zapas; wybieramy ang wewnątrz skompilowanego okna.
-      const run=id==='12a-switchmap-live'?runs[3]:runs.find(r=>r.value==='ang');
+      const run=id==='12a-switchmap-live'?runs[2]:runs.find(r=>r.value==='ang');
       if(id==='12b-debounce-switchmap') {
         const sample=run.input.at(-1).arrival+.6;
         assert.ok(sample<c.duration);

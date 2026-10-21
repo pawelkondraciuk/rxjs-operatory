@@ -4,9 +4,9 @@ export function createStageController(player,options={}) {
   // Liczone na bieżąco: scena na żywo (player.live) zmienia długość po unsubscribe i przy przesuwaniu okna.
   const checkpoints=()=>[0,...player.stops.map(s=>s.time),player.duration]
     .filter((time,index,times)=>index===0||time>times[index-1]+epsilon);
-  let mode=options.mode==='auto'?'auto':'manual',target=null,resumeIntent=false;
+  let mode=options.mode==='auto'?'auto':'manual',target=null,resumeIntent=false,skippedStop=null;
   const suspensions=new Set(),listeners=new Set();
-  function nextCheckpoint(){return checkpoints().find(time=>time>player.time+epsilon)??player.duration;}
+  function nextCheckpoint(){return checkpoints().find(time=>time>player.time+epsilon&&time!==skippedStop?.time)??player.duration;}
   // Scena na żywo z akcjami: etap to liczba wykonanych akcji, nie czas (chwile akcji wybiera prowadzący).
   // Postoje przed akcjami (np. subscribe i start emisji) liczą się po czasie, dopóki nie ma akcji.
   function reachedIndex(){
@@ -25,7 +25,7 @@ export function createStageController(player,options={}) {
   function cancelResume(){resumeIntent=false;}
   // autoPause (opt-in): postój, na którym zatrzymuje się także AUTO (np. przejście między fazami sceny).
   function run(){
-    const hold=player.stops.find(stop=>stop.autoPause&&stop.time>player.time+epsilon);
+    const hold=player.stops.find(stop=>stop.autoPause&&stop!==skippedStop&&stop.time>player.time+epsilon);
     if(hold)player.playTo(hold.time);else player.playContinuously();
   }
   function start(){
@@ -64,7 +64,7 @@ export function createStageController(player,options={}) {
     else player.playContinuously();
     target=null;changed();
   }
-  // Opt-in: pierwszy klik odsłania odpowiedź i uruchamia pokaz; dalsze kliki nawigują.
+  // Opt-in: pierwszy klik odsłania odpowiedź i uruchamia pokaz.
   function startOnNext(){
     if(player.startOnNext===undefined||player.time>=player.startOnNext-epsilon)return false;
     player.seek(player.startOnNext);target=null;player.playContinuously();changed();return true;
@@ -72,16 +72,31 @@ export function createStageController(player,options={}) {
   function next(){
     cancelResume();if(suspensions.size)return;
     if(startOnNext())return;
-    if(player.navigation==='slide'){options.onNavigate?.(1);return;}
+    if(player.navigation==='slide'){
+      if(player.finishBeforeNavigate&&player.state!=='finished')finish();
+      else options.onNavigate?.(1);
+      return;
+    }
     if(player.navigation==='after-intro'&&player.live?.state==='running'){options.onNavigate?.(1);return;}
     if(player.state==='finished'){options.onNavigate?.(1);return;}
     if(player.live){nextLive(player.live);return;}
-    if(player.isPlaying){
-      const end=target??nextCheckpoint();player.seek(end);target=null;changed();
+    // Opt-in playOnSkip: „dalej” w trakcie (także zapauzowanej) poprzedniej fazy przechodzi do nowej fazy i od razu
+    // odtwarza jej wejście i pokaz, bez dodatkowego kliknięcia na gotowej parze. Z READY i z postoju (np. po cofnięciu
+    // do czystej pary) „dalej” uruchamia bieżącą fazę jak zwykle.
+    const upcoming=player.stops.find(stop=>Math.abs(stop.time-nextCheckpoint())<epsilon);
+    const atCheckpoint=checkpoints().some(time=>Math.abs(time-player.time)<epsilon);
+    const skipping=upcoming?.playOnSkip&&Number.isFinite(upcoming.phaseStart)&&!atCheckpoint&&player.time<upcoming.phaseStart;
+    if(player.isPlaying||skipping){
+      const end=target??nextCheckpoint(),stop=player.stops.find(stop=>Math.abs(stop.time-end)<epsilon);
+      if(stop?.playOnSkip&&Number.isFinite(stop.phaseStart)){
+        skippedStop=stop;player.seek(stop.phaseStart);target=nextCheckpoint();
+        if(mode==='auto')run();else player.playTo(target);
+      }else{player.seek(end);target=null;}
+      changed();
     }else start();
   }
   function previous(){
-    cancelResume();if(suspensions.size)return;
+    cancelResume();if(suspensions.size)return;skippedStop=null;
     if(player.navigation==='slide'){options.onNavigate?.(-1);return;}
     const live=player.live;
     // Akcje: cofnięcie ostatniej (kadr z chwili jej wywołania, emisje biegną dalej); bez akcji — poprzedni postój
@@ -120,11 +135,11 @@ export function createStageController(player,options={}) {
     else if(!suspensions.size&&player.state!=='finished'){target=nextCheckpoint();run();}
     changed();
   }
-  function seek(time){cancelResume();target=null;player.seek(time);changed();}
+  function seek(time){cancelResume();skippedStop=null;target=null;player.seek(time);changed();}
   // Stabilny kadr znacznika (hash po przeładowaniu, podgląd Notes): scena z akcjami odtwarza je do tej chwili.
   function seekCheckpoint(time,finished=false){
     if(finished){finish();return;}
-    cancelResume();target=null;
+    cancelResume();skippedStop=null;target=null;
     if(player.live?.restore)player.live.restore(time);else player.seek(time);
     changed();
   }

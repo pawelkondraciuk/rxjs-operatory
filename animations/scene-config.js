@@ -1,4 +1,4 @@
-import { configureQuerySource, configureDebounceSwitch, configureSwitchMapLive, configureFlatten, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureCatchSearch, configureShareReplayOne, configureShareReplayRefCount, configureRetryBackoff } from './reference-scenes.js';
+import { configureQuerySource, configureDebounceSwitch, configureSwitchMapLive, configureFlatten, configureSubject, configureSubjectInterval, configureSubjectManual, configureInterval, configureHttp, configureLanes, configureShareLate, configureShareReplayLate, configureCatchInside, configureCatchOutside, configureDistinctSwitch, configureCatchSearch, configureShareReplayOne, configureShareReplayRefCount, configureRetryBackoff, configureTimeFour } from './reference-scenes.js';
 
 import { configureSearchDemo } from './search-demo.js';
 import { configureUsageStats } from './usage-stats.js';
@@ -14,7 +14,7 @@ export const mainOrder = [
   // przed switchMap i catchError wewnątrz switchMap w tej samej wyszukiwarce.
   '20a-sharereplay-interval','20b-sharereplay-refcount','20-sharereplay-2','08-map-strumienie','09-concatmap','10-mergemap','11-switchmap','12-exhaustmap','12-intro-wyszukiwarka','12-query-zrodlo','12a-switchmap-live','12b-debounce-switchmap','11a-distinct-switchmap','11b-catcherror-search',
     // Statystyki wywołań operatorów (lekkie przejście) przed podsumowaniem.
-  'b04-catcherror','x03-retry-backoff','24-rxjs-liczby','25-podsumowanie','pytania',
+  'b04-catcherror','x03-retry-backoff','16-czas-cztery','24-rxjs-liczby','25-podsumowanie','pytania',
 ];
 // Dawne adresy ?extras nie dodają już żadnych slajdów.
 export const extraOrder = [];
@@ -61,6 +61,8 @@ export function configureScene(scene) {
   if(id==='20b-sharereplay-refcount')configureShareReplayRefCount(scene);
   // retry({ count, delay }) z trzema ponowieniami i exponential backoff 1/2/4 s (MAIN, po catchError na zewnątrz).
   if(id==='x03-retry-backoff')configureRetryBackoff(scene);
+  // Cztery operatory czasowe po retry: trzy rundy par (debounce/throttle, throttle/audit, audit/sample) od zera.
+  if(id==='16-czas-cztery')configureTimeFour(scene);
   const entryConnections={
     '12b-debounce-switchmap':['source-debounce','debounce-op','op-observer'],
     '11a-distinct-switchmap':['source-debounce','debounce-distinct','distinct-op','op-observer'],

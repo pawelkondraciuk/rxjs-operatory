@@ -1,6 +1,6 @@
 # Speaker notes — RxJS: operatory, które znasz, ale bałeś się zagadać
 
-Pełny eksport notatek z [index.html](../index.html): **40 slajdów MAIN**, od powitania do pytań i feedbacku. Plan 33 tematów jest rozłożony na istniejące slajdy, warianty i checkpointy.
+Pełny eksport notatek z [index.html](../index.html): **41 slajdów MAIN**, od powitania do pytań i feedbacku. Plan 33 tematów jest rozłożony na istniejące slajdy, warianty i checkpointy.
 
 Kolejność części technicznej pochodzi z `mainOrder` w [animations/scene-config.js](../animations/scene-config.js); tytuły wariantów z `prepareSlides`. Otwarcie zachowuje kolejność HTML.
 
@@ -47,9 +47,10 @@ Pokazy symulują HTTP. Tam, gdzie rozpiska mówi o User, porównanie późnych o
 35. **catchError — wyszukiwarka działa dalej** — `11b-catcherror-search`
 36. **catchError na zewnątrz** — `b04-catcherror`
 37. **retry — nie udało się? Spróbuj później** — `x03-retry-backoff`
-38. **RxJS w prawdziwym kodzie — kto wygrywa?** — `24-rxjs-liczby`
-39. **To co, zagadamy do tych operatorów?** — `25-podsumowanie`
-40. **Pytania?** — `pytania`
+38. **Cztery operatory, jeden strumień** — `16-czas-cztery`
+39. **RxJS w prawdziwym kodzie — kto wygrywa?** — `24-rxjs-liczby`
+40. **To co, zagadamy do tych operatorów?** — `25-podsumowanie`
+41. **Pytania?** — `pytania`
 
 ## 1. Społeczność
 
@@ -1271,27 +1272,28 @@ Mamy query$ i funkcję zwracającą HTTP Observable. Jaki operator wstawić w pu
 
 **1 — switchMap**
 
-- switchMap pilnuje aktualności, nie częstotliwości.
-- ❓ SALA: Jak ograniczyć liczbę wywołań?
-
 Wybieramy switchMap. Użytkownik szybko pisze r → re → rea: każda litera to emisja query$ i nowy request. re odłącza HTTP #1, rea odłącza #2 — szary ×, bez odpowiedzi i bez complete. Dopiero #3 dla rea dostarcza wynik i kończy się zielonym complete. To jest problem: trzy requesty, z których dwa przerywamy. Complete dotyczy tylko inner; główny odbiorca nadal słucha.
 
-Teraz kasuje: re → r. Każde skasowanie znów wysyła request — re zostaje anulowane, r dostarcza wynik. Potem zastępuje tekst przez ang: a → an → ang (a i an anulowane, ang z wynikiem) i kasuje: an → a (an anulowane, a z wynikiem). Cykl się powtarza. Szybkie zmiany przerywają pracę, cisza po serii pozwala odebrać wynik. Widać maksymalnie trzy requesty; nowy dochodzi na dole, najstarszy znika z góry. Numery i liczniki rosną bez resetu.
-
-Pokaz działa do przejścia dalej. Spacja pauzuje/wznawia, R przywraca pytanie z ukrytą nazwą; prawo przechodzi do debounceTime, lewo do źródła query$. Odsubskrybowanie klienta nie cofa operacji wykonanej na serwerze. Teraz ograniczymy liczbę requestów: zaczekamy 300 ms ciszy.
+Po wyniku i complete HTTP #3 pokaz zatrzyma się automatycznie, zachowując wszystkie trzy wiersze. Szybkie dalej tylko pokaże ten sam końcowy kadr; dopiero kolejne przejdzie do debounceTime. Spacja pauzuje/wznawia, R przywraca pytanie z ukrytą nazwą, lewo wraca do źródła query$. Odsubskrybowanie klienta nie cofa operacji wykonanej na serwerze.
 
 ### Checkpoint `finished`
 
-**Kadr podsumowania**
+**2 — Trzy emisje, jeden wynik · ⏸ PAUZA**
 
-switchMap odsłonięty, HTTP #3 dla rea zakończone, #4 dla re anulowane, #5 dla r aktywne. Odbiorca zachowuje tablicę [#3] wyników dla rea. Nowe query może przerwać poprzedni request, ale zakończonego requestu już nie anuluje. Dalej dodamy debounceTime.
+Input rea. HTTP #1 dla r i #2 dla re anulowane, HTTP #3 dla rea zakończone. Odbiorca zachowuje tablicę [#3] wyników dla rea; liczniki 3 wejścia / 3 requesty HTTP / 0 aktywnych. Wszystkie trzy wiersze zostają na ekranie. Główny pipeline nadal jest aktywny — zatrzymaliśmy ilustrację, nie źródło.
+
+- switchMap pilnuje aktualności, nie częstotliwości.
+- ❓ SALA: Jak ograniczyć liczbę wywołań?
+
+Kolejne dalej przechodzi do debounceTime: zaczekamy 300 ms ciszy.
 
 ### Notatki bazowe rodziny — zastępowane przez checkpointy
 
 - ❓ SALA: Jaki operator wybrać, żeby wyniki dotyczyły aktualnej frazy?
 - Pierwsze „dalej” odsłania switchMap i uruchamia pokaz.
 - Każda zmiana query → nowe HTTP; poprzedni aktywny inner → unsubscribe.
-- Szybkie pisanie → mnóstwo requestów. switchMap pilnuje aktualności, nie częstotliwości.
+- ⏸ PAUZA: po r → re → rea pokaz zatrzymuje się automatycznie. HTTP #1 i #2 anulowane, #3 zakończone, wynik [#3]; liczniki 3/3/0.
+- switchMap pilnuje aktualności, nie częstotliwości.
 - ❓ SALA: Jak ograniczyć liczbę wywołań? Dalej: debounceTime.
 
 ## 33. debounceTime — czekamy na ciszę
@@ -1638,7 +1640,55 @@ W produkcji często dodaje się maksymalne opóźnienie i jitter, żeby wielu kl
 - Po wyczerpaniu prób error idzie dalej. Cel: mniej agresywne obciążanie backendu.
 - Dalej: RxJS w liczbach, potem trzy pytania podsumowania i puenta.
 
-## 38. RxJS w prawdziwym kodzie — kto wygrywa?
+## 38. Cztery operatory, jeden strumień
+
+**ID:** `16-czas-cztery`
+
+### Checkpoint `ready`
+
+**1 — debounceTime vs throttleTime**
+
+Dwa identyczne źródła, oba już podłączone. Prawo uruchamia emisje: ABC gęsto, przerwa, DEF gęsto, przerwa — i tak w kółko. Patrzymy, ile chcemy.
+
+Debounce restartuje odliczanie przy każdej wartości i oddaje ostatnią dopiero po 300 ms ciszy: C, F. Throttle od razu przepuszcza pierwszą i przez 300 ms ignoruje kolejne: A, D.
+
+Debounce czeka na ciszę. Throttle bierze pierwszą wartość z okna. Następne prawo: czysty stan i od razu nowe emisje; throttle zostaje na dole, w miejsce debounceTime wchodzi auditTime.
+
+### Checkpoint `round-2`
+
+**2 — throttleTime vs auditTime**
+
+Stan wyczyszczony, ABC · DEF rusza od początku od razu po kliknięciu (lewo resetuje parę 2). Oba otwierają okno 300 ms przy pierwszej wartości. Throttle oddaje ją od razu (A, D), audit czeka do końca okna i oddaje ostatnią, którą zobaczył (C, F).
+
+Throttle bierze pierwszą. Audit oddaje ostatnią z okna. Następne prawo: audit znika, throttle zostaje na dole i zmienia konfigurację na leading: false, trailing: true. SampleTime jest od razu widoczny na swoim miejscu; czyste źródła i historie. Po przygotowaniu pary pokaz zaczyna się bez dodatkowego kliknięcia.
+
+### Checkpoint `round-3`
+
+**3 — throttleTime trailing-only vs sampleTime**
+
+Oba wiersze już zasubskrybowane, źródła i historie wyczyszczone. Throttle zostaje na dole; podpis leading: false, trailing: true pokazuje zmianę konfiguracji. Sample zastępuje audit na górze.
+
+Najpierw przez jeden takt nic nie przychodzi: sample już tyka (pusty takt 300 ms), throttle stoi. Potem wspólna sekwencja: A 350, B 450, C 550, D 1000, E 1100 ms. Sample: C@600, E@1200. Throttle: C@650, E@1300. Te same C i E, inne momenty emisji.
+
+Throttle otwiera okno po zdarzeniu. Po emisji C otwiera następne okno, ale bez nowych wejść kończy je w 950 ms i czeka na D. Po E odlicza jeszcze do 1600 ms i staje. Sample tyka stale co 300 ms, również podczas ciszy; bez nowej wartości nie emituje.
+
+Throttle liczy od zdarzenia. Sample działa według własnego zegara. 300 ms trwa 3 s, żeby było widać różnice. Po końcu pokaz sam się zatrzyma; następne prawo prowadzi do RxJS w liczbach. Przy powrocie do tego checkpointu prawo wznawia pokaz.
+
+### Checkpoint `summary`
+
+**Podsumowanie**
+
+Oba odbiorniki mają C, E, ale sample emituje w 300/900 ms, a throttle trailing-only w 350/1000 ms. Identyczne wartości nie oznaczają identycznego działania operatorów. Po pustym oknie throttle nie odlicza; zegar sample działa stale.
+
+Następne prawo: RxJS w liczbach.
+
+### Checkpoint `finished`
+
+**Podsumowanie**
+
+Throttle liczy od zdarzenia. Sample działa według własnego zegara. Oba dostarczyły C, E w różnych chwilach. Przejście: RxJS w liczbach.
+
+## 39. RxJS w prawdziwym kodzie — kto wygrywa?
 
 **ID:** `24-rxjs-liczby`
 
@@ -1689,7 +1739,7 @@ Te liczby pochodzą z konkretnego zestawu kodu, więc nie traktujmy ich jako ran
 - map 4282; shareReplay 926 vs share 252 (≈3,7×); concatAll 1.
 - Około minuty; dalej: podsumowanie.
 
-## 39. To co, zagadamy do tych operatorów?
+## 40. To co, zagadamy do tych operatorów?
 
 **ID:** `25-podsumowanie`
 
@@ -1710,7 +1760,7 @@ Bo to, że działa, nie znaczy, że robi to, czego oczekujesz.
 - Operator działa ≠ operator robi to, czego oczekuję.
 - Zatrzymaj się na tej myśli. Kolejne „dalej” prowadzi do „Pytania?” z QR do feedbacku; „wstecz” ukrywa puentę.
 
-## 40. Pytania?
+## 41. Pytania?
 
 **ID:** `pytania`
 

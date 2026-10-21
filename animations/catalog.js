@@ -63,6 +63,8 @@ add("11a-distinct-switchmap","distinctUntilChanged — znowu to samo?","",1,[],[
 add("11b-catcherror-search","catchError — wyszukiwarka działa dalej","",1,[],[],"");
 add("12-intro-wyszukiwarka","Zaprojektujmy wyszukiwarkę","",1,[],[],"");
 // Statystyki wywołań i postoje: configureUsageStats (usage-stats.js).
+// Trzy rundy operatorów czasowych: configureTimeFour (reference-scenes.js).
+add("16-czas-cztery","Cztery operatory, jeden strumień","",1,[],[],"");
 add("24-rxjs-liczby","RxJS w prawdziwym kodzie — kto wygrywa?","",1,[],[],"");
 add("12-query-zrodlo","Źródło: skąd bierze się query$?","",1,[],[],"");
 add("12a-switchmap-live","switchMap — nowe zapytanie anuluje poprzednie","",1,[],[],"");

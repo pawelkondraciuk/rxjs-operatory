@@ -438,14 +438,27 @@ export function renderScene(frame,options={}) {
       svg+='</g>';continue;
     }
     const lines=wrapLabel(n.label,Math.floor(n.w/(14*k))),failed=n.workState==='errored';
-    svg+=`<g data-node="${esc(n.id)}" opacity="${opacity}" data-active="${n.active}" data-work-state="${n.workState}"><rect x="${n.x-n.w/2}" y="${n.y-n.h/2}" width="${n.w}" height="${n.h}" rx="${n.rx??5}" fill="${n.fill}" stroke="${failed?'#b51e2e':n.active?'#805095':'#26343d'}" stroke-width="${failed||n.active?4:1.5}"/>`;
+    // offsetY (opt-in node.enter): wjazd całego kafelka z wierszami i portami do jego miejsca.
+    const enter=n.offsetY&&!reduced?` transform="translate(0 ${+n.offsetY.toFixed(2)})"`:'';
+    svg+=`<g data-node="${esc(n.id)}" opacity="${opacity}" data-active="${n.active}" data-work-state="${n.workState}"${enter}><rect x="${n.x-n.w/2}" y="${n.y-n.h/2}" width="${n.w}" height="${n.h}" rx="${n.rx??5}" fill="${n.fill}" stroke="${failed?'#b51e2e':n.active?'#805095':'#26343d'}" stroke-width="${failed||n.active?4:1.5}"/>`;
     // statusInside trzyma stan w kafelku, gdy pod nim stoi panel (np. EMISJE pod odbiorcą).
     const inside=n.statusInside&&n.status,labelShift=inside?-12*k:0;
     // Etykieta kafelka rośnie do labelScale (4:3), o ile najdłuższa linia mieści się w szerokości; inaczej zostaje przy textScale.
     const longest=Math.max(1,...lines.map(line=>Array.from(line).length));
     const naturalLabelSize=clamp((n.w-24)/(longest*.55),26*k,26*(frame.labelScale||k));
-    const labelSize=n.labelSize??naturalLabelSize,lineStep=28*labelSize/26,labelX=n.labelX??n.x;
-    lines.forEach((line,i)=>svg+=text(labelX,n.y+(n.labelOffset||0)+labelShift+(i-(lines.length-1)/2)*lineStep,line,labelSize,n.notification&&!n.terminalBadge?'style="fill:#fff"':''));
+    // subLabel (opt-in, np. konfiguracja operatora): mała pigułka pod nazwą w nagłówku; nazwa przesuwa się w górę
+    // i zmniejsza do połowy wysokości nagłówka. subLabelSince podświetla ją przez 1,5 s (zmiana konfiguracji).
+    const sub=n.subLabel&&n.defH?{size:Math.min(17*k,n.defH*.32),dy:n.defH*.25}:null;
+    const labelSize=Math.min(n.labelSize??naturalLabelSize,sub?n.defH*.5:Infinity),lineStep=28*labelSize/26,labelX=n.labelX??n.x;
+    const labelY=n.y+(n.labelOffset||0)+labelShift-(sub?n.defH*.17:0);
+    lines.forEach((line,i)=>svg+=text(labelX,labelY+(i-(lines.length-1)/2)*lineStep,line,labelSize,n.notification&&!n.terminalBadge?'style="fill:#fff"':''));
+    if(sub) {
+      const y=labelY+n.defH*.17+sub.dy,w=String(n.subLabel).length*.52*sub.size+20*k,h=sub.size*1.45;
+      const flash=n.subLabelSince===undefined||reduced?0:1-clamp((frame.time-n.subLabelSince)/1.5);
+      svg+=`<g data-sub-label="${esc(n.subLabel)}"><rect x="${n.x-w/2}" y="${y-h/2}" width="${w}" height="${h}" rx="${h/2}" fill="#F3E6F8" stroke="#8E5AA6" stroke-width="${(1.5+3*flash).toFixed(2)}"/>`+
+        (flash>0?`<rect data-sub-label-flash="true" x="${n.x-w/2}" y="${y-h/2}" width="${w}" height="${h}" rx="${h/2}" fill="#B384C6" opacity="${(.55*flash).toFixed(3)}"/>`:'')+
+        text(n.x,y+1,n.subLabel,sub.size,'style="font-weight:700;fill:#5B2D70"')+'</g>';
+    }
     if(inside)svg+=text(n.x,n.y+16*k,n.status,20*k,n.notification?'style="fill:#fff"':failed?'style="fill:#b51e2e"':'');
     else if(n.status)svg+=text(n.x,n.y+n.h/2+21*k,n.status,20*k,failed?'style="fill:#b51e2e"':'');
     if(n.showProgress)svg+=`<rect data-work-progress="${n.progress}" x="${n.x-n.w/2}" y="${n.y+n.h/2-9}" width="${n.w*n.progress}" height="9" fill="#132f42"/>`;

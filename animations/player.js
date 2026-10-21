@@ -66,6 +66,8 @@ function paint(){
   // mark.quiet: fragment bez stałego wyróżnienia — kolor pojawia się tylko w czasie active.
   return `<span class="rx-code-mark${segment.mark.quiet?' rx-code-quiet':''}${segment.active?' rx-code-active':''}" data-mark="${esc(segment.mark.id||'')}" style="--mark-bg:${segment.mark.bg};--mark-line:${segment.mark.line};opacity:${opacity}" aria-hidden="${opacity===0}">${text}</span>`;
  };
+ // data-lines: liczba linii kodu bieżącego kadru (CSS może zmniejszyć font sceny z dłuższym kodem w jednej fazie).
+ if(el.code.dataset)el.code.dataset.lines=String(fullCode.split('\n').length);
  if(snapshot.codeView)el.code.innerHTML=snapshot.codeView.map(line=>{const html=line.map(mark).join('');codeOffset++;return html;}).join('\n');
  else el.code.innerHTML=reveal?codeHtml(reveal.prefix)+`<span data-code-reveal="true" style="opacity:${reducedMotion&&reveal.opacity>0?1:reveal.opacity}" aria-hidden="${reveal.opacity===0}">${codeHtml(reveal.suffix)}</span>`:codeHtml(snapshot.code);
  el.stage.innerHTML=renderScene(snapshot,{reducedMotion});
@@ -173,6 +175,7 @@ root.addEventListener('keydown',event=>{
 paint();
 const api={subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener);},pause,cleanup,play,playTo,playContinuously,toggle,step,finishStep,reset:restart,restart,seek,
 get navigation(){return scene.playback?.navigation;},get startOnNext(){return scene.playback?.startOnNext;},get stillTime(){return scene.playback?.stillTime;},
+get finishBeforeNavigate(){return Boolean(scene.playback?.finishBeforeNavigate);},
 get resetOnExit(){return Boolean(scene.playback?.resetOnExit);},finish:()=>{
  if(scene.playback?.stillTime!==undefined){seek(scene.playback.stillTime);return;}
  // „Pokaż wynik” w trakcie emisji anuluje bieżące wykonanie; druk i READY — umowna chwila defaultClose.
