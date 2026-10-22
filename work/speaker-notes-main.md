@@ -1,10 +1,10 @@
 # Speaker notes — RxJS: operatory, które znasz, ale bałeś się zagadać
 
-Pełny eksport notatek z [index.html](../index.html): **41 slajdów MAIN**, od powitania do pytań i feedbacku. Plan 33 tematów jest rozłożony na istniejące slajdy, warianty i checkpointy.
+Pełny eksport notatek z [index.html](../index.html): **42 slajdów MAIN**, od powitania do pytań i feedbacku. Plan 33 tematów jest rozłożony na istniejące slajdy, warianty i checkpointy.
 
 Kolejność części technicznej pochodzi z `mainOrder` w [animations/scene-config.js](../animations/scene-config.js); tytuły wariantów z `prepareSlides`. Otwarcie zachowuje kolejność HTML.
 
-❓ SALA oznacza pytanie do publiczności, ⏸ PAUZA — miejsce na zatrzymanie i komentarz. Notatki checkpointów zastępują notatki bazowe w oknie prelegenta. Na slajdach kodu i podsumowania notatki fragmentów opisują kolejne wyróżnienia i puentę. Wspólne notatki rodzin zawierają także skrót pozostałych wariantów.
+❓ SALA oznacza pytanie do publiczności, ⏸ PAUZA — miejsce na zatrzymanie i komentarz. Notatki checkpointów zastępują notatki bazowe w oknie prelegenta. Na slajdach kodu notatki fragmentów opisują kolejne wyróżnienia. Wspólne notatki rodzin zawierają także skrót pozostałych wariantów.
 
 Pokazy symulują HTTP. Tam, gdzie rozpiska mówi o User, porównanie późnych odbiorców używa na diagramie wartości 42. W concatMap B czeka w kolejce, a C w tej animacji przychodzi już po zakończeniu B. Trzy pytania podsumowania są do wypowiedzenia; publiczny układ slajdu pozostaje bez zmian.
 
@@ -18,39 +18,40 @@ Pokazy symulują HTTP. Tam, gdzie rozpiska mówi o User, porównanie późnych o
 6. **Zawsze gdzieś się przewijałem**
 7. **Poprzednie wystąpienia**
 8. **RxJS Operatory, które znasz, ale bałeś się zagadać** — `tytul`
-9. **HTTP: od definicji do wykonania** — `05-zrodla-2`
-10. **httpGet od środka** — `05b-http-kod`
-11. **Cold: jedna definicja, trzy wykonania** — `04a-dwa-tory`
-12. **interval: strumień bez końca** — `05-zrodla`
-13. **Subject — ręczna emisja** — `05-zrodla-5`
-14. **Subject: ręczny multicast HTTP** — `05-zrodla-3`
-15. **Subject — kto odłączy źródło?** — `05-zrodla-4`
-16. **Jakie znasz operatory RxJS?** — `02-znane-operatory`
-17. **Operator to funkcja** — `04-operator`
-18. **myMap od środka** — `04b-map-kod`
-19. **A share?** — `03-a-share`
-20. **share(): wspólny request i późny odbiorca** — `04a-dwa-tory-2`
-21. **share() — kto odłączy źródło?** — `04a-dwa-tory-3`
-22. **shareReplay(1): kto zatrzyma interval?** — `20a-sharereplay-interval`
-23. **shareReplay z refCount: kiedy znika bufor?** — `20b-sharereplay-refcount`
-24. **shareReplay: późny odbiorca dostaje wynik** — `20-sharereplay-2`
-25. **A jeśli wartością jest Observable?** — `08-map-strumienie`
-26. **concatMap — Po kolei** — `09-concatmap`
-27. **mergeMap — Równocześnie** — `10-mergemap`
-28. **switchMap — Najnowsza subskrypcja** — `11-switchmap`
-29. **exhaustMap — Jestem zajęty** — `12-exhaustmap`
-30. **Zaprojektujmy wyszukiwarkę** — `12-intro-wyszukiwarka`
-31. **Źródło: skąd bierze się query$?** — `12-query-zrodlo`
-32. **Wybór operatora** — `12a-switchmap-live`
-33. **debounceTime — czekamy na ciszę** — `12b-debounce-switchmap`
-34. **distinctUntilChanged — znowu to samo?** — `11a-distinct-switchmap`
-35. **catchError — wyszukiwarka działa dalej** — `11b-catcherror-search`
-36. **catchError na zewnątrz** — `b04-catcherror`
-37. **retry — nie udało się? Spróbuj później** — `x03-retry-backoff`
-38. **Cztery operatory, jeden strumień** — `16-czas-cztery`
-39. **RxJS w prawdziwym kodzie — kto wygrywa?** — `24-rxjs-liczby`
-40. **To co, zagadamy do tych operatorów?** — `25-podsumowanie`
-41. **Pytania?** — `pytania`
+9. **RxJS — o co w tym chodzi?** — `01a-fabryka-soku`
+10. **Rx marbles** — `01b-rx-marbles`
+11. **HTTP: od definicji do wykonania** — `05-zrodla-2`
+12. **httpGet od środka** — `05b-http-kod`
+13. **Cold: jedna definicja, trzy wykonania** — `04a-dwa-tory`
+14. **interval: strumień bez końca** — `05-zrodla`
+15. **Subject — ręczna emisja** — `05-zrodla-5`
+16. **Subject: ręczny multicast HTTP** — `05-zrodla-3`
+17. **Subject — kto odłączy źródło?** — `05-zrodla-4`
+18. **Jakie znasz operatory RxJS?** — `02-znane-operatory`
+19. **Operator to funkcja** — `04-operator`
+20. **myMap od środka** — `04b-map-kod`
+21. **A share?** — `03-a-share`
+22. **share(): wspólny request i późny odbiorca** — `04a-dwa-tory-2`
+23. **share() — kto odłączy źródło?** — `04a-dwa-tory-3`
+24. **shareReplay(1): kto zatrzyma interval?** — `20a-sharereplay-interval`
+25. **shareReplay z refCount: kiedy znika bufor?** — `20b-sharereplay-refcount`
+26. **shareReplay: późny odbiorca dostaje wynik** — `20-sharereplay-2`
+27. **A jeśli wartością jest Observable?** — `08-map-strumienie`
+28. **concatMap — Po kolei** — `09-concatmap`
+29. **mergeMap — Równocześnie** — `10-mergemap`
+30. **switchMap — Najnowsza subskrypcja** — `11-switchmap`
+31. **exhaustMap — Jestem zajęty** — `12-exhaustmap`
+32. **Zaprojektujmy wyszukiwarkę** — `12-intro-wyszukiwarka`
+33. **Źródło: skąd bierze się query$?** — `12-query-zrodlo`
+34. **Wybór operatora** — `12a-switchmap-live`
+35. **debounceTime — czekamy na ciszę** — `12b-debounce-switchmap`
+36. **distinctUntilChanged — znowu to samo?** — `11a-distinct-switchmap`
+37. **catchError — wyszukiwarka działa dalej** — `11b-catcherror-search`
+38. **catchError na zewnątrz** — `b04-catcherror`
+39. **retry — nie udało się? Spróbuj później** — `x03-retry-backoff`
+40. **Cztery operatory, jeden strumień** — `16-czas-cztery`
+41. **RxJS w prawdziwym kodzie — kto wygrywa?** — `24-rxjs-liczby`
+42. **Pytania?** — `pytania`
 
 ## 1. Społeczność
 
@@ -131,9 +132,61 @@ Pokazy symulują HTTP. Tam, gdzie rozpiska mówi o User, porównanie późnych o
 - ❓ SALA: Kto zna RxJS? Kto używa? Kto lubi?
 - Asynchroniczne zdarzenia i wartości: kliknięcia, HTTP, WebSocket, timery.
 - Źródło → operatory → odbiorca. Emisje w czasie i deklaratywne przetwarzanie.
-- Dziś przyglądamy się praktycznemu zachowaniu operatorów. Zaczynamy od HTTP.
+- Dziś przyglądamy się praktycznemu zachowaniu operatorów. Zaczynamy od prostej fabryki soku, potem HTTP.
 
-## 9. HTTP: od definicji do wykonania
+## 9. RxJS — o co w tym chodzi?
+
+**ID:** `01a-fabryka-soku`
+
+### Checkpoint `ready`
+
+**0 — Fabryka**
+
+Zanim zobaczymy kod: wyobraźcie sobie małą fabrykę soku. Jest podajnik, taśma, dwie maszyny i ktoś, kto czeka na sok.
+
+„Dalej” uruchamia taśmę.
+
+### Checkpoint `source`
+
+**1 — Źródło**
+
+Owoce nie leżą wszystkie naraz na stole — pojawiają się jeden po drugim, w czasie. Podajnik to źródło: w RxJS to Observable.
+
+### Checkpoint `gate`
+
+**2 — Bramka**
+
+Bramka przepuszcza tylko jabłka; gruszka zjeżdża do skrzynki. Wybieramy, co nas interesuje — w RxJS robi to filter.
+
+### Checkpoint `juicer`
+
+**3 — Wyciskarka**
+
+Każde jabłko zamienia się w jedną szklankę soku. Przekształcamy wartości — to map. Bramka i wyciskarka to operatory: małe, wymienne maszyny ustawione w rzędzie.
+
+### Checkpoint `finished`
+
+**4 — Odbiorca**
+
+Odbiorca dostaje gotowe szklanki. Nie układamy owoców ręcznie — opisujemy, co zrobić z kolejną wartością, kiedy się pojawi.
+
+**Przejście:** „A teraz klasyczne diagramy RxJS…” — i poważna mina.
+
+### Notatki bazowe rodziny — zastępowane przez checkpointy
+
+- Intro dla osób, które RxJS widzą pierwszy raz: taśmociąg w fabryce soku, około minuty.
+- Źródło → operatory → odbiorca. Bez kodu; nazwy filter i map tylko w notatkach.
+- Pauzy taśmy są zabiegiem ilustracyjnym, nie buforowaniem.
+
+## 10. Rx marbles
+
+**ID:** `01b-rx-marbles`
+
+- Klasyczne diagramy marbles — bez słowa komentarza. Stój poważnie 2–3 sekundy, niech sala pomyśli „no i zaczęło się”.
+- Puenta: „Dobra, żartowałem. Zobaczmy coś z życia.”
+- **Przejście:** „A teraz zamiast jabłka — odpowiedź z serwera.”
+
+## 11. HTTP: od definicji do wykonania
 
 **ID:** `05-zrodla-2`
 
@@ -195,7 +248,7 @@ Na ekranie: zielony impuls od HTTP GET do A, wiersze zielenieją, przy A ✓ com
 - Daj obu wykonaniom chwilę na emisje. Po odejściu A pokaż, że B nadal odbiera.
 - Dalej: Subject — ręczna emisja. Pozostałe warianty źródeł mają osobne notatki checkpointów.
 
-## 10. httpGet od środka
+## 12. httpGet od środka
 
 **ID:** `05b-http-kod`
 
@@ -244,7 +297,7 @@ Zaraz po next wywołujemy subscriber.complete() — HTTP ma dokładnie jedną wa
 
 Na ekranie: wyróżnione complete() (zielone). Prawo: Cold — jedna definicja, trzy wykonania.
 
-## 11. Cold: jedna definicja, trzy wykonania
+## 13. Cold: jedna definicja, trzy wykonania
 
 **ID:** `04a-dwa-tory`
 
@@ -301,7 +354,7 @@ Stan końcowy: A — Paweł, B — Kondraciuk, C — Białystok, wszystkie compl
 - share() + HTTP: A/B współdzielą request #1; po complete pytanie z sali i późny C uruchamia #2.
 - share() + interval: ostatni unsubscribe odłącza źródło. Każdy wariant ma osobne notatki checkpointów.
 
-## 12. interval: strumień bez końca
+## 14. interval: strumień bez końca
 
 **ID:** `05-zrodla`
 
@@ -313,7 +366,7 @@ Stan końcowy: A — Paweł, B — Kondraciuk, C — Białystok, wszystkie compl
 - Daj obu wykonaniom chwilę na emisje. Po odejściu A pokaż, że B nadal odbiera.
 - Dalej: Subject — ręczna emisja. Pozostałe warianty źródeł mają osobne notatki checkpointów.
 
-## 13. Subject — ręczna emisja
+## 15. Subject — ręczna emisja
 
 **ID:** `05-zrodla-5`
 
@@ -419,7 +472,7 @@ Na ekranie: A — 1, 2, complete; B — 2, complete; C — tylko complete, bez h
 - Daj obu wykonaniom chwilę na emisje. Po odejściu A pokaż, że B nadal odbiera.
 - Dalej: Subject — ręczna emisja. Pozostałe warianty źródeł mają osobne notatki checkpointów.
 
-## 14. Subject: ręczny multicast HTTP
+## 16. Subject: ręczny multicast HTTP
 
 **ID:** `05-zrodla-3`
 
@@ -473,7 +526,7 @@ Jeden HTTP zasilił A i B. Późny C dostał samo complete: Subject nie odtwarza
 - Daj obu wykonaniom chwilę na emisje. Po odejściu A pokaż, że B nadal odbiera.
 - Dalej: Subject — ręczna emisja. Pozostałe warianty źródeł mają osobne notatki checkpointów.
 
-## 15. Subject — kto odłączy źródło?
+## 17. Subject — kto odłączy źródło?
 
 **ID:** `05-zrodla-4`
 
@@ -544,7 +597,7 @@ Prawo: „Jakie znasz operatory RxJS?”.
 - Daj obu wykonaniom chwilę na emisje. Po odejściu A pokaż, że B nadal odbiera.
 - Dalej: Subject — ręczna emisja. Pozostałe warianty źródeł mają osobne notatki checkpointów.
 
-## 16. Jakie znasz operatory RxJS?
+## 18. Jakie znasz operatory RxJS?
 
 **ID:** `02-znane-operatory`
 
@@ -554,7 +607,7 @@ Prawo: „Jakie znasz operatory RxJS?”.
 - Odsłaniaj kolejno: map, tap, filter, switchMap.
 - Dalej: operator to funkcja — User → fullName na przykładzie map.
 
-## 17. Operator to funkcja
+## 19. Operator to funkcja
 
 **ID:** `04-operator`
 
@@ -641,7 +694,7 @@ Prawo: „myMap od środka”.
 - subscribe w lewo; next w prawo. map synchronicznie zmienia wartość, nie uruchamia dodatkowego HTTP.
 - complete przechodzi dalej. Dalej: myMap od środka.
 
-## 18. myMap od środka
+## 20. myMap od środka
 
 **ID:** `04b-map-kod`
 
@@ -671,7 +724,7 @@ Na razie mamy jeden widok, który wyświetla pełne imię i nazwisko. Pamiętaci
 
 Prawo: „A share?”. Potem wrócimy do surowego user$ = httpGet<User>('/api/users/42'), bez map, i pól firstName/lastName, a po ich complete dołożymy późne city.
 
-## 19. A share?
+## 21. A share?
 
 **ID:** `03-a-share`
 
@@ -681,7 +734,7 @@ Prawo: „A share?”. Potem wrócimy do surowego user$ = httpGet<User>('/api/us
 - Przypomnij: Cold — trzy requesty; Subject + HTTP — jeden request, ale ręczne podłączenie.
 - Czy operator może podłączyć źródło i zarządzać nim za nas? Dalej: share(), wspólny request A/B i późny C.
 
-## 20. share(): wspólny request i późny odbiorca
+## 22. share(): wspólny request i późny odbiorca
 
 **ID:** `04a-dwa-tory-2`
 
@@ -724,7 +777,7 @@ Share współdzieli aktywne wykonanie i resetuje się po complete. Późny odbio
 - share() + HTTP: A/B współdzielą request #1; po complete pytanie z sali i późny C uruchamia #2.
 - share() + interval: ostatni unsubscribe odłącza źródło. Każdy wariant ma osobne notatki checkpointów.
 
-## 21. share() — kto odłączy źródło?
+## 23. share() — kto odłączy źródło?
 
 **ID:** `04a-dwa-tory-3`
 
@@ -765,7 +818,7 @@ Share odłącza źródło po odejściu ostatniego odbiorcy. Późny C uruchamia 
 - share() + HTTP: A/B współdzielą request #1; po complete pytanie z sali i późny C uruchamia #2.
 - share() + interval: ostatni unsubscribe odłącza źródło. Każdy wariant ma osobne notatki checkpointów.
 
-## 22. shareReplay(1): kto zatrzyma interval?
+## 24. shareReplay(1): kto zatrzyma interval?
 
 **ID:** `20a-sharereplay-interval`
 
@@ -825,7 +878,7 @@ Jak to naprawić? shareReplay({ bufferSize: 1, refCount: true }). Prawo: ten sam
 - B odchodzi → źródło nadal aktywne bez odbiorców.
 - Dalej: jawne refCount: true.
 
-## 23. shareReplay z refCount: kiedy znika bufor?
+## 25. shareReplay z refCount: kiedy znika bufor?
 
 **ID:** `20b-sharereplay-refcount`
 
@@ -901,7 +954,7 @@ Wyjątek: gdy źródło zakończyło się complete, resetu nie ma i bufor zostaj
 - Późny C → nowe wykonanie interval od 0; odejście C znów sprząta źródło.
 - Dalej: ta sama konfiguracja i zakończony HTTP — czy bufor zostanie?
 
-## 24. shareReplay: późny odbiorca dostaje wynik
+## 26. shareReplay: późny odbiorca dostaje wynik
 
 **ID:** `20-sharereplay-2`
 
@@ -923,7 +976,7 @@ Jeden request, A i późny B dostali 42 i complete. refCount: true czyści bufor
 - Jeden request; bufor zakończonego HTTP zostaje także z refCount: true.
 - Dalej: map + concatAll.
 
-## 25. A jeśli wartością jest Observable?
+## 27. A jeśli wartością jest Observable?
 
 **ID:** `08-map-strumienie`
 
@@ -989,7 +1042,7 @@ S1 otrzymał A i complete. Jeden request HTTP: map tworzy Observable, concatAll 
 - Inner complete; outer nadal może działać. Tutaj jedna wartość i jeden request.
 - Wiele wejść i kolejka — następny slajd, concatMap.
 
-## 26. concatMap — Po kolei
+## 28. concatMap — Po kolei
 
 **ID:** `09-concatmap`
 
@@ -1056,7 +1109,7 @@ Wyniki A, B, C w kolejności wejść. Koszt: B czekało na całe A.
 - #1 complete → dopiero wtedy projekcja i start B. C w tej animacji przychodzi już po B; gdyby przyszło wcześniej, też czekałoby.
 - Kolejność zachowana, brak równoległości. Przykład: kolejne zapisy formularza.
 
-## 27. mergeMap — Równocześnie
+## 29. mergeMap — Równocześnie
 
 **ID:** `10-mergemap`
 
@@ -1107,7 +1160,7 @@ S1 dostaje wyniki w kolejności nadejścia: B, A, C. Globalne complete przyszło
 - ❓ SALA: Który request skończy pierwszy? Wyniki według odpowiedzi: B, A, C.
 - complete całości dopiero po outer i wszystkich innerach.
 
-## 28. switchMap — Najnowsza subskrypcja
+## 30. switchMap — Najnowsza subskrypcja
 
 **ID:** `11-switchmap`
 
@@ -1158,7 +1211,7 @@ S1 dostaje B i C. Anulowane A nie wraca. Pamiętaj: unsubscribe nie cofa operacj
 - unsubscribe ≠ complete. Abort klienta nie cofa operacji na serwerze.
 - Typowe zastosowanie: wyszukiwarka.
 
-## 29. exhaustMap — Jestem zajęty
+## 31. exhaustMap — Jestem zajęty
 
 **ID:** `12-exhaustmap`
 
@@ -1204,7 +1257,7 @@ A kończy się normalnie, B nie wraca. C przychodzi po zakończeniu A i dostaje 
 - Przykład: formularz i wielokrotny submit. Wyniki tej animacji: A, C.
 - Dalej: cztery strategie HTTP zastosujemy w wyszukiwarce.
 
-## 30. Zaprojektujmy wyszukiwarkę
+## 32. Zaprojektujmy wyszukiwarkę
 
 **ID:** `12-intro-wyszukiwarka`
 
@@ -1216,7 +1269,7 @@ A kończy się normalnie, B nie wraca. C przychodzi po zakończeniu A i dostaje 
 - Spacja pauzuje/wznawia, strzałki zmieniają slajd. Dane są lokalną symulacją.
 - Dalej: fromEvent → map → trim → query$, współdzielone przez share().
 
-## 31. Źródło: skąd bierze się query$?
+## 33. Źródło: skąd bierze się query$?
 
 **ID:** `12-query-zrodlo`
 
@@ -1258,7 +1311,7 @@ Druk, F i Upcoming pokazują pełny pipeline i angular u obu odbiorców. Mamy go
 - share() współdzieli jedną subskrypcję do zdarzeń i jedno wykonanie map.
 - Kolejne kroki: map → share → subskrypcje i pisanie. Dalej: wybór operatora HTTP.
 
-## 32. Wybór operatora
+## 34. Wybór operatora
 
 **ID:** `12a-switchmap-live`
 
@@ -1296,7 +1349,7 @@ Kolejne dalej przechodzi do debounceTime: zaczekamy 300 ms ciszy.
 - switchMap pilnuje aktualności, nie częstotliwości.
 - ❓ SALA: Jak ograniczyć liczbę wywołań? Dalej: debounceTime.
 
-## 33. debounceTime — czekamy na ciszę
+## 35. debounceTime — czekamy na ciszę
 
 **ID:** `12b-debounce-switchmap`
 
@@ -1364,7 +1417,7 @@ Druk, F i Upcoming pokazują trzy HTTP: #1 rea anulowany przez switchMap, #2 rea
 - Ilustracja jest spowolniona 5×. Po wyniku HTTP #2 kolejne „dalej” uruchamia pokaz ciągły.
 - Dalej: debounce nie porównuje fraz — distinctUntilChanged.
 
-## 34. distinctUntilChanged — znowu to samo?
+## 36. distinctUntilChanged — znowu to samo?
 
 **ID:** `11a-distinct-switchmap`
 
@@ -1424,7 +1477,7 @@ Po strzałce w prawo wpisaliśmy znowu react. Fraza przeszła przez distinctUnti
 - Ponowne react po ang przechodzi. Potem error 500 zamyka subskrypcję; dalsze pisanie zmienia tylko UI.
 - Dalej: catchError wewnątrz switchMap.
 
-## 35. catchError — wyszukiwarka działa dalej
+## 37. catchError — wyszukiwarka działa dalej
 
 **ID:** `11b-catcherror-search`
 
@@ -1484,7 +1537,7 @@ Stan końcowy: HTTP #1 react — error 500, catchError dał [] i complete; HTTP 
 - Outer query$ nadal działa; angular → kolejny HTTP.
 - Błąd jednego requestu nie kończy wyszukiwarki. Dalej: catchError poza switchMap.
 
-## 36. catchError na zewnątrz
+## 38. catchError na zewnątrz
 
 **ID:** `b04-catcherror`
 
@@ -1547,7 +1600,7 @@ W wyszukiwarce obsłużyliśmy błąd pojedynczego HTTP. CatchError na zewnątrz
 - ⏸ PAUZA: kolejne kliknięcie B → brak reakcji. Położenie catchError zmienia zachowanie aplikacji.
 - To of([]) kończy wynik; inny zastępczy Observable mógłby działać dłużej. Dalej: retry.
 
-## 37. retry — nie udało się? Spróbuj później
+## 39. retry — nie udało się? Spróbuj później
 
 **ID:** `x03-retry-backoff`
 
@@ -1638,9 +1691,9 @@ W produkcji często dodaje się maksymalne opóźnienie i jitter, żeby wielu kl
 - Wykładnicze opóźnienia: 1 s → 2 s → 4 s; podczas oczekiwania brak aktywnego requestu.
 - Błędy zatrzymane wewnątrz retry. Sukces próby #4 → User i complete.
 - Po wyczerpaniu prób error idzie dalej. Cel: mniej agresywne obciążanie backendu.
-- Dalej: RxJS w liczbach, potem trzy pytania podsumowania i puenta.
+- Dalej: RxJS w liczbach, potem pytania.
 
-## 38. Cztery operatory, jeden strumień
+## 40. Cztery operatory, jeden strumień
 
 **ID:** `16-czas-cztery`
 
@@ -1688,7 +1741,7 @@ Następne prawo: RxJS w liczbach.
 
 Throttle liczy od zdarzenia. Sample działa według własnego zegara. Oba dostarczyły C, E w różnych chwilach. Przejście: RxJS w liczbach.
 
-## 39. RxJS w prawdziwym kodzie — kto wygrywa?
+## 41. RxJS w prawdziwym kodzie — kto wygrywa?
 
 **ID:** `24-rxjs-liczby`
 
@@ -1730,37 +1783,16 @@ A concatAll, które pokazywaliśmy jako fundament działania concatMap? W tym zb
 
 Te liczby pochodzą z konkretnego zestawu kodu, więc nie traktujmy ich jako rankingu całego świata. Ale pokazują jedną rzecz: nie wszystkich operatorów używamy równie często. Najważniejsze to rozumieć ich zachowanie i umieć wybrać właściwy.
 
-**Przejście:** „To co, zagadamy do tych operatorów?”
+**Przejście:** „Pytania?” — zaproś do pytań i feedbacku.
 
 ### Notatki bazowe rodziny — zastępowane przez checkpointy
 
 - Dane z zestawienia rxjs-usage: liczba wywołań w kodzie wybranego zbioru, nie wykonań w runtime.
 - Cztery *Map: switchMap 1418 (79,1%), mergeMap 251 (14,0%), concatMap 96 (5,4%), exhaustMap 28 (1,6%); razem 1793.
 - map 4282; shareReplay 926 vs share 252 (≈3,7×); concatAll 1.
-- Około minuty; dalej: podsumowanie.
+- Około minuty; dalej: pytania i feedback.
 
-## 40. To co, zagadamy do tych operatorów?
-
-**ID:** `25-podsumowanie`
-
-### Notatki bazowe
-
-- To co, zagadamy do tych operatorów?
-- Ile naprawdę uruchamiam subskrypcji?
-- Nowa wartość: kolejka, równoległość, anulowanie czy ignorowanie?
-- complete, error, unsubscribe — kto sprząta?
-- Wypowiedz te trzy pytania; środkowe wiersze slajdu pozostają puste. „Dalej” odsłania puentę.
-
-### Notatki fragmentu
-
-**1 — Puenta**
-
-Bo to, że działa, nie znaczy, że robi to, czego oczekujesz.
-
-- Operator działa ≠ operator robi to, czego oczekuję.
-- Zatrzymaj się na tej myśli. Kolejne „dalej” prowadzi do „Pytania?” z QR do feedbacku; „wstecz” ukrywa puentę.
-
-## 41. Pytania?
+## 42. Pytania?
 
 **ID:** `pytania`
 

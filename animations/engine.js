@@ -750,6 +750,10 @@ export function compileScene(scene) {
         return {...chart,progress:1-(1-grow)**3,valuesOpacity:clamp((time-(chart.valuesFrom??chart.from))/(chart.valuesDuration??chart.duration))};
       })}:{}),
       ...(graph.bigStats?{bigStats:graph.bigStats.map(stat=>({...stat,opacity:clamp((time-stat.at)/stat.duration)}))}:{}),
+      // Ilustracje (opt-in graph.illustrations): czysta funkcja czasu ilustracji → lista assetów z pozycją i parametrami.
+      // graph.illustrationStill(time) wskazuje kadr dla ograniczonego ruchu (koniec bieżącego etapu zamiast przesuwania).
+      ...(graph.illustrations?{illustrations:evaluate(graph.illustrations,time),
+        ...(graph.illustrationStill?{reducedIllustrations:evaluate(graph.illustrations,graph.illustrationStill(time))}:{})}:{}),
       ...(callouts.length?{callouts:callouts.flatMap(callout=>{
         const opacity=Math.min(clamp((time-callout.from)/.25),1-clamp((time-callout.to)/.3));
         if(time<callout.from||opacity<=0)return [];

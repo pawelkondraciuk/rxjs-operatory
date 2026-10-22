@@ -368,6 +368,54 @@
 					<aside class="notes"><ul><li>❓ SALA: Kto zna RxJS? Kto używa? Kto lubi?</li><li>Asynchroniczne zdarzenia i wartości: kliknięcia, HTTP, WebSocket, timery.</li><li>Źródło → operatory → odbiorca. Emisje w czasie i deklaratywne przetwarzanie.</li><li>Dziś przyglądamy się praktycznemu zachowaniu operatorów. Zaczynamy od HTTP.</li></ul></aside>
 				</section>
 
+				<!-- Intro dla początkujących: rysunkowa fabryka soku (źródło → operatory → odbiorca), bez kodu. -->
+				<section id="01a-fabryka-soku" class="animation-slide rx-juice-factory-slide" data-animation="01a-fabryka-soku">
+					<h2>RxJS — o co w tym chodzi?</h2>
+					<div class="rx-player" aria-label="RxJS — o co w tym chodzi?"></div>
+					<aside class="notes"><ul><li>Intro dla osób, które RxJS widzą pierwszy raz: taśmociąg w fabryce soku, około minuty.</li><li>Źródło → operatory → odbiorca. Bez kodu; nazwy filter i map tylko w notatkach.</li><li>Pauzy taśmy są zabiegiem ilustracyjnym, nie buforowaniem.</li></ul></aside>
+					<template data-checkpoint-notes="01a-fabryka-soku">
+                        <div data-checkpoint="ready"><p><strong>0 — Fabryka</strong></p><p>Zanim zobaczymy kod: wyobraźcie sobie małą fabrykę soku. Jest podajnik, taśma, dwie maszyny i ktoś, kto czeka na sok.</p><p>„Dalej” uruchamia taśmę.</p></div>
+                        <div data-checkpoint="source"><p><strong>1 — Źródło</strong></p><p>Owoce nie leżą wszystkie naraz na stole — pojawiają się jeden po drugim, w czasie. Podajnik to źródło: w RxJS to Observable.</p></div>
+                        <div data-checkpoint="gate"><p><strong>2 — Bramka</strong></p><p>Bramka przepuszcza tylko jabłka; gruszka zjeżdża do skrzynki. Wybieramy, co nas interesuje — w RxJS robi to filter.</p></div>
+                        <div data-checkpoint="juicer"><p><strong>3 — Wyciskarka</strong></p><p>Każde jabłko zamienia się w jedną szklankę soku. Przekształcamy wartości — to map. Bramka i wyciskarka to operatory: małe, wymienne maszyny ustawione w rzędzie.</p></div>
+                        <div data-checkpoint="finished"><p><strong>4 — Odbiorca</strong></p><p>Odbiorca dostaje gotowe szklanki. Nie układamy owoców ręcznie — opisujemy, co zrobić z kolejną wartością, kiedy się pojawi.</p><p><strong>Przejście:</strong> „A teraz klasyczne diagramy RxJS…” — i poważna mina.</p></div>
+                    </template>
+				</section>
+
+				<!-- Żart: „klasyczna” plansza marbles bez komentarza; puenta wyłącznie ustna. -->
+				<section id="01b-rx-marbles" class="rx-marbles-slide" data-speaker-title="Rx marbles">
+					<svg class="rx-marbles" viewBox="0 0 1140 600" role="img" aria-labelledby="rx-marbles-title">
+						<title id="rx-marbles-title">Rx marbles: 1, 2, 3, 4 → map(x =&gt; x * 10) → 10, 20, 30, 40 → filter(x =&gt; x &gt; 20) → 30, 40.</title>
+						<!-- źródło -->
+						<line class="marbles-axis" x1="70" y1="50" x2="1070" y2="50"/>
+						<path class="marbles-arrow" d="M1066 34 L1094 50 L1066 66 Z"/>
+						<line class="marbles-complete" x1="960" y1="16" x2="960" y2="84"/>
+						<g class="marbles-marble"><circle cx="230" cy="50" r="38" fill="#FFC15C"/><text x="230" y="50">1</text></g>
+						<g class="marbles-marble"><circle cx="430" cy="50" r="38" fill="#8CD0DA"/><text x="430" y="50">2</text></g>
+						<g class="marbles-marble"><circle cx="630" cy="50" r="38" fill="#E7B5F1"/><text x="630" y="50">3</text></g>
+						<g class="marbles-marble"><circle cx="830" cy="50" r="38" fill="#A6D98C"/><text x="830" y="50">4</text></g>
+						<rect class="marbles-operator" x="70" y="120" width="1000" height="96"/>
+						<text class="marbles-operator-label" x="570" y="168">map(x =&gt; x * 10)</text>
+						<!-- wynik map = wejście filter -->
+						<line class="marbles-axis" x1="70" y1="286" x2="1070" y2="286"/>
+						<path class="marbles-arrow" d="M1066 270 L1094 286 L1066 302 Z"/>
+						<line class="marbles-complete" x1="960" y1="252" x2="960" y2="320"/>
+						<g class="marbles-marble"><circle cx="230" cy="286" r="38" fill="#FFC15C"/><text x="230" y="286">10</text></g>
+						<g class="marbles-marble"><circle cx="430" cy="286" r="38" fill="#8CD0DA"/><text x="430" y="286">20</text></g>
+						<g class="marbles-marble"><circle cx="630" cy="286" r="38" fill="#E7B5F1"/><text x="630" y="286">30</text></g>
+						<g class="marbles-marble"><circle cx="830" cy="286" r="38" fill="#A6D98C"/><text x="830" y="286">40</text></g>
+						<rect class="marbles-operator" x="70" y="356" width="1000" height="96"/>
+						<text class="marbles-operator-label" x="570" y="404">filter(x =&gt; x &gt; 20)</text>
+						<!-- wynik filter -->
+						<line class="marbles-axis" x1="70" y1="522" x2="1070" y2="522"/>
+						<path class="marbles-arrow" d="M1066 506 L1094 522 L1066 538 Z"/>
+						<line class="marbles-complete" x1="960" y1="488" x2="960" y2="556"/>
+						<g class="marbles-marble"><circle cx="630" cy="522" r="38" fill="#E7B5F1"/><text x="630" y="522">30</text></g>
+						<g class="marbles-marble"><circle cx="830" cy="522" r="38" fill="#A6D98C"/><text x="830" y="522">40</text></g>
+					</svg>
+					<aside class="notes"><ul><li>Klasyczne diagramy marbles — bez słowa komentarza. Stój poważnie 2–3 sekundy, niech sala pomyśli „no i zaczęło się”.</li><li>Puenta: „Dobra, żartowałem. Zobaczmy coś z życia.”</li><li><strong>Przejście:</strong> „A teraz zamiast jabłka — odpowiedź z serwera.”</li></ul></aside>
+				</section>
+
 				<!-- Część merytoryczna. Kolejność, tytuły i notatki edytujemy tutaj. -->
 
 				<section id="02-znane-operatory" class="known-operators-slide">
@@ -723,7 +771,7 @@ return new Observable(subscriber => {
 				<section id="x03-retry-backoff" class="animation-slide" data-animation="x03-retry-backoff">
 					<h2>retry — nie udało się? Spróbuj później</h2>
 					<div class="rx-player" aria-label="retry — nie udało się? Spróbuj później"></div>
-					<aside class="notes"><ul><li>Błąd → ponowna subskrypcja upstream; każda próba to nowy cold HTTP.</li><li>count: 3 → pierwsza próba + maksymalnie trzy ponowienia.</li><li>Wykładnicze opóźnienia: 1 s → 2 s → 4 s; podczas oczekiwania brak aktywnego requestu.</li><li>Błędy zatrzymane wewnątrz retry. Sukces próby #4 → User i complete.</li><li>Po wyczerpaniu prób error idzie dalej. Cel: mniej agresywne obciążanie backendu.</li><li>Dalej: cztery operatory czasowe na jednym strumieniu, potem RxJS w liczbach, trzy pytania podsumowania i puenta.</li></ul></aside>
+					<aside class="notes"><ul><li>Błąd → ponowna subskrypcja upstream; każda próba to nowy cold HTTP.</li><li>count: 3 → pierwsza próba + maksymalnie trzy ponowienia.</li><li>Wykładnicze opóźnienia: 1 s → 2 s → 4 s; podczas oczekiwania brak aktywnego requestu.</li><li>Błędy zatrzymane wewnątrz retry. Sukces próby #4 → User i complete.</li><li>Po wyczerpaniu prób error idzie dalej. Cel: mniej agresywne obciążanie backendu.</li><li>Dalej: cztery operatory czasowe na jednym strumieniu, potem RxJS w liczbach i pytania.</li></ul></aside>
 					<template data-checkpoint-notes="x03-retry-backoff">
                         <div data-checkpoint="ready"><p><strong>0 — Pierwsza próba już podłączona</strong></p><p>A jest już podłączony przez retry do HTTP #1. Widać całą subskrypcję i pierwszy request z postępem 0%; liczniki 1/1. Pierwsze prawo pokazuje pracę i błąd pierwszej próby. Retry ponownie subskrybuje cold HTTP po 1/2/4 s.</p></div>
 
@@ -753,42 +801,25 @@ return new Observable(subscriber => {
 				<section id="24-rxjs-liczby" class="animation-slide rx-usage-stats-slide" data-animation="24-rxjs-liczby">
 					<h2>RxJS w prawdziwym kodzie — kto wygrywa?</h2>
 					<div class="rx-player" aria-label="RxJS w prawdziwym kodzie — kto wygrywa?"></div>
-					<aside class="notes"><ul><li>Dane z zestawienia rxjs-usage: liczba wywołań w kodzie wybranego zbioru, nie wykonań w runtime.</li><li>Cztery *Map: switchMap 1418 (79,1%), mergeMap 251 (14,0%), concatMap 96 (5,4%), exhaustMap 28 (1,6%); razem 1793.</li><li>map 4282; shareReplay 926 vs share 252 (≈3,7×); concatAll 1.</li><li>Około minuty; dalej: podsumowanie.</li></ul></aside>
+					<aside class="notes"><ul><li>Dane z zestawienia rxjs-usage: liczba wywołań w kodzie wybranego zbioru, nie wykonań w runtime.</li><li>Cztery *Map: switchMap 1418 (79,1%), mergeMap 251 (14,0%), concatMap 96 (5,4%), exhaustMap 28 (1,6%); razem 1793.</li><li>map 4282; shareReplay 926 vs share 252 (≈3,7×); concatAll 1.</li><li>Około minuty; dalej: pytania i feedback.</li></ul></aside>
 					<template data-checkpoint-notes="24-rxjs-liczby">
                         <div data-checkpoint="ready"><p><strong>0 — Pytanie</strong></p><p>Przez ostatnie kilkadziesiąt minut poznawaliśmy różne operatory. A jak myślicie, którego z czterech Map używa się najczęściej w tym zestawieniu?</p><p>Na ekranie kolejność z prezentacji: concatMap, mergeMap, switchMap, exhaustMap. Daj sali chwilę na odpowiedź; pierwsze „dalej” odsłoni paski i wartości bez zmiany kolejności wierszy.</p></div>
                         <div data-checkpoint="ranking"><p><strong>1 — Ranking</strong></p><p>SwitchMap odpowiada za prawie 80% wywołań wśród tej czwórki. MergeMap ma 14%, concatMap nieco ponad 5%, a exhaustMap mniej niż 2%.</p></div>
                         <div data-checkpoint="map"><p><strong>2 — map</strong></p><p>A najczęściej wykorzystywanym operatorem w całym zestawieniu jest zwykły map — ponad cztery tysiące wywołań.</p></div>
                         <div data-checkpoint="share-replay"><p><strong>3 — shareReplay</strong></p><p>ShareReplay pojawia się niemal cztery razy częściej niż zwykły share. Widać, że zapamiętywanie wyniku bywa bardzo przydatne.</p></div>
                         <div data-checkpoint="concat-all"><p><strong>4 — concatAll</strong></p><p>A concatAll, które pokazywaliśmy jako fundament działania concatMap? W tym zbiorze użyto go bezpośrednio tylko jeden raz.</p></div>
-                        <div data-checkpoint="finished"><p><strong>5 — Finał</strong></p><p>Te liczby pochodzą z konkretnego zestawu kodu, więc nie traktujmy ich jako rankingu całego świata. Ale pokazują jedną rzecz: nie wszystkich operatorów używamy równie często. Najważniejsze to rozumieć ich zachowanie i umieć wybrać właściwy.</p><p><strong>Przejście:</strong> „To co, zagadamy do tych operatorów?”</p></div>
+                        <div data-checkpoint="finished"><p><strong>5 — Finał</strong></p><p>Te liczby pochodzą z konkretnego zestawu kodu, więc nie traktujmy ich jako rankingu całego świata. Ale pokazują jedną rzecz: nie wszystkich operatorów używamy równie często. Najważniejsze to rozumieć ich zachowanie i umieć wybrać właściwy.</p><p><strong>Przejście:</strong> „Pytania?” — zaproś do pytań i feedbacku.</p></div>
                     </template>
 				</section>
-                <section id="25-podsumowanie" class="closing-slide">
-                    <div class="closing-layout">
-                        <h2>To co, zagadamy<br>
-                            do tych operatorów?</h2>
-                        <!-- Trzy miejsca na przyszłe pytania. Dodaj ikonę i tekst do każdego
-                             wiersza, a fragmenty pytań umieść przed fragmentem puenty. -->
-                        <div class="closing-questions">
-                            <div class="closing-question"></div>
-                            <div class="closing-question"></div>
-                            <div class="closing-question"></div>
-                        </div>
-                        <div class="closing-takeaway fragment" data-fragment-index="0">
-                            <p>Bo to, że działa, nie znaczy,<br>
-                                że robi to, czego oczekujesz.</p>
-                            <aside class="notes"><p><strong>1 — Puenta</strong></p><p>Bo to, że działa, nie znaczy, że robi to, czego oczekujesz.</p><ul><li>Operator działa ≠ operator robi to, czego oczekuję.</li><li>Zatrzymaj się na tej myśli. Kolejne „dalej” prowadzi do „Pytania?” z QR do feedbacku; „wstecz” ukrywa puentę.</li></ul></aside>
-                        </div>
-                    </div>
-                    <aside class="notes"><ul><li>To co, zagadamy do tych operatorów?</li><li>Ile naprawdę uruchamiam subskrypcji?</li><li>Nowa wartość: kolejka, równoległość, anulowanie czy ignorowanie?</li><li>complete, error, unsubscribe — kto sprząta?</li><li>Wypowiedz te trzy pytania; środkowe wiersze slajdu pozostają puste. „Dalej” odsłania puentę.</li></ul></aside>
-                </section>
-
 					<section id="pytania" class="questions-slide">
                         <h2>Pytania?</h2>
-                        <a class="questions-website" href="https://pawelkondraciuk.github.io/">pawelkondraciuk.github.io</a>
                         <a class="feedback-qr" href="https://crossweb.pl/feedback/aks-lwt/" aria-label="Otwórz formularz feedbacku">
                             <img src="/feedback-qr.svg" width="380" height="380" alt="Kod QR do formularza feedbacku na Crossweb">
                         </a>
+                        <figure class="questions-quote">
+                            <blockquote>„taki kurczę deep dive bardziej nawet i zajrzenie pod maskę niekiedy”</blockquote>
+                            <figcaption>~ Hubert Zub</figcaption>
+                        </figure>
                         <aside class="notes"><ul><li>Zaproś do pytań o przykłady i operatory.</li><li>QR → formularz feedbacku: https://crossweb.pl/feedback/aks-lwt/. Daj chwilę na zeskanowanie.</li><li>WebStorm — przypomnij o konkursie / giveaway.</li><li>Podziękuj za udział i wspólne spotkanie. To ostatni slajd.</li></ul></aside>
                     </section>
 
