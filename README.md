@@ -51,8 +51,8 @@ Kolejność po slajdzie tytułowym:
 2. Pierwsze slajdy techniczne pokazują komplet podstawowych zachowań Observable: HTTP — subscribe, next, complete (`05-zrodla-2`) → kod źródłowy httpGet krok po kroku (`05b-http-kod`) → Cold: jedna definicja, trzy wykonania, trzy complete (`04a-dwa-tory`) → interval na żywo — cold, osobne wykonanie każdego odbiorcy, unsubscribe (`05-zrodla`) → Subject — ręczne next, późny subskrybent bez historii, complete, subskrypcja po zakończeniu i ignorowane next(3) (`05-zrodla-5`) → Subject: ręczny multicast HTTP (`05-zrodla-3`) → Subject — kto odłączy źródło? (`05-zrodla-4`). Po nich „Jakie znasz operatory RxJS?” (`02-znane-operatory`) → HTTP GET + map: obiekt User → „Paweł Kondraciuk” (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`), wstęp do share + HTTP.
 3. Jedna historia Cold → Subject → share na tych samych przykładach: cold — trzy subskrypcje, trzy HTTP, trzy complete (`04a-dwa-tory`) → Subject + HTTP: jeden request dla A/B, późny C dostaje tylko complete (`05-zrodla-3`) → Subject + interval: odbiorcy odchodzą, źródło nadal działa (`05-zrodla-4`) → pytanie o znane operatory → HTTP GET + map (`04-operator`) → kod myMap (`04b-map-kod`) → „A share?” (`03-a-share`) → share + HTTP: A/B współdzielą request #1, po complete pytanie z sali i późny C uruchamia request #2 (`04a-dwa-tory-2`) → share + interval: A/B odchodzą, późny C uruchamia nowe interval od 0 (`04a-dwa-tory-3`) → shareReplay(1) na interval: odbiorcy odchodzą, źródło pracuje dalej (`20a-sharereplay-interval`) → shareReplay z refCount: true na interval: ostatni odbiorca czyści bufor i odłącza źródło, późny C zaczyna od zera (`20b-sharereplay-refcount`) → shareReplay z refCount: true + HTTP: późny odbiorca dostaje wynik z bufora (`20-sharereplay-2`). Powtarzające je cold timer i oba slajdy `07-hot-cold` zostały usunięte.
 4. **map + concatAll (`08-map-strumienie`) pozostaje kluczowym pomostem w MAIN**, bezpośrednio przed concatMap → mergeMap → switchMap → exhaustMap (cztery *Map obok siebie) → „Zaprojektujmy wyszukiwarkę” (`12-intro-wyszukiwarka`) → źródło query$ (`12-query-zrodlo`) → switchMap na żywo (`12a-switchmap-live`) → debounceTime + switchMap (`12b-debounce-switchmap`) → distinctUntilChanged przed switchMap (`11a-distinct-switchmap`, jedyny distinctUntilChanged w MAIN) → catchError wewnątrz switchMap w tej samej wyszukiwarce (`11b-catcherror-search`).
-5. catchError na zewnątrz (`b04-catcherror`) → retry z backoff 1/2/4 s (`x03-retry-backoff`) → cztery operatory czasowe (`16-czas-cztery`) → RxJS w liczbach (`24-rxjs-liczby`) → „Pytania?”. Osobny wariant „catchError wewnątrz” został usunięty; lokalną obsługę błędu pokazuje wyszukiwarka (`11b-catcherror-search`).
-6. „Pytania?” z kodem QR do feedbacku → rozmowa z salą.
+5. catchError na zewnątrz (`b04-catcherror`) → retry z backoff 1/2/4 s (`x03-retry-backoff`) → cztery operatory czasowe (`16-czas-cztery`) → RxJS w liczbach (`24-rxjs-liczby`) → „Feedback”. Osobny wariant „catchError wewnątrz” został usunięty; lokalną obsługę błędu pokazuje wyszukiwarka (`11b-catcherror-search`).
+6. „Feedback” z kodem QR do feedbacku → rozmowa z salą.
 
 | Część właściwa | Budżet |
 | --- | --- |
@@ -958,7 +958,7 @@ Sterowanie: READY → prawo uruchamia pętlę pary 1 → prawo (także po pauzie
 
 ### RxJS w prawdziwym kodzie — kto wygrywa? — `24-rxjs-liczby`
 
-**MAIN — po czterech operatorach czasowych, przed „Pytania?”.** Lekki finał części technicznej (60–90 s): ciekawostki z zestawienia rxjs-usage — liczba wywołań w kodzie wybranego zbioru, nie wykonań w runtime i nie ranking całego ekosystemu.
+**MAIN — po czterech operatorach czasowych, przed „Feedback”.** Lekki finał części technicznej (60–90 s): ciekawostki z zestawienia rxjs-usage — liczba wywołań w kodzie wybranego zbioru, nie wykonań w runtime i nie ranking całego ekosystemu.
 
 **Na ekranie:** tytuł serif, nagłówek **„Cztery Map. Jeden zdecydowany zwycięzca.”** i płaski wykres poziomy bez osi, siatki i legendy. Paski na wspólnej skali 100% (jasne tło toru = 100%):
 
@@ -980,7 +980,7 @@ Suma 1793; procenty zaokrąglone. Pod wykresem trzy duże liczby bez kart: **428
 | 2 `map` | 4282 · map() (0,3 s). |
 | 3 `share-replay` | 3,7× · shareReplay vs share (0,3 s). |
 | 4 `concat-all` | 1 · concatAll() (0,3 s). |
-| 5 `finished` | Bez zmian na ekranie; notatka końcowa. Następne „dalej” → „Pytania?”. |
+| 5 `finished` | Bez zmian na ekranie; notatka końcowa. Następne „dalej” → „Feedback”. |
 
 MANUAL i AUTO zatrzymują się po każdym odsłonięciu (tempo z pilota); szybkie „dalej” kończy bieżący etap, „wstecz” cofa o etap, wyjście ze slajdu resetuje go. Przy ograniczeniu ruchu odsłonięcia są natychmiastowe. Druk i podgląd Notes pokazują pełny finał.
 
@@ -995,9 +995,9 @@ MANUAL i AUTO zatrzymują się po każdym odsłonięciu (tempo z pilota); szybki
 
 ## Pytania i feedback
 
-### Pytania? — `pytania`
+### Feedback — `pytania`
 
-**Ostatni slajd prezentacji.** Duże „Pytania?” (150 px w 4:3, 130 px w 16:9), pod nim czarno-biały kod QR (380/320 px) do [formularza feedbacku na Crossweb](https://crossweb.pl/feedback/aks-lwt/). QR jest również klikalnym linkiem. Na dole cytat z feedbacku jak testimonial: „taki kurczę deep dive bardziej nawet i zajrzenie pod maskę niekiedy” (kursywa, #55515C, 36/30 px), a pod nim podpis „~ Hubert Zub” (#7457D9, 28/24 px), bez ramki, tła i animacji. Bez adresu strony, dodatkowych tekstów, linków do dodatków i dalszych slajdów. Gotowy SVG z białym marginesem znajduje się w `public/feedback-qr.svg` i działa także offline oraz w druku.
+**Ostatni slajd prezentacji.** Duże „Feedback” (150 px w 4:3, 130 px w 16:9), pod nim czarno-biały kod QR (380/320 px) do [formularza feedbacku na Crossweb](https://crossweb.pl/feedback/aks-lwt/). QR jest również klikalnym linkiem. Na dole cytat z feedbacku jak testimonial: „taki kurczę deep dive bardziej nawet i zajrzenie pod maskę niekiedy” (kursywa, #55515C, 36/30 px), a pod nim podpis „~ Hubert Zub” (#7457D9, 28/24 px), bez ramki, tła i animacji. Bez adresu strony, dodatkowych tekstów, linków do dodatków i dalszych slajdów. Gotowy SVG z białym marginesem znajduje się w `public/feedback-qr.svg` i działa także offline oraz w druku.
 
 **Speaker notes — stałe przez cały slajd:**
 

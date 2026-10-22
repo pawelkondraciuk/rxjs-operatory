@@ -45,7 +45,7 @@ Eksport z [index.html](../index.html): **42 slajdy MAIN** w kolejności prezenta
 39. **retry — nie udało się? Spróbuj później** — `x03-retry-backoff`
 40. **Cztery operatory, jeden strumień** — `16-czas-cztery`
 41. **RxJS w prawdziwym kodzie — kto wygrywa?** — `24-rxjs-liczby`
-42. **Pytania?** — `pytania`
+42. **Feedback** — `pytania`
 
 ## 1. Społeczność
 
@@ -433,7 +433,7 @@ Eksport z [index.html](../index.html): **42 slajdy MAIN** w kolejności prezenta
 - **concatAll: 1**
 - **Wybrany zbiór, nie cały świat**
 
-## 42. Pytania?
+## 42. Feedback
 
 **ID:** `pytania`
 
