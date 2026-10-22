@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules,playbackHarness}=require('./v2-harness.cjs');
 // 20b-sharereplay-refcount (MAIN, po 20a): interval(1000).pipe(shareReplay({ bufferSize: 1, refCount: true })) → A/B/C
@@ -154,14 +155,12 @@ test('buffer reset fades the stored ball out instead of cutting it',async()=>{
  assert.equal(node(c.snapshot(reset-.05),'replay').bufferPocket.values.length,1);
 });
 
-test('placed between shareReplay(1) on interval and shareReplay refCount on HTTP; notes cover every checkpoint',async()=>{
+test('placed between shareReplay(1) on interval and shareReplay refCount on HTTP; notes recall the source lifetime',async()=>{
  const {scene:s}=await scene(),{mainOrder}=(await modules(['scene-config']))['scene-config'];
  const i=mainOrder.indexOf(id);
  assert.deepEqual([mainOrder[i-1],mainOrder[i+1]],['20a-sharereplay-interval','20-sharereplay-2']);
- const html=fs.readFileSync('index.html','utf8');
- const source=html.match(new RegExp(`<template data-checkpoint-notes="${id}">([\\s\\S]*?)</template>`))[1];
- assert.deepEqual(Array.from(source.matchAll(/data-checkpoint="([^"]+)"/g),x=>x[1]),['ready',...s.playback.stops.map(x=>x.id),'finished']);
- assert.match(source,/resetOnRefCountZero/);assert.match(source,/przy unsubscribe/);assert.match(source,/od 0/);
+ const source=slideNotes(id);
+ assert.match(source,/refCount: true/);assert.match(source,/reset bufora/);assert.match(source,/od 0/);assert.match(source,/po complete zostaje/);
 });
 
 test('only after unsubscribe B: hold a normal upstream and buffer until the explicit answer, including AUTO and fast next',async()=>{

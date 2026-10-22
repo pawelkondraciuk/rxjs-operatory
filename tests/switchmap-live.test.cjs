@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -200,7 +201,7 @@ test('code replacement keeps syntax colouring, strong switchMap emphasis and the
   const css=fs.readFileSync('animations/reveal.css','utf8');
   assert.match(css,/rx-operator-choice \[data-mark="switch"\][^}]*width:9ch/);
   const section=fs.readFileSync('index.html','utf8').split('<section id="12a-switchmap-live"')[1].split('</section>')[0];
-  for(const checkpoint of ['ready','revealed','finished'])assert.ok(section.includes(`data-checkpoint="${checkpoint}"`));
+   const notes=slideNotes('12a-switchmap-live');assert.match(notes,/Trzy requesty, jeden wynik/);assert.match(notes,/Aktualność ≠ ograniczenie częstotliwości/);
 });
 
 

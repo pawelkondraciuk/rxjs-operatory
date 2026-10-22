@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {modules}=require('./v2-harness.cjs');
 // Wariant 05-zrodla-2: HTTP → Odbiorca, box odbioru pod odbiorcą, praca tylko w kafelku HTTP.
@@ -103,12 +104,7 @@ test('.subscribe() A stays on the subscribed stop and fades when the request sta
  assert.ok(lane(moving,'http').progress>0);assert.ok((moving.callouts?.[0]?.opacity??0)<1);
 });
 
-test('speaker notes: one template entry per stage, from definition to complete',async()=>{
- const {c}=await http('4:3'),html=require('node:fs').readFileSync('index.html','utf8');
- const template=html.match(/<template data-checkpoint-notes="05-zrodla-2">([\s\S]*?)<\/template>/)[1];
- assert.deepEqual([...template.matchAll(/data-checkpoint="([^"]+)"/g)].map(m=>m[1]),['ready',...c.stops.map(s=>s.id),'finished']);
- const note=id=>template.match(new RegExp(`data-checkpoint="${id}">([\\s\\S]*?)</div>`))[1];
- assert.match(note('ready'),/wyłącznie definicja/);assert.doesNotMatch(note('receiver'),/\.subscribe\(render\)/);
- assert.match(note('subscribed'),/\.subscribe\(\) A/);assert.match(note('response'),/wyleciała z HTTP/);
- assert.doesNotMatch(note('first'),/✓ complete/);assert.match(note('finished'),/✓ complete/);assert.match(note('finished'),/kod źródłowy httpGet/);
+test('speaker notes recall definition, subscribe and terminal order',()=>{
+ const notes=slideNotes('05-zrodla-2');
+ assert.match(notes,/Definicja ≠ wykonanie/);assert.match(notes,/subscribe uruchamia request/);assert.match(notes,/next → complete/);
 });

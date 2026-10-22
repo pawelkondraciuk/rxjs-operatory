@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules,playbackHarness}=require('./v2-harness.cjs');
 // 20-sharereplay-2 (shareReplay({ bufferSize: 1, refCount: true })): HTTP GET → shareReplay(1) → A/B w wyglądzie torów
@@ -97,8 +98,8 @@ test('shareReplay: one stop right after B subscribes (ball still in the buffer),
  controller.next();h.advance(100);controller.next();assert.equal(player.state,'finished');
  controller.previous();assert.equal(player.time,stop);assert.deepEqual(balls(player.snapshot,'B'),[]);
  controller.reset();controller.setMode('manual');controller.setMode('auto');h.advance(30000);assert.equal(player.state,'finished');
- const html=fs.readFileSync('index.html','utf8'),template=html.match(/<template data-checkpoint-notes="20-sharereplay-2">([\s\S]*?)<\/template>/)[1];
- assert.deepEqual([...template.matchAll(/data-checkpoint="([^"]+)"/g)].map(m=>m[1]),['ready','subscribed-b','finished']);
+ const notes=slideNotes('20-sharereplay-2');
+ assert.match(notes,/Późny B — co dostanie\?/);assert.match(notes,/42 \+ complete/);assert.match(notes,/Po complete bufor zostaje/);
 });
 
 test('shareReplay: ports share Y, the buffer pocket hangs under the operator and rewind is deterministic in both formats',async()=>{

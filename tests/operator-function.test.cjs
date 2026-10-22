@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {modules,playbackHarness,revealMock}=require('./v2-harness.cjs');
@@ -178,17 +179,9 @@ test('custom timing preserves the storyboard and all checkpoint snapshots are de
   assert.deepEqual(history(c.snapshot(c.duration)),['"…"']);
 });
 
-test('checkpoint notes follow the stops and lead from map to its source code',async()=>{
-  const {compiled:c}=await subject();
-  const html=require('node:fs').readFileSync('index.html','utf8');
-  const source=html.match(/<template data-checkpoint-notes="04-operator">([\s\S]*?)<\/template>/)[1];
-  const notes=Object.fromEntries([...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)].map(([,id,text])=>[id,text]));
-  assert.deepEqual(Object.keys(notes),['ready',...Array.from(c.stops,s=>s.id),'finished']);
-  assert.match(notes.ready,/pobieramy dane użytkownika z HTTP[\s\S]*pełnego imienia i nazwiska/);
-  assert.match(notes.mapped,/synchronicznie ją przekształca[\s\S]*każdej kolejnej emisji/);
-  assert.match(notes.received,/jeden request[\s\S]*jeden string\. To nadal jedno wykonanie Observable/);
-  assert.match(notes.complete,/complete przechodzi dalej do odbiorcy/);
-  assert.match(notes.finished,/subskrypcję biegnącą w lewo[\s\S]*wartość płynącą w prawo[\s\S]*Prawo: „myMap od środka”/);
+test('map notes recall synchronous transformation and a single HTTP',()=>{
+ const notes=slideNotes('04-operator');
+ assert.match(notes,/subscribe ←, wartości →/);assert.match(notes,/synchronicznie: User → string/);assert.match(notes,/Jeden request HTTP/);assert.match(notes,/complete przechodzi dalej/);
 });
 
 // Wyświetlany kod: HTML z <wbr> jako punktami łamania, bez zmiany treści.

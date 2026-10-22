@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -124,17 +125,16 @@ test('MANUAL i AUTO zatrzymują się po każdym etapie; szybkie dalej kończy et
   controller.next();h.advance(6000);assert.equal(player.state,'finished');
 });
 
-test('HTML: slajd między tytułem a Rx marbles, notatki per checkpoint i pierwsze miejsce w MAIN',async()=>{
+test('HTML: slajd między tytułem a Rx marbles, stałe notatki slajdu i pierwsze miejsce w MAIN',async()=>{
   const {m,compiled}=await fixture();
   const html=fs.readFileSync('index.html','utf8');
   const section=html.match(/<section id="01a-fabryka-soku"[\s\S]*?<\/section>/)[0];
   assert.match(section,/data-animation="01a-fabryka-soku"/);
   assert.match(section,/<h2>RxJS — o co w tym chodzi\?<\/h2>/);
-  const notes=[...section.matchAll(/data-checkpoint="([^"]+)"/g)].map(match=>match[1]);
-  assert.deepEqual(plain(notes),['ready',...compiled.stops.map(stop=>stop.id),'finished']);
-  assert.match(section,/A teraz klasyczne diagramy RxJS/);
+  const notes=slideNotes('01a-fabryka-soku');
+  assert.match(notes,/Bramka — filter/);assert.match(notes,/Wyciskarka — map/);
   const marbles=html.match(/<section id="01b-rx-marbles"[\s\S]*?<\/section>/)[0];
-  assert.match(marbles,/A teraz zamiast jabłka — odpowiedź z serwera/);
+  assert.match(marbles,/Zamiast jabłka: odpowiedź HTTP/);
   assert.doesNotMatch(marbles,/<h2|fragment|data-animation/);
   assert.doesNotMatch(section,/<pre|<code/);
   assert.ok(html.indexOf('id="tytul"')<html.indexOf('id="01a-fabryka-soku"'));

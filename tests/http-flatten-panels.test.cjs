@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {modules,playbackHarness}=require('./v2-harness.cjs');
 const definitions=[['08-map-strumienie','concatAll'],['09-concatmap','concatMap'],['10-mergemap','mergeMap'],['11-switchmap','switchMap'],['12-exhaustmap','exhaustMap']];
@@ -250,8 +251,8 @@ test('concatMap answer: B in the queue, no projection until A completes',async()
  const startC=find(c,{type:'inner-subscribe',edge:'inner2-op'}).at;
  assert.ok(doneB<arrivedC&&arrivedC<startC);
  assert.deepEqual(Array.from(rows(c,arrivedC),r=>r.state).slice(0,2),['completed','completed']);
- const html=require('node:fs').readFileSync('index.html','utf8'),notes=html.match(/<template data-checkpoint-notes="09-concatmap">([\s\S]*?)<\/template>/)[1];
- assert.match(notes,/B kończy się, zanim przyjdzie C/);
+ const notes=slideNotes('09-concatmap');
+ assert.match(notes,/C przychodzi po B/);assert.match(notes,/Kolejka wartości, przed projekcją/);
 });
 
 test('mergeMap answer: two active HTTP rows, B returns before A',async()=>{
@@ -309,14 +310,9 @@ test('seeking all event frames in either format is deterministic and local rows 
  }
 });
 
-test('speaker notes of concatAll and the four strategies follow their checkpoints in order',async()=>{
- const {scene,compile}=await family(),html=require('node:fs').readFileSync('index.html','utf8');
- for(const [id]of definitions){
-  const source=html.match(new RegExp(`<template data-checkpoint-notes="${id}">([\\s\\S]*?)</template>`))[1];
-  const notes=[...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)];
-  assert.deepEqual(notes.map(n=>n[1]),['ready',...Array.from(compile(scene(id)).stops,s=>s.id),'finished'],id);
-  if(id!=='08-map-strumienie')assert.match(notes.find(n=>n[1]==='question')[2],/\?/,id);
- }
+test('flattening slide notes recall semantics and the question for each strategy',()=>{
+ for(const [id]of definitions){const notes=slideNotes(id);if(id!=='08-map-strumienie')assert.match(notes,/\?/,id);}
+ const notes=slideNotes('08-map-strumienie');assert.match(notes,/map tworzy Observable/);assert.match(notes,/concatAll subskrybuje inner/);assert.match(notes,/Dwa HTTP/);assert.match(notes,/complete innera ≠ complete całości/);
 });
 
 test('09–12 titles hide the operator answer until the question stop has passed',async()=>{

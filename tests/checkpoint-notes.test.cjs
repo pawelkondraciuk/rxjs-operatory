@@ -2,43 +2,53 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const {modules}=require('./v2-harness.cjs');
 const ids=['ready','defined','multicast','complete','subscribed-c','finished'];
 function slide(id='05-zrodla-3'){
- const html=fs.readFileSync('index.html','utf8');
- const source=html.match(/<template data-checkpoint-notes="05-zrodla-3">([\s\S]*?)<\/template>/)[1];
- const entries=[...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)]
-  .map(([,checkpoint,innerHTML])=>({dataset:{checkpoint},innerHTML}));
- const template={content:{querySelectorAll:()=>entries}};
+ const {slideNotes}=require('./slide-notes.cjs');
+ const template={innerHTML:slideNotes('05-zrodla-3')};
  const note={innerHTML:'existing variant notes'};
  const markers=ids.slice(1).map(stop=>({dataset:stop==='finished'?{handoff:'true'}:{stop},children:[],append(n){this.children.push(n);}}));
- return {id,note,markers,entries,ownerDocument:{createElement:()=>({})},
-  querySelector:s=>s==='aside.notes'?note:s===`template[data-checkpoint-notes="05-zrodla-3"]`?template:null,
+ return {id,note,markers,template,stepped:true,
+  querySelector(s){return s==='aside.notes'?note:s===`.rx-fragment-steps`?(this.stepped?{}:null):s===`template[data-slide-notes="05-zrodla-3"]`?template:null;},
   querySelectorAll:()=>markers};
 }
-test('Subject checkpoint notes use native Reveal fragment notes and keep READY separate',async()=>{
+test('variant notes are a single slide list; stage markers never receive fragment notes',async()=>{
  const {['checkpoint-notes']:m}=await modules(['checkpoint-notes']);const s=slide();
- assert.equal(m.prepareCheckpointNotes(s),true);
- assert.deepEqual(s.entries.map(n=>n.dataset.checkpoint),ids);
- assert.match(s.note.innerHTML,/0 — Wprowadzenie/);
- assert.doesNotMatch(s.note.innerHTML,/5 — Podsumowanie/);
- for(const [i,marker] of s.markers.entries()){
-  assert.equal(marker.children.length,1);assert.equal(marker.children[0].className,'notes');
-  assert.equal(marker.children[0].innerHTML,s.entries[i+1].innerHTML);
- }
- assert.match(s.markers.at(-1).children[0].innerHTML,/Ale sami musieliśmy podłączyć źródło\. Czy RxJS może zrobić to za nas\?/);
+ assert.equal(m.prepareSlideNotes(s),true);
+ assert.equal(s.note.innerHTML,s.template.innerHTML);
+ assert.ok(s.markers.every(marker=>marker.children.length===0));
+ assert.match(s.note.innerHTML,/Jeden HTTP, odbiorcy A\/B/);
+ assert.match(s.note.innerHTML,/Późny C — tylko complete/);
 });
-test('checkpoint notes leave other variants untouched and print uses the final explanation',async()=>{
+test('base notes stay intact and marker-free print gets the same complete list',async()=>{
  const {['checkpoint-notes']:m}=await modules(['checkpoint-notes']);
  for(const id of ['05-zrodla','06-subskrypcja']){
-  const s=slide(id);assert.equal(m.prepareCheckpointNotes(s),false);assert.equal(s.note.innerHTML,'existing variant notes');
+  const s=slide(id);assert.equal(m.prepareSlideNotes(s),false);assert.equal(s.note.innerHTML,'existing variant notes');
   assert.ok(s.markers.every(marker=>marker.children.length===0));
  }
- const s=slide();s.markers=[];m.prepareCheckpointNotes(s,{printMode:true});assert.match(s.note.innerHTML,/5 — Podsumowanie/);
+ const live=slide(),print=slide();print.markers.length=0;
+ m.prepareSlideNotes(live);m.prepareSlideNotes(print);
+ assert.equal(print.note.innerHTML,live.note.innerHTML);
 });
-test('missing checkpoint notes fail explicitly instead of retaining a stale explanation',async()=>{
- const {['checkpoint-notes']:m}=await modules(['checkpoint-notes']);const s=slide();
- s.entries.splice(2,1);assert.throws(()=>m.prepareCheckpointNotes(s),/brak notatki checkpointu multicast/);
+test('every HTML section and variant has short bullet notes, with no per-fragment overrides',()=>{
+ const html=fs.readFileSync('index.html','utf8');
+ const sections=[...html.matchAll(/<section\b[^>]*>([\s\S]*?)<\/section>/g)];
+ assert.equal(sections.length,36);
+ assert.doesNotMatch(html,/data-checkpoint-notes|data-checkpoint=|data-notes=/);
+ for(const [,body] of sections){
+  const notes=[...body.matchAll(/<aside class="notes">([\s\S]*?)<\/aside>/g)];
+  assert.equal(notes.length,1);
+  const lists=[notes[0][1],...[...body.matchAll(/<template data-slide-notes="[^"]+">([\s\S]*?)<\/template>/g)].map(m=>m[1])];
+  for(const note of lists){
+   assert.match(note,/^<ul><li><strong>/);
+   const bullets=[...note.matchAll(/<li><strong>([^<]+)<\/strong><\/li>/g)];
+   assert.ok(bullets.length>=2&&bullets.length<=6);
+   assert.equal(note,'<ul>'+bullets.map(m=>m[0]).join('')+'</ul>');
+   assert.ok(bullets.every(m=>m[1].split(/\s+/).length<=9),'krótkie hasła');
+  }
+  for(const [,fragment]of body.matchAll(/<span class="fragment code-walk-step"[^>]*>([\s\S]*?)<\/span>/g))assert.doesNotMatch(fragment,/notes/);
+ }
 });
 
-test('Notes receiver restores the requested frame only for a matching template and trusted parent',async()=>{
+test('Notes receiver restores the requested frame for stage markers independently of note templates and only from a trusted parent',async()=>{
  const {['checkpoint-notes']:m}=await modules(['checkpoint-notes']);
  const s=slide(),calls=[];s.markers.forEach((marker,i)=>marker.dataset.time=String(i+1));
  const parent={},listeners=[];
@@ -53,7 +63,8 @@ test('Notes receiver restores the requested frame only for a matching template a
  calls.length=0;send(4);assert.equal(calls.at(-1)[1],20);
  calls.length=0;send(-1);assert.equal(calls.at(-1)[1],0);
  calls.length=0;send(4,{origin:'http://untrusted'});send(4,{source:{}});assert.equal(calls.length,0);
- s.id='05-zrodla';send(4);assert.equal(calls.length,0);
+ s.id='05-zrodla';send(4);assert.equal(calls.at(-1)[1],20,'base variant without a template also restores');
+ calls.length=0;s.stepped=false;send(4);assert.equal(calls.length,0,'ordinary slides use native Reveal restore');
 });
 
 test('restoring fragment state does not turn Notes synchronization into pilot actions',async()=>{

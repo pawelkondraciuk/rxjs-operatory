@@ -1,23 +1,9 @@
-// Reveal Notes odczytuje aside.notes bieżącego fragmentu. Kontroler stages już
-// synchronizuje fragmenty z checkpointami, również w AUTO i po seek/reset.
-// Szablon dotyczy końcowego ID wariantu; pozostałe warianty zachowują swoje notes.
-export function prepareCheckpointNotes(slide,{printMode=false}={}) {
-  const template=slide.querySelector(`template[data-checkpoint-notes="${slide.id}"]`);
+// Jedna stała lista na cały slajd, także w druku. Wariant wybieramy po klonowaniu
+// sekcji; fragmenty sterują wyłącznie animacją i nigdy nie zawierają aside.notes.
+export function prepareSlideNotes(slide) {
+  const template=slide.querySelector(`template[data-slide-notes="${slide.id}"]`);
   if(!template)return false;
-  const notes=new Map([...template.content.querySelectorAll('[data-checkpoint]')]
-    .map(note=>[note.dataset.checkpoint,note.innerHTML]));
-  const noteFor=id=>{
-    if(!notes.has(id))throw new Error(`${slide.id}: brak notatki checkpointu ${id}`);
-    return notes.get(id);
-  };
-  slide.querySelector('aside.notes').innerHTML=noteFor(printMode?'finished':'ready');
-  for(const marker of slide.querySelectorAll('.rx-step')) {
-    const id=marker.dataset.handoff==='true'?'finished':marker.dataset.stop;
-    const note=slide.ownerDocument.createElement('aside');
-    note.className='notes';
-    note.innerHTML=noteFor(id);
-    marker.append(note);
-  }
+  slide.querySelector('aside.notes').innerHTML=template.innerHTML;
   return true;
 }
 
@@ -28,7 +14,7 @@ export function isNotesPreview(view=window) {
 
 // Podgląd Notes dostaje setState przez postMessage. Jego fragmenty nie są
 // kliknięciami pilota: seek odtwarza kadr, bez startu animacji i zwrotnego cofania
-// głównej prezentacji. Opt-in: tylko wariant z szablonem notatek checkpointów.
+// głównej prezentacji. Dotyczy scen z markerami etapów, niezależnie od notatek.
 // Główne okno ignoruje setState z okna Notes: podgląd tylko odzwierciedla główną prezentację,
 // a jego własne zmiany fragmentów (debounce 500 ms w pluginie) cofałyby albo przeskakiwały animację.
 // Sterowanie z okna Notes idzie klawiszami (installNotesKeyBridge), jak z pilota.
@@ -46,7 +32,7 @@ export function installCheckpointNotesReceiver(deck,stages,{getPlayer,view=windo
     if(!state||!Number.isInteger(state.indexh))return;
     if(!receiver){event.stopImmediatePropagation();return;}
     const slide=deck.getSlide(state.indexh,state.indexv||0);
-    if(!slide?.querySelector(`template[data-checkpoint-notes="${slide.id}"]`))return;
+    if(!slide?.querySelector('.rx-fragment-steps'))return;
     event.stopImmediatePropagation();
     stages.restore(()=>{
       deck.setState(state);

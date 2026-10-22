@@ -4,7 +4,7 @@ Polska prezentacja Pawła Kondraciuka o sterowaniu pracą, kolejnością, subskr
 
 Ten README jest mapą treści: opisuje slajdy, zawartość bloczków i speaker notes. Implementację animacji, mapę plików i używane API znajdziesz w [AGENTS.md](AGENTS.md).
 
-Pełny eksport notatek dla **42 slajdów MAIN**, od powitania do pytań i feedbacku, znajduje się w [work/speaker-notes-main.md](work/speaker-notes-main.md). Uwzględnia plan 33 tematów, aktualną kolejność wariantów oraz wszystkie notatki checkpointów i fragmentów. Źródłem notatek wyświetlanych przez Reveal pozostaje `index.html`.
+Pełny eksport notatek dla **42 slajdów MAIN**, od powitania do pytań i feedbacku, znajduje się w [work/speaker-notes-main.md](work/speaker-notes-main.md). Każdy slajd ma jedną stałą listę haseł; warianty mają osobne listy, bez podmiany podczas animacji ani wyróżnień kodu. Źródłem notatek wyświetlanych przez Reveal pozostaje `index.html`.
 
 ## Uruchomienie i obsługa
 
@@ -33,9 +33,9 @@ Na slajdach debounceTime (`12b`), distinctUntilChanged (`11a`), catchError w wys
 
 Porównania są osobnymi slajdami. Warianty z sufiksami -2/-3/-4 powstają podczas uruchamiania; pierwszy zachowuje ID bazowe. Poniżej podano kolejność MAIN, a dalszy spis opisuje rodziny tematycznie.
 
-Każda pozycja opisuje temat, ekran/bloczki i notatki prelegenta. Tabele wariantów podają rzeczywiste tytuły i kod nad diagramem. Bazowe speaker notes rodzin są klonowane z sekcją; gdy wariant ma `template[data-checkpoint-notes]` dla swojego ID, jego notatki checkpointów zastępują bazowy opis w oknie prelegenta. Notatki przytoczono z ujednoliconymi odstępami; powtarzaną instrukcję obsługi zwykłych animacji opisano wspólnie wyżej.
+Każda pozycja opisuje temat, ekran/bloczki i notatki prelegenta. Tabele wariantów podają rzeczywiste tytuły i kod nad diagramem. `aside.notes` zawiera stałą listę slajdu; alternatywne warianty wybierają ją raz z `template[data-slide-notes]` po ustaleniu końcowego ID.
 
-Notatki są dopasowane do planu 33 tematów: krótkie punkty bazowe, **❓ SALA** przy pytaniach i **⏸ PAUZA** przy postojach animacji. Otwarcie obejmuje powrót do Zmiany Klimatu, lokalną społeczność i konkurs WebStorm; slajd tytułowy pyta „Kto zna? Kto używa? Kto lubi?” oraz wprowadza źródło → operatory → odbiorcę. Rozwinięcia checkpointów zachowują wskazówki do demonstracji.
+Notatki to krótkie, pogrubione bullet pointy: zwykle 2–5 słów, bez opisu ekranu, kliknięć, pauz ani gotowych wypowiedzi. Przypominają kluczowe pojęcia, pułapki i pytania. Pozostają takie same podczas całego slajdu, także w AUTO i druku; kontroler animacji nadal obsługuje swoje postoje.
 
 Czasy są umownym modelem dydaktycznym. Przelot wartości i pauza przy operatorze spowalniają ilustrację; nie dodają opóźnień do rzeczywistego synchronicznego RxJS. HTTP jest symulowane. Pasek pokazuje czas pracy, a nie pomiar postępu prawdziwego żądania.
 
@@ -102,12 +102,11 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Na ekranie:** dwie kolumny: Discord „meet.js Poland” z QR i podpisem „Dołącz do rozmowy”; Facebook „JavaScript i front-end Białystok” z QR i podpisem „Dołącz do grupy”.
 
-**Speaker notes:**
+**Speaker notes — stałe przez cały slajd:**
 
-- Powitanie meet.js Białystok — wracamy do Zmiany Klimatu.
-- Lokalna społeczność: Discord meet.js Poland i grupa JavaScript i front-end Białystok. Daj chwilę na zeskanowanie QR.
-- WebStorm — zapowiedz konkurs / giveaway; wrócimy do niego na końcu.
-- Przejście do pytania: kiedy odbyło się pierwsze spotkanie?
+- **Powrót do Zmiany Klimatu**
+- **Discord / grupa Białystok**
+- **WebStorm — konkurs**
 
 ### Pierwsze meet.js: pytanie — `pierwsze-meetjs-pytanie`
 
@@ -115,10 +114,10 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Na ekranie:** duże pytanie „Kiedy odbyło się pierwsze spotkanie meet.js w Białymstoku?”. Odpowiedź pojawia się na następnym slajdzie.
 
-**Speaker notes:**
+**Speaker notes — stałe przez cały slajd:**
 
-- ❓ SALA: Kiedy odbyło się pierwsze spotkanie meet.js w Białymstoku?
-- Daj chwilę na odpowiedzi. To podchwytliwe pytanie — odpowiedź na następnym slajdzie.
+- **Pierwsze spotkanie — kiedy?**
+- **Pułapka z numeracją**
 
 ### meet.js Białystok #2 — `pierwsze-meetjs-odpowiedz`
 
@@ -126,10 +125,11 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Na ekranie:** tytuł, data 24 lutego 2015 i plakat spotkania w Zmianie Klimatu.
 
-**Speaker notes:**
+**Speaker notes — stałe przez cały slajd:**
 
-- 24 lutego 2015, Zmiana Klimatu — pierwsze spotkanie pod szyldem meet.js, ale numer #2.
-- Numer #1 odbył się wcześniej jako JavaScript Białystok. Dalej: początki przed meet.js.
+- **24 lutego 2015**
+- **Pierwsze meet.js, numer #2**
+- **Wcześniej JavaScript Białystok**
 
 ### JavaScript Białystok #1 — `javascript-bialystok-1`
 
@@ -137,12 +137,12 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Na ekranie:** tytuł i data 20 stycznia 2015. Najpierw plakat, następnie trzy zdjęcia odsłaniane fragmentami Reveal: prelegent na scenie, sala pełna uczestników i publiczność skupiona na prelekcji.
 
-**Speaker notes:**
+**Speaker notes — stałe przez cały slajd:**
 
-- 20 stycznia 2015 — pierwsze spotkanie JavaScript Białystok, jeszcze przed meet.js.
-- Angular — Karol Rogowski. Adam Piotrowski, Hubert i znajome twarze na zdjęciach.
-- Zmiana Klimatu — dzisiejsze spotkanie to powrót do korzeni.
-- Odsłaniaj zdjęcia kolejnymi kliknięciami. Wtedy obcy ludzie, dziś znajome twarze — jak operatorzy z tytułu.
+- **20 stycznia 2015**
+- **Angular — Karol Rogowski**
+- **Adam, Hubert, znajome twarze**
+- **Zmiana Klimatu — korzenie**
 
 ### Historia meet.js Białystok — `historia-meetjs`
 
@@ -150,12 +150,12 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Na ekranie:** oś lat z numerami edycji, datami i linkami do wydarzeń; podtytuł „62 spotkania · 7 miejsc · 2015–2026”. Kolory oznaczają Zmianę Klimatu, SoftwareHut, HACKLAG, Explorer HQ, Instapage Poland, 6-Ścian PUB Sześcian i Klub GWINT. Legenda zawiera udziały miejsc i oznaczenie odwołanych #34 i #38. Slajd obejmuje także planowaną edycję #65.
 
-**Speaker notes:**
+**Speaker notes — stałe przez cały slajd:**
 
-- 62 spotkania; numeracja nie opisuje całej historii — początki przed meet.js i odwołane edycje.
-- Zmiana Klimatu → SoftwareHut → Instapage i kolejne miejsca. Kolory na osi odpowiadają legendzie.
-- Rozwój → COVID → przerwy → powroty.
-- Lokalna społeczność, ci sami ludzie przez lata. Cel: regularne spotkania.
+- **62 spotkania, 7 miejsc**
+- **Odwołane #34 i #38**
+- **COVID, przerwy, powroty**
+- **Społeczność przez lata**
 
 ### Zawsze gdzieś się przewijałem
 
@@ -163,10 +163,10 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Na ekranie:** stos sześciu archiwalnych zdjęć autora na widowni, odsłanianych kolejnymi fragmentami. Slajd nie ma własnego ID w HTML.
 
-**Speaker notes:**
+**Speaker notes — stałe przez cały slajd:**
 
-- Zawsze gdzieś się przewijałem — znajdź mnie na archiwalnych zdjęciach.
-- Ci sami ludzie przez lata tworzą lokalną społeczność. Kolejne kliknięcia odsłaniają zdjęcia.
+- **Znajdź mnie na zdjęciach**
+- **Znajome twarze przez lata**
 
 ### Poprzednie wystąpienia
 
@@ -174,11 +174,11 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Na ekranie:** dwie karty ze zdjęciami: „Jak zostać mobile deweloperem w 1 dzień” — podpis „17. lipiec 2016 · meet.js #8”; „Trening na redukcję: jak spalić kilobajty” — „17. maj 2017 · meet.js #15”. Slajd nie ma własnego ID w HTML.
 
-**Speaker notes:**
+**Speaker notes — stałe przez cały slajd:**
 
-- Dwa wcześniejsze wystąpienia, około 10 lat temu: mobile development (2016) i redukcja wagi skryptów (2017).
-- Programowanie wtedy a AI dzisiaj — wiele się zmieniło.
-- Dzisiaj RxJS: praktyczne zachowanie operatorów i decyzje o pracy, kolejności oraz współdzieleniu.
+- **Mobile 2016, kilobajty 2017**
+- **Dekada zmian — dziś AI**
+- **Dziś: zachowanie operatorów**
 
 ### Tytuł prezentacji — `tytul`
 
@@ -186,12 +186,11 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 **Na ekranie:** „RxJS — Operatory, które znasz, ale bałeś się zagadać”. Karta: Paweł Kondraciuk, awatar, X/GitHub `@pawelkondraciuk`, Discord meet.js Poland, „Sr. JavaScript Developer” i logo Tradeweb. To statyczny slajd.
 
-**Speaker notes:**
+**Speaker notes — stałe przez cały slajd:**
 
-- ❓ SALA: Kto zna RxJS? Kto używa? Kto lubi?
-- Asynchroniczne zdarzenia i wartości: kliknięcia, HTTP, WebSocket, timery.
-- Źródło → operatory → odbiorca. Emisje w czasie i deklaratywne przetwarzanie.
-- Dziś przyglądamy się praktycznemu zachowaniu operatorów. Zaczynamy od HTTP.
+- **Kto zna / używa / lubi?**
+- **Zdarzenia i wartości w czasie**
+- **Źródło → operatory → odbiorca**
 
 ## Wprowadzenie do RxJS
 
@@ -208,13 +207,12 @@ Status to mały tekst bez ramki przy prawej krawędzi wiersza odbiorcy, po prawe
 
 Stopka opisuje bieżący etap. Postój po każdym etapie także w AUTO; po finale „dalej” prowadzi do planszy Rx marbles. Szybkie „dalej” kończy etap, „wstecz” cofa do poprzedniego postoju, powrót na slajd przywraca wejście. Przy ograniczonym ruchu każdy etap od razu pokazuje stan końcowy; druk — finał. Pauzy taśmy są zabiegiem ilustracyjnym, nie modelem buforowania.
 
-**Speaker notes (per checkpoint):**
+**Speaker notes — stałe przez cały slajd:**
 
-- Wejście: „Zanim zobaczymy kod: wyobraźcie sobie małą fabrykę soku.”
-- Źródło: owoce pojawiają się jeden po drugim, w czasie — podajnik to Observable.
-- Bramka: wybieramy, co nas interesuje — filter.
-- Wyciskarka: jedno jabłko → jedna szklanka — map; bramka i wyciskarka to operatory.
-- Finał: puenta i zapowiedź „A teraz klasyczne diagramy RxJS…” — z poważną miną.
+- **Owoce — emisje w czasie**
+- **Bramka — filter**
+- **Wyciskarka — map**
+- **Szklanki — wynik u odbiorcy**
 
 ### Rx marbles (żart) — `01b-rx-marbles`
 
@@ -222,7 +220,10 @@ Stopka opisuje bieżący etap. Postój po każdym etapie także w AUTO; po final
 
 **Na ekranie:** klasyczny diagram marbles łańcucha dwóch operatorów, w osadzonym SVG na kremowym tle: źródło 1, 2, 3, 4 → `map(x => x * 10)` → 10, 20, 30, 40 → `filter(x => x > 20)` → 30, 40. Wynik map jest jednocześnie wejściem filter (jedna wspólna oś pośrodku). Poziome osie ze strzałkami, kolorowe kulki z liczbami (wynik w kolorze swojego wejścia, wyrównany w czasie), biały prostokąt operatora, pionowa kreska complete. Style `.rx-marbles` w custom.css (4:3 i 16:9). Podgląd prelegenta pokazuje nazwę „Rx marbles” (`data-speaker-title`).
 
-**Speaker notes:** 2–3 sekundy poważnej ciszy („no i zaczęło się”), potem puenta: „Dobra, żartowałem. Zobaczmy coś z życia.” Przejście: „A teraz zamiast jabłka — odpowiedź z serwera.”
+**Speaker notes — stałe przez cały slajd:**
+
+- **Marbles — żart**
+- **Zamiast jabłka: odpowiedź HTTP**
 
 ### Jakie znasz operatory RxJS? — `02-znane-operatory`
 
@@ -230,11 +231,10 @@ Stopka opisuje bieżący etap. Postój po każdym etapie także w AUTO; po final
 
 **Na ekranie:** pytanie i odsłaniane pojedynczo bloczki tekstowe: `map`, `tap`, `filter`, `switchMap`.
 
-**Speaker notes:**
+**Speaker notes — stałe przez cały slajd:**
 
-- ❓ SALA: Jakie znasz operatory RxJS? Daj chwilę na odpowiedzi.
-- Odsłaniaj kolejno: map, tap, filter, switchMap.
-- Dalej: operator to funkcja — User → fullName na przykładzie map.
+- **Jakie operatory znacie?**
+- **map / tap / filter / switchMap**
 
 ### A share? — `03-a-share`
 
@@ -242,11 +242,12 @@ Stopka opisuje bieżący etap. Postój po każdym etapie także w AUTO; po final
 
 **Na ekranie:** wyłącznie duże pytanie „A share?”.
 
-**Speaker notes:**
+**Speaker notes — stałe przez cały slajd:**
 
-- ❓ SALA: A share? Kto używa i co właściwie współdzielimy?
-- Przypomnij: Cold — trzy requesty; Subject + HTTP — jeden request, ale ręczne podłączenie.
-- Czy operator może podłączyć źródło i zarządzać nim za nas? Dalej: share(), wspólny request A/B i późny C.
+- **Kto używa share?**
+- **Cold: trzy requesty**
+- **Subject: ręczne podłączenie**
+- **Automatyczne zarządzanie źródłem?**
 
 ## Źródła, subskrypcje i operatory
 
@@ -272,7 +273,13 @@ httpGet<User>('/api/users/42')
 | 6 | complete | Zielony impuls z HTTP przez map do A; wiersze HTTP GET, map i A zielenieją, a przy A (nad długim wynikiem, w linii etykiety pola) pojawia się `✓ complete` — bez napisu w HTTP GET i map. Map nie zatrzymuje complete i nie wywołuje drugiego requestu. |
 | — | FINISHED | Podpis „Jeden request, jeden User, jeden string. complete zakończył wykonanie”. |
 
-**Speaker notes** (`template[data-checkpoint-notes="04-operator"]`): „Załóżmy, że pobieramy dane użytkownika z HTTP. Dostajemy cały obiekt, ale nasz widok potrzebuje tylko pełnego imienia i nazwiska” → pipe nie uruchamia HTTP → subscribe uruchamia jeden request → „Operator map dostaje pojedynczą wartość i synchronicznie ją przekształca. Tutaj z obiektu User tworzymy string” (map działa dla każdej kolejnej emisji, nasze HTTP emituje jedną) → „HTTP wykonał jeden request i wyemitował jeden obiekt. Map przekształcił go w jeden string. To nadal jedno wykonanie Observable” → „Map nie zmienia sposobu zakończenia — complete przechodzi dalej do odbiorcy” → przejście do „myMap od środka”: zobaczymy w kodzie subskrypcję biegnącą w lewo i emisję płynącą w prawo. Po „A share?” wracamy do surowego `user$ = httpGet<User>('/api/users/42')`, bez map.
+**Speaker notes — stałe przez cały slajd:**
+
+- **pipe: nadal definicja**
+- **subscribe ←, wartości →**
+- **map synchronicznie: User → string**
+- **Jeden request HTTP**
+- **complete przechodzi dalej**
 
 Kontroler `stages`: → zaczyna lub kończy etap, ← cofa checkpoint także w AUTO, Spacja pauzuje/wznawia, M zmienia tryb, R przywraca zatrzymany READY. Tempo ilustracji: etap pipe 0,65 s, pojawienie odbiorcy 0,3 s, subscribe 1 s (0,5 s na odcinek, między odcinkami postój 0,6 s na map — `timing.mapHold`), request 2 s, przelot 1,4 s, projekcja 2 s, zatrzymanie odbioru 0,5 s, terminal 1,6 s, cisza 1 s przed FINISHED.
 
@@ -295,7 +302,13 @@ function myMap<T, R>(fn: (value: T) => R) {
 }
 ```
 
-**Speaker notes (początek i dwa fragmenty):** Wywołanie `myMap(fn)` tworzy funkcję operatora, a podanie `source$` tworzy nowy Observable — nadal tylko definicję. `source$` z linii 2 to źródło (u nas HTTP GET); przy subskrypcji wynikowego Observable `source$.subscribe(...)` podłącza je: subskrypcja idzie w lewo, jak od A przez map do HTTP. Zwrócona subskrypcja zapewnia odłączenie źródła przy rezygnacji odbiorcy. `subscriber` z `new Observable<R>(subscriber => {` to odbiorca wynikowego Observable (u nas A). Gdy źródło emituje, `fn(value)` synchronicznie przekształca wartość, a `subscriber.next(...)` wysyła wynik w prawo. `error` i `complete` są przekazywane dalej. Na koniec przypomnij trzy requesty na Cold i jeden HTTP ręcznie podłączony do Subjecta; zapytaj, czy operator może podłączyć źródło za nas. Prawo: „A share?”. Cel: 30–45 s w ramach bloku wprowadzenia.
+**Speaker notes — stałe przez cały slajd:**
+
+- **Operator zwraca funkcję**
+- **subscribe wyniku → subscribe źródła**
+- **fn(value) → subscriber.next**
+- **error / complete przekazane dalej**
+- **Zwrócona subskrypcja — teardown**
 
 ### Tory wykonania: cold, share() + HTTP i share() + interval — `04a-dwa-tory`, `-2`, `-3`
 
@@ -311,23 +324,39 @@ function myMap<T, R>(fn: (value: T) => R) {
 
 READY (bez zmian względem poprzedniej wersji): sam nagłówek HTTP GET, trzy puste pola, bez liter A/B/C, portów i połączeń; liczniki Observable 1, Requesty HTTP 0. Pierwsze „dalej”: A (1 s czasu modelu), B (1,25 s) i C (1,5 s) subskrybują kolejno — chwilowe `.subscribe()` z literą toru nad kolumną pól, impuls biegnie od pola do HTTP, w HTTP GET rośnie wiersz wykonania i startuje osobny request. Wszystkie trzy trwają równolegle (postęp jako tło wierszy). Drugie „dalej” (received): requesty kończą się kolejno, każde wykonanie emituje cały obiekt User (kulka „{…}”); pola pokazują Paweł, Kondraciuk i Białystok, complete jeszcze nie dotarło. Trzecie „dalej” (complete): trzy zielone impulsy complete, przy polach ✓ complete. Ostatnie „dalej”: AUTO do FINISHED z podpisem „Jedna definicja, trzy wykonania i trzy identyczne requesty — każde z własnym zakończeniem”. Stan końcowy: A — Paweł, B — Kondraciuk, C — Białystok, wszystkie complete; Requesty HTTP 3.
 
-| Nr | Checkpoint | Notatka prelegenta |
-| --- | --- | --- |
-| 0 | READY | Wyobraźmy sobie widok aplikacji. W jednym miejscu wyświetlamy imię użytkownika, w drugim nazwisko, a w trzecim miasto. Wszystkie potrzebują danych tego samego użytkownika. |
-| 1 | requests | Mamy jedną definicję user$. Ale każde z tych miejsc niezależnie ją subskrybuje. I co się dzieje? Powstają trzy osobne requesty. |
-| 2 | received | Każdy request wraca osobno. Każde pole dostaje swój własny, identyczny obiekt User i pokazuje z niego swoją właściwość. |
-| 3 | complete | Każde wykonanie kończy się własnym complete. To trzy niezależne wykonania tego samego cold Observable — każde ma własny cykl życia. |
-| 4 | FINISHED | Mamy jedną definicję Observable, ale trzy wykonania. Każde ma własną subskrypcję i własny cykl życia. Wszystkie pytają backend o dokładnie tego samego użytkownika. Czy naprawdę musimy wykonywać trzy requesty? Do tego pytania wrócimy. Prawo: interval. |
 
 **share(): wspólny request i późny odbiorca (`-2`).** READY pokazuje definicję user$, HTTP GET i dwa pola A (`user.firstName`) oraz B (`user.lastName`). Pierwszy krok (`share-added`) dopisuje `.pipe(share())`. Następny krok odtwarza bez pośrednich postojów subskrypcję A, dołączenie B do trwającego HTTP #1, odpowiedź User do obu pól i complete. Postęp HTTP trwa 1,2 s; imię i nazwisko pokazują Paweł i Kondraciuk. Postój `complete`: 0 odbiorców, 1 request; ⏸ PAUZA również w AUTO i pytanie „A co, jeśli ktoś zasubskrybuje po zakończeniu requestu?”. Kolejne prawo w jednym etapie ujawnia C (`user.city`), uruchamia HTTP #2 (postęp także 1,2 s), pokazuje Białystok i complete (`complete-c`). A/B zachowują dane i zakończone subskrypcje. Żaden request ani dostarczenie jego wyniku nie wymaga osobnego kliknięcia w trakcie. Łącznie trzy postoje: share-added, complete, complete-c. Requesty kończą na 2, Odbiorcy na 0; potem FINISHED i share + interval. Osobny `20-sharereplay` pozostaje tylko modelem QA.
 
-**share(): kto odłączy źródło? (`-3`) — 45–60 sekund.** READY ma tylko A/B i jedno już działające wykonanie interval #1, kod `const shared$ = interval(1000).pipe(share());`. Pierwsze „dalej” wywołuje `subA.unsubscribe()` — B nadal odbiera. Drugie to `subB.unsubscribe()`: ostatni odbiorca odchodzi, × B kończy się na share() i scena staje (⏸ PAUZA także w AUTO): Odbiorców 0, połączenie share() → interval #1 nadal zestawione, bez nowych emisji — pytanie do publiczności „Co się wydarzy?”. Trzecie „dalej” (`disconnect`) pokazuje odpowiedź: share() sam odłącza upstream (× do interval), #1 szarzeje i przestaje emitować, bez complete; licznik emisji stoi dowolnie długo. To rozdzielenie ilustracji — w RxJS odłączenie następuje synchronicznie przy unsubscribe B. Czwarte „dalej” ujawnia późnego C i pokazuje jego subscribe przez share() do źródła: powstaje interval #2, liczący od 0; C nie dostaje historii A/B. Dawne #1 i A/B pozostają odłączeni. Emisje do C trwają na żywo, następne prawo zmienia slajd. Szybkie prawo jedynie kończy bieżącą animację, lewo cofa ostatnią akcję; reset przywraca A/B i #1. Postoje: unsub-a, unsub-b, disconnect, subscribed-c. Druk/F pokazują zatrzymane #1 i aktywne #2 z C; jeden wspólny renderer i zegar. Notatki per checkpoint; dalej shareReplay(1) na interval.
+**share(): kto odłączy źródło? (`-3`) — 45–60 sekund.** READY ma tylko A/B i jedno już działające wykonanie interval #1, kod `const shared$ = interval(1000).pipe(share());`. Pierwsze „dalej” wywołuje `subA.unsubscribe()` — B nadal odbiera. Drugie to `subB.unsubscribe()`: ostatni odbiorca odchodzi, × B kończy się na share() i scena staje (⏸ PAUZA także w AUTO): Odbiorców 0, połączenie share() → interval #1 nadal zestawione, bez nowych emisji — pytanie do publiczności „Co się wydarzy?”. Trzecie „dalej” (`disconnect`) pokazuje odpowiedź: share() sam odłącza upstream (× do interval), #1 szarzeje i przestaje emitować, bez complete; licznik emisji stoi dowolnie długo. To rozdzielenie ilustracji — w RxJS odłączenie następuje synchronicznie przy unsubscribe B. Czwarte „dalej” ujawnia późnego C i pokazuje jego subscribe przez share() do źródła: powstaje interval #2, liczący od 0; C nie dostaje historii A/B. Dawne #1 i A/B pozostają odłączeni. Emisje do C trwają na żywo, następne prawo zmienia slajd. Szybkie prawo jedynie kończy bieżącą animację, lewo cofa ostatnią akcję; reset przywraca A/B i #1. Postoje: unsub-a, unsub-b, disconnect, subscribed-c. Druk/F pokazują zatrzymane #1 i aktywne #2 z C; jeden wspólny renderer i zegar. Notatki są stałą listą haseł dla slajdu.
 
 **Dawny wariant share za map z unsubscribe A (`lanesMode: 'share-unsub'`).** Nie jest już slajdem; ścieżka `lanesGraph` (HTTP GET → map → share() → odbiorcy, kod `httpGet<number>(url)` / `  .pipe(map(x => x * 2), share())`) zostaje dla scenariuszy `shareScenario` i testów mechanizmu.
 
 **Scenariusze share (dane, nie osobne slajdy).** `shareScenario` (lista Subscriberów `{id, start, unsub?}`) wylicza sesje upstreamu: C (niebieski) dołącza do trwającego upstreamu w trzecim wierszu, bez nowego requestu; odejście ostatniego aktywnego przed odpowiedzią anuluje upstream (HTTP z niedokończonym paskiem, bez complete); późniejszy Subscriber otwiera nową sesję w swoim kolorze (nowy wiersz HTTP/map, połączenie do share z załamaniem). Sprawdzają to testy.
 
-**Speaker notes:** Nagłówki to jedna definicja, wiersze to wykonania. Cold: każdy subscribe tworzy własny request. share współdzieli upstream, ale nie skleja odbiorców — każdy ma własny wiersz i może odejść osobno. Dolne wykonania HTTP dla *Map pozostają bez zmian.
+**Speaker notes — stałe przez cały slajd:**
+
+**`04a-dwa-tory`**
+
+- **Jedna definicja, trzy wykonania**
+- **Trzy async pipe — ile requestów?**
+- **Własny wynik i complete**
+- **Niezależne cykle życia**
+
+**`04a-dwa-tory-2`**
+
+- **A/B — wspólny HTTP #1**
+- **Późny C po complete?**
+- **Reset po complete**
+- **C — nowy HTTP #2**
+- **share nie pamięta wyniku**
+
+**`04a-dwa-tory-3`**
+
+- **A/B — jeden interval**
+- **Ostatni odbiorca odchodzi?**
+- **Zero odbiorców → odłączenie źródła**
+- **Bez complete i historii**
+- **Późny C — od 0**
 
 ### Źródła — rodzina `05-zrodla`
 
@@ -335,7 +364,7 @@ Warianty zachowują ID, lecz zajmują oddzielne miejsca narracji: **HTTP otwiera
 
 | ID | Kod i zachowanie |
 | --- | --- |
-| 05-zrodla-2 | `httpGet('/api/data')`. READY ma tylko nagłówek HTTP GET. Etapy: receiver (pojawia się odbiorca z ikoną inbox i literą A, bez połączenia) → subscribed (dopisane `.subscribe(render)`, impuls dotarł do HTTP, migawka `.subscribe()` A widoczna, request jeszcze nie ruszył) → response (migawka gaśnie, request w wierszu HTTP, pauza tuż po wylocie „dane”) → first (dane u A przed complete) → AUTO: complete do A i FINISHED. Notatki per checkpoint w `template[data-checkpoint-notes="05-zrodla-2"]` (definicja, odbiorca, subscribe, request i odpowiedź, dane u A, complete i przejście do kodu httpGet). |
+| 05-zrodla-2 | `httpGet('/api/data')`. READY ma tylko nagłówek HTTP GET. Etapy: receiver (pojawia się odbiorca z ikoną inbox i literą A, bez połączenia) → subscribed (dopisane `.subscribe(render)`, impuls dotarł do HTTP, migawka `.subscribe()` A widoczna, request jeszcze nie ruszył) → response (migawka gaśnie, request w wierszu HTTP, pauza tuż po wylocie „dane”) → first (dane u A przed complete) → AUTO: complete do A i FINISHED. Notatki są stałą listą haseł dla slajdu |
 | 05-zrodla | `interval(1000)` na żywo (cold), kafelek podpisany samym `interval`. READY: interval i odbiorca A (ikona inbox, litera A) → `.subscribe()` (dopisane `.subscribe(render)`, postój z migawką `.subscribe()` A, bez emisji) → emisje A 0, 1, 2… bez końca → pojawia się B i subskrybuje: drugi wiersz wykonania w interval, B dostaje własne 0, 1, 2… (pierwsze 0 już 0,6 s po zestawieniu subskrypcji; migawka `.subscribe()` B gaśnie, gdy B zaczyna emitować) → `.unsubscribe()` A → `.unsubscribe()` B (bez complete) → kolejne „dalej” przechodzi dalej. |
 | 05-zrodla-5 | Stale tylko `const subject$ = new Subject<number>();`. A subskrybuje i dostaje `subject$.next(1)`; dopiero potem pojawia się B (`subject$.subscribe(observerB)`) i nie dostaje wcześniejszej 1; `subject$.next(2)` trafia do A i B; `subject$.complete()` — zielony impuls do obu, wiersze ✓ complete, historie zostają (A: 1, 2; B: 2). Następnie C subskrybuje zakończony Subject i dostaje tylko complete, bez wartości; next(3) jest ignorowane. Odbiorcy nadal 0. Bez error, unsubscribe i upstreamu. |
 | 05-zrodla-3 | Kod rośnie etapami: `const subject$ = new Subject<User>();` → `const http$ = httpGet<User>('/api/users/42');` → `http$.subscribe(subject$);`. A/B (firstName/lastName) subskrybują Subject od READY; trzecia instrukcja podłącza jedno HTTP i rozsyła User oraz complete do A/B. Dopiero po complete następny krok dodaje city: późny C dostaje samo complete, bez danych i nowego requestu. |
@@ -379,19 +408,6 @@ Fragment `new Subject<number>()` świeci od każdego ręcznego next do wyjścia 
 
 Harmonogram (czas ilustracji = czas modelu): A pojawia się 0,3 s, subscribe 0,6 s (zestawienie 1 s), next(1) 2,3 s (postój emit-1 2,8; rozesłanie 3,5, dotarcie 4,9), B pojawia się 5,5 s, subscribe 5,8 s, next(2) 7,5 s (rozejście do portów 8,1–8,7 = postój emit-2, dotarcie 10,1), complete 10,8 s (wysłanie 11,4, dotarcie 12,6), C pojawia się 13,7 s, subscribe 14 s → zestawienie i natychmiastowe complete 15 s → dotarcie 16,2 s (postój 16,7), ignorowane next(3) 17,5 s (postój 18), podsumowanie 19,2 s, koniec 20,2 s. Cofanie przed subscribe B/C usuwa odpowiedniego odbiorcę razem z jego wierszem; historia B nigdy nie pojawia się przed subskrypcją, C zawsze ma pustą historię. Wydłużenie przelotu complete służy ilustracji — Subject nie czeka i nie otwiera ponownie emisji.
 
-| Nr | Checkpoint | Notatka prelegenta |
-| --- | --- | --- |
-| 0 | READY | Interval sam produkował kolejne liczby. A co, jeśli chcielibyśmy sami decydować, kiedy pojawi się następna wartość? |
-| 1 | subscribed-a | Subject jest jednocześnie Observable, które można subskrybować, i Observerem, któremu możemy przekazywać wartości. Najpierw korzystamy z pierwszej roli: A subskrybuje. |
-| 2 | emit-1 | Teraz druga rola Subjecta: sami wywołujemy next(1). Komu Subject przekaże tę wartość? |
-| 3 | next-1 | Subject rozsyła wartość do aktualnych odbiorców — na razie jest tylko A. |
-| 4 | subscribed-b | Teraz pojawia się drugi odbiorca. Jak myślicie, czy dostanie jedynkę, którą Subject wyemitował wcześniej? |
-| 5 | emit-2 | Wywołujemy next(2): jedna wartość rozchodzi się na powiadomienia do A i B. |
-| 6 | next-2 | Nie. Subject nie odtwarza wcześniejszych wartości. B dostaje dopiero dwójkę, podczas gdy A otrzymał zarówno jedynkę, jak i dwójkę. |
-| 7 | complete | Teraz ręcznie kończymy Subject. Complete trafia do wszystkich odbiorców i zamyka ich subskrypcje. Nie musimy już osobno wywoływać unsubscribe. |
-| 8 | subscribed-c | C subskrybuje zakończony Subject: dostaje od razu complete, bez wartości next. A i B bez zmian, Odbiorcy stale 0. |
-| 9 | next-ignored | subject$.next(3) nic nie emituje. Zakończonego Subjecta nie można wznowić kolejnym next. |
-| 10 | FINISHED / podsumowanie | Subject jest przykładem hot Observable — rozsyła emisje do aktualnych subskrybentów. Nowy odbiorca nie dostaje historii; po complete dostaje tylko complete. Przed chwilą wywoływaliśmy next i complete ręcznie. A jeśli te powiadomienia przyjdą z HTTP? Czy Subject może rozesłać wynik jednego requestu do kilku odbiorców? Prawo: „Subject: ręczny multicast HTTP”. |
 
 **Subject: ręczny multicast HTTP — 60–75 sekund.** Bezpośrednio po „Subject — ręczna emisja”, przed „Subject — kto odłączy źródło?”; odpowiedź na wcześniejszy problem Cold. Te same pola widoku A/B/C (`user.firstName` → Paweł, `user.lastName` → Kondraciuk, `user.city` → Białystok; ten sam wygląd, rozmiar, kolory i kulka `{…}`), ale jeden request zasila je przez Subject. Kod rośnie etapami w tym samym rendererze, z tą samą lewą krawędzią, fontem i interlinią:
 
@@ -414,23 +430,56 @@ Diagram HTTP GET → Subject → pola A/B, z miejscem na późnego C (HTTP 177/2
 | 4 | subscribed-c | Dopiero teraz pojawia się user.city; C subskrybuje zakończony Subject. Dostaje samo complete, bez wartości i bez nowego requestu. Pole pozostaje puste z ✓ complete. |
 | 5 | FINISHED | A/B zachowują dane i statusy, C ma tylko complete; 1 request, 0 aktywnych odbiorców. |
 
-MANUAL zatrzymuje się po każdym z czterech etapów (bez postoju podczas subscribe i requestu); następny krok po complete dodaje city i pokazuje subscribe oraz natychmiastowe complete. AUTO odtwarza tę samą kolejność. Subject nie odtwarza historii i nie uruchamia HTTP po późnej subskrypcji. Jeden next z HTTP trafia tylko do A/B. Późny C pozostaje poza licznikiem aktywnych odbiorców zakończonego Subjecta. Notatki READY, każdego checkpointu i FINISHED są w index.html; po podsumowaniu przechodzimy do Subject + interval.
+MANUAL zatrzymuje się po każdym z czterech etapów (bez postoju podczas subscribe i requestu); następny krok po complete dodaje city i pokazuje subscribe oraz natychmiastowe complete. AUTO odtwarza tę samą kolejność. Subject nie odtwarza historii i nie uruchamia HTTP po późnej subskrypcji. Jeden next z HTTP trafia tylko do A/B. Późny C pozostaje poza licznikiem aktywnych odbiorców zakończonego Subjecta. Notatki są stałą listą haseł dla slajdu.
 
 **Subject — kto odłączy źródło? (`05-zrodla-4`) — 45–60 sekund.** Bezpośrednio po Subject: ręczny multicast HTTP (`05-zrodla-3`) i przed „Jakie znasz operatory RxJS?” (`02-znane-operatory`): wracamy do Subjecta, z interval zamiast HTTP. Kod przez cały slajd: `const subject$ = new Subject<number>();` oraz `const connection = interval(1000).subscribe(subject$);` (bez kodu subskrypcji A/B/C). Diagram interval(1000) → Subject → A/B/C w wyglądzie torów Subject + HTTP (te same wysokości nagłówka 79 i wierszy 89, top 178/102, viewBox 1240×612/460): interval x/w 212/310 z jednym wierszem `#1` (turkus `#238F83`), Subject 592/230 z wierszami A/B/C, kompaktowi odbiorcy 1000/366 wyrównani z wierszami Subject (A fioletowy, B pomarańczowy, C niebieski); wszystkie kable poziome, wejście `#1` trafia w wiersz A. Odbiorca pokazuje ostatnią odebraną liczbę (kulka r 34, font 30, kolor emisji `#1`).
 
 Slajd startuje już działający: wszystkie subskrypcje są zestawione przed t = 0, a emisje 0, 1, 2… ruszają przy wejściu (co 1 s, przelot 0,8 s, rozesłanie w Subject 0,4 s). Scena jest na żywo jak interval: postoje nie zatrzymują emisji. Kolejne „dalej”: `subA.unsubscribe()`, `subB.unsubscribe()`, `subC.unsubscribe()` — migawka w miejscu nagłówka kolumny odbiorców z literą i kolorem toru; wartość, która dotarła już do Subjecta, jeszcze dociera, potem szary impuls × biegnie od odbiorcy w lewo i kończy się na Subject; szarzeją tylko wiersz odbiorcy, jego kabel i wiersz w Subject. Tor `#1` zachowuje kolor i nigdy nie dostaje impulsu. Czwarte „dalej” (etap 4) niczego nie wywołuje: wyróżnia w kodzie `interval(1000).subscribe(subject$)`; wartości nadal dochodzą do Subjecta i tam gasną (kurczą się na porcie wejścia), licznik „Emisje interval” rośnie, „Odbiorcy Subject” = 0, A/B/C zachowują ostatnie liczby. Emisje trwają bez końca, aż prowadzący naciśnie „dalej” — nic nie zatrzymuje interval automatycznie. Piąte „dalej” (ostatni checkpoint, `connection`) wywołuje `connection.unsubscribe()`: migawka z etykietą `#1` nad połączeniem interval → Subject, wartość już wysłana jeszcze dociera do Subjecta, potem szary impuls × biegnie od Subjecta w lewo do interval; wiersz `#1` przechodzi w „odsubskrybowano” (szary), kabel szarzeje i przygasa, licznik emisji staje. Subject nie dostaje complete (brak zielonego impulsu, `subject$.complete()` ani zmiany jego wierszy) — pozostaje otwarty; A/B/C pozostają odłączeni. Scena dochodzi do FINISHED, a szóste „dalej” przechodzi do „Jakie znasz operatory RxJS?”. „Dalej” w trakcie animacji unsubscribe tylko ją kończy; lewo cofa ostatnią akcję (po cofnięciu `connection.unsubscribe()` interval znów emituje bez końca, po cofnięciu odbiorcy — odbiorca znów odbiera), z etapu 0 — poprzedni slajd. AUTO i Spacja nie wywołują unsubscribe. Wyjście ze slajdu technicznie sprząta wykonanie, także bez końcowego kroku; powrót zaczyna od stanu początkowego. Druk i „pokaż wynik” dają nieruchomy kadr zatrzymanego źródła.
 
-| Nr | Checkpoint | Notatka prelegenta |
-| --- | --- | --- |
-| 0 | READY (emisje trwają) | Przed chwilą pokazaliśmy, że możemy podłączyć HTTP do Subjecta. Teraz zamiast HTTP wykorzystamy dobrze już znany interval. Mamy trzech odbiorców i jedno wspólne źródło. |
-| 1 | unsub-a | Pierwszy odbiorca rezygnuje. Jego subskrypcja się kończy, ale pozostali nadal dostają wartości. |
-| 2 | unsub-b | B również się odłącza. C nadal otrzymuje wartości. Ale czy obecność C w ogóle ma wpływ na działanie źródła? (interval działa dzięki osobnej subskrypcji connection, nie dzięki C) |
-| 3 | unsub-c | Teraz odłączamy ostatniego. I jak myślicie, co powinno się wydarzyć ze źródłem? |
-| 4 | source | Wszyscy odbiorcy już się odłączyli. Ale zobaczcie — interval nadal emituje wartości. Subject ciągle je odbiera, chociaż nikogo już nimi nie powiadamia. |
-| 5 | connection | Bo mamy jeszcze jedną subskrypcję, którą sami stworzyliśmy. To połączenie interval z Subjectem. I dopiero teraz ręcznie je odłączamy. |
-| — | FINISHED (po zatrzymaniu, druk) | Interval przestaje pracować. Ale Subject nadal istnieje — nie dostał complete. Musieliśmy sami zarządzać tym połączeniem. Do zarządzania źródłem wrócimy przy `share()`. Prawo: „Jakie znasz operatory RxJS?”. |
 
 **Speaker notes pozostałych źródeł:** Angular HttpClient jest przykładem cold źródła; nie generalizować tego na już uruchomiony Promise. Timer kończy automatycznie, interval przez rezygnację odbiorcy.
+
+**Speaker notes — stałe przez cały slajd:**
+
+**`05-zrodla-2`**
+
+- **Definicja ≠ wykonanie**
+- **subscribe uruchamia request**
+- **next → complete**
+- **httpGet: klient HTTP, nie operator**
+
+**`05-zrodla`**
+
+- **Cold: osobny timer każdego odbiorcy**
+- **Późny B — własne 0**
+- **Emisje bez końca**
+- **unsubscribe tylko własnego wykonania**
+- **unsubscribe ≠ complete**
+
+**`05-zrodla-5`**
+
+- **Observable + Observer**
+- **Ręczne next → aktualni odbiorcy**
+- **Późny B — bez historii**
+- **complete kończy Subject**
+- **Późny C — tylko complete**
+- **next po complete ignorowane**
+
+**`05-zrodla-3`**
+
+- **Subject również Observerem**
+- **http$.subscribe(subject$) — ręczne podłączenie**
+- **Jeden HTTP, odbiorcy A/B**
+- **HTTP complete → Subject complete**
+- **Późny C — tylko complete**
+
+**`05-zrodla-4`**
+
+- **Ręczne połączenie ze źródłem**
+- **Zero odbiorców — interval działa**
+- **Brak automatycznego refCount**
+- **connection.unsubscribe() zatrzymuje źródło**
+- **Subject pozostaje otwarty**
 
 ### httpGet od środka — `05b-http-kod`
 
@@ -459,7 +508,12 @@ return new Observable(subscriber => {
 
 Etapy to zwykłe fragmenty Reveal: prawo/lewo w przód i w tył, hash zapamiętuje etap, druk ma osobną stronę na każdy etap.
 
-**Speaker notes:** osobna notatka na każdy etap (w fragmencie): 0 — „Zajrzyjmy do środka naszego httpGet” (cały kod), 1 — subscriber to odbiorca; funkcja z new Observable uruchamia się dopiero przy subscribe, 2 — fetch wysyła request, r.json() parsuje odpowiedź, 3 — next(data) to kulka z diagramu, 4 — complete() od razu po jedynej wartości HTTP. Prawo: Cold.
+**Speaker notes — stałe przez cały slajd:**
+
+- **Producent uruchamiany przy subscribe**
+- **fetch → r.json()**
+- **subscriber.next(data) → complete()**
+- **Uproszczenie: tylko ścieżka sukcesu**
 
 ### A jeśli wartością jest Observable? — `08-map-strumienie`
 
@@ -489,7 +543,14 @@ Każde prawo uruchamia kolejny etap; ponowne prawo podczas ruchu kończy bieżą
 
 **Wniosek w FINISHED:** „map tworzy Observable, concatAll je subskrybuje. id$ i oba innery zakończone — S1 dostaje complete.” Liczniki: „Innery uruchomione” = 2, „Aktywne” = 0.
 
-**Speaker notes:** osobne notatki dla READY, ośmiu checkpointów i FINISHED w `template[data-checkpoint-notes="08-map-strumienie"]`. Wyjaśniają tworzenie Observable bez requestu, subskrypcję uruchamiającą HTTP, rozdzielenie next i complete oraz to, że po complete innera #1 źródło może emitować dalej (B → HTTP #2), dopóki samo nie wyśle complete. Przejście: co, jeśli kolejna wartość przyjdzie podczas trwającego HTTP? Kolejkowanie pokaże concatMap. Na oba przykłady około 3 minut.
+**Speaker notes — stałe przez cały slajd:**
+
+- **map tworzy Observable**
+- **Utworzenie ≠ request**
+- **concatAll subskrybuje inner**
+- **Dwa HTTP: A, potem B**
+- **complete innera ≠ complete całości**
+- **Koniec: outer + wszystkie innery**
 
 ### Wspólny problem 09–12: A pracuje, przychodzi B
 
@@ -513,14 +574,14 @@ Góra bez zmian: id$ → operator → kompaktowy Odbiorca, jeden główny tor S1
 
 **Na bloczkach:** S1 zasubskrybowany od READY; postoje first (A dociera, projekcja), active (inner A subskrybowany, HTTP A startuje), question, answer. Odpowiedź: #2 · B przechodzi w „w kolejce” (przerywany placeholder) — wartość bez projekcji, inner, kafelka HTTP GET i inner subscribera. Po complete A placeholder płynnie zmienia się w nowy kafelek HTTP GET B z własnym inner subscriberem w tym samym slocie: projekcja, subskrypcja, progress. B kończy się przed przyjściem C (4,8 s vs 5,2 s modelu), więc C trafia na pustą kolejkę i od razu dostaje swój HTTP; gdyby przyszło w trakcie B, czekałoby w kolejce. Wynik A, B, C.
 
-**Speaker notes (per checkpoint, szablon `data-checkpoint-notes`):**
+**Speaker notes — stałe przez cały slajd:**
 
-- **Start:** Operatory, które dla każdej wartości mogą uruchomić osobną pracę. Projekcja zwraca Observable, operator decyduje, kiedy go zasubskrybować.
-- **READY / A / HTTP A:** jedna główna subskrypcja S1, zestawiona już w READY; projekcja tylko tworzy Observable (własny kafelek HTTP GET), request rusza dopiero, gdy inner subscriber — go zasubskrybuje.
-- **A pracuje, przychodzi B:** Uruchomimy drugi request czy poczekamy?
-- **Odpowiedź:** concatMap kolejkowuje B. Dopóki A się nie skończy, nie wywołujemy nawet projekcji dla B.
-- **Wynik:** Kolejność zachowana, kolejka zwiększa opóźnienie.
-- **Zastosowanie (tylko w notatkach):** kolejkowanie zapisów, gdy kolejność jest ważna (np. autosave formularza).
+- **map + concatAll**
+- **A pracuje — co z B?**
+- **Kolejka wartości, przed projekcją**
+- **complete A → start B**
+- **C przychodzi po B**
+- **Kolejność zapisów — autosave**
 
 ### mergeMap — `10-mergemap`
 
@@ -532,13 +593,13 @@ Góra bez zmian: id$ → operator → kompaktowy Odbiorca, jeden główny tor S1
 
 **Na bloczkach:** READY z zestawionym S1, postoje question, answer i c-result. Odpowiedź: projekcja B i druga, osobna instancja HTTP GET z własnym inner subscriberem równolegle z A (dwa kafelki „w trakcie”, licznik aktywne 2). Krótszy HTTP B kończy przed A: odbiorca dostaje B, A, C w kolejności nadejścia. Każdy inner najpierw dostarcza wynik do S1, a dopiero potem (osobny kadr, `timing.valueTerminalGap` 0,5 s) kończy się complete. Postój c-result: wynik C u S1, inner C jeszcze w toku, S1 bez complete (id$ już zakończone). Kolejne „dalej”: complete inner C, a po nim (przerwa `timing.terminalGap` 0,4 s) complete S1.
 
-**Speaker notes:**
+**Speaker notes — stałe przez cały slajd:**
 
-- **Wprowadzenie:** Identyczna sytuacja: A pracuje i pojawia się B, ale tym razem mamy mergeMap.
-- **Pytanie:** Czy naprawdę musimy czekać na zakończenie A?
-- **Odpowiedź:** Nie. mergeMap uruchamia oba wewnętrzne Observable równolegle. Wyniki mogą wracać w dowolnej kolejności.
-- **Wynik C:** każdy inner najpierw dostarcza wynik, potem complete; globalne complete dopiero po zakończeniu id$ i wszystkich innerów.
-- **Zastosowanie (tylko w notatkach):** niezależne, równoległe requesty HTTP (np. szczegóły kilku produktów naraz).
+- **A pracuje — co z B?**
+- **Równoległe subskrypcje**
+- **Wyniki według odpowiedzi: B, A, C**
+- **Koniec: outer + wszystkie innery**
+- **Niezależne requesty / uploady**
 
 ### switchMap — `11-switchmap`
 
@@ -550,13 +611,14 @@ Góra bez zmian: id$ → operator → kompaktowy Odbiorca, jeden główny tor S1
 
 **Na bloczkach:** READY z zestawionym S1, postoje question, answer, started. Odpowiedź: szary impuls × jedzie od inner subscribera #1 po kablu do HTTP GET A — teardown wewnętrznej subskrypcji A (inner subscriber szarzeje od razu); po jego dotarciu lane #1 · A jest „anulowane” (szary, zatrzymany pasek, bez impulsu complete i bez odpowiedzi) i zostaje widoczne do końca. Górny tor S1 pozostaje aktywny. Potem projekcja B: nowy kafelek HTTP GET B z inner subscriberem (postój started); dalej szybszy finał (przeloty i terminale 0,5 s, C zaraz po B): wynik B, potem C, complete. Cała scena ok. 17,8 s zamiast 22 s.
 
-**Speaker notes:**
+**Speaker notes — stałe przez cały slajd:**
 
-- **Wprowadzenie:** A już pracuje. Teraz przychodzi B.
-- **Pytanie:** Co stanie się z A? Dokończy pracę czy zostanie anulowane?
-- **Odpowiedź:** switchMap odsubskrybowuje poprzednie wewnętrzne Observable i przełącza się na nowe. Główna subskrypcja S1 nadal działa.
-- **Pułapka:** ABORT klienta ≠ cofnięcie operacji serwera; unsubscribe ≠ complete.
-- **Zastosowanie (tylko w notatkach):** dane dla aktualnie wybranego użytkownika albo aktualnego wyszukiwania.
+- **Nowa wartość — co z A?**
+- **Poprzedni inner → unsubscribe**
+- **Wyniki aktualnego innera**
+- **unsubscribe ≠ complete**
+- **Serwer nie cofa operacji**
+- **Wyszukiwarka — aktualna fraza**
 
 ### exhaustMap — `12-exhaustmap`
 
@@ -568,13 +630,13 @@ Góra bez zmian: id$ → operator → kompaktowy Odbiorca, jeden główny tor S1
 
 **Na bloczkach:** READY z zestawionym S1, postoje question i answer. Odpowiedź: #2 z kulką B — przygaszony placeholder „POMINIĘTE”, bez projekcji, inner, kafelka HTTP GET, inner subscribera, portów i kolejki; B nie wraca później. A kończy się normalnie; C przychodzi po zakończeniu A i dostaje własny kafelek HTTP GET z inner subscriberem. Wynik A, C.
 
-**Speaker notes:**
+**Speaker notes — stałe przez cały slajd:**
 
-- **Wprowadzenie:** A pracuje. Przychodzi B. Poznaliśmy już kolejkowanie, równoległość i anulowanie.
-- **Pytanie:** A co, jeśli nie chcemy teraz przyjmować żadnej kolejnej pracy?
-- **Odpowiedź:** exhaustMap ignoruje B. Nie uruchamia projekcji, nie tworzy requestu i nie zapisuje B na później. Dopiero po zakończeniu A może przyjąć następną wartość.
-- **Zastosowanie (tylko w notatkach):** ignorowanie kolejnych kliknięć „Zapisz”, dopóki obecny zapis trwa.
-- **Przejście:** „Znamy już cztery sposoby obsługi kolejnych requestów. Zbudujmy teraz wyszukiwarkę i zobaczmy, które operatory rzeczywiście są nam potrzebne.” (to samo zdanie otwiera notatki `12-intro-wyszukiwarka`).
+- **Drugie kliknięcie podczas zapisu?**
+- **Aktywny inner → ignorowanie wejść**
+- **Bez projekcji i kolejki**
+- **Po complete przyjmuje kolejne**
+- **Wielokrotny submit**
 
 ### Zaprojektujmy wyszukiwarkę — `12-intro-wyszukiwarka`
 
@@ -597,7 +659,12 @@ Pisanie co 180 ms, kasowanie co 150 ms, przejście przy pustym polu 700 ms, ogl�
 
 **Stopka:** Pokaz działania gotowej wyszukiwarki: fraza zmienia się automatycznie, a lista wyników reaguje i pogrubia dopasowania.
 
-**Speaker notes:** Gotowy komponent startuje automatycznie, pokazuje cztery przykłady po pięć wyników. Zwróć uwagę na dopasowania wewnątrz nazw, skracanie wyróżnień przy kasowaniu i wygaszenie dropdownu przy pustym polu. Debounce czeka na 300 ms ciszy. Następny slajd zagląda pod spód: budujemy źródło query$ ze zdarzeń input.
+**Speaker notes — stałe przez cały slajd:**
+
+- **Wyszukiwarka frameworków**
+- **300 ms ciszy**
+- **Pusta fraza — brak wyników**
+- **Skąd bierze się query$?**
 
 ### Źródło: skąd bierze się query$? — `12-query-zrodlo`
 
@@ -616,13 +683,12 @@ Kod rysuje standardowy odtwarzacz: kolory składni, pastelowe marki źródła/ma
 
 **Stopka:** fromEvent tworzy strumień ze zdarzeń input, map wyciąga tekst, a share pozwala współdzielić jedno źródło dalej.
 
-**Speaker notes per checkpoint:**
+**Speaker notes — stałe przez cały slajd:**
 
-- **ready — 0 — Źródło i odbiorcy:** Skąd bierze się query$? Na razie mamy tylko definicję fromEvent i pusty input. Dwa pola odbiorców są widoczne, ale nikt jeszcze nie subskrybuje: nie ma portów, przewodów ani emisji. Dalej dodaje map.
-- **map — 1 — Wyciągamy tekst:** Dopisujemy .pipe(map(event => (event.target as HTMLInputElement).value.trim())). map dostaje zdarzenie input; event.target ma typ EventTarget, więc rzutujemy go na HTMLInputElement, odczytujemy value i usuwamy białe znaki. Kafelek map pojawia się razem z kodem. To nadal tylko definicja, bez subskrypcji i danych. Dalej dodaje share.
-- **share — 2 — Wspólne źródło:** Dopisujemy share() i pokazujemy jego kafelek. Współdzielimy jedno źródło i jedno wykonanie map między podglądem query a wyszukiwarką. Dalsze prawo szybko podłączy obu odbiorców i jedyny upstream, a potem uruchomi pisanie.
-- **live — 3 — Subskrypcja i dane:** A szybko subskrybuje przez share i map do fromEvent; B dołącza do share bez drugiej subskrypcji źródła. Dopiero teraz input wpisuje a → an → ang → angu → angul → angula → angular, czeka, kasuje litery do pustego tekstu i powtarza. map zamienia zdarzenie na tekst, share rozdziela tę samą kapsułkę do obu odbiorców. Pusty string to "". Przeloty spowalniają ilustrację, nie rzeczywiste operatory. Spacja pauzuje, lewo wraca do etapu share, R do początkowej definicji. Prawo przechodzi do wyboru operatora; wyjście odłącza subskrypcje i zatrzymuje zegar bez animacji. Powrót zaczyna od READY.
-- **finished — 4 — Gotowe query$:** Druk, F i Upcoming pokazują pełny pipeline i angular u obu odbiorców. Mamy gotowy strumień tekstu. Na następnym slajdzie wybierzemy operator: co powinno stać się z poprzednim requestem, gdy przychodzi nowa fraza?
+- **fromEvent — zdarzenia input**
+- **map — value.trim()**
+- **query$: podgląd + wyszukiwarka**
+- **share: jeden listener, jedno map**
 
 ### Wybór operatora — `12a-switchmap-live`
 
@@ -644,7 +710,15 @@ Pod separatorem trzy pełne wiersze HTTP GET → inner subscriber; wszystkie poz
 
 **Stopka:** Każde nowe query może przerwać poprzedni request i uruchomić nowy.
 
-**Sterowanie i notatki:** READY daje chwilę na odpowiedź sali. Pierwsze dalej odsłania operator i uruchamia pokaz do automatycznego postoju. Szybkie dalej kończy animację na tym samym slajdzie; dopiero dalej z końcowego kadru zmienia slajd. Spacja pauzuje/wznawia, R i powrót przywracają pytanie. Lewo wraca do źródła query$. Notatki `ready`, `revealed`, `finished` opisują pytanie, pokaz i nieruchomy kadr (#1/#2 cancelled, #3 completed, 3/3/0, tablica [#3], input rea); ostatni ma własny fragment Reveal. Druk, F i Upcoming pokazują ten sam wynik. Anulowanie klienta nie cofa operacji na serwerze. Następny krok: poczekać 300 ms ciszy dzięki debounceTime.
+**Sterowanie:** READY daje chwilę na odpowiedź sali. Pierwsze dalej odsłania operator i uruchamia pokaz do automatycznego postoju. Szybkie dalej kończy animację na tym samym slajdzie; dopiero dalej z końcowego kadru zmienia slajd. Spacja pauzuje/wznawia, R i powrót przywracają pytanie. Lewo wraca do źródła query$. Notatki są stałą listą haseł dla slajdu. Druk, F i Upcoming pokazują ten sam wynik. Anulowanie klienta nie cofa operacji na serwerze. Następny krok: poczekać 300 ms ciszy dzięki debounceTime.
+
+**Speaker notes — stałe przez cały slajd:**
+
+- **Jaki operator dla aktualnej frazy?**
+- **switchMap — poprzednie HTTP anulowane**
+- **Trzy requesty, jeden wynik**
+- **Aktualność ≠ ograniczenie częstotliwości**
+- **Jak ograniczyć requesty?**
 
 ### debounceTime — czekamy na ciszę — `12b-debounce-switchmap`
 
@@ -662,9 +736,17 @@ query$.pipe(
 
 Kolejne pisanie zaczyna się 1 s po uruchomieniu poprzedniego HTTP. Pozostałe requesty trwają 2 s i zdążą dostarczyć wynik oraz complete inner przed kolejną emisją debounce. Bez error; jedyne unsubscribe innera to anulowanie długiego rea przez ponowne rea. Główna subskrypcja pozostaje aktywna. Numery requestów, wyniki [#N] i liczniki rosną przez kolejne cykle bez resetu.
 
-**Sterowanie:** READY ma już całą subskrypcję, bez requestu; pierwsze prawo uruchamia wpisywanie. Postoje buffered, request-1, typing, switched, complete-2. Postój typing (ręczna pauza): ponownie wpisane rea w pamięci debounceTime, timer odlicza, HTTP #1 rea nadal trwa — pytanie, czy klawisz już przerwał request. switched: debounceTime wyemitował znowu rea, HTTP #1 anulowany, HTTP #2 (rea) zestawiony. complete-2: wynik [#2] i complete. Następne prawo uruchamia ciągły pokaz (request-3, HTTP #3 dla ang): od tej chwili nie ma dalszych postojów. Ponowne prawo w trakcie przejścia kończy wprowadzenie i zaczyna emisje. Prawo podczas ciągłych emisji od razu zmienia slajd, także przy pauzie. Lewo cofa do complete-2, Spacja pauzuje/wznawia, R i ponowne wejście resetują do zatrzymanego READY. AUTO może odtworzyć całe wprowadzenie bez postojów i kontynuuje bez końca. F, druk i Upcoming pokazują nieruchomy kadr: #1 rea anulowany, #2 rea i #3 ang zakończone, input ang (po skasowaniu i dopisaniu g) w pamięci debounceTime z odliczaniem, wynik [#3], liczniki 15/3/0. Notatki per checkpoint, request-3 opisuje cały pokaz ciągły.
+**Sterowanie:** READY ma już całą subskrypcję, bez requestu; pierwsze prawo uruchamia wpisywanie. Postoje buffered, request-1, typing, switched, complete-2. Postój typing (ręczna pauza): ponownie wpisane rea w pamięci debounceTime, timer odlicza, HTTP #1 rea nadal trwa — pytanie, czy klawisz już przerwał request. switched: debounceTime wyemitował znowu rea, HTTP #1 anulowany, HTTP #2 (rea) zestawiony. complete-2: wynik [#2] i complete. Następne prawo uruchamia ciągły pokaz (request-3, HTTP #3 dla ang): od tej chwili nie ma dalszych postojów. Ponowne prawo w trakcie przejścia kończy wprowadzenie i zaczyna emisje. Prawo podczas ciągłych emisji od razu zmienia slajd, także przy pauzie. Lewo cofa do complete-2, Spacja pauzuje/wznawia, R i ponowne wejście resetują do zatrzymanego READY. AUTO może odtworzyć całe wprowadzenie bez postojów i kontynuuje bez końca. F, druk i Upcoming pokazują nieruchomy kadr: #1 rea anulowany, #2 rea i #3 ang zakończone, input ang (po skasowaniu i dopisaniu g) w pamięci debounceTime z odliczaniem, wynik [#3], liczniki 15/3/0. Notatki są stałą listą haseł dla slajdu.
 
 **Stopka:** debounceTime przepuszcza wartość dopiero po chwili ciszy. Samo naciśnięcie klawisza nie przerywa requestu.
+
+**Speaker notes — stałe przez cały slajd:**
+
+- **300 ms ciszy**
+- **Każdy znak resetuje timer**
+- **Klawisz już anuluje HTTP?**
+- **Anulowanie dopiero po debounce**
+- **Powtórzona fraza — kolejny HTTP**
 
 ### distinctUntilChanged — znowu to samo? — `11a-distinct-switchmap`
 
@@ -686,19 +768,27 @@ query$.pipe(
 
 1. `first`: r → re → rea → reac → react; react przechodzi przez debounce i distinct, HTTP #1 dostarcza wynik i complete inner. Pauza: 5 zmian inputa / 5 wejść query$ / 1 emisja debounce / 1 request / 0 aktywnych.
 2. `duplicate`: szybkie skasowanie ostatniej litery i dopisanie t (reac → react w < 300 ms). Wpisane: react, reac, react; wyszły z debounceTime: react, react — środkowe reac zastąpione w pamięci debounce. distinct porównuje react z ostatnim wyemitowanym react i odrzuca duplikat: w wierszu distinctUntilChanged widać obok siebie przygaszoną odrzucaną kulkę react i kulkę pamięci react, podpis „duplikat”. Bez nowego HTTP i anulowania. Pauza: 7 / 7 / 2 / 1 / 0.
-3. `successes`: vue i ang przechodzą. Wszystkie trzy HTTP (react, vue, ang) kończą się sukcesem i complete inner, główny pipeline działa. Pauza: 15 / 15 / 4 / 3 / 0.
-4. `request-error`: pusty → r → re → rea → reac → react. Znowu react przechodzi, bo ostatnio wyemitowano ang (distinct pamięta tylko ostatnią). HTTP #4 już pracuje, jeszcze bez błędu. Pauza: 21 / 21 / 5 / 4 / 1. Pasek i request stoją do kolejnej strzałki.
-5. `error`: HTTP #4 emituje error 500. Błąd idzie przez switchMap do odbiorcy; szary teardown odłącza distinct, debounce i query$. Ten HTTP i główny pipeline bez complete. Pauza po pełnym odłączeniu: input nadal react, 21 / 21 / 5 / 4 / 0, główna subskrypcja zakończona błędem.
-6. FINISHED: input kasuje react literami (reac → … → pusty) i wpisuje angular. Zmienia się wyłącznie UI, bez kulek RxJS, timera, wyników i HTTP #5. Liczniki: 33 / 21 / 5 / 4 / 0; wynik [#3] zostaje w czerwonym odbiorcy. W dole zakończone poprawnie #2 i #3 oraz błędny #4.
-7. Dopiero kolejna strzałka przechodzi na następny slajd.
+3. `http-error`: jeden ciągły etap bez postoju podczas requestu — vue przechodzi (HTTP #2 sukces i complete inner), potem pusty → a → an → ang. ang przechodzi przez distinct, a HTTP #3 sam kończy się error 500. Pauza tuż po 500: wiersz #3 czerwony z „error 500”, impuls dotarł do switchMap, odbiorca jeszcze bez błędu (wynik [#2]), główny pipeline aktywny, input ang. Liczniki: 15 / 15 / 4 / 3 / 0.
+4. `error`: błąd idzie przez switchMap do odbiorcy; szary teardown odłącza distinct, debounce i query$ (bez complete). Pauza po pełnym odłączeniu: input nadal ang, 15 / 15 / 4 / 3 / 0, główna subskrypcja zakończona błędem.
+5. FINISHED: input dopisuje angu → angul → angula → angular: zmienia się wyłącznie UI, bez kulek RxJS, timera, wyników i HTTP #4 — query$ nie ma już subskrypcji. Liczniki: 19 / 15 / 4 / 3 / 0, główna subskrypcja zakończona błędem; wynik [#2] zostaje w czerwonym odbiorcy. W dole zakończone poprawnie #1 i #2 oraz błędny #3.
+6. Dopiero kolejna strzałka przechodzi na następny slajd.
 
-Litery co 100 ms i debounce 300 ms modelu, ilustracja 5× wolniejsza. Każdy z pięciu postojów zatrzymuje MANUAL i AUTO dowolnie długo. Szybkie dalej kończy wyłącznie bieżący etap; nie przeskakuje z sukcesów od razu do finału ani na kolejny slajd. Lewo cofa po checkpointach, R i powrót resetują READY, wyjście zatrzymuje zegar. F/druk/podgląd końcowy pokazują angular i martwy pipeline. Notatki: ready, first, duplicate, successes, request-error, error, finished.
+Litery co 100 ms i debounce 300 ms modelu, ilustracja 5× wolniejsza. Każdy z czterech postojów zatrzymuje MANUAL i AUTO dowolnie długo. Szybkie dalej kończy wyłącznie bieżący etap; nie przeskakuje od razu do finału ani na kolejny slajd. Lewo cofa po checkpointach, R i powrót resetują READY, wyjście zatrzymuje zegar. F/druk/podgląd końcowy pokazują angular i martwy pipeline. Notatki są stałą listą haseł dla slajdu.
 
 **Stopka końcowa:** Jeden nieobsłużony błąd HTTP zakończył całą wyszukiwarkę.
 
+**Speaker notes — stałe przez cały slajd:**
+
+- **Po debounce, przed switchMap**
+- **Porównanie z ostatnią emisją**
+- **Domyślnie ===; obiekty po referencji**
+- **react → react: bez HTTP**
+- **ang: error 500**
+- **Error 500 zamyka wyszukiwarkę**
+
 ### catchError — wyszukiwarka działa dalej — `11b-catcherror-search`
 
-**MAIN — bezpośrednio po distinctUntilChanged, przed catchError na zewnątrz z kliknięciami.** Ta sama wyszukiwarka, nowa subskrypcja (nie przywracamy tej zamkniętej błędem). Poprzedni slajd pokazał `react → HTTP 500 → error odbiorcy → angular nie działa`; tutaj `react → HTTP 500 → catchError → [] → angular → HTTP 200 → wynik`.
+**MAIN — bezpośrednio po distinctUntilChanged, przed catchError na zewnątrz z kliknięciami.** Ta sama wyszukiwarka, nowa subskrypcja (nie przywracamy tej zamkniętej błędem). Poprzedni slajd pokazał `ang → HTTP 500 → error odbiorcy → angular nie działa`; tutaj `react → HTTP 500 → catchError → [] → angular → HTTP 200 → wynik`.
 
 Pełny kod jest widoczny od READY, bez etapu odsłaniania catchError:
 
@@ -724,9 +814,17 @@ query$.pipe(
 4. `success` (koniec sceny): kasowanie react i wpisanie angular, każda zmiana trafia do query$; debounce i distinct przepuszczają angular, HTTP #2 zwraca [#2], który przechodzi przez catchError bez zmian do odbiorcy; complete HTTP #2 przechodzi przez catchError i kończy inner. Główny pipeline bez error, complete i teardown. Liczniki: 17 / 2 / 2 requesty / 1 błąd / 0 aktywnych, input angular, wynik [#2].
 5. Kolejna strzałka przechodzi na następny slajd.
 
-Szybkie dalej kończy wyłącznie bieżący etap, lewo cofa po checkpointach, R i powrót resetują READY. F/druk/podgląd końcowy pokazują finał. Notatki: ready, request, error, fallback, success, finished.
+Szybkie dalej kończy wyłącznie bieżący etap, lewo cofa po checkpointach, R i powrót resetują READY. F/druk/podgląd końcowy pokazują finał. Notatki są stałą listą haseł dla slajdu.
 
 **Stopka końcowa:** Błąd jednego requestu nie musi kończyć całego strumienia.
+
+**Speaker notes — stałe przez cały slajd:**
+
+- **catchError wewnątrz switchMap**
+- **Error HTTP → of([])**
+- **[] + complete tylko innera**
+- **query$ nadal aktywne**
+- **angular — następny HTTP działa**
 
 ### catchError — `b04-catcherror`
 
@@ -740,13 +838,15 @@ Szybkie dalej kończy wyłącznie bieżący etap, lewo cofa po checkpointach, R 
 
 - Na zewnątrz (ten sam design): góra „klik$” → „switchMap” → „catchError” → kompaktowy odbiorca S1 — cztery kafelki z execution lanes, porty i kable toru S1 na jednej wysokości. Pod linią podziału (bez napisu) instancja jak w 09–12: `#1 · A`, turkusowy kafelek HTTP GET z lane (progress na pełną wysokość) i krótki kabel do inner subscribera; bez etapu catchError w dole i bez kontenera.
 - Przebieg na zewnątrz (czas modelu): S1 jest już podłączony od READY; klik A w 0,6 s tworzy inner #1 i HTTP A. HTTP trwa 1,8 s (widoczny postęp): w 2,4 s HTTP A emituje error (bez complete): lane HTTP i inner subscriber czerwone (! error), czerwony impuls biegnie do inner subscribera, a potem przez switchMap do zewnętrznego catchError. Po jego dotarciu catchError odłącza pierwotny strumień: szary impuls × od switchMap do klik$, wiersze klik$ i switchMap szare (teardown, bez czerwieni i complete). Następnie w wierszu catchError chwilowo widać `of([])`: catchError subskrybuje Observable zastępczy, kulka [] (kolor S1) wychodzi w 3,1 s, a zielony impuls complete w 3,4 s (catchError i S1 zielone). Klik B w 4,2 s pojawia się w szarym wierszu klik$ i gaśnie: nie dociera do switchMap, nie ma projekcji, inner ani HTTP. Licznik requestów HTTP: 1.
-- Postoje na zewnątrz: request (HTTP A w trakcie), http-error (error opuścił HTTP A, switchMap, catchError, klik$ i S1 jeszcze działają), error (błąd w catchError, klik$ nadal podłączony — pauza przed fallbackiem), caught (teardown), fallback, click-b, potem AUTO do podsumowania; terminale 0,7 s, całość ok. 12,2 s ilustracji. Notatki per checkpoint w `template[data-checkpoint-notes="b04-catcherror"]` (start, klik A, błąd HTTP, błąd w catchError, przechwycenie, fallback, kolejne kliknięcie, podsumowanie).
+- Postoje na zewnątrz: request (HTTP A w trakcie), http-error (error opuścił HTTP A, switchMap, catchError, klik$ i S1 jeszcze działają), error (błąd w catchError, klik$ nadal podłączony — pauza przed fallbackiem), caught (teardown), fallback, click-b, potem AUTO do podsumowania; terminale 0,7 s, całość ok. 12,2 s ilustracji. Notatki są stałą listą haseł dla slajdu.
 
-**Speaker notes:**
+**Speaker notes — stałe przez cały slajd:**
 
-> Porównaj ten slajd z poprzednią wyszukiwarką: tam catchError obsługiwał błąd pojedynczego HTTP wewnątrz switchMap, więc kolejne zapytanie działało. Tutaj catchError stoi za switchMap. Klik A uruchamia HTTP, a po błędzie catchError odłącza pierwotny strumień (klik$ i switchMap) i subskrybuje of([]). S1 dostaje [] i complete; klik B nie uruchamia HTTP B. Nie sugeruj, że każdy zewnętrzny catchError zawsze kończy wynik: tutaj wynika to z wyboru of([]).
->
-> Na zewnątrz (per checkpoint): „Zobaczmy, co się stanie, gdy HTTP zwróci błąd, a catchError znajduje się na zewnątrz switchMap.” → klik A uruchamia HTTP → HTTP zwraca error 500, wewnątrz nie ma catchError → błąd przeszedł przez switchMap do catchError, klik$ nadal podłączony (pytanie: czy kolejne kliknięcia zadziałają?) → „Dopiero tutaj łapie go zewnętrzny catchError. Problem polega na tym, że oryginalny strumień zostaje odsubskrybowany.” → „CatchError przełącza się na zastępcze of([]). Dostajemy pustą tablicę, a potem complete.” → „I teraz klikamy ponownie. Nic się nie dzieje. Nie dlatego, że switchMap zignorował kliknięcie, tylko dlatego, że nie mamy już aktywnej subskrypcji kliknięć.” → „W wyszukiwarce obsłużyliśmy błąd pojedynczego HTTP. CatchError na zewnątrz zastępuje cały strumień po błędzie; tutaj of([]) emituje i kończy wynik. Teraz zobaczmy retry: zamiast zastępować strumień, ponowimy subskrypcję źródła.”
+- **catchError na zewnątrz switchMap**
+- **Błąd odłącza oryginalne źródło**
+- **of([]) → [] → complete**
+- **Kolejne kliknięcie — brak reakcji**
+- **Zakończenie zależy od fallbacku**
 
 Semantyka zastępowania błędu: [implementacja catchError w RxJS 7.8.2](https://github.com/ReactiveX/rxjs/blob/7.8.2/src/internal/operators/catchError.ts).
 
@@ -756,7 +856,15 @@ Semantyka zastępowania błędu: [implementacja catchError w RxJS 7.8.2](https:/
 
 **MAIN — po obu pokazach shareReplay na interval, przed map + concatAll.** Osobny wariant share został połączony ze slajdem `04a-dwa-tory-2`; ID shareReplay pozostaje bez zmian.
 
-HTTP GET → shareReplay(1) → A/B, jedna kieszeń bufora. READY pozostaje nieruchomy. Pierwsze prawo: A subskrybuje → HTTP zwraca 42 do A i bufora → complete → późny B subskrybuje i scena staje (`subscribed-b`, ⏸ pytanie „Co teraz dostanie B?”): subskrypcja B zestawiona, 42 leży w buforze, nic nie leci, bez nowego HTTP. Drugie prawo: 42 powoli wyjeżdża z kieszeni (1,2 s) i leci do B (0,8 s), potem complete. Request trwa około 1 s; przekazanie 42 z HTTP do shareReplay i do A — przeloty 0,6 s, rozdzielenie 0,5 s; terminale 0,4 s. Zostaje jeden request i bufor zakończonego źródła, również przy refCount: true. FINISHED czeka na następne prawo; szybkie prawo podczas ruchu kończy bieżący etap. Notatki: READY, subscribed-b (pytanie) i FINISHED — różnica względem share().
+HTTP GET → shareReplay(1) → A/B, jedna kieszeń bufora. READY pozostaje nieruchomy. Pierwsze prawo: A subskrybuje → HTTP zwraca 42 do A i bufora → complete → późny B subskrybuje i scena staje (`subscribed-b`, ⏸ pytanie „Co teraz dostanie B?”): subskrypcja B zestawiona, 42 leży w buforze, nic nie leci, bez nowego HTTP. Drugie prawo: 42 powoli wyjeżdża z kieszeni (1,2 s) i leci do B (0,8 s), potem complete. Request trwa około 1 s; przekazanie 42 z HTTP do shareReplay i do A — przeloty 0,6 s, rozdzielenie 0,5 s; terminale 0,4 s. Zostaje jeden request i bufor zakończonego źródła, również przy refCount: true. FINISHED czeka na następne prawo; szybkie prawo podczas ruchu kończy bieżący etap. Notatki są stałą listą haseł dla slajdu.
+
+**Speaker notes — stałe przez cały slajd:**
+
+- **refCount: true na HTTP**
+- **Jeden request, bufor wyniku**
+- **Późny B — co dostanie?**
+- **Z bufora: 42 + complete**
+- **Po complete bufor zostaje**
 
 ### shareReplay(1): kto zatrzyma interval? — `20a-sharereplay-interval`
 
@@ -772,7 +880,15 @@ HTTP GET → shareReplay(1) → A/B, jedna kieszeń bufora. READY pozostaje nier
 | 3 | `subscribed-b` | `.subscribe()` B: najpierw ostatnia wartość z bufora, potem kolejne na żywo; bez drugiego upstreamu. |
 | 4 | `unsub-b` | `.unsubscribe()` B: znów zero odbiorców, interval nadal pracuje, bufor się aktualizuje. |
 
-Kolejne „dalej” zmienia slajd, lewo cofa ostatnią akcję. Konkretne liczby zależą od chwili kliknięcia; druk i hash używają umownych chwil akcji. Bez complete i bez odłączenia upstreamu. Notatki per checkpoint w `template[data-checkpoint-notes="20a-sharereplay-interval"]`; finished prowadzi do shareReplay({ bufferSize: 1, refCount: true }) na tym samym interval.
+Kolejne „dalej” zmienia slajd, lewo cofa ostatnią akcję. Konkretne liczby zależą od chwili kliknięcia; druk i hash używają umownych chwil akcji. Bez complete i bez odłączenia upstreamu. Notatki są stałą listą haseł dla slajdu.
+
+**Speaker notes — stałe przez cały slajd:**
+
+- **shareReplay(1): ostatnia wartość**
+- **Domyślnie refCount: false**
+- **Zero odbiorców — interval działa**
+- **Bufor nadal aktualizowany**
+- **Późny B: bufor + live**
 
 ### shareReplay z refCount: kiedy znika bufor? — `20b-sharereplay-refcount`
 
@@ -787,6 +903,15 @@ READY: definicje i pusty bufor. Pierwsze prawo podłącza A i uruchamia emisje. 
 
 Kolejne prawo (`reset`) pokazuje odpowiedź: reset bufora i × do interval, Odbiorcy 0 / Upstream 0. To rozdzielenie ilustracji synchronicznego resetu RxJS, nie opóźnienie działania operatora. Następnie C zaczyna od 0 w nowym wykonaniu #2 (`subscribed-c`), a jego odejście (`unsub-c`) ponownie czyści bufor i kończy scenę, bez dodatkowej pauzy na pytanie. MANUAL/AUTO zatrzymują się po B; szybkie prawo podczas odłączania jedynie kończy ten etap. Dalej: ta sama konfiguracja na zakończonym HTTP.
 
+**Speaker notes — stałe przez cały slajd:**
+
+- **refCount: true na interval**
+- **B: bufor + wspólne źródło**
+- **Ostatni odbiorca odchodzi?**
+- **Odłączenie źródła + reset bufora**
+- **Późny C — od 0**
+- **Wyjątek: bufor po complete zostaje**
+
 ### retry — nie udało się? Spróbuj później — `x03-retry-backoff`
 
 **MAIN — bezpośrednio po catchError na zewnątrz, przed czterema operatorami czasowymi.** Kod używa współczesnego API `retry({ count, delay })`: `count: 3` pozwala na trzy ponowienia poza pierwszym wykonaniem, czyli maksymalnie cztery requesty HTTP. Funkcja `delay` zwraca `timer(1000 * 2 ** (retryCount - 1))`, dlatego kolejne odstępy wynoszą 1, 2 i 4 sekundy.
@@ -795,7 +920,16 @@ Kolejne prawo (`reset`) pokazuje odpowiedź: reset bufora i × do interval, Odbi
 
 Po każdym z trzech błędów czerwony impuls kończy się na retry i nie dociera do A. MANUAL zatrzymuje się przy błędzie; następne prawo uruchamia pełne odliczanie w jedynym lane operatora (`czekam 1,0 s`, `2,0 s`, `4,0 s`) i dopiero po jego zakończeniu nową subskrypcję źródła; ponowne „dalej” w trakcie odliczania kończy etap (skok do nowej subskrypcji), jak na pozostałych slajdach. Wtedy zakończone wiersze przesuwają się o jedną pozycję w dół, a nowa próba pojawia się bezpośrednio pod nagłówkiem HTTP GET. AUTO zachowuje pełne odstępy. W czasie backoff licznik „Aktywne” wynosi 0. Wyjście ze slajdu resetuje scenę i zatrzymuje wspólny RAF.
 
-READY ma A i HTTP #1 już podłączone (0% pracy, 1/1). Checkpointy: error-1, request-2, error-2, request-3, error-3 (pytanie o następne 8 s), request-4, success i summary. Finał: Requesty HTTP 4, Aktywne 0; A otrzymał `next(User) → complete`, bez trzech pośrednich błędów. Notatki przypominają o terminalnym error po wyczerpaniu prób, maksymalnym opóźnieniu, jitterze i ponawianiu wyłącznie odpowiednich błędów przejściowych.
+READY ma A i HTTP #1 już podłączone (0% pracy, 1/1). Checkpointy: error-1, request-2, error-2, request-3, error-3 (pytanie o następne 8 s), request-4, success i summary. Finał: Requesty HTTP 4, Aktywne 0; A otrzymał `next(User) → complete`, bez trzech pośrednich błędów. Notatki są stałą listą haseł dla slajdu.
+
+**Speaker notes — stałe przez cały slajd:**
+
+- **retry = ponowna subskrypcja**
+- **count: 3 → maksymalnie 4 próby**
+- **Backoff: 1 / 2 / 4 s**
+- **Oczekiwanie bez aktywnego HTTP**
+- **Wyczerpany limit → error**
+- **Produkcja: błędy przejściowe, limit, jitter**
 
 ### Cztery operatory, jeden strumień — `16-czas-cztery`
 
@@ -811,7 +945,16 @@ Rundy 1–2 zachowują dotychczasowy scenariusz, wygląd i tempo: 300 ms trwa 2 
 
 Runda 3 odtwarza raz wspólny scenariusz **A@350, B@450, C@550, D@1000, E@1100 ms** — źródło rusza dopiero po pierwszym takcie, więc najpierw widać, że sample tyka sam, a throttle stoi. Sample emituje **C@600, E@1200**, a throttle trailing-only **C@650, E@1300**. Obaj odbiorcy dostają C, E, lecz w innych chwilach. 300 ms trwa tu 3 s, więc różnice wynoszą odpowiednio 0,5 i 1 s pokazu. Throttle rozpoczyna okno od zdarzenia, po emisji trailing otwiera kolejne, a po pustym oknie przestaje odliczać (950–1000 ms i po 1600 ms). Sample tyka stale co 300 ms od subskrypcji, również podczas ciszy; bez nowej wartości nie emituje niczego. Zatrzymanie odtwarzacza nie oznacza complete ani unsubscribe.
 
-Sterowanie: READY → prawo uruchamia pętlę pary 1 → prawo (także po pauzie) czyści stan i od razu uruchamia pętlę pary 2 → prawo podczas emisji uruchamia przejście i jednorazową rundę 3 bez dodatkowego kliknięcia. Lewo w trakcie pary resetuje ją do czystego, zatrzymanego postoju (`round-2`/`round-3`); kolejne prawo uruchamia ją od początku. Audit znika, throttle zostaje na dole i dostaje wyróżniony podpis `leading: false, trailing: true`, a sample pojawia się od razu na swoim miejscu. Oba źródła, pamięci, timery i historie zaczynają od zera; emisje startują po przygotowaniu pary. Po rundzie 3 pokaz sam zatrzymuje się (`summary`); następne prawo prowadzi do RxJS w liczbach. AUTO nadal zatrzymuje się na gotowych parach; hash `round-2`/`round-3` pokazuje nieruchomą, wyczyszczoną parę. Spacja pauzuje/wznawia (timery i emisje stoją), R wraca do READY. Druk i F pokazują końcowe C, E u obu odbiorców. Notatki: `ready`, `round-2`, `round-3`, `summary`, `finished`.
+Sterowanie: READY → prawo uruchamia pętlę pary 1 → prawo (także po pauzie) czyści stan i od razu uruchamia pętlę pary 2 → prawo podczas emisji uruchamia przejście i jednorazową rundę 3 bez dodatkowego kliknięcia. Lewo w trakcie pary resetuje ją do czystego, zatrzymanego postoju (`round-2`/`round-3`); kolejne prawo uruchamia ją od początku. Audit znika, throttle zostaje na dole i dostaje wyróżniony podpis `leading: false, trailing: true`, a sample pojawia się od razu na swoim miejscu. Oba źródła, pamięci, timery i historie zaczynają od zera; emisje startują po przygotowaniu pary. Po rundzie 3 pokaz sam zatrzymuje się (`summary`); następne prawo prowadzi do RxJS w liczbach. AUTO nadal zatrzymuje się na gotowych parach; hash `round-2`/`round-3` pokazuje nieruchomą, wyczyszczoną parę. Spacja pauzuje/wznawia (timery i emisje stoją), R wraca do READY. Druk i F pokazują końcowe C, E u obu odbiorców. Notatki są stałą listą haseł dla slajdu.
+
+**Speaker notes — stałe przez cały slajd:**
+
+- **debounce: ostatnia po ciszy**
+- **throttle domyślnie: pierwsza w oknie**
+- **audit: ostatnia na końcu okna**
+- **throttle trailing: okno od zdarzenia**
+- **sample: własny zegar, puste takty**
+- **Te same wartości, inne chwile**
 
 ### RxJS w prawdziwym kodzie — kto wygrywa? — `24-rxjs-liczby`
 
@@ -841,7 +984,14 @@ Suma 1793; procenty zaokrąglone. Pod wykresem trzy duże liczby bez kart: **428
 
 MANUAL i AUTO zatrzymują się po każdym odsłonięciu (tempo z pilota); szybkie „dalej” kończy bieżący etap, „wstecz” cofa o etap, wyjście ze slajdu resetuje go. Przy ograniczeniu ruchu odsłonięcia są natychmiastowe. Druk i podgląd Notes pokazują pełny finał.
 
-**Speaker notes:** pytanie o najczęstszy *Map; ranking („prawie 80%…”); map („ponad cztery tysiące wywołań”); shareReplay („niemal cztery razy częściej niż zwykły share”); concatAll („tylko jeden raz”); finał — to konkretny zbiór kodu, nie ranking świata; najważniejsze to rozumieć zachowanie operatorów i umieć wybrać właściwy. Przejście: „Pytania?” — zaproś do pytań i feedbacku.
+**Speaker notes — stałe przez cały slajd:**
+
+- **Najczęstszy *Map?**
+- **switchMap ≈ 80%**
+- **map: 4282**
+- **shareReplay / share ≈ 3,7×**
+- **concatAll: 1**
+- **Wybrany zbiór, nie cały świat**
 
 ## Pytania i feedback
 
@@ -849,7 +999,12 @@ MANUAL i AUTO zatrzymują się po każdym odsłonięciu (tempo z pilota); szybki
 
 **Ostatni slajd prezentacji.** Duże „Pytania?” (150 px w 4:3, 130 px w 16:9), pod nim czarno-biały kod QR (380/320 px) do [formularza feedbacku na Crossweb](https://crossweb.pl/feedback/aks-lwt/). QR jest również klikalnym linkiem. Na dole cytat z feedbacku jak testimonial: „taki kurczę deep dive bardziej nawet i zajrzenie pod maskę niekiedy” (kursywa, #55515C, 36/30 px), a pod nim podpis „~ Hubert Zub” (#7457D9, 28/24 px), bez ramki, tła i animacji. Bez adresu strony, dodatkowych tekstów, linków do dodatków i dalszych slajdów. Gotowy SVG z białym marginesem znajduje się w `public/feedback-qr.svg` i działa także offline oraz w druku.
 
-**Speaker notes:** zaproś do pytań o przykłady i operatory, poproś o feedback przez QR, przypomnij konkurs WebStorm i podziękuj za udział.
+**Speaker notes — stałe przez cały slajd:**
+
+- **Pytania z sali**
+- **Feedback — QR**
+- **WebStorm — konkurs**
+- **Dzięki za spotkanie**
 
 ## Gdzie jest źródło treści
 

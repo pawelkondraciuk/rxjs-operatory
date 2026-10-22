@@ -1956,8 +1956,9 @@ function catchOutsideGraph(scene) {
   return graph;
 }
 
-// Trzeci etap wyszukiwarki: distinct od READY → trzy sukcesy → po kliknięciu nieobsłużony error dla react;
-// potem UI kasuje react i wpisuje angular bez reakcji pipeline'u.
+// Trzeci etap wyszukiwarki: distinct od READY → react, duplikat react, vue → HTTP #3 dla ang kończy się
+// nieobsłużonym error 500 (bez postoju podczas requestu); postój tuż po 500, potem propagacja i teardown
+// (postój po odłączeniu query$), na końcu dopisanie angular w UI bez reakcji pipeline'u.
 // UI po błędzie jest niezależne od zdarzeń zamkniętej subskrypcji.
 export function configureDistinctSwitch(scene) {
   const model=distinctSearchModel();
@@ -1967,8 +1968,7 @@ export function configureDistinctSwitch(scene) {
     playback:{entry:'manual',finish:'hold',controller:'stages',resetOnExit:true,stops:[
       {id:'first',time:model.search.runs[0].completed+.3,autoPause:true},
       {id:'duplicate',time:model.search.outputs[1].arrival+1.05,autoPause:true},
-      {id:'successes',time:model.search.successStop,autoPause:true},
-      {id:'request-error',time:model.search.runs.at(-1).connected+.2,autoPause:true},
+      {id:'http-error',time:model.search.errorStop,autoPause:true},
       {id:'error',time:model.search.detached+.25,autoPause:true},
     ]},
   });
@@ -1986,9 +1986,9 @@ function distinctSearchModel() {
   const t=searchTiming,firstAt=.3,round=searchRound,burst=searchBurst;
   // react → HTTP #1; szybkie skasowanie i dopisanie t (reac → react w < 300 ms): debounceTime odrzuca reac i emituje
   // ponownie react, distinctUntilChanged porównuje z ostatnią wyemitowaną wartością (react) i blokuje — bez HTTP.
-  // Potem vue i ang; na końcu znowu react przechodzi (ostatnią wyemitowaną było ang) i kończy się błędem 500.
+  // Potem vue (sukces) i ang — trzeci request kończy się błędem 500.
   const bursts=[burst(['r','re','rea','reac','react'],firstAt),burst(['reac','react'],12.8),
-    burst(['','v','vu','vue'],17.5),burst(['','a','an','ang'],26.5),burst(['','r','re','rea','reac','react'],35.6)];
+    burst(['','v','vu','vue'],17.5),burst(['','a','an','ang'],26.5)];
   const inputs=bursts.flat();
   const outputs=debounceSearchInputs(inputs).map((v,i,all)=>({...v,at:round(v.at),arrival:round(v.arrival),
     duplicate:i>0&&v.value===all[i-1].value}));
@@ -2002,9 +2002,11 @@ function distinctSearchModel() {
   });
   const error=runs.at(-1).end,resultError=round(error+t.terminal+.15),receiverError=round(resultError+t.terminal);
   const teardown=[receiverError,round(receiverError+t.terminal),round(receiverError+2*t.terminal)];
-  const detached=round(teardown[2]+t.terminal),uiStart=round(detached+.65);
-  const unobserved=burst(searchRetype,uiStart);
-  const successStop=round(runs.at(-2).completed+.35);
+  const detached=round(teardown[2]+t.terminal),uiStart=round(detached+1);
+  // Po błędzie użytkownik dopisuje angular: input działa, ale query$ nie ma już subskrypcji.
+  const unobserved=burst(['angu','angul','angula','angular'],uiStart);
+  // Postój tuż po 500: impuls error dotarł do switchMap, odbiorca jeszcze nic nie dostał.
+  const errorStop=round(error+t.terminal+.05);
   const duration=round(unobserved.at(-1).at+1);
   const source={id:'query',bg:'rgba(143,201,212,.4)',line:'#4fa5b5'},http={...source,id:'http'};
   const op={id:'switch',bg:'rgba(216,179,230,.45)',line:'#b384c6'},debounce={...op,id:'debounce'};
@@ -2025,7 +2027,7 @@ function distinctSearchModel() {
   const clocks=[...new Set(codeLines.flat().flatMap(part=>(part.active||[]).flatMap(v=>[v.from.logicalAt,v.to.logicalAt])))];
   const seen=(values,time)=>values.filter(v=>v.at<=time+1e-9).length;
   return {code,codeLines,codeFrames:[],rows:[],checkpoints:[],duration,
-    graph:distinctSearchGraph,search:{bursts,inputs,outputs,passed,runs,unobserved,successStop,error,resultError,receiverError,teardown,detached,clocks},
+    graph:distinctSearchGraph,search:{bursts,inputs,outputs,passed,runs,unobserved,errorStop,error,resultError,receiverError,teardown,detached,clocks},
     captions:[[0,'distinctUntilChanged porównuje wartość z ostatnią, którą sam wyemitował.'],
       [firstAt,'Użytkownik wpisuje react. Po 300 ms ciszy react przejdzie przez debounceTime i distinctUntilChanged.'],
       [runs[0].completed,'react: HTTP #1 dostarczył wynik i complete inner. distinctUntilChanged pamięta react.'],
@@ -2033,14 +2035,14 @@ function distinctSearchModel() {
       [outputs[1].arrival,'debounceTime ponownie emituje react. distinctUntilChanged porównuje je z ostatnim react.'],
       [outputs[1].arrival+.8,'react === react — duplikat. Nie powstaje drugi request.'],
       [bursts[2][0].at,'vue różni się od react — distinctUntilChanged przepuszcza nowe zapytanie.'],
-      [bursts[3][0].at,'ang różni się od vue — kolejny HTTP dostarczy wynik i complete inner.'],
-      [runs.at(-2).completed,'Trzy udane HTTP: react, vue, ang. Dalej uruchomi kolejne zapytanie, które zakończy się błędem.'],
-      [bursts[4][0].at,'Znowu react — ostatnio wyemitowano ang, więc distinctUntilChanged przepuszcza je do switchMap.'],
-      [runs.at(-1).connected,'HTTP #4 dla react pracuje. Dalej pokaże błąd tego requestu.'],
-      [error,'HTTP #4 dla react: error 500. Nieobsłużony błąd przechodzi przez switchMap.'],
+      [runs[1].completed,'vue: HTTP #2 dostarczył wynik i complete inner.'],
+      [bursts[3][0].at,'ang różni się od vue — distinctUntilChanged przepuszcza je do switchMap.'],
+      [runs.at(-1).connected,'HTTP #3 dla ang pracuje.'],
+      [error,'HTTP #3 dla ang: error 500. Co teraz stanie się z wyszukiwarką?'],
+      [resultError,'Nieobsłużony błąd przechodzi przez switchMap do odbiorcy.'],
       [receiverError,'Odbiorca dostał error. Cała subskrypcja wyszukiwarki zostaje zamknięta.'],
       [detached,'query$ odłączone. Dalej pokaże zmiany inputa, na które pipeline już nie reaguje.'],
-      [uiStart,'Input nadal działa. Pipeline jest odłączony — brak emisji i requestu dla angular.'],
+      [uiStart,'Input nadal działa. Brak subskrypcji — angular nie trafia do query$, brak emisji i requestu.'],
       [duration-.3,'Jeden nieobsłużony błąd HTTP zakończył całą wyszukiwarkę.']],
     metrics:[{label:'zmiany inputa',value:time=>seen(inputs,time)+seen(unobserved,time)},
       {label:'wejścia query$',value:time=>seen(inputs,time)},

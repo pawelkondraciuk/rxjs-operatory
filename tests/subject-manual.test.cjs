@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {modules,playbackHarness}=require('./v2-harness.cjs');
@@ -247,21 +248,9 @@ test('layout keeps Subject → A/B/C on horizontal lanes inside the diagram in b
  }
 });
 
-test('checkpoint notes follow the new order: question at B, answer at next(2), hot summary before Subject HTTP',async()=>{
- const {c}=await manual();
- const html=require('node:fs').readFileSync('index.html','utf8');
- const source=html.match(/<template data-checkpoint-notes="05-zrodla-5">([\s\S]*?)<\/template>/)[1];
- const notes=Object.fromEntries([...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)].map(([,id,text])=>[id,text]));
- assert.deepEqual(Object.keys(notes),['ready',...Array.from(c.stops,s=>s.id),'finished']);
- assert.match(notes.ready,/Interval sam produkował kolejne liczby\. A co, jeśli chcielibyśmy sami decydować, kiedy pojawi się następna wartość\?/);
- assert.match(notes['subscribed-b'],/Teraz pojawia się drugi odbiorca\. Jak myślicie, czy dostanie jedynkę, którą Subject wyemitował wcześniej\?/);
- assert.doesNotMatch(notes['subscribed-b'],/Subject nie odtwarza/,'pytanie bez odpowiedzi');
- assert.match(notes['next-2'],/Nie\. Subject nie odtwarza wcześniejszych wartości\. B dostaje dopiero dwójkę, podczas gdy A otrzymał zarówno jedynkę, jak i dwójkę/);
- assert.match(notes.complete,/Complete trafia do wszystkich odbiorców i zamyka ich subskrypcje/);
- assert.match(notes['subscribed-c'],/C.*complete[\s\S]*bez.*wartości/);
- assert.match(notes['next-ignored'],/next\(3\)[\s\S]*nie.*emituje/);
- assert.match(notes.finished,/Subject jest przykładem hot Observable — rozsyła emisje do aktualnych subskrybentów\. Nowy odbiorca nie dostaje historii\. Do różnicy między hot i cold jeszcze wrócimy[\s\S]*Prawo: „Subject: ręczny multicast HTTP/);
- assert.doesNotMatch(source,/error\(|BehaviorSubject|ReplaySubject|shareReplay/);
+test('Subject manual slide notes recall no history and terminal behavior',()=>{
+ const notes=slideNotes('05-zrodla-5');
+ assert.match(notes,/Observable \+ Observer/);assert.match(notes,/Późny B — bez historii/);assert.match(notes,/complete kończy Subject/);assert.match(notes,/Późny C — tylko complete/);assert.match(notes,/next po complete ignorowane/);
 });
 
 test('all checkpoints rewind deterministically; going back removes B and never shows its history before subscribe',async()=>{
