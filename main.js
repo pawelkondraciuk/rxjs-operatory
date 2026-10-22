@@ -16,7 +16,7 @@ import { compileScene } from './animations/engine.js';
 import { installRevealStages } from './animations/reveal-stages.js';
 import { installAutoFinishGuard } from './animations/reveal-auto-finish.js';
 import { installSpeakerPreview } from './animations/speaker-preview.js';
-import { prepareCheckpointNotes, installCheckpointNotesReceiver, installNotesKeyBridge, installNotesMirror, isNotesPreview, showNotesPreviewFrame } from './animations/checkpoint-notes.js';
+import { prepareSlideNotes, installCheckpointNotesReceiver, installNotesKeyBridge, installNotesMirror, isNotesPreview, showNotesPreviewFrame } from './animations/checkpoint-notes.js';
 import { FORMATS, formatFromSearch, withFormat, toggledFormatUrl } from './animations/format.js';
 import { prepareCodeWalk } from './animations/code-walk.js';
 
@@ -104,8 +104,8 @@ for (const slide of steppedSlides) {
   button.addEventListener('click', toggleMode);
   slide.append(button);
 }
-// Szablony notatek są wybierane po rozwinięciu wariantów i utworzeniu markerów.
-for (const slide of document.querySelectorAll('[data-animation]')) prepareCheckpointNotes(slide, { printMode });
+// Stałe notatki konkretnego slajdu wybieramy raz, po rozwinięciu wariantów.
+for (const slide of document.querySelectorAll('[data-animation]')) prepareSlideNotes(slide);
 
 function isStaged(slide = deck.getCurrentSlide()) { return sceneById.get(slide?.dataset.animation)?.playback?.controller === 'stages'; }
 function isStepped(slide = deck.getCurrentSlide()) { return slide?.classList.contains('rx-stepped'); }

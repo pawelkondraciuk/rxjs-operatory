@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules,playbackHarness}=require('./v2-harness.cjs');
 // 20a-sharereplay-interval (MAIN, przed shareReplay z refCount: true na HTTP): interval(1000).pipe(shareReplay(1)) → A/B
@@ -129,12 +130,10 @@ test('print and restore: stable frames with defaults; deterministic snapshots in
  assert.equal(printed.player.state,'finished');assert.equal(printed.player.live.stage,3);
 });
 
-test('placed between share() + interval and shareReplay refCount: true on interval; notes cover every checkpoint',async()=>{
+test('placed between share() + interval and shareReplay refCount: true on interval; notes recall the source lifetime',async()=>{
  const {scene:s}=await scene(),{mainOrder}=(await modules(['scene-config']))['scene-config'];
  const i=mainOrder.indexOf(id);
  assert.deepEqual([mainOrder[i-1],mainOrder[i+1]],['04a-dwa-tory-3','20b-sharereplay-refcount']);
- const html=fs.readFileSync('index.html','utf8');
- const source=html.match(new RegExp(`<template data-checkpoint-notes="${id}">([\\s\\S]*?)</template>`))[1];
- assert.deepEqual(Array.from(source.matchAll(/data-checkpoint="([^"]+)"/g),x=>x[1]),['ready',...s.playback.stops.map(x=>x.id),'finished']);
- assert.match(source,/refCount: false/);assert.match(source,/refCount: true/);assert.match(source,/cały czas/);
+ const source=slideNotes(id);
+ assert.match(source,/refCount: false/);assert.match(source,/Zero odbiorców — interval działa/);assert.match(source,/Bufor nadal aktualizowany/);
 });

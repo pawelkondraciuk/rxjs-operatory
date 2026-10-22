@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules,playbackHarness}=require('./v2-harness.cjs');
 const id='x03-retry-backoff';
@@ -114,7 +115,6 @@ test('MANUAL: next during a countdown finishes the stage; rewind/reset are deter
  assert.deepEqual(main.slice(main.indexOf('b04-catcherror'),main.indexOf('b04-catcherror')+3),['b04-catcherror',id,'16-czas-cztery']);
  assert.ok(!m['scene-config'].extraIds.has(id));
  assert.equal(scene.group,'main');
- const html=fs.readFileSync('index.html','utf8');
- for(const checkpoint of ['ready','error-1','request-2','error-2','request-3','error-3','request-4','success','summary','finished'])
-  assert.match(html,new RegExp(`data-checkpoint="${checkpoint}"`));
+ const notes=slideNotes(id);
+ assert.match(notes,/ponowna subskrypcja/);assert.match(notes,/maksymalnie 4 próby/);assert.match(notes,/Wyczerpany limit → error/);
 });

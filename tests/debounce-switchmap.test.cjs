@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -204,7 +205,6 @@ test('three code lines retain syntax and simultaneous highlights; notes describe
   }
   const section=fs.readFileSync('index.html','utf8').match(/<section id="12b-debounce-switchmap"[^]*?<\/section>/)[0];
   assert.match(section,/class="animation-slide rx-debounce-search-slide"/);assert.doesNotMatch(section,/rx-slide-navigation/);
-  for(const key of ['ready',...Array.from(c.stops,s=>s.id),'finished'])assert.ok(section.includes(`data-checkpoint="${key}"`),key);
-  assert.doesNotMatch(section,/failed-input|HTTP #6.*bł|Wolniejszy HTTP|data-checkpoint="cancel/);
-  assert.match(section,/5×/);assert.match(section,/po debounceTime, przed switchMap/);
+  const notes=slideNotes('12b-debounce-switchmap');
+  assert.match(notes,/Każdy znak resetuje timer/);assert.match(notes,/Anulowanie dopiero po debounce/);assert.match(notes,/Powtórzona fraza — kolejny HTTP/);
 });

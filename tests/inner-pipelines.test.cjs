@@ -104,7 +104,7 @@ test('code syntax: tokens are coloured on every slide as a layer independent of 
  for(const word of ['map','share'])assert.equal(queryKind(word),'op',word);
  assert.equal(queryKind('event =>'),'param');assert.equal(queryKind('HTMLInputElement'),'type');assert.equal(queryKind('as '),'kw');
  assert.equal(queryKind("'input'"),'str');assert.equal(queryKind('inputEl'),null);
- // Każdy slajd z kodem (01-tytul nie jest podpięty do HTML, 25-podsumowanie nie ma kodu).
+ // Każdy slajd z kodem (01-tytul nie jest podpięty do HTML).
  for(const [id,scene]of scenes)if(scene.code)assert.equal(scene.codeSyntax,true,id);
  const late="klik$.pipe(withLatestFrom(filtry$))",lk=codeTokens(late);assert.equal(lk[late.indexOf('withLatestFrom')],'op');
  const ng="@if (user$ | async; as user) { … }",nk=codeTokens(ng);assert.equal(nk[ng.indexOf('async')],'op');assert.equal(nk[ng.indexOf('user$')],'src');

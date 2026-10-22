@@ -1,4 +1,5 @@
 import { esc, text, token, wrapLabel, colors, clamp, fitLabel } from './primitives.js';
+import { illustration } from './illustrations.js';
 
 export function executionPanelRows(frame,panel) {
   const limit=clamp(Math.floor(panel.maxRows||3),3,5);
@@ -741,6 +742,7 @@ export function renderScene(frame,options={}) {
   for(const panel of frame.searchPanels||[])svg+=searchPanel(panel,frame.time,reduced);
   for(const chart of frame.barCharts||[])svg+=barChart(chart,reduced);
   for(const stat of frame.bigStats||[])svg+=bigStat(stat,reduced);
+  for(const item of (reduced&&frame.reducedIllustrations)||frame.illustrations||[])svg+=illustration(item);
   for(const readout of frame.readouts||[]) {
     const size=readout.font||26,value=String(readout.value);
     svg+=`<g data-readout="${esc(readout.id)}"><rect x="${readout.x-readout.w/2}" y="${readout.y-readout.h/2}" width="${readout.w}" height="${readout.h}" rx="6" fill="${readout.fill||'#fff'}" stroke="${readout.stroke||'#43525b'}" stroke-width="2"/>`;

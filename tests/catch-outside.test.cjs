@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules}=require('./v2-harness.cjs');
 // b04-catcherror: catchError za switchMap w tym samym wyglądzie co catchError wewnątrz. Góra klik$ → switchMap → catchError → S1,
@@ -116,10 +117,8 @@ test('catchError outside: checkpoints follow the narration and speaker notes, co
  const marks=frame=>Array.from(frame.codeView.flat().filter(p=>p.active),p=>p.mark.id);
  assert.deepEqual(marks(working),['http']);
  assert.deepEqual(marks(c.snapshot(at(c,'source-next','catch-observer','[]'))),['catch']);
- const html=fs.readFileSync('index.html','utf8');
- const template=html.match(/<template data-checkpoint-notes="b04-catcherror">([\s\S]*?)<\/template>/)[1];
- assert.deepEqual([...template.matchAll(/data-checkpoint="([^"]+)"/g)].map(m=>m[1]),['ready',...ids,'finished']);
- assert.match(template,/catchError znajduje się na zewnątrz switchMap/);
+ const notes=slideNotes('b04-catcherror');
+ assert.match(notes,/catchError na zewnątrz switchMap/);assert.match(notes,/Zakończenie zależy od fallbacku/);
  for(const time of [0,...c.stops.map(s=>s.time),c.duration]){
   const frame=JSON.stringify(c.snapshot(time));c.snapshot(c.duration);c.snapshot(0);
   assert.equal(JSON.stringify(c.snapshot(time)),frame);

@@ -11,6 +11,8 @@ function add(id,title,code,duration,rows,captions,notes,extra={}){
 }
 const cards=(id,title,items,captions,notes,duration=16,extra={})=>add(id,title,"",duration,[],captions,notes,{kind:"cards",items:items.map((label,i)=>({label,at:1+i*2.3,color:["source","op","http","b"][i%4]})),...extra});
 cards("01-tytul","RxJS — operatory, które znasz, ale bałeś się zagadać",["Kiedy?","Ile naraz?","Co pominąć?","Co współdzielić?"],[[0,""],[3,"Znane nazwy. Konkretne decyzje o pracy."],[12,"Jedno zdarzenie może uruchomić znacznie więcej, niż myślisz."]],"Otwarcie. Zapowiedz decyzje o pracy, kolejności i współdzieleniu. Tytuł można pozostawić jako statyczny slajd.",14);
+// Intro dla początkujących: fabryka soku na taśmociągu, konfiguracja w configureJuiceFactory (juice-factory.js).
+add("01a-fabryka-soku","RxJS — o co w tym chodzi?","",1,[],[],"");
 add("04-operator","Operator to funkcja","",1,[],[],"");
 add("04a-dwa-tory","Cold: jedna definicja, trzy wykonania","",1,[],[],"");
 add("20a-sharereplay-interval","shareReplay(1): kto zatrzyma interval?","",1,[],[],"");

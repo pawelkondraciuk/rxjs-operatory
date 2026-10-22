@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -102,18 +103,16 @@ test('MANUAL i AUTO zatrzymują się po każdym odsłonięciu; szybkie dalej ko�
   controller.next();h.advance(3000);assert.equal(player.state,'finished');
 });
 
-test('HTML, notatki per checkpoint i miejsce przed podsumowaniem',async()=>{
+test('HTML, stałe notatki slajdu i miejsce przed pytaniami',async()=>{
   const {m,compiled}=await fixture();
   const html=fs.readFileSync('index.html','utf8');
   const section=html.match(/<section id="24-rxjs-liczby"[\s\S]*?<\/section>/)[0];
   assert.match(section,/data-animation="24-rxjs-liczby"/);
   assert.match(section,/<h2>RxJS w prawdziwym kodzie — kto wygrywa\?<\/h2>/);
-  const notes=[...section.matchAll(/data-checkpoint="([^"]+)"/g)].map(match=>match[1]);
-  assert.deepEqual(plain(notes),['ready',...compiled.stops.map(stop=>stop.id),'finished']);
-  assert.match(section,/którego z czterech Map używa się najczęściej/);
-  assert.match(section,/To co, zagadamy do tych operatorów\?/);
+  const notes=slideNotes('24-rxjs-liczby');
+  assert.match(notes,/Najczęstszy \*Map\?/);assert.match(notes,/Wybrany zbiór, nie cały świat/);
   assert.ok(html.indexOf('id="16-czas-cztery"')<html.indexOf('id="24-rxjs-liczby"'));
-  assert.ok(html.indexOf('id="24-rxjs-liczby"')<html.indexOf('id="25-podsumowanie"'));
+  assert.ok(html.indexOf('id="24-rxjs-liczby"')<html.indexOf('id="pytania"'));
   const order=m['scene-config'].mainOrder;
-  assert.deepEqual(plain(order.slice(-4)),['16-czas-cztery','24-rxjs-liczby','25-podsumowanie','pytania']);
+  assert.deepEqual(plain(order.slice(-3)),['16-czas-cztery','24-rxjs-liczby','pytania']);
 });

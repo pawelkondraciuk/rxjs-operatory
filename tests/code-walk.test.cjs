@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -89,15 +90,10 @@ test('CSS drives every step from .current-fragment and fits both formats',()=>{
  }
 });
 
-test('speaker notes: one per step inside its fragment, plus the overview',()=>{
- assert.equal(steps.length,4);
- assert.deepEqual(steps.map(s=>s.notes.match(/<strong>(\d) —/)[1]),['1','2','3','4']);
- assert.match(steps[0].notes,/subscriber[\s\S]*dopiero przy subscribe/);
- assert.match(steps[1].notes,/fetch[\s\S]*r\.json\(\)/);
- assert.match(steps[2].notes,/subscriber\.next\(data\)/);
- assert.match(steps[3].notes,/subscriber\.complete\(\)[\s\S]*Prawo: Cold/);
- const overview=body.slice(body.lastIndexOf('</span>')).match(/<aside class="notes">([\s\S]*?)<\/aside>/)[1];
- assert.match(overview,/0 — Jak działa httpGet\?[\s\S]*cały kod od początku/);
+test('httpGet code has one static list and no fragment notes',()=>{
+ assert.equal(steps.length,4);assert.ok(steps.every(s=>!s.notes.trim()));
+ assert.equal((body.match(/<aside class="notes">/g)||[]).length,1);
+ const notes=slideNotes('05b-http-kod');assert.match(notes,/Producent uruchamiany przy subscribe/);assert.match(notes,/fetch → r\.json\(\)/);assert.match(notes,/tylko ścieżka sukcesu/);
 });
 
 test('full myMap slide preserves all code and highlights only upstream subscribe then downstream next',async()=>{
@@ -140,8 +136,8 @@ test('full myMap slide preserves all code and highlights only upstream subscribe
  assert.match(holder.innerHTML,/<span class="cw-tok-next">next<\/span>/);
  assert.match(holder.innerHTML,/<span class="cw-tok-complete">complete<\/span>/);
  assert.match(holder.innerHTML,/<span class="cw-tok-error">error<\/span>/);
- assert.match(steps[0].notes,/Subskrypcja idzie w lewo[\s\S]*teardown/);
- assert.match(steps[1].notes,/Emisja idzie w prawo[\s\S]*Prawo: „A share\?”/);
+ assert.ok(steps.every(s=>!s.notes.trim()));
+ const notes=slideNotes('04b-map-kod');assert.match(notes,/subscribe wyniku → subscribe źródła/);assert.match(notes,/teardown/);
  assert.throws(()=>w.codeWalkModel(source,{mode:'full',steps:[{focus:'13'}]}),/poza oknem/);
  for(const [size,lh,pad,title,height] of [[37,1.5,44,90,960],[36,1.34,36,64,720]]){
   assert.ok((Math.max(...model.lines.map(l=>l.length))+3)*.602*size+48<=1280,'najdłuższa linia z numerem');

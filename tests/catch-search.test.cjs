@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -189,12 +190,8 @@ test('same top geometry and input as distinct, stable rows, syntax marks, notes 
   assert.ok(active(stop(c,'error')).includes('catch'));
   assert.ok(active(at(c,'deliver-next','inner1-catch1')+.1).includes('catch'));
  }
- const template=fs.readFileSync('index.html','utf8').match(/<template data-checkpoint-notes="11b-catcherror-search">([\s\S]*?)<\/template>/)[1];
- assert.deepEqual([...template.matchAll(/data-checkpoint="([^"]+)"/g)].map(m=>m[1]),['ready',...stopIds,'finished']);
- assert.match(template,/Tym razem przechwycimy błąd wewnątrz switchMap/);
- assert.match(template,/błąd trafia do catchError, a nie do głównego odbiorcy/);
- assert.match(template,/nie straciliśmy subskrypcji/);
- assert.match(template,/To zasługa umieszczenia catchError wewnątrz switchMap/);
+ const notes=slideNotes('11b-catcherror-search');
+ assert.match(notes,/catchError wewnątrz switchMap/);assert.match(notes,/complete tylko innera/);assert.match(notes,/query\$ nadal aktywne/);assert.match(notes,/następny HTTP działa/);
 });
 
 test('placed directly after distinctUntilChanged in MAIN',async()=>{

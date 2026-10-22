@@ -100,7 +100,7 @@ export function codeWalkHtml(model) {
 }
 
 // Buduje okno kodu z section[data-code-walk]: źródło w script[type="text/plain"].code-walk-source, etapy w
-// .code-walk-step[data-from][data-focus][data-mark?] (kolejne fragmenty Reveal; notatki etapu w ich aside.notes).
+// .code-walk-step[data-from][data-focus][data-mark?] (kolejne wyróżnienia Reveal; stałe notatki na sekcji).
 // data-code-walk-mode="full": bez okna i zwijania; kroki wymagają tylko data-focus.
 export function prepareCodeWalk(section) {
   const source=section.querySelector('.code-walk-source'),steps=[...section.querySelectorAll('.code-walk-step')];

@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules,playbackHarness}=require('./v2-harness.cjs');
 // 16-czas-cztery: trzy rundy (debounce/throttle, audit/throttle, trailing-only throttle/sample) na jednym slajdzie, każda od zera
@@ -259,5 +260,5 @@ test('placed after retry and before statistics, with per-checkpoint notes',async
  assert.ok(html.indexOf('id="x03-retry-backoff"')<html.indexOf('id="16-czas-cztery"'));
  assert.ok(html.indexOf('id="16-czas-cztery"')<html.indexOf('id="24-rxjs-liczby"'));
  assert.match(section,/<h2>Cztery operatory, jeden strumień<\/h2>/);
- for(const checkpoint of ['ready','round-2','round-3','summary','finished'])assert.match(section,new RegExp(`data-checkpoint="${checkpoint}"`));
+ const notes=slideNotes('16-czas-cztery');assert.match(notes,/debounce: ostatnia po ciszy/);assert.match(notes,/sample: własny zegar/);assert.match(notes,/Te same wartości, inne chwile/);
 });

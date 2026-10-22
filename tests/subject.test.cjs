@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {modules,playbackHarness}=require('./v2-harness.cjs');
@@ -229,14 +230,9 @@ test('all Subject checkpoints and split frames rewind deterministically; manual 
  for(const [id] of fields)assert.deepEqual(values(player.snapshot,id),id==='C'?[]:['{…}']);
 });
 
-test('Subject checkpoint notes explain A/B completion before the late city subscriber',async()=>{
- const {c}=await subject(),html=require('node:fs').readFileSync('index.html','utf8');
- const source=html.match(/<template data-checkpoint-notes="05-zrodla-3">([\s\S]*?)<\/template>/)[1];
- const notes=Object.fromEntries([...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)].map(([,id,text])=>[id,text]));
- assert.deepEqual(Object.keys(notes),['ready',...Array.from(c.stops,s=>s.id),'finished']);
- assert.match(notes.ready,/firstName[\s\S]*lastName/);assert.match(notes.complete,/Subject.*zakończon/);
- assert.match(notes['subscribed-c'],/tylko complete[\s\S]*bez.*wartości[\s\S]*bez nowego requestu/);
- assert.match(notes.finished,/Ale sami musieliśmy podłączyć źródło\. Czy RxJS może zrobić to za nas\?/);
+test('Subject slide notes recall multicast and late completion',()=>{
+ const notes=slideNotes('05-zrodla-3');
+ assert.match(notes,/ręczne podłączenie/);assert.match(notes,/Jeden HTTP, odbiorcy A\/B/);assert.match(notes,/Subject complete/);assert.match(notes,/Późny C — tylko complete/);
 });
 
 test('late city appears only on the next step after complete; subscribing to a completed Subject delivers no User and starts no HTTP',async()=>{

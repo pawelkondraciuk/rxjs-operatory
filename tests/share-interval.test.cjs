@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules,playbackHarness,revealMock}=require('./v2-harness.cjs');
 async function scene(format='4:3'){
@@ -127,9 +128,8 @@ test('Reveal advances through two unsubscribe actions, the disconnect and a late
  const adapter=h.install(deck,{getController:()=>controller});adapter.refresh();controller.toggle();h.advance(4000);
  for(let i=0;i<4;i++){deck.press(39);h.advance(6000);assert.equal(player.live.stage,i+1);assert.equal(deck.fragmentIndex,i)}
  deck.press(39);assert.deepEqual(deck.navigation,[1]);adapter.destroy();
- const html=fs.readFileSync('index.html','utf8'),source=html.match(/<template data-checkpoint-notes="04a-dwa-tory-3">([\s\S]*?)<\/template>/)[1];
- assert.deepEqual([...source.matchAll(/data-checkpoint="([^"]+)"/g)].map(m=>m[1]),['ready',...s.playback.stops.map(s=>s.id),'finished']);
- assert.match(source,/B.*ostatni/);assert.match(source,/data-checkpoint="unsub-b">[\s\S]*?Co się wydarzy\?/);assert.match(source,/C.*od 0/);assert.match(source,/Prawo: shareReplay\(1\)/);
+ const source=slideNotes('04a-dwa-tory-3');
+ assert.match(source,/Ostatni odbiorca odchodzi\?/);assert.match(source,/Zero odbiorców → odłączenie źródła/);assert.match(source,/C — od 0/);
 });
 
 test('F during an unsubscribe, the disconnect or late subscribe finishes the handoff and shows a value from interval #2',async()=>{

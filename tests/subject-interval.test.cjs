@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules,playbackHarness,revealMock}=require('./v2-harness.cjs');
 // 05-zrodla-4: Subject + interval — odbiorcy A/B/C odchodzą kolejno, connection (interval → Subject) zostaje,
@@ -178,19 +179,9 @@ test('Reveal fragments and checkpoint notes follow stages; restore and print giv
  printed.h.advance(5000);assert.equal(printed.h.frames.size,0);assert.equal(printed.player.state,'finished');
 });
 
-test('speaker notes template covers every checkpoint with the planned narration',async()=>{
- const html=fs.readFileSync('index.html','utf8');
- const source=html.match(/<template data-checkpoint-notes="05-zrodla-4">([\s\S]*?)<\/template>/)[1];
- const ids=Array.from(source.matchAll(/data-checkpoint="([^"]+)"/g),x=>x[1]);
- assert.deepEqual(ids,['ready','unsub-a','unsub-b','unsub-c','source','connection','finished']);
- const note=id=>source.match(new RegExp(`data-checkpoint="${id}">([\\s\\S]*?)</div>`))[1];
- assert.match(note('ready'),/Zamiast HTTP bierzemy dobrze już znany interval/);
- assert.match(note('unsub-b'),/B również się odłącza\. C nadal otrzymuje wartości\. Ale czy obecność C w ogóle ma wpływ na działanie źródła\?/);
- assert.doesNotMatch(note('unsub-b'),/bo mamy jeszcze trzeciego odbiorcę/);
- assert.match(note('unsub-c'),/Teraz odłączamy ostatniego\. I jak myślicie, co powinno się wydarzyć ze źródłem\?/);
- assert.match(note('source'),/Wszyscy odbiorcy już się odłączyli\. Ale zobaczcie — interval nadal emituje wartości\. Subject ciągle je odbiera, chociaż nikogo już nimi nie powiadamia\./);
- assert.match(note('connection'),/Bo mamy jeszcze jedną subskrypcję, którą sami stworzyliśmy\. To połączenie interval z Subjectem\. I dopiero teraz ręcznie je odłączamy\./);
- assert.match(note('finished'),/W Subject wszyscy się odłączyli, ale interval nadal pracował[\s\S]*Do zarządzania źródłem wrócimy przy share\(\)[\s\S]*Prawo: „Jakie znasz operatory RxJS\?”/);
+test('Subject interval notes recall the independent upstream connection',()=>{
+ const notes=slideNotes('05-zrodla-4');
+ assert.match(notes,/Zero odbiorców — interval działa/);assert.match(notes,/connection\.unsubscribe\(\) zatrzymuje źródło/);assert.match(notes,/Subject pozostaje otwarty/);
 });
 
 test('last next: connection.unsubscribe() — grey × from Subject to interval, interval cancelled, no more emissions, Subject without complete',async()=>{

@@ -1,3 +1,4 @@
+const {slideNotes}=require('./slide-notes.cjs');
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {modules,playbackHarness}=require('./v2-harness.cjs');
 
@@ -247,13 +248,9 @@ test('share(): code grows from user$ = httpGet<User>(...) to .pipe(share()) with
  for(const id of shareStops)assert.deepEqual(shown(at(id)),[]);
 });
 
-test('share(): checkpoint notes follow the combined story and ask before revealing C',async()=>{
- const {c}=await lanes('4:3','04a-dwa-tory-2'),html=fs.readFileSync('index.html','utf8');
- const source=html.match(/<template data-checkpoint-notes="04a-dwa-tory-2">([\s\S]*?)<\/template>/)[1];
- const notes=Object.fromEntries([...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)].map(([,id,text])=>[id,text]));
- assert.deepEqual(Object.keys(notes),['ready',...Array.from(c.stops,s=>s.id),'finished']);
- assert.match(notes.complete,/A co, jeśli ktoś zasubskrybuje po zakończeniu requestu/);
- assert.match(notes['complete-c'],/Requesty: 2/);assert.match(notes.finished,/Prawo: share\(\) — kto odłączy źródło/);
+test('share HTTP notes distinguish shared execution and a late new request',()=>{
+ const notes=slideNotes('04a-dwa-tory-2');
+ assert.match(notes,/A\/B — wspólny HTTP #1/);assert.match(notes,/Późny C po complete\?/);assert.match(notes,/C — nowy HTTP #2/);assert.match(notes,/Reset po complete/);
 });
 
 test('tiles grow: a fixed definition part, then one execution row per subscription reaching the tile',async()=>{
@@ -415,19 +412,9 @@ test('share slides use the cold look: pipeline code, transient subscribe/unsubsc
  assert.equal((c.snapshot(ev('stream-complete','share-B')+.1).callouts||[]).length,0,'complete bez napisu');
 });
 
-test('cold has checkpoint notes for READY, each manual stop and the handoff to interval',async()=>{
- const {c}=await lanes();
- const html=fs.readFileSync('index.html','utf8');
- const source=html.match(/<template data-checkpoint-notes="04a-dwa-tory">([\s\S]*?)<\/template>/)[1];
- const notes=Object.fromEntries([...source.matchAll(/<div data-checkpoint="([^"]+)">([\s\S]*?)<\/div>/g)].map(([,id,text])=>[id,text]));
- assert.deepEqual(Object.keys(notes),['ready',...Array.from(c.stops,s=>s.id),'finished']);
- assert.match(notes.ready,/Wyobraźmy sobie widok aplikacji\. W jednym miejscu wyświetlamy imię użytkownika, w drugim nazwisko, a w trzecim miasto\./);
- assert.match(notes.requests,/Mamy jedną definicję user\$\. Ale każde z tych miejsc niezależnie ją subskrybuje\. I co się dzieje\? Powstają trzy osobne requesty\./);
- assert.match(notes.received,/Każdy request wraca osobno\./);
- assert.doesNotMatch(notes.received,/complete docierają/,'odbiór przed complete');
- assert.match(notes.complete,/Każde wykonanie kończy się własnym complete\./);
- assert.match(notes.finished,/Czy naprawdę musimy wykonywać trzy requesty\?[\s\S]*Prawo: interval/);
- assert.doesNotMatch(source,/catchError/,'obsługa błędów pozostaje na późniejsze slajdy');
+test('cold notes recall independent executions',()=>{
+ const notes=slideNotes('04a-dwa-tory');
+ assert.match(notes,/Jedna definicja, trzy wykonania/);assert.match(notes,/Trzy async pipe — ile requestów\?/);assert.match(notes,/Własny wynik i complete/);assert.match(notes,/Niezależne cykle życia/);assert.doesNotMatch(notes,/catchError/);
 });
 
 test('cold statuses at the fields: A, B and C ✓ complete, each only after its terminal pulse',async()=>{
